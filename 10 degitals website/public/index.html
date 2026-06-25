@@ -1,0 +1,3149 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" id="root-html">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>10 Digital | Digital Design Studio</title>
+<link rel="icon" href="assets/img/logo.jpg">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+<!-- Firebase (compat build keeps the global `firebase` namespace so existing inline onclick="" handlers keep working without a module bundler) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<!-- html2pdf bundles html2canvas + jsPDF — lets the admin export a designed quotation PDF fully client-side -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
+<style>
+/* ═══════════════════════════════════════════
+   10 DIGITAL — FULL 3D WEBSITE + ADMIN DASHBOARD
+   Single File | Bilingual AR/EN | Firebase Backend
+   ═══════════════════════════════════════════ */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Inter','Noto Sans Arabic',sans-serif;
+  background:#faf8ff;
+  color:#131b2e;
+  overflow-x:hidden;
+}
+body[dir="rtl"]{font-family:'Noto Sans Arabic','Inter',sans-serif}
+
+/* ─── TOKENS ─── */
+:root{
+  --bg:#faf8ff;
+  --surface:#ffffff;
+  --surface-dim:#eaedff;
+  --surface-high:#e2e7ff;
+  --surface-variant:#dae2fd;
+  --primary:#5d5f5f;
+  --primary-dark:#131b2e;
+  --secondary:#50616b;
+  --accent:#c0a060;
+  --accent-glow:rgba(192,160,96,.25);
+  --text:#131b2e;
+  --text-muted:#747676;
+  --text-light:#444748;
+  --border:rgba(255,255,255,.35);
+  --glass:rgba(255,255,255,.55);
+  --glass-dark:rgba(255,255,255,.06);
+  --glass-dark-border:rgba(255,255,255,.12);
+  --shadow:0 8px 32px rgba(224,242,254,.35);
+  --shadow-lg:0 20px 60px rgba(224,242,254,.45);
+  --success:#22c55e;
+  --warning:#f59e0b;
+  --danger:#ef4444;
+  --info:#3b82f6;
+  --gutter:24px;
+  --radius:24px;
+}
+.container{max-width:1280px;margin:0 auto;padding:0 var(--gutter)}
+.text-center{text-align:center}
+.w-full{width:100%}
+
+/* ─── 3D UTILITIES ─── */
+.perspective-1000{perspective:1000px}
+.preserve-3d{transform-style:preserve-3d}
+
+/* ─── NAV ─── */
+.nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  height:80px;
+  background:rgba(250,248,255,.7);
+  backdrop-filter:blur(20px) saturate(1.4);
+  -webkit-backdrop-filter:blur(20px) saturate(1.4);
+  border-bottom:1px solid rgba(255,255,255,.5);
+  box-shadow:var(--shadow);
+  transition:all .3s;
+}
+.nav.scrolled{background:rgba(255,255,255,.95);height:72px;box-shadow:0 4px 30px rgba(0,0,0,.08)}
+.nav-inner{height:100%;display:flex;align-items:center;justify-content:space-between;max-width:1280px;margin:0 auto;padding:0 var(--gutter)}
+.nav-brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:1.25rem;letter-spacing:-.02em;color:var(--primary-dark);text-decoration:none}
+.nav-brand .logo-icon{width:44px;height:44px;border-radius:12px;object-fit:contain;box-shadow:0 8px 24px rgba(80,97,107,.25)}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{color:var(--text-muted);text-decoration:none;font-size:.88rem;font-weight:600;transition:color .2s;position:relative}
+.nav-links a:hover,.nav-links a.active{color:var(--primary-dark)}
+.nav-links a.active::after{content:'';position:absolute;bottom:-6px;left:0;right:0;height:2px;background:var(--accent);border-radius:2px}
+.nav-actions{display:flex;align-items:center;gap:12px}
+.lang-btn{
+  padding:8px 16px;border-radius:100px;border:1px solid rgba(93,95,95,.15);
+  background:rgba(255,255,255,.6);font-size:.75rem;font-weight:700;cursor:pointer;
+  color:var(--primary);transition:all .2s;display:flex;align-items:center;gap:6px
+}
+.lang-btn:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
+.btn-primary{
+  padding:10px 24px;border-radius:100px;border:none;
+  background:var(--primary-dark);color:#fff;font-size:.85rem;font-weight:700;cursor:pointer;
+  transition:all .3s;position:relative;overflow:hidden;box-shadow:0 4px 16px rgba(19,27,46,.2)
+}
+.btn-primary::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(120deg,transparent,rgba(255,255,255,.25),transparent);transition:.6s}
+.btn-primary:hover::before{left:100%}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(19,27,46,.3)}
+.btn-outline{
+  padding:10px 24px;border-radius:100px;border:1px solid rgba(93,95,95,.2);
+  background:rgba(255,255,255,.5);color:var(--primary-dark);font-size:.85rem;font-weight:700;cursor:pointer;
+  transition:all .3s
+}
+.btn-outline:hover{background:#fff;border-color:var(--primary-dark);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.btn-accent{
+  padding:10px 24px;border-radius:100px;border:none;
+  background:linear-gradient(135deg,var(--accent),#a08040);color:#0f172a;font-size:.85rem;font-weight:700;cursor:pointer;
+  transition:all .3s
+}
+.btn-accent:hover{transform:translateY(-2px);box-shadow:0 8px 24px var(--accent-glow)}
+.btn-sm{padding:8px 16px;font-size:.8rem}
+
+/* ─── GLASS ─── */
+.glass{
+  background:var(--glass);
+  backdrop-filter:blur(24px) saturate(1.4);
+  -webkit-backdrop-filter:blur(24px) saturate(1.4);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  transition:all .5s cubic-bezier(.23,1,.32,1);
+  position:relative;overflow:hidden
+}
+.glass:hover{background:rgba(255,255,255,.75);transform:translateY(-6px);box-shadow:var(--shadow-lg);border-color:rgba(255,255,255,.6)}
+.glass-dark{
+  background:var(--glass-dark);backdrop-filter:blur(20px) saturate(1.3);-webkit-backdrop-filter:blur(20px) saturate(1.3);
+  border:1px solid var(--glass-dark-border);border-radius:24px;transition:all .3s
+}
+
+/* ─── HERO V2 (VIDEO) ─── */
+.hero-v2{position:relative;min-height:100vh;display:flex;align-items:center;padding:140px 0 100px;overflow:hidden;background-color:#0f172a}
+.hero-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.4;filter:grayscale(30%) brightness(.8)}
+.hero-v2-grid{position:relative;z-index:10;display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.hero-v2-content{color:#fff}
+.hero-v2-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 20px;border-radius:100px;background:rgba(255,255,255,.1);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.2);font-size:.7rem;font-weight:800;letter-spacing:2px;color:var(--accent);margin-bottom:28px;text-transform:uppercase}
+.hero-v2 h1{font-size:clamp(2.8rem,6vw,5rem);font-weight:900;line-height:1.05;margin-bottom:24px;letter-spacing:-.03em}
+.hero-v2 h1 span{color:var(--accent)}
+.hero-v2 p{font-size:1.15rem;color:rgba(255,255,255,.7);line-height:1.6;margin-bottom:40px;max-width:540px}
+.hero-video-container{position:relative;width:100%;aspect-ratio:16/9;border-radius:24px;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);transform:perspective(1000px) rotateY(-8deg) rotateX(4deg);transition:all .8s cubic-bezier(.2,.8,.2,1);background:rgba(255,255,255,.05);backdrop-filter:blur(10px)}
+.hero-video-container:hover{transform:perspective(1000px) rotateY(-2deg) rotateX(1deg) scale(1.02);border-color:rgba(192,160,96,.4)}
+.hero-video-container video,.hero-video-container img.media{width:100%;height:100%;object-fit:cover;opacity:.85}
+.video-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,rgba(15,23,42,.4) 0%,transparent 70%);pointer-events:none;z-index:2}
+.play-btn{width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.1);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer;transition:all .4s cubic-bezier(.175,.885,.32,1.275);pointer-events:auto;box-shadow:0 0 40px rgba(0,0,0,.3)}
+.play-btn:hover{transform:scale(1.15);background:var(--accent);border-color:var(--accent);box-shadow:0 0 60px var(--accent-glow)}
+.floating-element{position:absolute;z-index:-1;background:linear-gradient(135deg,var(--accent),transparent);border-radius:50%;filter:blur(80px);opacity:.3}
+.float-1{width:300px;height:300px;top:-100px;right:-50px}
+.float-2{width:200px;height:200px;bottom:-50px;left:-50px;opacity:.15;background:var(--secondary)}
+
+/* ─── STATS BAR ─── */
+.stats-bar{background:var(--surface);padding:60px 0;border-bottom:1px solid rgba(0,0,0,.05);position:relative;z-index:20;margin-top:-60px;border-radius:40px 40px 0 0}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;text-align:center}
+.stat-item h3{font-size:2.5rem;font-weight:900;color:var(--primary-dark);margin-bottom:4px}
+.stat-item p{font-size:.9rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:1px}
+
+/* ─── SECTIONS ─── */
+.section{padding:100px 0;position:relative}
+.section-header{text-align:center;margin-bottom:64px}
+.section-header h2{font-size:clamp(2rem,4.5vw,3rem);font-weight:800;letter-spacing:-.02em;margin-bottom:14px;color:var(--primary-dark)}
+.section-header p{font-size:1.05rem;color:var(--text-muted);max-width:600px;margin:0 auto;line-height:1.6}
+.section-dark{background:#0f172a;color:#fff;overflow:hidden}
+.section-dark .section-header h2{color:#fff}
+.section-dark .section-header p{color:rgba(255,255,255,.6)}
+
+/* ─── ABOUT 3D CARDS ─── */
+.about-3d-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;perspective:1000px}
+.about-3d-card{
+  padding:40px 32px;border-radius:24px;
+  background:linear-gradient(135deg,rgba(255,255,255,.6),rgba(255,255,255,.3));
+  backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.5);
+  box-shadow:0 8px 32px rgba(224,242,254,.3);
+  transition:all .5s cubic-bezier(.23,1,.32,1);
+  transform-style:preserve-3d;position:relative;overflow:hidden
+}
+.about-3d-card:hover{transform:translateY(-12px) rotateX(5deg) rotateY(-3deg);box-shadow:0 24px 48px rgba(224,242,254,.5)}
+.about-3d-card .icon-3d{
+  width:60px;height:60px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(139,92,246,.06));
+  border:1px solid rgba(99,102,241,.2);color:var(--secondary);font-size:1.6rem;margin-bottom:20px;
+  box-shadow:0 8px 24px rgba(99,102,241,.15);transform:translateZ(30px)
+}
+.about-3d-card h3{font-size:1.2rem;font-weight:700;margin-bottom:10px;color:var(--primary-dark)}
+.about-3d-card p{font-size:.9rem;color:var(--text-muted);line-height:1.65}
+
+/* ─── CLIENT SUCCESS / TESTIMONIAL ─── */
+.testimonial-quote{font-size:1.5rem;font-weight:500;font-style:italic;line-height:1.6;color:#fff;margin-bottom:16px}
+.testimonial-cite{font-size:.9rem;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:var(--accent);font-style:normal}
+
+/* ─── TRUST LOGOS ─── */
+.trust-logos{padding:60px 0;border-top:1px solid rgba(0,0,0,.05);text-align:center}
+.trust-logos p{font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:var(--text-muted);margin-bottom:32px}
+.logo-flex{display:flex;justify-content:center;align-items:center;gap:60px;opacity:.5;flex-wrap:wrap}
+.logo-flex div{font-size:1.4rem;font-weight:900;color:var(--primary-dark)}
+
+/* ─── SERVICES 3D TILT ─── */
+.services-3d-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;perspective:1200px}
+.tilt-card{
+  padding:36px 32px;border-radius:24px;
+  background:linear-gradient(135deg,rgba(255,255,255,.7),rgba(255,255,255,.4));
+  backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.5);
+  box-shadow:0 8px 32px rgba(224,242,254,.3);
+  transition:all .4s cubic-bezier(.23,1,.32,1);
+  transform-style:preserve-3d;position:relative;cursor:pointer
+}
+.tilt-card:hover{box-shadow:0 20px 40px rgba(224,242,254,.5)}
+.tilt-card .tilt-icon{
+  width:64px;height:64px;border-radius:18px;display:flex;align-items:center;justify-content:center;
+  font-size:1.8rem;margin-bottom:20px;transform:translateZ(40px);
+  box-shadow:0 12px 32px rgba(0,0,0,.08)
+}
+.tilt-card h3{font-size:1.25rem;font-weight:700;margin-bottom:10px;color:var(--primary-dark);transform:translateZ(30px)}
+.tilt-card p{font-size:.9rem;color:var(--text-muted);line-height:1.65;transform:translateZ(20px)}
+.tilt-card .tilt-shine{position:absolute;inset:0;border-radius:24px;background:radial-gradient(circle at var(--x,50%) var(--y,50%),rgba(255,255,255,.4) 0%,transparent 60%);opacity:0;transition:opacity .3s;pointer-events:none}
+.tilt-card:hover .tilt-shine{opacity:1}
+
+/* ─── PORTFOLIO 3D GALLERY ─── */
+.portfolio-3d{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px;perspective:1000px}
+.port-3d-item{
+  position:relative;border-radius:24px;overflow:hidden;
+  background:linear-gradient(135deg,rgba(255,255,255,.6),rgba(255,255,255,.3));
+  backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.5);
+  box-shadow:0 8px 24px rgba(0,0,0,.06);
+  transform-style:preserve-3d;transition:all .5s cubic-bezier(.23,1,.32,1);
+  aspect-ratio:16/10;cursor:pointer
+}
+.port-3d-item:hover{transform:translateY(-10px) rotateX(3deg) scale(1.02);box-shadow:0 24px 48px rgba(0,0,0,.12)}
+.port-3d-item img,.port-3d-item video{width:100%;height:100%;object-fit:cover;transition:transform .7s}
+.port-3d-item:hover img,.port-3d-item:hover video{transform:scale(1.1)}
+.port-3d-overlay{
+  position:absolute;inset:0;background:linear-gradient(to top,rgba(19,27,46,.85) 0%,transparent 60%);
+  display:flex;flex-direction:column;justify-content:flex-end;padding:28px;
+  opacity:0;transition:opacity .4s
+}
+.port-3d-item:hover .port-3d-overlay{opacity:1}
+.port-3d-overlay h4{color:#fff;font-size:1.1rem;font-weight:700;margin-bottom:4px}
+.port-3d-overlay p{color:rgba(255,255,255,.7);font-size:.85rem}
+.port-3d-overlay .play-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;color:var(--primary-dark);font-size:1.5rem;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+
+/* ─── QUOTE / REQUEST PAGE (dark glass, adapted from Stitch quotation screen) ─── */
+.quote-page{background:#0f172a;color:#fff;position:relative;overflow:hidden}
+.quote-page .floating-orb{position:absolute;filter:blur(90px);opacity:.25;z-index:0;pointer-events:none;border-radius:50%}
+.quote-header{position:relative;z-index:1;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:32px;margin-bottom:56px}
+.quote-header h1{font-size:clamp(2.2rem,5vw,3.6rem);font-weight:900;line-height:1.05;text-transform:uppercase;letter-spacing:-.02em}
+.quote-badges{display:flex;flex-wrap:wrap;gap:14px;margin-top:28px}
+.quote-badge{display:flex;align-items:center;gap:10px;padding:10px 16px}
+.quote-badge .lbl{font-size:.65rem;text-transform:uppercase;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,.55)}
+.quote-badge .val{font-size:.85rem;color:#fff;font-weight:600}
+.estimator-card{padding:24px;min-width:280px}
+.estimator-card .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.estimator-card .head span:first-child{font-size:.7rem;font-weight:800;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
+.estimator-price{font-size:2.6rem;font-weight:900;color:#fff;line-height:1}
+.estimator-price small{font-size:1rem;font-weight:700;opacity:.6}
+.quote-grid{position:relative;z-index:1;display:grid;grid-template-columns:2fr 1fr;gap:32px;align-items:start}
+.quote-divider{display:flex;align-items:center;gap:16px;margin-bottom:28px}
+.quote-divider span.line{height:1px;flex:1;background:var(--glass-dark-border)}
+.quote-divider h2{font-size:1.1rem;font-weight:800;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:1px}
+.svc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:48px}
+.svc-card{padding:24px;cursor:pointer;transition:all .3s}
+.svc-card:hover{transform:translateY(-4px)}
+.svc-card.selected{border-color:var(--accent);background:rgba(255,255,255,.1)}
+.svc-card .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+.svc-card .icn{width:48px;height:48px;border-radius:50%;background:var(--secondary);display:flex;align-items:center;justify-content:center;color:#fff}
+.svc-card .check{width:24px;height:24px;border-radius:50%;border:2px solid var(--glass-dark-border);display:flex;align-items:center;justify-content:center;color:#0f172a;transition:all .2s}
+.svc-card.selected .check{background:var(--accent);border-color:var(--accent)}
+.svc-card h3{font-size:1.05rem;font-weight:700;margin-bottom:8px}
+.svc-card p{font-size:.85rem;color:rgba(255,255,255,.55);line-height:1.6;margin-bottom:14px}
+.svc-card .price{font-weight:800;color:var(--accent)}
+.tier-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;margin-bottom:48px}
+.tier-card{padding:32px;position:relative}
+.tier-card.recommended{border-color:var(--accent);background:rgba(255,255,255,.08);transform:scale(1.03);box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.tier-card .badge-rec{position:absolute;top:0;right:0;background:var(--accent);color:#0f172a;font-weight:800;font-size:.65rem;padding:5px 12px;border-radius:0 24px 0 12px}
+.tier-card .tier-label{font-size:.7rem;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,.5);text-transform:uppercase;margin-bottom:8px}
+.tier-card.recommended .tier-label{color:var(--accent)}
+.tier-card .tier-price{font-size:1.8rem;font-weight:900;margin-bottom:20px}
+.tier-card .tier-price small{font-size:.8rem;font-weight:600;opacity:.6}
+.tier-card ul{list-style:none;margin-bottom:24px;display:flex;flex-direction:column;gap:12px}
+.tier-card li{display:flex;gap:8px;align-items:center;font-size:.85rem;color:rgba(255,255,255,.7)}
+.tier-card li .ic{color:var(--accent);font-size:1.1rem}
+.tier-card button{width:100%;padding:12px;border-radius:12px;border:1px solid var(--glass-dark-border);background:transparent;color:#fff;font-weight:700;cursor:pointer;transition:all .2s}
+.tier-card.recommended button{background:var(--accent);color:#0f172a;border-color:var(--accent)}
+.journey-list{position:relative;padding-left:28px}
+.journey-list::before{content:'';position:absolute;left:7px;top:8px;bottom:8px;width:2px;background:var(--glass-dark-border)}
+.journey-step{position:relative;margin-bottom:32px}
+.journey-step::before{content:'';position:absolute;left:-28px;top:4px;width:14px;height:14px;border-radius:50%;background:var(--accent);border:4px solid #0f172a}
+.journey-step.todo::before{background:var(--glass-dark-border)}
+.journey-step h4{font-size:.9rem;font-weight:700;margin-bottom:4px}
+.journey-step p{font-size:.78rem;color:rgba(255,255,255,.5)}
+.maint-item{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--glass-dark-border);margin-bottom:10px;cursor:pointer;transition:all .2s}
+.maint-item:hover{border-color:var(--accent)}
+.maint-item span:first-child{font-size:.82rem;font-weight:700}
+.maint-item span:last-child{font-size:.78rem;color:var(--accent)}
+.config-form .form-group{margin-bottom:16px}
+.config-form label{display:block;font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.5);margin-bottom:8px}
+.config-form input,.config-form select,.config-form textarea{
+  width:100%;padding:13px 16px;border-radius:12px;border:1px solid var(--glass-dark-border);
+  background:rgba(255,255,255,.04);color:#fff;font-family:inherit;font-size:.9rem
+}
+.config-form input::placeholder,.config-form textarea::placeholder{color:rgba(255,255,255,.35)}
+.config-form input:focus,.config-form select:focus,.config-form textarea:focus{outline:none;border-color:var(--accent)}
+.config-form textarea{min-height:100px;resize:vertical}
+.live-pulse-row{display:flex;justify-content:space-between;margin-bottom:8px;font-size:.78rem}
+.live-pulse-row .v{color:var(--accent)}
+.live-pulse-bar{width:100%;height:4px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden;margin-bottom:20px}
+.live-pulse-bar .fill{height:100%;background:var(--accent)}
+.team-row{display:flex;align-items:center;gap:14px;margin-top:32px;padding-top:32px;border-top:1px solid var(--glass-dark-border)}
+.team-row img{width:42px;height:42px;border-radius:50%;border:2px solid #0f172a;object-fit:cover;margin-left:-12px}
+.team-row .plus{width:42px;height:42px;border-radius:50%;background:var(--secondary);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;border:2px solid #0f172a;margin-left:-12px}
+
+/* ─── FOOTER V2 ─── */
+.footer-v2{background:#0f172a;color:#fff;padding:100px 0 40px}
+.footer-grid{display:grid;grid-template-columns:1.5fr 1fr 1fr 1.5fr;gap:40px;margin-bottom:80px}
+.footer-v2 h4{font-size:1.1rem;font-weight:800;margin-bottom:24px;color:#fff}
+.footer-links{list-style:none}
+.footer-links li{margin-bottom:12px}
+.footer-links a{color:rgba(255,255,255,.6);text-decoration:none;font-size:.9rem;transition:color .2s}
+.footer-links a:hover{color:var(--accent)}
+.newsletter-form{display:flex;gap:10px;margin-top:16px}
+.newsletter-form input{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);padding:12px 20px;border-radius:100px;color:#fff;font-size:.9rem}
+.newsletter-form input:focus{outline:none;border-color:var(--accent)}
+.social-links{display:flex;gap:16px;margin-top:24px}
+.social-btn{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;color:#fff;text-decoration:none;transition:all .3s}
+.social-btn:hover{background:var(--accent);transform:translateY(-3px)}
+
+/* ─── REQUEST FORM (legacy, kept for reference styling reuse) ─── */
+.request-card{padding:48px}
+.form-group{margin-bottom:20px}
+.form-group label{display:block;font-size:.75rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px}
+.form-group input,.form-group textarea,.form-group select{
+  width:100%;padding:14px 18px;border-radius:16px;border:1px solid rgba(93,95,95,.12);
+  background:rgba(255,255,255,.6);font-family:inherit;font-size:.9rem;color:var(--primary-dark);
+  transition:all .2s
+}
+.form-group input:focus,.form-group textarea:focus,.form-group select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba(192,160,96,.12);background:#fff}
+.form-group textarea{min-height:120px;resize:vertical}
+
+/* ─── ADMIN DASHBOARD ─── */
+.admin-shell{display:none;min-height:100vh;background:var(--bg)}
+.admin-shell.active{display:block}
+.admin-sidebar{
+  position:fixed;left:0;top:0;bottom:0;width:260px;
+  background:linear-gradient(180deg,var(--primary-dark),#1a2744);
+  color:#fff;padding:24px;z-index:200;overflow-y:auto
+}
+.admin-sidebar .brand{font-size:1.2rem;font-weight:900;margin-bottom:40px;display:flex;align-items:center;gap:10px}
+.admin-sidebar .brand img{width:36px;height:36px;border-radius:10px;object-fit:contain}
+.admin-nav{display:flex;flex-direction:column;gap:8px}
+.admin-nav button{
+  display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;
+  background:transparent;border:none;color:rgba(255,255,255,.7);font-family:inherit;font-size:.9rem;font-weight:600;cursor:pointer;transition:all .2s;text-align:left
+}
+.admin-nav button:hover,.admin-nav button.active{background:rgba(255,255,255,.1);color:#fff}
+.admin-main{margin-left:260px;padding:32px;min-height:100vh}
+.admin-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;flex-wrap:wrap;gap:12px}
+.admin-header h1{font-size:1.6rem;font-weight:800;color:var(--primary-dark)}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;margin-bottom:32px}
+.stat-card{
+  padding:24px;border-radius:20px;background:#fff;border:1px solid rgba(93,95,95,.08);
+  box-shadow:0 4px 16px rgba(0,0,0,.04);position:relative;overflow:hidden
+}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent);border-radius:20px 20px 0 0}
+.stat-card .num{font-size:2rem;font-weight:800;color:var(--primary-dark);margin-bottom:4px}
+.stat-card .lbl{font-size:.8rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px}
+
+/* ─── TABLES ─── */
+.data-table{width:100%;border-collapse:collapse;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.04)}
+.data-table th{padding:14px 18px;text-align:left;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);background:var(--surface-dim);border-bottom:1px solid rgba(93,95,95,.08)}
+.data-table td{padding:14px 18px;font-size:.88rem;color:var(--text-light);border-bottom:1px solid rgba(93,95,95,.06)}
+.data-table tr:hover td{background:var(--surface-dim)}
+.data-table .status{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:100px;font-size:.75rem;font-weight:700}
+.data-table .status.pending{background:rgba(245,158,11,.1);color:var(--warning)}
+.data-table .status.completed{background:rgba(34,197,94,.1);color:var(--success)}
+.data-table .status.rejected{background:rgba(239,68,68,.1);color:var(--danger)}
+
+/* ─── QUOTATION BUILDER ─── */
+.qb-card{padding:32px;margin-bottom:24px}
+.qb-row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.qb-row .form-group{flex:1;min-width:200px;margin-bottom:0}
+.qb-services{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin:24px 0}
+.qb-service-item{
+  padding:20px;border-radius:16px;background:rgba(255,255,255,.6);border:1px solid rgba(93,95,95,.1);
+  display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:all .2s
+}
+.qb-service-item:hover{border-color:var(--accent)}
+.qb-service-item.selected{border-color:var(--accent);background:rgba(192,160,96,.08);box-shadow:0 0 0 3px rgba(192,160,96,.1)}
+.qb-service-item input{width:80px;padding:8px 12px;border-radius:10px;border:1px solid rgba(93,95,95,.15);font-family:inherit;font-size:.9rem;text-align:right}
+.qb-rec-item{padding:20px;border-radius:16px;background:rgba(255,255,255,.6);border:1px solid rgba(93,95,95,.1);display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:all .2s}
+.qb-rec-item:hover{border-color:var(--accent)}
+.qb-rec-item.selected{border-color:var(--accent);background:rgba(192,160,96,.08);box-shadow:0 0 0 3px rgba(192,160,96,.1)}
+.qb-rec-item input{width:80px;padding:8px 12px;border-radius:10px;border:1px solid rgba(93,95,95,.15);font-family:inherit;font-size:.9rem;text-align:right}
+.qb-rec-item .cyc{font-size:.7rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--accent)}
+.qb-addon-tag{display:inline-block;font-size:.6rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:1px 6px;margin-left:8px;vertical-align:middle}
+.qb-total{display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-radius:16px;background:#f6f3ec;color:#0c0c10;margin-top:24px;border:1px solid var(--border)}
+.qb-total .label{font-size:.9rem;font-weight:700;color:#0c0c10}
+.qb-total .label small{color:#0c0c10}
+.qb-total .value{font-size:1.6rem;font-weight:800;color:#0c0c10}
+
+/* ─── MODAL ─── */
+.modal-overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.25);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.show{display:flex}
+.modal-content{
+  max-width:480px;width:100%;padding:40px;text-align:center;border-radius:28px;
+  background:rgba(255,255,255,.95);backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,.6);
+  box-shadow:0 24px 64px rgba(0,0,0,.15);animation:modalIn .4s cubic-bezier(.22,1,.36,1)
+}
+@keyframes modalIn{from{opacity:0;transform:scale(.9) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}
+
+/* ─── LOGIN MODAL ─── */
+.login-modal .modal-content{max-width:400px}
+.login-modal input{width:100%;padding:14px 18px;border-radius:14px;border:1px solid rgba(93,95,95,.15);background:rgba(255,255,255,.6);font-family:inherit;font-size:.9rem;margin-bottom:12px}
+.login-modal input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba(192,160,96,.12)}
+
+/* ─── TABS ─── */
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* ─── REVEAL ANIMATIONS ─── */
+.reveal{opacity:0;transform:translateY(50px);transition:all 1s cubic-bezier(.22,1,.36,1)}
+.reveal.active{opacity:1;transform:translateY(0)}
+
+/* ─── FLOATING ACTION ─── */
+.fab{
+  position:fixed;bottom:24px;right:24px;z-index:90;
+  width:56px;height:56px;border-radius:50%;background:var(--primary-dark);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:1.4rem;cursor:pointer;
+  box-shadow:0 8px 24px rgba(19,27,46,.3);transition:all .3s;border:none
+}
+.fab:hover{transform:scale(1.1) rotate(90deg);background:var(--accent);color:#0f172a}
+
+/* ─── SERVICES ASSISTANT (scripted chat — no backend) ─── */
+.sa-fab{position:fixed;bottom:24px;right:24px;z-index:95;display:flex;align-items:center;gap:8px;
+  padding:0 18px 0 14px;height:56px;border:none;border-radius:999px;cursor:pointer;font-family:inherit;font-weight:800;
+  background:linear-gradient(135deg,var(--accent),#a98a45);color:#0c0c10;box-shadow:0 10px 30px var(--accent-glow);
+  transition:transform .25s cubic-bezier(.16,1,.3,1),box-shadow .25s}
+.sa-fab:hover{transform:translateY(-3px) scale(1.03);box-shadow:0 14px 40px var(--accent-glow)}
+.sa-fab .sa-ic{display:flex}
+.sa-fab-label{font-size:.85rem;letter-spacing:.3px}
+[dir="rtl"] .sa-fab{right:auto;left:24px;padding:0 14px 0 18px}
+
+.sa-panel{position:fixed;bottom:92px;right:24px;z-index:96;width:min(360px,calc(100vw - 32px));
+  max-height:min(74vh,560px);display:flex;flex-direction:column;overflow:hidden;
+  background:var(--surface,#16161c);border:1px solid var(--border);border-radius:20px;
+  box-shadow:0 24px 70px rgba(0,0,0,.55);opacity:0;transform:translateY(16px) scale(.98);pointer-events:none;
+  transition:opacity .25s ease,transform .25s cubic-bezier(.16,1,.3,1)}
+.sa-panel.open{opacity:1;transform:none;pointer-events:auto}
+[dir="rtl"] .sa-panel{right:auto;left:24px}
+
+.sa-head{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);
+  background:linear-gradient(135deg,rgba(194,163,95,.18),rgba(194,163,95,.03))}
+.sa-avatar{width:40px;height:40px;flex:0 0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:rgba(194,163,95,.14);border:1px solid var(--border);color:var(--accent)}
+.sa-title{font-size:.95rem;font-weight:800;color:var(--text);line-height:1.2}
+.sa-online{display:flex;align-items:center;gap:6px;font-size:.7rem;color:var(--text-muted);font-weight:700;margin-top:2px}
+.sa-online .dot{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 0 3px rgba(34,197,94,.18)}
+.sa-close{margin-inline-start:auto;background:none;border:none;color:var(--text-muted);font-size:1rem;cursor:pointer;
+  width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;transition:.2s}
+.sa-close:hover{background:rgba(255,255,255,.06);color:var(--text)}
+
+.sa-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.sa-row{display:flex;gap:10px;align-items:flex-start}
+.sa-mini{width:26px;height:26px;flex:0 0 auto;border-radius:50%;background:rgba(194,163,95,.14);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;border:1px solid var(--border)}
+.sa-bubble{background:var(--surface-high,#23232c);border:1px solid var(--border);border-radius:4px 16px 16px 16px;
+  padding:11px 14px;font-size:.86rem;line-height:1.55;color:var(--text);max-width:84%}
+[dir="rtl"] .sa-bubble{border-radius:16px 4px 16px 16px}
+.sa-cap{font-size:.64rem;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);margin-inline-start:36px}
+.sa-chips{display:flex;flex-wrap:wrap;gap:8px;margin-inline-start:36px}
+.sa-chip{display:inline-flex;align-items:center;gap:7px;min-height:42px;padding:8px 14px;border-radius:999px;cursor:pointer;
+  background:transparent;border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:.82rem;font-weight:600;transition:.2s}
+.sa-chip .material-symbols-outlined{font-size:18px;color:var(--accent)}
+.sa-chip:hover,.sa-chip:focus-visible{background:rgba(194,163,95,.12);border-color:var(--accent);color:var(--accent);outline:none}
+.sa-actions{display:flex;flex-wrap:wrap;gap:8px;margin-inline-start:36px}
+.sa-btn{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:9px 16px;border-radius:12px;cursor:pointer;
+  border:none;font-family:inherit;font-weight:800;font-size:.82rem;text-decoration:none;
+  background:linear-gradient(135deg,var(--accent),#a98a45);color:#0c0c10;transition:.2s}
+.sa-btn:hover{filter:brightness(1.07);transform:translateY(-1px)}
+.sa-btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.sa-btn-ghost:hover{border-color:var(--accent);color:var(--accent);filter:none}
+.sa-foot{padding:10px 16px;border-top:1px solid var(--border);text-align:center}
+.sa-foot a{font-size:.76rem;font-weight:700;color:var(--text-muted);text-decoration:none}
+.sa-foot a:hover{color:var(--accent)}
+@media (prefers-reduced-motion: reduce){
+  .sa-fab,.sa-panel,.sa-btn{transition:none}
+  .sa-fab:hover,.sa-btn:hover{transform:none}
+}
+
+/* ─── TOAST ─── */
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);
+  z-index:400;padding:14px 28px;border-radius:14px;background:var(--primary-dark);color:#fff;
+  font-size:.85rem;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.2);transition:all .4s;opacity:0
+}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:1024px){
+  .hero-v2-grid{grid-template-columns:1fr;text-align:center}
+  .hero-v2-content{display:flex;flex-direction:column;align-items:center}
+  .hero-video-container{transform:none !important;max-width:700px;margin:40px auto 0}
+  .floating-element{display:none}
+  .quote-grid{grid-template-columns:1fr}
+  .footer-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:768px){
+  .nav-links{display:none}
+  .admin-sidebar{width:100%;position:relative;height:auto}
+  .admin-main{margin-left:0}
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .section{padding:60px 0}
+  .portfolio-3d,.services-3d-grid{grid-template-columns:1fr}
+  .stat-grid{grid-template-columns:1fr}
+  .qb-row{flex-direction:column}
+  .qb-row .form-group{width:100%}
+  .footer-grid{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .hero-v2{padding:120px 0 60px}
+  .glass{padding:24px}
+  .request-card{padding:28px}
+}
+
+/* ─── RTL ─── */
+[dir="rtl"] .admin-sidebar{left:auto;right:0}
+[dir="rtl"] .admin-main{margin-left:0;margin-right:260px}
+[dir="rtl"] .fab{right:auto;left:24px}
+[dir="rtl"] .data-table th,[dir="rtl"] .data-table td{text-align:right}
+[dir="rtl"] .qb-total{flex-direction:row-reverse}
+[dir="rtl"] .qb-service-item{flex-direction:row-reverse}
+[dir="rtl"] .hero-video-container{transform:perspective(1000px) rotateY(8deg) rotateX(4deg)}
+[dir="rtl"] .hero-video-container:hover{transform:perspective(1000px) rotateY(2deg) rotateX(1deg) scale(1.02)}
+[dir="rtl"] .team-row img,[dir="rtl"] .team-row .plus{margin-left:0;margin-right:-12px}
+@media(max-width:768px){
+  [dir="rtl"] .admin-main{margin-right:0}
+}
+
+/* ═══════════════════════════════════════════
+   CINEMATIC HERO — FULL VIEWPORT
+   ═══════════════════════════════════════════ */
+
+/* Navbar dark mode when over cinematic hero */
+.nav.nav-hero-dark{background:rgba(2,4,9,.6);border-bottom-color:rgba(255,255,255,.08)}
+.nav.nav-hero-dark .nav-brand span,.nav.nav-hero-dark .nav-links a{color:rgba(255,255,255,.9)}
+.nav.nav-hero-dark .nav-links a:hover,.nav.nav-hero-dark .nav-links a.active{color:#fff}
+.nav.nav-hero-dark .nav-links a.active::after{background:var(--accent)}
+.nav.nav-hero-dark .lang-btn{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.9)}
+.nav.nav-hero-dark .lang-btn:hover{background:rgba(255,255,255,.18);color:#fff}
+.nav.nav-hero-dark .btn-primary{background:rgba(255,255,255,.12);box-shadow:none;color:#fff}
+.nav.nav-hero-dark .btn-primary:hover{background:#fff;color:#0f172a}
+.nav.scrolled.nav-hero-dark{background:rgba(8,12,24,.92)}
+
+/* Hero section */
+.hero-cinematic{
+  position:relative;
+  height:100vh;
+  min-height:640px;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  background:#020409;
+}
+
+/* Background video */
+.hero-bg-video{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  object-position:center;
+  z-index:0;
+  opacity:.75;
+}
+
+/* Cinematic dark gradient overlay */
+.hero-dark-overlay{
+  position:absolute;
+  inset:0;
+  z-index:1;
+  background:linear-gradient(
+    135deg,
+    rgba(2,4,9,.82) 0%,
+    rgba(2,4,9,.45) 50%,
+    rgba(2,4,9,.65) 100%
+  );
+}
+
+/* Bottom blur fade (CSS mask — only blurs the bottom 45%) */
+.hero-blur-overlay{
+  position:absolute;
+  inset:0;
+  z-index:2;
+  pointer-events:none;
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  -webkit-mask-image:linear-gradient(to top,black 0%,transparent 45%);
+  mask-image:linear-gradient(to top,black 0%,transparent 45%);
+}
+
+/* Cursor glow orb — follows mouse */
+.cursor-glow-orb{
+  position:fixed;
+  width:460px;
+  height:460px;
+  border-radius:50%;
+  pointer-events:none;
+  z-index:3;
+  background:radial-gradient(circle,rgba(192,160,96,.14) 0%,transparent 68%);
+  transform:translate(-50%,-50%);
+  transition:opacity .4s ease;
+  opacity:0;
+}
+
+/* Inner layout */
+.hero-c-inner{
+  position:relative;
+  z-index:10;
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  height:100%;
+  padding:100px 48px 56px;
+  max-width:1320px;
+  margin:0 auto;
+  width:100%;
+  gap:48px;
+}
+
+/* Left text column */
+.hero-c-text{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-end;
+  min-width:0;
+}
+
+/* Badge */
+.hero-c-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 18px;
+  border-radius:100px;
+  font-size:.68rem;
+  font-weight:800;
+  letter-spacing:2.5px;
+  color:var(--accent);
+  text-transform:uppercase;
+  margin-bottom:20px;
+  background:rgba(192,160,96,.1);
+  border:1px solid rgba(192,160,96,.25);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  width:fit-content;
+}
+
+/* Title */
+.hero-c-title{
+  font-size:clamp(3rem,6.5vw,6rem);
+  font-weight:900;
+  line-height:1.0;
+  color:#fff;
+  letter-spacing:-.04em;
+  margin-bottom:20px;
+}
+.hero-c-title .accent{color:var(--accent)}
+
+/* Metadata row */
+.hero-c-meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px 20px;
+  margin-bottom:20px;
+  font-size:.78rem;
+  font-weight:600;
+  color:rgba(255,255,255,.65);
+  letter-spacing:.3px;
+}
+.hero-meta-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  padding:5px 12px;
+  border-radius:100px;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.1);
+}
+.hero-meta-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--accent);
+  display:inline-block;
+  margin:0 2px;
+}
+
+/* Description */
+.hero-c-desc{
+  font-size:1rem;
+  color:rgba(255,255,255,.58);
+  line-height:1.65;
+  max-width:520px;
+  margin-bottom:32px;
+}
+
+/* CTA buttons */
+.hero-c-ctas{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:24px;
+}
+.btn-hero-solid{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:13px 28px;
+  border-radius:100px;
+  border:none;
+  background:#fff;
+  color:#0f172a;
+  font-family:inherit;
+  font-size:.88rem;
+  font-weight:700;
+  cursor:pointer;
+  transition:all .3s;
+}
+.btn-hero-solid:hover{background:#e8eaf0;transform:translateY(-2px);box-shadow:0 8px 28px rgba(255,255,255,.25)}
+
+.btn-hero-glass{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:13px 28px;
+  border-radius:100px;
+  border:none;
+  background:rgba(255,255,255,.07);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  color:#fff;
+  font-family:inherit;
+  font-size:.88rem;
+  font-weight:700;
+  cursor:pointer;
+  position:relative;
+  overflow:hidden;
+  transition:all .3s;
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.12);
+}
+.btn-hero-glass::before{
+  content:'';position:absolute;inset:0;border-radius:100px;padding:1.2px;
+  background:linear-gradient(180deg,rgba(255,255,255,.4) 0%,rgba(255,255,255,.12) 25%,rgba(255,255,255,0) 50%,rgba(255,255,255,.12) 80%,rgba(255,255,255,.4) 100%);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  pointer-events:none;
+}
+.btn-hero-glass:hover{background:rgba(255,255,255,.14);transform:translateY(-2px)}
+
+/* Arrow nav */
+.hero-c-arrows{display:flex;gap:10px}
+.btn-hero-arrow{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:9px 20px;border-radius:100px;border:none;
+  background:rgba(255,255,255,.05);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  color:rgba(255,255,255,.7);font-family:inherit;font-size:.8rem;font-weight:600;cursor:pointer;
+  position:relative;overflow:hidden;transition:all .3s;
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.08);
+}
+.btn-hero-arrow::before{
+  content:'';position:absolute;inset:0;border-radius:100px;padding:1px;
+  background:linear-gradient(180deg,rgba(255,255,255,.3) 0%,rgba(255,255,255,0) 50%,rgba(255,255,255,.15) 100%);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;
+}
+.btn-hero-arrow:hover{background:rgba(255,255,255,.12);color:#fff}
+
+/* Right: logo video */
+.hero-c-right{
+  flex-shrink:0;
+  display:flex;
+  align-items:flex-end;
+  justify-content:flex-end;
+  padding-bottom:40px;
+}
+.hero-logo-wrap{
+  position:relative;
+  width:300px;
+  height:300px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  will-change:transform;
+  transition:transform .4s cubic-bezier(.23,1,.32,1);
+}
+.hero-logo-vid{
+  width:240px;
+  height:240px;
+  object-fit:cover;
+  border-radius:50%;
+  position:relative;
+  z-index:2;
+  transition:filter .12s ease,box-shadow .12s ease;
+  filter:brightness(.92);
+}
+.hero-logo-glow-el{
+  position:absolute;
+  inset:-30px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(192,160,96,0) 0%,transparent 70%);
+  z-index:1;
+  pointer-events:none;
+  transition:background .08s ease,inset .08s ease;
+}
+.hero-ring{
+  position:absolute;
+  border-radius:50%;
+  border:1px solid rgba(192,160,96,.18);
+  animation:spinRing 9s linear infinite;
+  z-index:1;
+  pointer-events:none;
+}
+.hero-ring-1{inset:-18px}
+.hero-ring-2{inset:-42px;border-color:rgba(192,160,96,.09);animation-duration:14s;animation-direction:reverse}
+.hero-ring-3{inset:-70px;border-color:rgba(192,160,96,.05);animation-duration:20s}
+@keyframes spinRing{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+/* ─── BLR FADE UP ANIMATION ─── */
+@keyframes blurFadeUp{
+  from{opacity:0;filter:blur(20px);transform:translateY(40px)}
+  to{opacity:1;filter:blur(0);transform:translateY(0)}
+}
+.bfu{opacity:0;animation:blurFadeUp 1s ease-out forwards}
+
+/* RTL for cinematic hero */
+[dir="rtl"] .hero-c-inner{flex-direction:row-reverse}
+[dir="rtl"] .hero-c-text{align-items:flex-end;text-align:right}
+[dir="rtl"] .hero-c-badge,[dir="rtl"] .hero-c-meta,[dir="rtl"] .hero-c-ctas,[dir="rtl"] .hero-c-arrows{direction:rtl}
+
+/* Mobile */
+@media(max-width:1024px){
+  .hero-c-inner{padding:100px 32px 48px;gap:24px}
+  .hero-c-right{display:none}
+}
+@media(max-width:768px){
+  .hero-c-inner{padding:100px 24px 40px}
+  .hero-c-title{font-size:clamp(2.4rem,8vw,3.5rem)}
+  .hero-c-desc{font-size:.92rem}
+}
+@media(max-width:480px){
+  .hero-c-meta{gap:6px 10px}
+  .hero-meta-pill{font-size:.7rem}
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ◆ DARK ELEGANT THEME — charcoal + gold (site-wide override)
+   Matches the "WE PROMISE COMFORT" reference: near-black ground,
+   thin gold accents, warm off-white text. Loaded last so it wins.
+   ═══════════════════════════════════════════════════════════ */
+:root{
+  --bg:#0c0c10;
+  --surface:#16161c;
+  --surface-dim:#1b1b22;
+  --surface-high:#23232c;
+  --surface-variant:#2a2a35;
+  --primary:#e9e5dc;
+  --primary-dark:#f6f3ec;
+  --secondary:#a89f90;
+  --accent:#c2a35f;
+  --accent-glow:rgba(194,163,95,.35);
+  --text:#ece8df;
+  --text-muted:#8b867b;
+  --text-light:#bbb5a8;
+  --border:rgba(194,163,95,.14);
+  --glass:rgba(255,255,255,.045);
+  --glass-dark:rgba(255,255,255,.05);
+  --glass-dark-border:rgba(255,255,255,.10);
+  --shadow:0 10px 40px rgba(0,0,0,.45);
+  --shadow-lg:0 24px 70px rgba(0,0,0,.6);
+}
+body{background:#0c0c10;color:var(--text)}
+
+/* Subtle gold ambient grain behind everything */
+body::before{
+  content:'';position:fixed;inset:0;z-index:-2;pointer-events:none;
+  background:
+    radial-gradient(900px 600px at 12% 0%,rgba(194,163,95,.07),transparent 60%),
+    radial-gradient(800px 600px at 100% 100%,rgba(194,163,95,.05),transparent 55%),
+    #0c0c10;
+}
+
+/* NAV — permanent dark glass */
+.nav{background:rgba(10,10,14,.72);backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);border-bottom:1px solid rgba(194,163,95,.12);box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.nav.scrolled{background:rgba(8,8,12,.94)}
+.nav-brand span,.nav-brand{color:var(--primary-dark)}
+.nav-brand .logo-icon{box-shadow:0 8px 24px rgba(0,0,0,.5);border:1px solid rgba(194,163,95,.2)}
+.nav-links a{color:rgba(236,232,223,.62)}
+.nav-links a:hover,.nav-links a.active{color:#fff}
+.nav-links a.active::after{background:var(--accent)}
+.lang-btn{background:rgba(255,255,255,.05);border:1px solid rgba(194,163,95,.2);color:var(--text)}
+.lang-btn:hover{background:var(--accent);color:#0c0c10;border-color:var(--accent)}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#a98a45);color:#0c0c10;box-shadow:0 4px 18px var(--accent-glow)}
+.btn-primary:hover{box-shadow:0 8px 28px var(--accent-glow)}
+.btn-outline{background:rgba(255,255,255,.04);border:1px solid rgba(194,163,95,.25);color:var(--text)}
+.btn-outline:hover{background:rgba(255,255,255,.08);border-color:var(--accent);color:#fff}
+
+/* Disable the old light hero-over-nav toggle (nav is always dark now) */
+.nav.nav-hero-dark{background:rgba(10,10,14,.55)}
+.nav.scrolled.nav-hero-dark{background:rgba(8,8,12,.94)}
+
+/* STATS BAR */
+.stats-bar{background:var(--surface);border-bottom:1px solid rgba(194,163,95,.1);border-radius:40px 40px 0 0;box-shadow:0 -20px 60px rgba(0,0,0,.4)}
+.stat-item h3{color:#fff}
+.stat-item h3{background:linear-gradient(135deg,#fff,var(--accent));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.stat-item p{color:var(--text-muted)}
+
+/* SECTIONS */
+.section-header h2{color:var(--primary-dark)}
+.section-header p{color:var(--text-muted)}
+.section-dark{background:#08080b}
+
+/* ABOUT / TILT / PORTFOLIO cards → dark glass */
+.about-3d-card,.tilt-card,.port-3d-item{
+  background:linear-gradient(135deg,rgba(255,255,255,.05),rgba(255,255,255,.02));
+  border:1px solid rgba(194,163,95,.14);
+  box-shadow:0 12px 40px rgba(0,0,0,.4);
+}
+.about-3d-card h3,.tilt-card h3{color:var(--primary-dark)}
+.about-3d-card p,.tilt-card p{color:var(--text-muted)}
+.about-3d-card:hover,.port-3d-item:hover{box-shadow:0 24px 60px rgba(0,0,0,.55),0 0 0 1px rgba(194,163,95,.25)}
+.glass{background:var(--glass);border:1px solid rgba(194,163,95,.14);box-shadow:var(--shadow)}
+.glass:hover{background:rgba(255,255,255,.07);border-color:rgba(194,163,95,.3)}
+
+/* TRUST LOGOS */
+.trust-logos{border-top:1px solid rgba(194,163,95,.1)}
+.trust-logos p{color:var(--text-muted)}
+.logo-flex div{color:var(--text-light)}
+
+/* MODALS / FORMS */
+.modal-content{background:rgba(22,22,28,.96);border:1px solid rgba(194,163,95,.18);color:var(--text)}
+.modal-content h3{color:var(--primary-dark)}
+.login-modal input,.form-group input,.form-group textarea,.form-group select{
+  background:rgba(255,255,255,.04);border:1px solid rgba(194,163,95,.18);color:var(--text)
+}
+.form-group input:focus,.form-group textarea:focus,.form-group select:focus,.login-modal input:focus{
+  border-color:var(--accent);box-shadow:0 0 0 4px rgba(194,163,95,.12);background:rgba(255,255,255,.06)
+}
+.form-group label{color:var(--text-muted)}
+
+/* ADMIN → dark */
+.admin-shell{background:#0c0c10}
+.admin-sidebar{background:linear-gradient(180deg,#101016,#0a0a0e);border-right:1px solid rgba(194,163,95,.1)}
+.admin-main{background:#0c0c10}
+.admin-header h1{color:var(--primary-dark)}
+.stat-card{background:var(--surface);border:1px solid rgba(194,163,95,.12);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.stat-card .num{color:var(--primary-dark)}
+.stat-card .lbl{color:var(--text-muted)}
+.data-table{background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.data-table th{background:var(--surface-dim);color:var(--text-muted);border-bottom:1px solid rgba(194,163,95,.1)}
+.data-table td{color:var(--text-light);border-bottom:1px solid rgba(255,255,255,.05)}
+.data-table tr:hover td{background:rgba(255,255,255,.03)}
+.qb-card .form-group input,.qb-row input,#qbServices input,#qbAddons input,#qbRecurring input{background:rgba(255,255,255,.04);border:1px solid rgba(194,163,95,.18);color:var(--text)}
+.qb-service-item,.qb-rec-item{background:rgba(255,255,255,.03);border:1px solid rgba(194,163,95,.12)}
+.qb-service-item strong,.qb-rec-item strong{color:var(--primary-dark)}
+.fab{background:linear-gradient(135deg,var(--accent),#a98a45);color:#0c0c10}
+
+/* ═══════════════════════════════════════════════════════════
+   ◆ HERO REDESIGN — reference look + continuous mouse parallax
+   ═══════════════════════════════════════════════════════════ */
+.hero-cinematic{
+  background:radial-gradient(1200px 800px at 70% 30%,#16141a 0%,#0a0a0e 55%,#070709 100%);
+}
+/* Background video — now clearly visible & moving */
+.hero-bg-video{opacity:.42;filter:grayscale(15%) contrast(1.05) brightness(.9);will-change:transform}
+/* Lighter overlay so the motion reads as video, gold vignette */
+.hero-dark-overlay{
+  background:
+    linear-gradient(105deg,rgba(8,8,11,.86) 0%,rgba(8,8,11,.35) 48%,rgba(8,8,11,.55) 100%),
+    radial-gradient(circle at 72% 42%,transparent 0%,transparent 30%,rgba(8,8,11,.4) 75%);
+}
+.hero-blur-overlay{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  -webkit-mask-image:linear-gradient(to top,black 0%,transparent 38%);
+  mask-image:linear-gradient(to top,black 0%,transparent 38%);
+}
+/* Layers that parallax get smooth easing + will-change */
+.hero-c-text,.hero-c-right,.cursor-glow-orb{will-change:transform}
+
+/* Title — elegant, gold accent, wide tracking like the reference */
+.hero-c-title{
+  font-weight:800;
+  letter-spacing:-.02em;
+  text-shadow:0 2px 40px rgba(0,0,0,.5);
+}
+.hero-c-title .accent{
+  color:var(--accent);
+  background:linear-gradient(135deg,#e9cf94 0%,#c2a35f 55%,#9a7c3e 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero-c-badge{letter-spacing:3px}
+
+/* RIGHT: logo video inside a thin gold open frame.
+   The logo video is 1470×630 (≈2.33:1 LANDSCAPE), so the frame is sized
+   to that exact aspect — the whole "10 DIGITAL" logo shows, no cropping. */
+.hero-c-right{padding-bottom:0;align-items:center}
+.hero-logo-frame{
+  position:relative;
+  width:480px;
+  height:300px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  will-change:transform;
+  transform-style:preserve-3d;
+}
+/* Thin gold rectangle — same aspect as the video, offset up-left so the
+   video's corner "breaks out" of the frame. Parallaxes independently. */
+.hero-logo-frame .gold-frame{
+  position:absolute;
+  width:440px;
+  height:189px;
+  top:calc(50% - 20px);
+  left:calc(50% - 22px);
+  transform:translate(-50%,-50%);
+  border:1.5px solid rgba(194,163,95,.65);
+  z-index:1;
+  pointer-events:none;
+  box-shadow:0 0 50px rgba(194,163,95,.10) inset;
+  will-change:transform;
+}
+/* Top-left corner accent tick */
+.hero-logo-frame .gold-frame::after{
+  content:'';position:absolute;top:-1.5px;left:-1.5px;width:28px;height:28px;
+  border-top:2px solid var(--accent);border-left:2px solid var(--accent);
+}
+/* The logo video — landscape, full logo shown (contain). No frame. */
+.hero-logo-vid{
+  position:relative;
+  z-index:2;
+  width:460px;
+  height:197px;
+  border-radius:16px;
+  object-fit:contain;
+  background:#08080c;
+  filter:brightness(1) contrast(1.05);
+  box-shadow:0 30px 80px rgba(0,0,0,.6);
+  transition:filter .15s ease,box-shadow .15s ease;
+  will-change:transform;
+}
+.hero-logo-glow-el{
+  position:absolute;
+  width:460px;height:197px;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  inset:auto;
+  z-index:0;
+}
+/* Remove the spinning circular rings — reference is clean rectangles */
+.hero-ring{display:none}
+/* Soft caption under the frame */
+.hero-frame-caption{
+  position:absolute;
+  bottom:14px;
+  left:50%;
+  transform:translateX(-50%);
+  width:460px;
+  text-align:center;font-size:.62rem;font-weight:700;letter-spacing:4px;
+  text-transform:uppercase;color:rgba(194,163,95,.75);z-index:3;
+  text-shadow:0 2px 10px rgba(0,0,0,.6);
+}
+
+/* VOICES OF INNOVATION — the intro video is 1080×1920 (portrait/TikTok),
+   so present it in a portrait phone-style frame instead of a cropped 16:9. */
+#client-success .hero-video-container{
+  aspect-ratio:9/16;
+  max-width:340px;
+  width:100%;
+  margin:0 auto;
+  border-radius:30px;
+  border:1px solid rgba(194,163,95,.2);
+}
+#client-success .hero-video-container video.media{
+  width:100%;height:100%;object-fit:cover;opacity:1;
+}
+#client-success .play-btn{width:84px;height:84px}
+
+/* The blur-fade-up plays once as a gentle entrance — opacity only,
+   so the hero never feels "frozen": continuous motion comes from the
+   JS mouse-parallax loop, not a one-shot transform. */
+@keyframes blurFadeUp{
+  from{opacity:0;filter:blur(8px)}
+  to{opacity:1;filter:blur(0)}
+}
+
+@media(max-width:1024px){
+  .hero-c-right{display:flex;justify-content:center;margin-top:0}
+  .hero-logo-frame{width:380px;height:240px}
+  .hero-logo-vid,.hero-logo-frame .gold-frame,.hero-logo-glow-el,.hero-frame-caption{width:340px;height:146px}
+  .hero-frame-caption{height:auto}
+}
+@media(max-width:768px){
+  .hero-c-inner{flex-direction:column;align-items:flex-start;justify-content:flex-end}
+  .hero-c-right{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="public-site">
+
+<!-- NAV -->
+<nav class="nav" id="navbar">
+  <div class="nav-inner">
+    <a href="#" class="nav-brand" onclick="showPublicPage('home')">
+      <img src="assets/img/logo.jpg" alt="10 Digital Logo" class="logo-icon">
+      <span data-i18n="brand">10 DIGITAL</span>
+    </a>
+    <div class="nav-links">
+      <a href="#home" class="active" data-i18n="nav_home" onclick="showPublicPage('home')">Home</a>
+      <a href="#about" data-i18n="nav_about" onclick="showPublicPage('about')">About</a>
+      <a href="#services" data-i18n="nav_services" onclick="showPublicPage('services')">Services</a>
+      <a href="#portfolio" data-i18n="nav_portfolio" onclick="showPublicPage('portfolio')">Portfolio</a>
+      <a href="#contact" data-i18n="nav_contact" onclick="showPublicPage('contact')">Contact</a>
+    </div>
+    <div class="nav-actions">
+      <button class="lang-btn" onclick="toggleLang()">
+        <span class="material-symbols-outlined" style="font-size:16px">translate</span>
+        <span id="langLabel">العربية</span>
+      </button>
+      <button class="btn-primary btn-sm" onclick="openLogin()" data-i18n="nav_admin">Admin</button>
+    </div>
+  </div>
+</nav>
+
+<!-- HOME / HERO — CINEMATIC FULL-VIEWPORT -->
+<div id="page-home" class="public-page">
+<section class="hero-cinematic" id="home">
+
+  <!-- Full-screen background video -->
+  <video class="hero-bg-video" autoplay muted loop playsinline>
+    <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260508_215831_c6a8989c-d716-4d8d-8745-e972a2eec711.mp4" type="video/mp4">
+  </video>
+
+  <!-- Cinematic dark overlay -->
+  <div class="hero-dark-overlay"></div>
+
+  <!-- Bottom blur fade (CSS mask — blurs only bottom 45%) -->
+  <div class="hero-blur-overlay"></div>
+
+  <!-- Cursor glow orb -->
+  <div class="cursor-glow-orb" id="cursorGlowOrb"></div>
+
+  <!-- Hero inner layout -->
+  <div class="hero-c-inner">
+
+    <!-- LEFT: Text content -->
+    <div class="hero-c-text">
+
+      <!-- Badge -->
+      <div class="hero-c-badge bfu" style="animation-delay:150ms">
+        <span class="material-symbols-outlined" style="font-size:16px">auto_awesome</span>
+        <span data-i18n="hero_badge">PREMIUM DESIGN STUDIO</span>
+      </div>
+
+      <!-- Title -->
+      <h1 class="hero-c-title bfu" style="animation-delay:350ms">
+        <span data-i18n="hero_title_line1">Craft Your</span><br>
+        <span class="accent" data-i18n="hero_title_line2">Digital Legacy</span>
+      </h1>
+
+      <!-- Metadata pills -->
+      <div class="hero-c-meta bfu" style="animation-delay:280ms">
+        <span class="hero-meta-pill">
+          <span class="material-symbols-outlined" style="font-size:14px;color:var(--accent)">design_services</span>
+          Design <span class="hero-meta-dot"></span> Development <span class="hero-meta-dot"></span> Motion
+        </span>
+        <span class="hero-meta-pill">
+          <span class="material-symbols-outlined" style="font-size:14px;color:var(--accent)">palette</span>
+          Branding <span class="hero-meta-dot"></span> UI/UX <span class="hero-meta-dot"></span> Video
+        </span>
+        <span class="hero-meta-pill">
+          <span class="material-symbols-outlined" style="font-size:14px;color:var(--accent)">smart_toy</span>
+          Web Dev <span class="hero-meta-dot"></span> AI <span class="hero-meta-dot"></span> 3D
+        </span>
+      </div>
+
+      <!-- Description -->
+      <p class="hero-c-desc bfu" style="animation-delay:480ms" data-i18n="hero_desc">
+        We architect high-performance ecosystems that fuse elite aesthetics with industrial-grade engineering. Elevate your brand to the global stage.
+      </p>
+
+      <!-- CTA Buttons -->
+      <div class="hero-c-ctas bfu" style="animation-delay:580ms">
+        <button class="btn-hero-solid" onclick="showPublicPage('contact')">
+          <span class="material-symbols-outlined" style="font-size:18px">rocket_launch</span>
+          <span data-i18n="hero_cta_primary">Start Your Project</span>
+        </button>
+        <button class="btn-hero-glass" onclick="showPublicPage('portfolio')">
+          <span data-i18n="hero_cta_secondary">View Showcase</span>
+        </button>
+      </div>
+
+      <!-- Navigation arrows -->
+      <div class="hero-c-arrows bfu" style="animation-delay:760ms">
+        <button class="btn-hero-arrow" onclick="heroNav(-1)">
+          <span class="material-symbols-outlined" style="font-size:18px">chevron_left</span>
+          <span data-i18n="hero_prev">Previous</span>
+        </button>
+        <button class="btn-hero-arrow" onclick="heroNav(1)">
+          <span data-i18n="hero_next">Next</span>
+          <span class="material-symbols-outlined" style="font-size:18px">chevron_right</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- RIGHT: Logo video framed in thin gold — cursor-reactive glow -->
+    <div class="hero-c-right" id="heroRight">
+      <div class="hero-logo-frame bfu" style="animation-delay:500ms" id="heroLogoWrap">
+        <div class="hero-logo-glow-el" id="heroLogoGlowEl"></div>
+        <video class="hero-logo-vid" id="heroLogoVid" autoplay muted loop playsinline preload="auto" poster="assets/img/logo.jpg">
+          <source src="assets/logo-video.mp4" type="video/mp4">
+        </video>
+        <div class="hero-frame-caption" data-i18n="hero_frame_caption">10 DIGITAL STUDIO</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- STATS BAR -->
+<section class="stats-bar">
+  <div class="container">
+    <div class="stats-grid reveal active">
+      <div class="stat-item"><h3>150+</h3><p data-i18n="stat_projects">Projects Delivered</p></div>
+      <div class="stat-item"><h3>12+</h3><p data-i18n="stat_experience">Years Experience</p></div>
+      <div class="stat-item"><h3>45+</h3><p data-i18n="stat_experts">Digital Experts</p></div>
+      <div class="stat-item"><h3>98%</h3><p data-i18n="stat_retention">Client Retention</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section class="section" id="about">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2 data-i18n="about_title">Who We Are</h2>
+      <p data-i18n="about_desc">10 Digital is a premium digital design studio crafting immersive web experiences, native mobile applications, and data-driven marketing campaigns.</p>
+    </div>
+    <div class="about-3d-grid">
+      <div class="about-3d-card reveal">
+        <div class="icon-3d"><span class="material-symbols-outlined">architecture</span></div>
+        <h3 data-i18n="about_card_1_title">Web Architecture</h3>
+        <p data-i18n="about_card_1_desc">Fluid, high-performance web experiences built with cutting-edge frameworks for unrivaled speed and SEO dominance.</p>
+      </div>
+      <div class="about-3d-card reveal">
+        <div class="icon-3d" style="background:linear-gradient(135deg,rgba(34,197,94,.12),rgba(34,197,94,.06));border-color:rgba(34,197,94,.2);color:var(--success)"><span class="material-symbols-outlined">smartphone</span></div>
+        <h3 data-i18n="about_card_2_title">Mobile Ecosystems</h3>
+        <p data-i18n="about_card_2_desc">Native Android & iOS development with seamless cross-platform synchronization and elite user experience design.</p>
+      </div>
+      <div class="about-3d-card reveal">
+        <div class="icon-3d" style="background:linear-gradient(135deg,rgba(236,72,153,.12),rgba(236,72,153,.06));border-color:rgba(236,72,153,.2);color:#ec4899"><span class="material-symbols-outlined">campaign</span></div>
+        <h3 data-i18n="about_card_3_title">Integrated Marketing</h3>
+        <p data-i18n="about_card_3_desc">Product photography, social media virality, and targeted promotion. We turn high-end products into digital movements.</p>
+      </div>
+      <div class="about-3d-card reveal">
+        <div class="icon-3d" style="background:linear-gradient(135deg,rgba(192,160,96,.12),rgba(192,160,96,.06));border-color:rgba(192,160,96,.2);color:var(--accent)"><span class="material-symbols-outlined">3d_rotation</span></div>
+        <h3 data-i18n="about_card_4_title">3D Experiences</h3>
+        <p data-i18n="about_card_4_desc">Immersive 3D web design with parallax depth, spatial animations, and interactive elements that captivate audiences.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CLIENT SUCCESS / TESTIMONIAL -->
+<section class="section section-dark" id="client-success">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2 data-i18n="success_title">Voices of Innovation</h2>
+      <p data-i18n="success_desc">Hear from the leaders we've partnered with to build digital legacies.</p>
+    </div>
+    <div class="reveal" style="max-width:900px;margin:0 auto">
+      <div class="hero-video-container glass-dark" style="transform:none">
+        <video id="voicesVideo" class="media" autoplay muted loop playsinline preload="auto" poster="assets/img/hero-video-poster.jpg" style="opacity:1">
+          <source src="assets/voices-video.mp4" type="video/mp4">
+        </video>
+        <div class="video-overlay" id="voicesOverlay" onclick="toggleVoicesSound()" style="cursor:pointer">
+          <div class="play-btn" id="voicesSoundBtn" style="width:100px;height:100px;background:var(--accent);border-color:var(--accent)" title="Tap for sound">
+            <span class="material-symbols-outlined" style="font-size:44px">volume_off</span>
+          </div>
+        </div>
+      </div>
+      <div class="text-center" style="margin-top:48px">
+        <blockquote class="testimonial-quote" data-i18n="testimonial_quote">"10 Digital didn't just build a website; they architected our future."</blockquote>
+        <cite class="testimonial-cite" data-i18n="testimonial_cite">— CEO, Astra Corp.</cite>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST LOGOS -->
+<section class="trust-logos">
+  <div class="container">
+    <p data-i18n="trust_label">Trusted by Innovation Leaders</p>
+    <div class="logo-flex">
+      <div>TECHNO</div><div>ASTRA</div><div>NEXUS</div><div>OMAN CO</div><div>ELITE WEB</div>
+    </div>
+  </div>
+</section>
+</div>
+<!-- SERVICES PAGE -->
+<div id="page-services" class="public-page" style="display:none;padding-top:120px">
+<section class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2 data-i18n="services_title">Precision Services</h2>
+      <p data-i18n="services_desc">Modular solutions for complex digital challenges. Toggle services to build your custom ecosystem.</p>
+    </div>
+    <div class="services-3d-grid" id="servicesGrid"><!-- Injected by JS --></div>
+    <div class="text-center" style="margin-top:40px">
+      <button class="btn-accent" onclick="showPublicPage('contact')" data-i18n="btn_request_service">Request Service</button>
+    </div>
+  </div>
+</section>
+</div>
+
+<!-- PORTFOLIO PAGE -->
+<div id="page-portfolio" class="public-page" style="display:none;padding-top:120px">
+<section class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2 data-i18n="portfolio_title">Portfolio</h2>
+      <p data-i18n="portfolio_desc">Witness the synthesis of aesthetics and function through our curated portfolio.</p>
+    </div>
+    <div class="portfolio-3d" id="portfolioGrid">
+      <div class="port-3d-item reveal" onclick="openMediaFromUrl('assets/img/portfolio-1.jpg','image')">
+        <img src="assets/img/portfolio-1.jpg" alt="Creative Studio Hub">
+        <div class="port-3d-overlay"><h4>Creative Studio Hub</h4><p>Featured Design</p></div>
+      </div>
+      <div class="port-3d-item reveal" onclick="openMediaFromUrl('assets/img/portfolio-2.png','image')">
+        <img src="assets/img/portfolio-2.png" alt="Lumina Platform">
+        <div class="port-3d-overlay"><h4>Lumina Platform</h4><p>Analytics Dashboard</p></div>
+      </div>
+      <div class="port-3d-item reveal" onclick="openMediaFromUrl('assets/img/portfolio-3.png','image')">
+        <img src="assets/img/portfolio-3.png" alt="Zenith App">
+        <div class="port-3d-overlay"><h4>Zenith App</h4><p>iOS & Android App</p></div>
+      </div>
+      <div class="port-3d-item reveal" onclick="openMediaFromUrl('assets/img/portfolio-4.png','image')">
+        <img src="assets/img/portfolio-4.png" alt="Aura CRM">
+        <div class="port-3d-overlay"><h4>Aura CRM</h4><p>SaaS Platform</p></div>
+      </div>
+      <div class="port-3d-item reveal" onclick="openMediaFromUrl('assets/img/portfolio-5.png','image')">
+        <img src="assets/img/portfolio-5.png" alt="Nova Enterprise">
+        <div class="port-3d-overlay"><h4>Nova Enterprise</h4><p>Corporate Website</p></div>
+      </div>
+      <div class="port-3d-item reveal" onclick="openMediaFromUrl('assets/img/portfolio-1.jpg','image')">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a2744,#2d3a5c);color:#fff">
+          <span class="material-symbols-outlined" style="font-size:4rem;opacity:.5">play_circle</span>
+        </div>
+        <div class="port-3d-overlay"><div class="play-btn"><span class="material-symbols-outlined">play_arrow</span></div><h4>Showreel 2026</h4><p>Motion & 3D Reel</p></div>
+      </div>
+      <!-- Firebase-uploaded portfolio items injected here by renderPortfolio() -->
+    </div>
+  </div>
+</section>
+</div>
+<!-- REQUEST A QUOTE PAGE (adapted from Stitch "LUMINA STUDIO" quotation screen) -->
+<div id="page-contact" class="public-page quote-page" style="display:none;padding-top:120px;padding-bottom:100px">
+  <div class="floating-orb" style="width:500px;height:500px;background:var(--accent);top:-150px;left:-150px"></div>
+  <div class="floating-orb" style="width:400px;height:400px;background:var(--secondary);bottom:-150px;right:-150px"></div>
+  <div class="container">
+    <div class="quote-header reveal">
+      <div>
+        <h1 data-i18n="quote_title">Project Proposal<br>&amp; Quotation</h1>
+        <div class="quote-badges">
+          <div class="glass-dark quote-badge"><span class="material-symbols-outlined" style="color:var(--accent)">domain</span><div><p class="lbl" data-i18n="qb_client">Client Name</p><p class="val" id="quoteClientLabel" data-i18n="quote_client_default">Prospective Client</p></div></div>
+          <div class="glass-dark quote-badge"><span class="material-symbols-outlined" style="color:var(--accent)">fingerprint</span><div><p class="lbl" data-i18n="qb_project">Project ID</p><p class="val" id="quoteProjectId">10D-2026-001</p></div></div>
+          <div class="glass-dark quote-badge"><span class="material-symbols-outlined" style="color:var(--accent)">event_available</span><div><p class="lbl" data-i18n="qb_valid">Validity</p><p class="val" data-i18n="quote_valid_days">30 Days</p></div></div>
+        </div>
+      </div>
+      <div class="glass-dark estimator-card">
+        <div class="head"><span data-i18n="quote_estimator">REAL-TIME ESTIMATOR</span><span class="material-symbols-outlined" style="color:var(--accent)">analytics</span></div>
+        <p class="estimator-price"><span id="quoteTotal">0</span> <small>RO</small></p>
+        <p style="font-size:.8rem;color:rgba(255,255,255,.5);margin-top:8px" data-i18n="quote_estimator_desc">Estimate based on selected features below.</p>
+      </div>
+    </div>
+
+    <div class="quote-grid">
+      <div>
+        <!-- CORE SERVICES -->
+        <div class="quote-divider"><span class="line"></span><h2><span class="material-symbols-outlined" style="color:var(--accent)">grid_view</span><span data-i18n="quote_core_services">CORE SERVICES</span></h2><span class="line"></span></div>
+        <div class="svc-grid" id="quoteServicesGrid"><!-- injected by JS --></div>
+
+        <!-- STRATEGIC PACKAGES -->
+        <div class="quote-divider"><span class="line"></span><h2><span class="material-symbols-outlined" style="color:var(--accent)">payments</span><span data-i18n="quote_packages">STRATEGIC PACKAGES</span></h2><span class="line"></span></div>
+        <div class="tier-grid">
+          <div class="glass-dark tier-card">
+            <p class="tier-label" data-i18n="tier_starter">STARTER</p>
+            <p class="tier-price"><span id="priceStarter">450</span> <small>RO</small></p>
+            <ul>
+              <li><span class="material-symbols-outlined ic">check_circle</span><span data-i18n="tier_starter_1">Basic SEO Package</span></li>
+              <li><span class="material-symbols-outlined ic">check_circle</span><span data-i18n="tier_starter_2">Standard Hosting</span></li>
+              <li><span class="material-symbols-outlined ic">check_circle</span><span data-i18n="tier_starter_3">Email Support</span></li>
+            </ul>
+            <button onclick="selectTier('Starter')" data-i18n="tier_select">Select Starter</button>
+          </div>
+          <div class="glass-dark tier-card recommended">
+            <span class="badge-rec" data-i18n="tier_recommended">RECOMMENDED</span>
+            <p class="tier-label" data-i18n="tier_pro">PROFESSIONAL</p>
+            <p class="tier-price"><span id="priceProfessional">1,250</span> <small>RO</small></p>
+            <ul>
+              <li><span class="material-symbols-outlined ic">check_circle</span><span data-i18n="tier_pro_1">Priority Development</span></li>
+              <li><span class="material-symbols-outlined ic">check_circle</span><span data-i18n="tier_pro_2">Cloud Auto-Scaling</span></li>
+              <li><span class="material-symbols-outlined ic">check_circle</span><span data-i18n="tier_pro_3">24/7 Concierge</span></li>
+              <li><span class="material-symbols-outlined ic">check_circle</span><span data-i18n="tier_pro_4">Custom API Links</span></li>
+            </ul>
+            <button onclick="selectTier('Professional')" data-i18n="tier_select_pro">Select Pro</button>
+          </div>
+          <div class="glass-dark tier-card">
+            <p class="tier-label" data-i18n="tier_enterprise">ENTERPRISE</p>
+            <p class="tier-price" data-i18n="tier_custom">Custom</p>
+            <ul>
+              <li><span class="material-symbols-outlined ic">check_circle</span><span data-i18n="tier_ent_1">On-Site Specialists</span></li>
+              <li><span class="material-symbols-outlined ic">check_circle</span><span data-i18n="tier_ent_2">Source Ownership</span></li>
+              <li><span class="material-symbols-outlined ic">check_circle</span><span data-i18n="tier_ent_3">Unlimited Edits</span></li>
+            </ul>
+            <button onclick="selectTier('Enterprise')" data-i18n="tier_contact">Contact Us</button>
+          </div>
+        </div>
+
+        <!-- CONFIGURATION PORTAL -->
+        <div class="quote-divider"><span class="line"></span><h2><span class="material-symbols-outlined" style="color:var(--accent)">send</span><span data-i18n="quote_init">INITIALIZE INQUIRY</span></h2><span class="line"></span></div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:24px" class="quote-grid">
+          <div class="glass-dark" style="padding:32px">
+            <div class="config-form">
+              <div class="form-group"><label data-i18n="form_name">Full Name</label><input type="text" id="quoteName" placeholder="Authorized Signatory"></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="form-group"><label data-i18n="form_email">Email Address</label><input type="email" id="quoteEmail" placeholder="john@company.com"></div>
+                <div class="form-group"><label data-i18n="form_phone">Phone / WhatsApp</label><input type="text" id="quotePhone" placeholder="+968 XXXX XXXX"></div>
+              </div>
+              <div class="form-group"><label data-i18n="form_message">Additional Scope Notes</label><textarea id="quoteNotes" placeholder="Briefly describe your vision..."></textarea></div>
+              <button class="btn-accent w-full" onclick="submitQuoteRequest()" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:16px">
+                <span class="material-symbols-outlined">rocket_launch</span>
+                <span data-i18n="quote_submit">SUBMIT QUOTATION REQUEST</span>
+              </button>
+            </div>
+          </div>
+          <div class="glass-dark" style="padding:32px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+              <h3 style="font-size:1rem;font-weight:800" data-i18n="quote_pulse">Live Pulse</h3>
+              <div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--success)"></span><span style="font-size:.65rem;font-weight:700;color:rgba(255,255,255,.5)" data-i18n="quote_active">STUDIO ACTIVE</span></div>
+            </div>
+            <div class="live-pulse-row"><span data-i18n="quote_pulse_1">Server Resource Allocation</span><span class="v">88%</span></div>
+            <div class="live-pulse-bar"><div class="fill" style="width:88%"></div></div>
+            <div class="live-pulse-row"><span data-i18n="quote_pulse_2">Dev Queue Velocity</span><span class="v" data-i18n="quote_pulse_2_val">High</span></div>
+            <div class="live-pulse-bar"><div class="fill" style="width:65%"></div></div>
+            <div class="live-pulse-row"><span data-i18n="quote_pulse_3">Active Collaborations</span><span class="v" data-i18n="quote_pulse_3_val">12 Partners</span></div>
+            <div class="live-pulse-bar"><div class="fill" style="width:92%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SIDEBAR -->
+      <aside>
+        <div class="glass-dark" style="padding:32px">
+          <h3 style="font-size:1rem;font-weight:800;margin-bottom:28px;display:flex;align-items:center;gap:8px"><span class="material-symbols-outlined" style="color:var(--accent)">timeline</span><span data-i18n="quote_journey">PROJECT JOURNEY</span></h3>
+          <div class="journey-list">
+            <div class="journey-step"><h4 data-i18n="journey_1_title">01. Discovery</h4><p data-i18n="journey_1_desc">Target audience analysis &amp; requirements mapping.</p></div>
+            <div class="journey-step todo"><h4 data-i18n="journey_2_title">02. UI/UX Design</h4><p data-i18n="journey_2_desc">Interactive wireframes and high-fidelity 3D visuals.</p></div>
+            <div class="journey-step todo"><h4 data-i18n="journey_3_title">03. Development</h4><p data-i18n="journey_3_desc">Full-stack implementation and API integration.</p></div>
+            <div class="journey-step todo"><h4 data-i18n="journey_4_title">04. Content &amp; QA</h4><p data-i18n="journey_4_desc">Data population and rigorous performance testing.</p></div>
+            <div class="journey-step todo"><h4 data-i18n="journey_5_title">05. Launch</h4><p data-i18n="journey_5_desc">App store deployment and live environment scale-up.</p></div>
+          </div>
+          <h4 style="font-size:.75rem;font-weight:800;letter-spacing:1.5px;color:var(--accent);margin:32px 0 16px" data-i18n="quote_maintenance">MAINTENANCE PLANS</h4>
+          <div class="maint-item" onclick="selectMaintenance('Weekly Check-up')"><span data-i18n="maint_1">Weekly Check-up</span><span><span id="priceMaintWeekly">80</span> RO /mo</span></div>
+          <div class="maint-item" onclick="selectMaintenance('Monthly Full-Sync')"><span data-i18n="maint_2">Monthly Full-Sync</span><span><span id="priceMaintMonthly">250</span> RO /mo</span></div>
+          <div class="maint-item" onclick="selectMaintenance('Annual Retainer')" style="border-color:var(--accent)"><span data-i18n="maint_3" style="color:var(--accent)">Annual Retainer</span><span><span id="priceMaintAnnual">2,200</span> RO /yr</span></div>
+          <div class="team-row">
+            <img src="assets/img/team-1.png" alt="">
+            <img src="assets/img/team-2.png" alt="">
+            <div class="plus">+4</div>
+            <p style="font-size:.65rem;font-weight:800;text-transform:uppercase;color:rgba(255,255,255,.5);margin-left:12px" data-i18n="quote_team">Assigned Team</p>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+<!-- FOOTER -->
+<footer class="footer-v2">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div style="font-weight:900;font-size:1.6rem;color:#fff;margin-bottom:20px;display:flex;align-items:center;gap:10px"><img src="assets/img/logo.jpg" alt="" style="width:36px;height:36px;border-radius:10px;object-fit:contain">10 DIGITAL</div>
+        <p style="color:rgba(255,255,255,.5);line-height:1.6;font-size:.9rem" data-i18n="foot_bio">Synthesizing elite aesthetics with industrial engineering for the digital age.</p>
+        <div class="social-links">
+          <a class="social-btn" href="#"><span class="material-symbols-outlined">public</span></a>
+          <a class="social-btn" href="#"><span class="material-symbols-outlined">share</span></a>
+          <a class="social-btn" href="#"><span class="material-symbols-outlined">alternate_email</span></a>
+        </div>
+      </div>
+      <div>
+        <h4 data-i18n="foot_services_title">Services</h4>
+        <ul class="footer-links">
+          <li><a href="#" onclick="showPublicPage('services');return false" data-i18n="nav_services">Services</a></li>
+          <li><a href="#" onclick="showPublicPage('portfolio');return false" data-i18n="nav_portfolio">Portfolio</a></li>
+          <li><a href="#" onclick="showPublicPage('about');return false" data-i18n="nav_about">About</a></li>
+          <li><a href="#" onclick="showPublicPage('contact');return false" data-i18n="nav_contact">Contact</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 data-i18n="foot_company_title">Company</h4>
+        <ul class="footer-links">
+          <li><a href="#" data-i18n="foot_privacy">Privacy Policy</a></li>
+          <li><a href="#" data-i18n="foot_terms">Terms of Service</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 data-i18n="foot_newsletter_title">Join Our Circle</h4>
+        <p style="color:rgba(255,255,255,.5);font-size:.85rem" data-i18n="foot_newsletter_desc">Get digital insights delivered monthly.</p>
+        <div class="newsletter-form">
+          <input type="email" id="newsletterEmail" data-i18n="foot_newsletter_placeholder" placeholder="Email address">
+          <button class="btn-accent btn-sm" onclick="subscribeNewsletter()" style="padding:10px 16px"><span class="material-symbols-outlined" style="font-size:18px">send</span></button>
+        </div>
+      </div>
+    </div>
+    <div style="border-top:1px solid rgba(255,255,255,.05);padding-top:40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px">
+      <div style="font-size:.8rem;color:rgba(255,255,255,.4)">© 2026 10 Digital. <span data-i18n="foot_rights">All rights reserved.</span></div>
+      <div style="display:flex;gap:20px">
+        <a href="#" style="color:rgba(255,255,255,.4);text-decoration:none;font-size:.8rem">OMAN</a>
+        <a href="#" style="color:rgba(255,255,255,.4);text-decoration:none;font-size:.8rem">UAE</a>
+        <a href="#" style="color:rgba(255,255,255,.4);text-decoration:none;font-size:.8rem">GLOBAL</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</div><!-- /public-site -->
+
+<!-- ═══════════════════════════════════════════
+     ADMIN DASHBOARD
+     ═══════════════════════════════════════════ -->
+<div class="admin-shell" id="admin-shell">
+  <div class="admin-sidebar">
+    <div class="brand">
+      <img src="assets/img/logo.jpg" alt="">
+      <span>10 DIGITAL</span>
+    </div>
+    <div class="admin-nav">
+      <button class="active" onclick="adminTab('dashboard',event)" data-i18n="adm_dashboard"><span class="material-symbols-outlined">dashboard</span> Dashboard</button>
+      <button onclick="adminTab('quotations',event)" data-i18n="adm_quotations"><span class="material-symbols-outlined">receipt_long</span> Quotations</button>
+      <button onclick="adminTab('builder',event)" data-i18n="adm_builder"><span class="material-symbols-outlined">build</span> Quote Builder</button>
+      <button onclick="adminTab('pricing',event)" data-i18n="adm_pricing"><span class="material-symbols-outlined">sell</span> Pricing</button>
+      <button onclick="adminTab('requests',event)" data-i18n="adm_requests"><span class="material-symbols-outlined">inbox</span> Requests</button>
+      <button onclick="adminTab('portfolio',event)" data-i18n="adm_portfolio"><span class="material-symbols-outlined">photo_library</span> Portfolio</button>
+      <button onclick="adminTab('analytics',event)" data-i18n="adm_analytics"><span class="material-symbols-outlined">analytics</span> Analytics</button>
+      <button onclick="logoutAdmin()" style="margin-top:auto;color:var(--danger)"><span class="material-symbols-outlined">logout</span> Logout</button>
+    </div>
+  </div>
+  <div class="admin-main">
+
+    <!-- DASHBOARD TAB -->
+    <div id="tab-dashboard" class="tab-content active">
+      <div class="admin-header">
+        <h1 data-i18n="adm_dashboard_title">Dashboard Overview</h1>
+        <button class="btn-outline btn-sm" onclick="showPublicPage('home')">← <span data-i18n="adm_back">Back to Site</span></button>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="num" id="statVisitors">0</div><div class="lbl" data-i18n="stat_visitors">Total Visitors</div></div>
+        <div class="stat-card"><div class="num" id="statRequests">0</div><div class="lbl" data-i18n="stat_requests">Service Requests</div></div>
+        <div class="stat-card"><div class="num" id="statQuotes">0</div><div class="lbl" data-i18n="stat_quotes">Quotations Sent</div></div>
+        <div class="stat-card"><div class="num" id="statPending">0</div><div class="lbl" data-i18n="stat_pending">Pending Quotes</div></div>
+      </div>
+      <div class="glass" style="padding:32px">
+        <h3 style="font-size:1.2rem;font-weight:700;margin-bottom:20px;color:var(--primary-dark)" data-i18n="adm_recent">Recent Activity</h3>
+        <div id="recentActivity">No recent activity.</div>
+      </div>
+    </div>
+
+    <!-- QUOTATIONS TAB -->
+    <div id="tab-quotations" class="tab-content">
+      <div class="admin-header"><h1 data-i18n="adm_quotations_title">Pending Quotations</h1></div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="quotesTable">
+          <thead><tr>
+            <th data-i18n="tbl_id">ID</th><th data-i18n="tbl_client">Client</th><th data-i18n="tbl_services">Services</th>
+            <th data-i18n="tbl_amount">Amount</th><th data-i18n="tbl_status">Status</th><th data-i18n="tbl_date">Date</th><th data-i18n="tbl_actions">Actions</th>
+          </tr></thead>
+          <tbody id="quotesTableBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No quotations yet.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- QUOTE BUILDER TAB -->
+    <div id="tab-builder" class="tab-content">
+      <div class="admin-header"><h1 data-i18n="adm_builder_title">Quotation Builder</h1></div>
+      <div class="glass qb-card">
+        <div class="qb-row">
+          <div class="form-group"><label data-i18n="qb_client">Client Name</label><input type="text" id="qbClient" placeholder="Company Name"></div>
+          <div class="form-group"><label data-i18n="qb_email">Client Email</label><input type="email" id="qbEmail" placeholder="client@company.com"></div>
+          <div class="form-group"><label data-i18n="qb_phone">WhatsApp / Phone</label><input type="text" id="qbPhone" placeholder="+968 XXXX XXXX"></div>
+        </div>
+        <div class="qb-row">
+          <div class="form-group"><label data-i18n="qb_project">Project ID</label><input type="text" id="qbProjectId" value="10D-2026-001" readonly style="background:rgba(93,95,95,.05)"></div>
+          <div class="form-group"><label data-i18n="qb_valid">Valid Until (Days)</label><input type="number" id="qbValid" value="30" min="1"></div>
+          <div class="form-group"><label>Delivery Time (Days · max 7)</label><input type="number" id="qbDelivery" value="5" min="1" max="7" oninput="clampQbDelivery(this)"></div>
+        </div>
+        <h4 style="margin:24px 0 12px;font-size:1rem;font-weight:700;color:var(--primary-dark)" data-i18n="qb_services_label">Select Services & Prices</h4>
+        <div class="qb-services" id="qbServices"><!-- filled by renderQbServices() from servicesData --></div>
+
+        <h4 style="margin:24px 0 12px;font-size:1rem;font-weight:700;color:var(--primary-dark)" data-i18n="qb_addons_title">Add-ons (Optional)</h4>
+        <div class="qb-services" id="qbAddons"><!-- filled by renderQbAddons() from addonsData --></div>
+
+        <h4 style="margin:24px 0 12px;font-size:1rem;font-weight:700;color:var(--primary-dark)" data-i18n="qb_recurring_title">Recurring Plan (Maintenance &amp; Support)</h4>
+        <div class="qb-services" id="qbRecurring"><!-- filled by renderQbRecurring() from recurringData --></div>
+
+        <div class="qb-total"><span class="label" data-i18n="qb_total">Total Investment</span><span class="value" id="qbTotal">RO 0</span></div>
+        <div id="qbRecurringNote" style="display:none;margin-top:10px;font-size:.85rem;font-weight:700;color:var(--accent)"></div>
+        <div style="display:flex;gap:12px;margin-top:24px;flex-wrap:wrap">
+          <button class="btn-primary" onclick="saveQuotation()" data-i18n="qb_save">Save Quotation</button>
+          <button class="btn-accent" id="qbPdfBtn" onclick="downloadQuotePdf()"><span class="material-symbols-outlined" style="font-size:18px;vertical-align:-4px">picture_as_pdf</span> Download PDF</button>
+          <button class="btn-accent" onclick="shareWhatsApp()" data-i18n="qb_whatsapp">Send via WhatsApp</button>
+          <button class="btn-outline" onclick="shareEmail()" data-i18n="qb_email_btn">Send via Email</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRICING TAB -->
+    <div id="tab-pricing" class="tab-content">
+      <div class="admin-header">
+        <h1 data-i18n="adm_pricing_title">Pricing Manager</h1>
+        <span style="font-size:.8rem;color:var(--text-muted)" data-i18n="adm_pricing_hint">Changes sync live to the public site &amp; quote builder.</span>
+      </div>
+
+      <div class="glass" style="padding:32px;margin-bottom:24px">
+        <h3 style="font-size:1.05rem;font-weight:800;margin-bottom:6px;color:var(--primary-dark)" data-i18n="price_core">Core Services <small style="font-weight:500;color:var(--text-muted)">(RO)</small></h3>
+        <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:20px" data-i18n="price_core_desc">Used by the public estimator and the admin Quote Builder.</p>
+        <div class="qb-row" id="pricingServices"><!-- injected by JS --></div>
+      </div>
+
+      <div class="glass" style="padding:32px;margin-bottom:24px">
+        <h3 style="font-size:1.05rem;font-weight:800;margin-bottom:6px;color:var(--primary-dark)" data-i18n="price_addons">Add-ons <small style="font-weight:500;color:var(--text-muted)">(RO)</small></h3>
+        <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:20px" data-i18n="price_addons_desc">Optional extras shown in the Quote Builder and public request page.</p>
+        <div class="qb-row" id="pricingAddons"><!-- injected by JS --></div>
+      </div>
+
+      <div class="glass" style="padding:32px;margin-bottom:24px">
+        <h3 style="font-size:1.05rem;font-weight:800;margin-bottom:6px;color:var(--primary-dark)" data-i18n="price_packages">Strategic Packages <small style="font-weight:500;color:var(--text-muted)">(RO)</small></h3>
+        <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:20px" data-i18n="price_packages_desc">Shown on the public Quotation page tiers.</p>
+        <div class="qb-row">
+          <div class="form-group"><label data-i18n="tier_starter">STARTER</label><input type="number" id="setStarter" min="0"></div>
+          <div class="form-group"><label data-i18n="tier_pro">PROFESSIONAL</label><input type="number" id="setProfessional" min="0"></div>
+        </div>
+      </div>
+
+      <div class="glass" style="padding:32px;margin-bottom:24px">
+        <h3 style="font-size:1.05rem;font-weight:800;margin-bottom:6px;color:var(--primary-dark)" data-i18n="price_maint">Maintenance Plans <small style="font-weight:500;color:var(--text-muted)">(RO)</small></h3>
+        <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:20px" data-i18n="price_maint_desc">Shown in the public Quotation sidebar.</p>
+        <div class="qb-row">
+          <div class="form-group"><label data-i18n="maint_1">Weekly Check-up</label><input type="number" id="setMaintWeekly" min="0"></div>
+          <div class="form-group"><label data-i18n="maint_2">Monthly Full-Sync</label><input type="number" id="setMaintMonthly" min="0"></div>
+          <div class="form-group"><label data-i18n="maint_3">Annual Retainer</label><input type="number" id="setMaintAnnual" min="0"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button class="btn-primary" onclick="savePricing()" data-i18n="price_save"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px">save</span> Save Prices</button>
+        <button class="btn-outline" onclick="resetPricingDefaults()" data-i18n="price_reset">Reset to Defaults</button>
+      </div>
+    </div>
+
+    <!-- REQUESTS TAB -->
+    <div id="tab-requests" class="tab-content">
+      <div class="admin-header"><h1 data-i18n="adm_requests_title">Service Requests</h1></div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="requestsTable">
+          <thead><tr>
+            <th data-i18n="tbl_name">Name</th><th data-i18n="tbl_email">Email</th><th data-i18n="tbl_phone">Phone</th>
+            <th data-i18n="tbl_service">Service / Est.</th><th data-i18n="tbl_message">Message</th><th data-i18n="tbl_date">Date</th>
+          </tr></thead>
+          <tbody id="requestsTableBody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No requests yet.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PORTFOLIO MANAGER TAB -->
+    <div id="tab-portfolio" class="tab-content">
+      <div class="admin-header"><h1 data-i18n="adm_portfolio_title">Portfolio Manager</h1></div>
+      <div class="glass" style="padding:32px;margin-bottom:24px">
+        <h3 style="font-size:1.1rem;font-weight:700;margin-bottom:16px;color:var(--primary-dark)" data-i18n="adm_upload">Upload New Item</h3>
+        <div class="qb-row">
+          <div class="form-group"><label data-i18n="adm_upload_title">Title</label><input type="text" id="portTitle" placeholder="Project Name"></div>
+          <div class="form-group"><label data-i18n="adm_upload_cat">Category</label><input type="text" id="portCategory" placeholder="Web / App / Branding"></div>
+        </div>
+        <div class="form-group"><label data-i18n="adm_upload_file">File (Image or MP4 Video)</label><input type="file" id="portFile" accept="image/*,video/mp4" onchange="previewUpload()"></div>
+        <div id="uploadPreview" style="margin:16px 0;display:none">
+          <div style="max-width:300px;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.1)">
+            <img id="uploadPreviewImg" style="width:100%;display:none">
+            <video id="uploadPreviewVid" style="width:100%;display:none" controls></video>
+          </div>
+        </div>
+        <button class="btn-primary" id="uploadBtn" onclick="uploadPortfolio()" data-i18n="adm_upload_btn">Add to Portfolio</button>
+      </div>
+      <div class="portfolio-3d" id="adminPortfolioGrid"><!-- Firestore items --></div>
+    </div>
+
+    <!-- ANALYTICS TAB -->
+    <div id="tab-analytics" class="tab-content">
+      <div class="admin-header"><h1 data-i18n="adm_analytics_title">Visitor Analytics</h1></div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="num" id="statUnique">0</div><div class="lbl" data-i18n="stat_unique">Unique Visitors</div></div>
+        <div class="stat-card"><div class="num" id="statToday">0</div><div class="lbl" data-i18n="stat_today">Today</div></div>
+        <div class="stat-card"><div class="num" id="statPages">0</div><div class="lbl" data-i18n="stat_pages">Page Views</div></div>
+      </div>
+      <div class="glass" style="padding:32px">
+        <h3 style="font-size:1.1rem;font-weight:700;margin-bottom:16px;color:var(--primary-dark)" data-i18n="adm_visitors">Visitor Log</h3>
+        <div id="visitorLog" style="max-height:400px;overflow-y:auto"><p style="color:var(--text-muted)">No visitor data yet.</p></div>
+      </div>
+    </div>
+
+  </div><!-- /admin-main -->
+</div><!-- /admin-shell -->
+
+<!-- Login Modal -->
+<div class="modal-overlay login-modal" id="loginModal">
+  <div class="modal-content">
+    <img src="assets/img/logo.jpg" alt="" style="width:56px;height:56px;border-radius:14px;object-fit:contain;margin:0 auto 16px;display:block">
+    <h3 style="font-size:1.4rem;font-weight:800;margin-bottom:8px;color:var(--primary-dark)" data-i18n="login_title">Admin Login</h3>
+    <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:24px" data-i18n="login_desc">Enter your credentials to access the dashboard.</p>
+    <div style="position:relative;margin-bottom:12px">
+      <input type="password" id="loginPass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" style="margin-bottom:0;padding-right:48px">
+      <button type="button" onclick="toggleLoginPass()" id="loginPassToggle" title="Show password"
+        style="position:absolute;top:50%;right:10px;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);display:flex;align-items:center;padding:6px">
+        <span class="material-symbols-outlined" style="font-size:20px">visibility</span>
+      </button>
+    </div>
+    <button class="btn-primary w-full" onclick="doLogin()" style="margin-top:8px" data-i18n="login_btn">Login</button>
+    <button class="btn-outline w-full" onclick="closeLogin()" style="margin-top:8px" data-i18n="login_cancel">Cancel</button>
+    <p id="loginHint" style="font-size:.72rem;color:var(--text-muted);margin-top:14px;line-height:1.5" data-i18n="login_hint">First time? Type the password you want and press Login — it becomes your permanent admin password.</p>
+  </div>
+</div>
+
+<!-- Success Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Media Lightbox -->
+<div class="modal-overlay" id="lightbox" onclick="closeLightbox()">
+  <div style="max-width:900px;width:100%;padding:20px" onclick="event.stopPropagation()">
+    <div style="position:relative;border-radius:24px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.3)">
+      <img id="lightboxImg" style="width:100%;display:none">
+      <video id="lightboxVid" style="width:100%;display:none" controls autoplay></video>
+      <button onclick="closeLightbox()" style="position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;border:none;background:rgba(0,0,0,.5);color:#fff;cursor:pointer;font-size:1.2rem;display:flex;align-items:center;justify-content:center">×</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   FIREBASE
+   ═══════════════════════════════════════════ */
+const firebaseConfig = {
+  apiKey: "AIzaSyCAaQ8RF1NOdReX-1-yYXOuuwxWqWQpdxY",
+  authDomain: "digital-e54f2.firebaseapp.com",
+  projectId: "digital-e54f2",
+  messagingSenderId: "12730152228",
+  appId: "1:12730152228:web:77b2f39654f0b57c32efb1",
+  measurementId: "G-GYM7M7DZKF"
+};
+/* Note: Firebase Storage is intentionally NOT used — all media uploads go to
+   Cloudinary (see CLOUDINARY_* below). No storageBucket / storage.rules needed. */
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+/* Visible login UI only asks for a password — it is matched against this fixed
+   admin account under the hood so Firestore security rules can tell
+   "signed-in admin" apart from "anonymous visitor". Create this user once in
+   Firebase Console > Authentication > Users (see SETUP.md). */
+const ADMIN_EMAIL = 'admin@10digital.om';
+
+/* Portfolio media uploads go to Cloudinary (free tier, unsigned upload preset)
+   instead of Firebase Storage — Storage requires the Blaze billing plan to
+   enable even its first bucket. Create a free Cloudinary account and an
+   UNSIGNED upload preset, then fill these in (see SETUP.md). Both values are
+   safe to expose client-side — an unsigned preset only allows uploads, not
+   reads/deletes/account access. */
+const CLOUDINARY_CLOUD_NAME = 'dlutxjphq';
+const CLOUDINARY_UPLOAD_PRESET = 'ml_default';
+
+/* ═══════════════════════════════════════════
+   TRANSLATIONS
+   ═══════════════════════════════════════════ */
+const i18n = {
+  en: {
+    brand:"10 DIGITAL", nav_home:"Home", nav_about:"About", nav_services:"Services", nav_portfolio:"Portfolio", nav_contact:"Contact", nav_admin:"Admin",
+    hero_badge:"PREMIUM DESIGN STUDIO", hero_title:"Craft Your <br><span>Digital Legacy</span>", hero_desc:"We architect high-performance ecosystems that fuse elite aesthetics with industrial-grade engineering. Elevate your brand to the global stage.", hero_cta_primary:"Start Your Project", hero_cta_secondary:"View Showcase",
+    stat_projects:"Projects Delivered", stat_experience:"Years Experience", stat_experts:"Digital Experts", stat_retention:"Client Retention",
+    about_title:"Who We Are", about_desc:"10 Digital is a premium digital design studio crafting immersive web experiences, native mobile applications, and data-driven marketing campaigns.",
+    about_card_1_title:"Web Architecture", about_card_1_desc:"Fluid, high-performance web experiences built with cutting-edge frameworks for unrivaled speed and SEO dominance.",
+    about_card_2_title:"Mobile Ecosystems", about_card_2_desc:"Native Android & iOS development with seamless cross-platform synchronization and elite user experience design.",
+    about_card_3_title:"Integrated Marketing", about_card_3_desc:"Product photography, social media virality, and targeted promotion. We turn high-end products into digital movements.",
+    about_card_4_title:"3D Experiences", about_card_4_desc:"Immersive 3D web design with parallax depth, spatial animations, and interactive elements that captivate audiences.",
+    success_title:"Voices of Innovation", success_desc:"Hear from the leaders we've partnered with to build digital legacies.",
+    testimonial_quote:"“10 Digital didn't just build a website; they architected our future.”", testimonial_cite:"— CEO, Astra Corp.",
+    trust_label:"Trusted by Innovation Leaders",
+    services_title:"Precision Services", services_desc:"Modular solutions for complex digital challenges. Toggle services to build your custom ecosystem.",
+    btn_request_service:"Request Service",
+    portfolio_title:"Portfolio", portfolio_desc:"Witness the synthesis of aesthetics and function through our curated portfolio.",
+    quote_title:"Project Proposal<br>&amp; Quotation", quote_valid_days:"30 Days", quote_estimator:"REAL-TIME ESTIMATOR", quote_estimator_desc:"Estimate based on selected features below.",
+    quote_core_services:"CORE SERVICES", quote_packages:"STRATEGIC PACKAGES", quote_init:"INITIALIZE INQUIRY", quote_submit:"SUBMIT QUOTATION REQUEST",
+    quote_pulse:"Live Pulse", quote_active:"STUDIO ACTIVE", quote_pulse_1:"Server Resource Allocation", quote_pulse_2:"Dev Queue Velocity", quote_pulse_2_val:"High", quote_pulse_3:"Active Collaborations", quote_pulse_3_val:"12 Partners",
+    quote_journey:"PROJECT JOURNEY", quote_maintenance:"MAINTENANCE PLANS", quote_team:"Assigned Team", quote_client_default:"Prospective Client",
+    tier_starter:"STARTER", tier_starter_1:"Basic SEO Package", tier_starter_2:"Standard Hosting", tier_starter_3:"Email Support", tier_select:"Select Starter",
+    tier_pro:"PROFESSIONAL", tier_recommended:"RECOMMENDED", tier_pro_1:"Priority Development", tier_pro_2:"Cloud Auto-Scaling", tier_pro_3:"24/7 Concierge", tier_pro_4:"Custom API Links", tier_select_pro:"Select Pro",
+    tier_enterprise:"ENTERPRISE", tier_custom:"Custom", tier_ent_1:"On-Site Specialists", tier_ent_2:"Source Ownership", tier_ent_3:"Unlimited Edits", tier_contact:"Contact Us",
+    journey_1_title:"01. Discovery", journey_1_desc:"Target audience analysis & requirements mapping.",
+    journey_2_title:"02. UI/UX Design", journey_2_desc:"Interactive wireframes and high-fidelity 3D visuals.",
+    journey_3_title:"03. Development", journey_3_desc:"Full-stack implementation and API integration.",
+    journey_4_title:"04. Content & QA", journey_4_desc:"Data population and rigorous performance testing.",
+    journey_5_title:"05. Launch", journey_5_desc:"App store deployment and live environment scale-up.",
+    maint_1:"Weekly Check-up", maint_2:"Monthly Full-Sync", maint_3:"Annual Retainer",
+    form_name:"Full Name", form_email:"Email Address", form_phone:"Phone / WhatsApp", form_message:"Additional Scope Notes",
+    foot_bio:"Synthesizing elite aesthetics with industrial engineering for the digital age.", foot_services_title:"Services", foot_company_title:"Company", foot_newsletter_title:"Join Our Circle", foot_newsletter_desc:"Get digital insights delivered monthly.", foot_newsletter_placeholder:"Email address",
+    foot_privacy:"Privacy Policy", foot_terms:"Terms of Service", foot_rights:"All rights reserved.",
+    login_title:"Admin Login", login_desc:"Enter your credentials to access the dashboard.", login_btn:"Login", login_cancel:"Cancel",
+    adm_dashboard:"Dashboard", adm_quotations:"Quotations", adm_builder:"Quote Builder", adm_requests:"Requests", adm_portfolio:"Portfolio", adm_analytics:"Analytics",
+    adm_dashboard_title:"Dashboard Overview", adm_back:"Back to Site",
+    stat_visitors:"Total Visitors", stat_requests:"Service Requests", stat_quotes:"Quotations Sent", stat_pending:"Pending Quotes",
+    stat_unique:"Unique Visitors", stat_today:"Today", stat_pages:"Page Views",
+    adm_recent:"Recent Activity", adm_quotations_title:"Pending Quotations", adm_builder_title:"Quotation Builder",
+    adm_requests_title:"Service Requests", adm_portfolio_title:"Portfolio Manager", adm_analytics_title:"Visitor Analytics",
+    adm_upload:"Upload New Item", adm_upload_title:"Title", adm_upload_cat:"Category", adm_upload_file:"File (Image or MP4 Video)", adm_upload_btn:"Add to Portfolio",
+    adm_visitors:"Visitor Log",
+    tbl_id:"ID", tbl_client:"Client", tbl_services:"Services", tbl_amount:"Amount", tbl_status:"Status", tbl_date:"Date", tbl_actions:"Actions",
+    tbl_name:"Name", tbl_email:"Email", tbl_phone:"Phone", tbl_service:"Service / Est.", tbl_message:"Message",
+    qb_client:"Client Name", qb_email:"Client Email", qb_phone:"WhatsApp / Phone", qb_project:"Project ID", qb_valid:"Valid Until (Days)",
+    qb_services_label:"Select Services & Prices", qb_total:"Total Investment", qb_total_once:"(one-time)", qb_save:"Save Quotation", qb_whatsapp:"Send via WhatsApp", qb_email_btn:"Send via Email",
+    qb_addons_title:"Add-ons (Optional)", qb_recurring_title:"Recurring Plan (Maintenance & Support)", qb_weekly:"Weekly", qb_monthly:"Monthly", qb_weekly_plan:"Weekly Care Plan", qb_monthly_plan:"Monthly Care Plan", qb_weekly_desc:"Updates, backups & monitoring · billed weekly", qb_monthly_desc:"Everything + priority fixes · billed monthly",
+    toast_request:"Request submitted successfully! We will contact you soon.",
+    toast_login:"Welcome back, Admin.", toast_login_fail:"Invalid password.",
+    toast_quote_saved:"Quotation saved successfully.", toast_portfolio:"Item added to portfolio.", toast_newsletter:"Subscribed! Welcome to the circle.",
+    status_pending:"Pending", status_completed:"Completed", status_rejected:"Rejected"
+  },
+  ar: {
+    brand:"10 ديجيتال", nav_home:"الرئيسية", nav_about:"من نحن", nav_services:"الخدمات", nav_portfolio:"أعمالنا", nav_contact:"تواصل", nav_admin:"المدير",
+    hero_badge:"استوديو تصميم متميز", hero_title:"اصنع <br><span>إرثك الرقمي</span>", hero_desc:"نصمم أنظمة بيئية عالية الأداء تدمج الجماليات المتميزة مع الهندسة الصناعية. ارفع علامتك التجارية إلى المستوى العالمي.", hero_cta_primary:"ابدأ مشروعك", hero_cta_secondary:"عرض الأعمال",
+    stat_projects:"مشروع منجز", stat_experience:"سنوات خبرة", stat_experts:"خبير رقمي", stat_retention:"رضا العملاء",
+    about_title:"من نحن", about_desc:"10 ديجيتال هي استوديو تصميم رقمي متميز يصنع تجارب ويب غامرة، تطبيقات جوال أصلية، وحملات تسويقية مدفوعة بالبيانات.",
+    about_card_1_title:"بنية الويب", about_card_1_desc:"تجارب ويب سريعة الاستجابة ومُحسّنة بأحدث الأطر لتحقيق أقصى سرعة وهيمنة على محركات البحث.",
+    about_card_2_title:"أنظمة الجوال", about_card_2_desc:"تطوير أصلي لـ Android و iOS مع مزامنة متعددة المنصات وتصميم تجربة مستخدم فاخر.",
+    about_card_3_title:"التسويق المتكامل", about_card_3_desc:"تصوير المنتجات، حملات فيروسية على السوشال ميديا، وترويج مستهدف. نحول منتجاتك إلى حركات رقمية.",
+    about_card_4_title:"تجارب ثلاثية الأبعاد", about_card_4_desc:"تصميم ويب ثلاثي الأبعاد غامر مع عمق البارالاكس، والرسوم المتحركة المكانية، والعناصر التفاعلية.",
+    success_title:"أصوات الابتكار", success_desc:"استمع لقادة الأعمال الذين تعاونوا معنا لبناء إرثهم الرقمي.",
+    testimonial_quote:"«10 ديجيتال لم يبنوا موقعًا فقط، بل صمموا مستقبلنا.»", testimonial_cite:"— الرئيس التنفيذي، أسترا كورب",
+    trust_label:"موثوق من قِبل قادة الابتكار",
+    services_title:"خدمات دقيقة", services_desc:"حلول وحدية للتحديات الرقمية المعقدة. قم بتبديل الخدمات لبناء نظامك البيئي المخصص.",
+    btn_request_service:"اطلب خدمة",
+    portfolio_title:"أعمالنا", portfolio_desc:"شاهد توليف الجماليات والوظائف من خلال محفظتنا المختارة.",
+    quote_title:"عرض المشروع<br>والتسعير", quote_valid_days:"30 يومًا", quote_estimator:"حاسبة فورية", quote_estimator_desc:"تقدير مبني على الخدمات المختارة أدناه.",
+    quote_core_services:"الخدمات الأساسية", quote_packages:"الباقات الاستراتيجية", quote_init:"بدء الاستفسار", quote_submit:"إرسال طلب التسعير",
+    quote_pulse:"نشاط الاستوديو", quote_active:"الاستوديو نشط", quote_pulse_1:"تخصيص موارد الخادم", quote_pulse_2:"سرعة قائمة التطوير", quote_pulse_2_val:"مرتفعة", quote_pulse_3:"التعاونات النشطة", quote_pulse_3_val:"12 شريكًا",
+    quote_journey:"مسار المشروع", quote_maintenance:"خطط الصيانة", quote_team:"الفريق المخصص", quote_client_default:"عميل محتمل",
+    tier_starter:"الأساسية", tier_starter_1:"حزمة SEO أساسية", tier_starter_2:"استضافة قياسية", tier_starter_3:"دعم عبر البريد", tier_select:"اختر الأساسية",
+    tier_pro:"المتميزة", tier_recommended:"موصى بها", tier_pro_1:"تطوير ذو أولوية", tier_pro_2:"توسع سحابي تلقائي", tier_pro_3:"دعم على مدار الساعة", tier_pro_4:"ربط API مخصص", tier_select_pro:"اختر المتميزة",
+    tier_enterprise:"المؤسسات", tier_custom:"مخصص", tier_ent_1:"متخصصون في الموقع", tier_ent_2:"ملكية المصدر", tier_ent_3:"تعديلات غير محدودة", tier_contact:"تواصل معنا",
+    journey_1_title:"01. الاكتشاف", journey_1_desc:"تحليل الجمهور المستهدف وتحديد المتطلبات.",
+    journey_2_title:"02. تصميم UI/UX", journey_2_desc:"نماذج تفاعلية ورسومات ثلاثية الأبعاد عالية الدقة.",
+    journey_3_title:"03. التطوير", journey_3_desc:"تنفيذ شامل وربط واجهات برمجية.",
+    journey_4_title:"04. المحتوى والجودة", journey_4_desc:"تعبئة البيانات واختبار الأداء الدقيق.",
+    journey_5_title:"05. الإطلاق", journey_5_desc:"النشر على المتاجر وتوسيع البيئة الحية.",
+    maint_1:"فحص أسبوعي", maint_2:"مزامنة شهرية كاملة", maint_3:"باقة سنوية",
+    form_name:"الاسم الكامل", form_email:"البريد الإلكتروني", form_phone:"الهاتف / واتساب", form_message:"ملاحظات إضافية عن النطاق",
+    foot_bio:"دمج الجماليات المتميزة مع الهندسة الصناعية للعصر الرقمي.", foot_services_title:"الخدمات", foot_company_title:"الشركة", foot_newsletter_title:"انضم إلينا", foot_newsletter_desc:"احصل على رؤى رقمية شهرية.", foot_newsletter_placeholder:"البريد الإلكتروني",
+    foot_privacy:"سياسة الخصوصية", foot_terms:"الشروط والأحكام", foot_rights:"جميع الحقوق محفوظة.",
+    login_title:"تسجيل دخول المدير", login_desc:"أدخل بيانات الاعتماد للوصول إلى لوحة التحكم.", login_btn:"دخول", login_cancel:"إلغاء",
+    adm_dashboard:"لوحة التحكم", adm_quotations:"العروض", adm_builder:"منشئ العروض", adm_requests:"الطلبات", adm_portfolio:"المحفظة", adm_analytics:"التحليلات",
+    adm_dashboard_title:"نظرة عامة", adm_back:"العودة للموقع",
+    stat_visitors:"إجمالي الزوار", stat_requests:"طلبات الخدمة", stat_quotes:"العروض المرسلة", stat_pending:"العروض المعلقة",
+    stat_unique:"زوار فريدون", stat_today:"اليوم", stat_pages:"مشاهدات الصفحات",
+    adm_recent:"النشاط الأخير", adm_quotations_title:"العروض المعلقة", adm_builder_title:"منشئ العروض",
+    adm_requests_title:"طلبات الخدمة", adm_portfolio_title:"مدير المحفظة", adm_analytics_title:"تحليلات الزوار",
+    adm_upload:"رفع عنصر جديد", adm_upload_title:"العنوان", adm_upload_cat:"التصنيف", adm_upload_file:"ملف (صورة أو فيديو MP4)", adm_upload_btn:"إضافة للمحفظة",
+    adm_visitors:"سجل الزوار",
+    tbl_id:"الرقم", tbl_client:"العميل", tbl_services:"الخدمات", tbl_amount:"المبلغ", tbl_status:"الحالة", tbl_date:"التاريخ", tbl_actions:"إجراءات",
+    tbl_name:"الاسم", tbl_email:"البريد", tbl_phone:"الهاتف", tbl_service:"الخدمة / التقدير", tbl_message:"الرسالة",
+    qb_client:"اسم العميل", qb_email:"بريد العميل", qb_phone:"واتساب / هاتف", qb_project:"رقم المشروع", qb_valid:"صالح لـ (أيام)",
+    qb_services_label:"اختر الخدمات والأسعار", qb_total:"إجمالي الاستثمار", qb_total_once:"(مرة واحدة)", qb_save:"حفظ العرض", qb_whatsapp:"إرسال واتساب", qb_email_btn:"إرسال بريد",
+    qb_addons_title:"إضافات (اختياري)", qb_recurring_title:"خطة متكررة (صيانة ودعم)", qb_weekly:"أسبوعي", qb_monthly:"شهري", qb_weekly_plan:"خطة العناية الأسبوعية", qb_monthly_plan:"خطة العناية الشهرية", qb_weekly_desc:"تحديثات ونسخ احتياطي ومراقبة · فوترة أسبوعية", qb_monthly_desc:"كل شيء + إصلاحات ذات أولوية · فوترة شهرية",
+    toast_request:"تم إرسال الطلب بنجاح! سنتواصل معك قريبًا.",
+    toast_login:"مرحبًا بك، مدير.", toast_login_fail:"كلمة المرور غير صحيحة.",
+    toast_quote_saved:"تم حفظ العرض بنجاح.", toast_portfolio:"تمت إضافة العنصر للمحفظة.", toast_newsletter:"تم الاشتراك! مرحبًا بك في الدائرة.",
+    status_pending:"معلق", status_completed:"مكتمل", status_rejected:"مرفوض"
+  }
+};
+let currentLang = 'en';
+function toggleLang(){
+  currentLang = currentLang === 'en' ? 'ar' : 'en';
+  document.documentElement.lang = currentLang;
+  document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+  document.getElementById('langLabel').textContent = currentLang === 'en' ? 'العربية' : 'English';
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if(i18n[currentLang][key]){
+      if(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.placeholder = i18n[currentLang][key];
+      else el.innerHTML = i18n[currentLang][key];
+    }
+  });
+  renderServices();
+  renderQuoteServices();
+  if(typeof updateRecurringNote === 'function') updateRecurringNote();
+}
+
+/* ═══════════════════════════════════════════
+   VISITOR TRACKING (Firestore)
+   ═══════════════════════════════════════════ */
+function trackVisitor(){
+  const sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2,9);
+  sessionStorage.setItem('10d_session', sid);
+  db.collection('visitors').add({ sessionId: sid, time: firebase.firestore.FieldValue.serverTimestamp(), page: location.hash || '#home', ua: navigator.userAgent }).catch(()=>{});
+}
+if(!sessionStorage.getItem('10d_session')) trackVisitor();
+
+/* ═══════════════════════════════════════════
+   PUBLIC PAGE NAVIGATION
+   ═══════════════════════════════════════════ */
+function showPublicPage(page){
+  document.querySelectorAll('.public-page').forEach(p => p.style.display = 'none');
+  const target = document.getElementById('page-' + page);
+  if(target) target.style.display = 'block';
+  document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+  const link = document.querySelector('.nav-links a[href="#' + page + '"]');
+  if(link) link.classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ═══════════════════════════════════════════
+   SERVICES GRID (Services page — 3D tilt cards)
+   ═══════════════════════════════════════════ */
+/* ─── SINGLE SOURCE OF TRUTH ───────────────────────────────────────────
+   servicesData + addonsData + recurringData drive EVERYTHING:
+   public services grid, chatbot, public request estimator, admin Quote
+   Builder, and the admin Pricing Manager. Add an item here once and it
+   appears in all of those places. Live prices come from PRICING (Firestore).
+   ──────────────────────────────────────────────────────────────────── */
+const servicesData = [
+  { id:'web', icon:'language', price:850, title_en:'Website Design', title_ar:'تصميم موقع ويب', desc_en:'Custom responsive web platform with product showcases, mapping, and request systems.', desc_ar:'منصة ويب مخصصة مع عرض المنتجات والخرائط وأنظمة الطلبات.', color:'rgba(99,102,241,.12)', border:'rgba(99,102,241,.2)', iconColor:'#6366f1' },
+  { id:'system', icon:'dns', price:1500, title_en:'Custom Systems', title_ar:'أنظمة مخصصة', desc_en:'Tailored ERP, dashboards, and internal tools that automate your daily operations.', desc_ar:'أنظمة ERP ولوحات تحكم وأدوات داخلية مخصصة لأتمتة عملياتك اليومية.', color:'rgba(20,184,166,.12)', border:'rgba(20,184,166,.2)', iconColor:'#14b8a6' },
+  { id:'chatbot', icon:'smart_toy', price:400, title_en:'Chatbot Assistant', title_ar:'مساعد شات بوت', desc_en:'Scripted or AI chat assistant that guides visitors and captures leads 24/7.', desc_ar:'مساعد محادثة (مبرمج أو ذكي) يرشد الزوار ويجمع العملاء المحتملين على مدار الساعة.', color:'rgba(14,165,233,.12)', border:'rgba(14,165,233,.2)', iconColor:'#0ea5e9' },
+  { id:'ios', icon:'phone_iphone', price:1200, title_en:'iOS App', title_ar:'تطبيق iOS', desc_en:'Native Swift app with Apple Pay, push notifications, and real-time tracking.', desc_ar:'تطبيق Swift أصلي مع Apple Pay والإشعارات والتتبع الفوري.', color:'rgba(34,197,94,.12)', border:'rgba(34,197,94,.2)', iconColor:'#22c55e' },
+  { id:'android', icon:'android', price:1100, title_en:'Android App', title_ar:'تطبيق Android', desc_en:'Native Kotlin app with Google Pay and deep Android ecosystem integration.', desc_ar:'تطبيق Kotlin أصلي مع Google Pay وتكامل عميق مع Android.', color:'rgba(59,130,246,.12)', border:'rgba(59,130,246,.2)', iconColor:'#3b82f6' },
+  { id:'marketing', icon:'campaign', price:450, title_en:'Marketing & Photo', title_ar:'تسويق وتصوير', desc_en:'Professional photography, viral campaigns, and targeted promotion strategies.', desc_ar:'تصوير احترافي، حملات فيروسية، واستراتيجيات ترويج مستهدفة.', color:'rgba(236,72,153,.12)', border:'rgba(236,72,153,.2)', iconColor:'#ec4899' },
+  { id:'branding', icon:'brush', price:600, title_en:'Branding & Logo', title_ar:'هوية وشعار', desc_en:'Bespoke visual identity including logo, color systems, and brand guidelines.', desc_ar:'هوية بصرية مخصصة تشمل الشعار وأنظمة الألوان وإرشادات العلامة.', color:'rgba(192,160,96,.12)', border:'rgba(192,160,96,.2)', iconColor:'#c0a060' },
+  { id:'maintenance', icon:'settings', price:300, title_en:'Maintenance', title_ar:'صيانة', desc_en:'Weekly, monthly, and annual maintenance plans to keep your platform secure.', desc_ar:'خطط صيانة أسبوعية وشهرية وسنوية للحفاظ على أمان منصتك.', color:'rgba(168,85,247,.12)', border:'rgba(168,85,247,.2)', iconColor:'#a855f7' }
+];
+/* Optional one-time add-ons */
+const addonsData = [
+  { id:'addon-hosting',   icon:'cloud',         price:120, title_en:'Hosting & Domain (1 yr)', title_ar:'استضافة ونطاق (سنة)', desc_en:'Managed hosting + domain.', desc_ar:'استضافة مُدارة + نطاق.' },
+  { id:'addon-seo',       icon:'travel_explore', price:200, title_en:'SEO Setup',             title_ar:'تهيئة SEO',          desc_en:'On-page SEO + search console.', desc_ar:'تحسين محركات البحث + Search Console.' },
+  { id:'addon-content',   icon:'edit_note',     price:150, title_en:'Content Writing',       title_ar:'كتابة المحتوى',      desc_en:'Copywriting for up to 6 pages.', desc_ar:'كتابة محتوى حتى 6 صفحات.' },
+  { id:'addon-support',   icon:'support_agent', price:100, title_en:'Priority Support',      title_ar:'دعم ذو أولوية',      desc_en:'Fast-track support channel.', desc_ar:'قناة دعم سريعة.' },
+  { id:'addon-revisions', icon:'autorenew',     price:90,  title_en:'Extra Revisions Pack',  title_ar:'باقة تعديلات إضافية', desc_en:'Additional design revision rounds.', desc_ar:'جولات تعديل تصميم إضافية.' }
+];
+/* Recurring maintenance/support plans (priced from PRICING.maintenance) */
+const recurringData = [
+  { id:'weekly',  cycle:'weekly',  price:80,  title_en:'Weekly Care Plan',  title_ar:'خطة العناية الأسبوعية', desc_en:'Updates, backups & monitoring · billed weekly.',  desc_ar:'تحديثات ونسخ احتياطي ومراقبة · فوترة أسبوعية.' },
+  { id:'monthly', cycle:'monthly', price:250, title_en:'Monthly Care Plan', title_ar:'خطة العناية الشهرية',  desc_en:'Everything + priority fixes · billed monthly.', desc_ar:'كل شيء + إصلاحات ذات أولوية · فوترة شهرية.' }
+];
+/* Language helpers for the catalog */
+function svcName(s){ return currentLang === 'ar' ? s.title_ar : s.title_en; }
+function svcDesc(s){ return currentLang === 'ar' ? s.desc_ar : s.desc_en; }
+function renderServices(){
+  const grid = document.getElementById('servicesGrid');
+  if(!grid) return;
+  grid.innerHTML = servicesData.map(s => `
+    <div class="tilt-card" onmousemove="tiltCard(event,this)" onmouseleave="resetTilt(this)">
+      <div class="tilt-shine"></div>
+      <div class="tilt-icon" style="background:linear-gradient(135deg,${s.color},rgba(255,255,255,.4));border:1px solid ${s.border};color:${s.iconColor}">
+        <span class="material-symbols-outlined">${s.icon}</span>
+      </div>
+      <h3>${currentLang==='en'?s.title_en:s.title_ar}</h3>
+      <p>${currentLang==='en'?s.desc_en:s.desc_ar}</p>
+    </div>
+  `).join('');
+}
+function tiltCard(e,card){ const rect=card.getBoundingClientRect(); const x=e.clientX-rect.left; const y=e.clientY-rect.top; const cx=rect.width/2; const cy=rect.height/2; const rx=(y-cy)/cy*-10; const ry=(x-cx)/cx*10; card.style.transform=`perspective(1000px) rotateX(${rx}deg) rotateY(${ry}deg) translateZ(20px)`; card.style.setProperty('--x',x+'px'); card.style.setProperty('--y',y+'px'); }
+function resetTilt(card){ card.style.transform='perspective(1000px) rotateX(0) rotateY(0) translateZ(0)'; }
+renderServices();
+
+/* ═══════════════════════════════════════════
+   PORTFOLIO — live synced from Firestore 'portfolio' collection.
+   Static demo items already live in the HTML; uploads from the admin
+   Portfolio Manager are appended/removed here in real time.
+   ═══════════════════════════════════════════ */
+function renderDynamicPortfolio(items){
+  const html = items.map(item => `
+    <div class="port-3d-item reveal active" data-fb-id="${item.id}" onclick="openMediaFromUrl('${item.url}','${item.type}')">
+      ${item.type === 'video' ? `<video src="${item.url}" style="width:100%;height:100%;object-fit:cover"></video>` : `<img src="${item.url}" alt="${item.title}" style="width:100%;height:100%;object-fit:cover">`}
+      <div class="port-3d-overlay">
+        ${item.type === 'video' ? '<div class="play-btn"><span class="material-symbols-outlined">play_arrow</span></div>' : ''}
+        <h4>${item.title}</h4><p>${item.category}</p>
+      </div>
+    </div>
+  `).join('');
+  const grid = document.getElementById('portfolioGrid');
+  const adminGrid = document.getElementById('adminPortfolioGrid');
+  if(grid){ grid.querySelectorAll('[data-fb-id]').forEach(el=>el.remove()); grid.insertAdjacentHTML('beforeend', html); }
+  if(adminGrid){ adminGrid.innerHTML = html || '<p style="color:var(--text-muted)">No uploads yet — items you add below will appear here and on the public Portfolio page.</p>'; }
+}
+db.collection('portfolio').orderBy('createdAt','desc').onSnapshot(snap => {
+  const items = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  renderDynamicPortfolio(items);
+}, err => console.warn('portfolio listener', err));
+
+function openMediaFromUrl(url,type){
+  if(type==='video'){ document.getElementById('lightboxVid').src=url; document.getElementById('lightboxVid').style.display='block'; document.getElementById('lightboxImg').style.display='none'; }
+  else { document.getElementById('lightboxImg').src=url; document.getElementById('lightboxImg').style.display='block'; document.getElementById('lightboxVid').style.display='none'; }
+  document.getElementById('lightbox').classList.add('show');
+}
+function closeLightbox(){ document.getElementById('lightbox').classList.remove('show'); const v=document.getElementById('lightboxVid'); if(v) v.pause(); }
+
+/* ═══════════════════════════════════════════
+   PUBLIC REQUEST-A-QUOTE PAGE
+   (instant public ballpark estimator — separate from the admin Quote
+   Builder's formal negotiated pricing)
+   ═══════════════════════════════════════════ */
+const quoteServicesData = [
+  { id:'web', icon:'language', price:850, checked:true, title_en:'Website Design', title_ar:'تصميم موقع ويب', desc_en:'Next-gen responsive experience with custom 3D interactions.', desc_ar:'تجربة استجابة من الجيل التالي مع تفاعلات ثلاثية الأبعاد مخصصة.' },
+  { id:'ios', icon:'smartphone', price:1200, checked:false, title_en:'iOS App', title_ar:'تطبيق iOS', desc_en:'Native Swift performance with Apple Human Interface design.', desc_ar:'أداء Swift أصلي بتصميم واجهة Apple البشرية.' },
+  { id:'android', icon:'android', price:1100, checked:false, title_en:'Android App', title_ar:'تطبيق Android', desc_en:'Material Design 3 apps built for performance and scalability.', desc_ar:'تطبيقات Material Design 3 مصممة للأداء والتوسع.' },
+  { id:'marketing', icon:'camera', price:450, checked:false, title_en:'Marketing & Photo', title_ar:'تسويق وتصوير', desc_en:'Professional studio photography and social campaign management.', desc_ar:'تصوير استوديو احترافي وإدارة حملات اجتماعية.' },
+  { id:'branding', icon:'palette', price:600, checked:true, title_en:'Branding', title_ar:'هوية تجارية', desc_en:'Visual identity, logo design, and brand guideline documentation.', desc_ar:'هوية بصرية وتصميم شعار ووثائق إرشادات العلامة.' }
+];
+function renderQuoteServices(){
+  const grid = document.getElementById('quoteServicesGrid');
+  if(!grid) return;
+  const defChecked = { web:true, branding:true };
+  const card = (s, kind) => {
+    const price = svcPrice(s, kind);
+    const sel = (kind === 'service' && defChecked[s.id]) ? ' selected' : '';
+    return `<div class="glass-dark svc-card${sel}" data-svc="${s.id}" data-price="${price}" onclick="toggleQuoteService(this)">
+      <div class="top">
+        <div class="icn"><span class="material-symbols-outlined">${s.icon || 'star'}</span></div>
+        <div class="check"><span class="material-symbols-outlined" style="font-size:16px">check</span></div>
+      </div>
+      <h3>${svcName(s)}</h3>
+      <p>${svcDesc(s)}</p>
+      <p class="price">${price} RO</p>
+    </div>`;
+  };
+  grid.innerHTML = servicesData.map(s => card(s,'service')).join('') + addonsData.map(s => card(s,'addon')).join('');
+  calcQuoteTotal();
+}
+function toggleQuoteService(card){ card.classList.toggle('selected'); calcQuoteTotal(); }
+function calcQuoteTotal(){
+  let total = 0;
+  document.querySelectorAll('#quoteServicesGrid .svc-card.selected').forEach(card => total += parseInt(card.dataset.price,10));
+  const el = document.getElementById('quoteTotal');
+  if(el) el.textContent = total.toLocaleString();
+  return total;
+}
+let selectedTier = null, selectedMaintenance = null;
+function selectTier(name){
+  const priceMap = { Starter: PRICING.packages.starter, Professional: PRICING.packages.professional, Enterprise: 'Custom' };
+  const price = priceMap[name] != null ? priceMap[name] : 'Custom';
+  selectedTier = { name, price };
+  const notes = document.getElementById('quoteNotes');
+  const priceLabel = price === 'Custom' ? 'Custom' : `${Number(price).toLocaleString()} RO`;
+  if(notes && !notes.value.includes(name)) notes.value = (notes.value ? notes.value + '\n' : '') + `Interested package: ${name} (${priceLabel})`;
+  showToast(currentLang==='en' ? `${name} package selected` : `تم اختيار باقة ${name}`);
+  document.getElementById('quoteName')?.scrollIntoView({behavior:'smooth', block:'center'});
+}
+function selectMaintenance(name){
+  selectedMaintenance = name;
+  const notes = document.getElementById('quoteNotes');
+  if(notes && !notes.value.includes(name)) notes.value = (notes.value ? notes.value + '\n' : '') + `Maintenance plan: ${name}`;
+  showToast(currentLang==='en' ? `${name} added to request` : `تمت إضافة ${name} للطلب`);
+}
+function submitQuoteRequest(){
+  const name = document.getElementById('quoteName').value.trim();
+  const email = document.getElementById('quoteEmail').value.trim();
+  const phone = document.getElementById('quotePhone').value.trim();
+  const notes = document.getElementById('quoteNotes').value.trim();
+  if(!name || !email){ showToast(currentLang==='en'?'Please fill name and email.':'يرجى ملء الاسم والبريد'); return; }
+  const services = Array.from(document.querySelectorAll('#quoteServicesGrid .svc-card.selected')).map(c => c.dataset.svc);
+  const estimatedTotal = calcQuoteTotal();
+  db.collection('requests').add({
+    name, email, phone, message: notes,
+    service: services.join(', ') || '-',
+    estimatedTotal, tier: selectedTier ? selectedTier.name : null,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    date: new Date().toLocaleString()
+  }).then(()=>{
+    showToast(i18n[currentLang].toast_request);
+    document.getElementById('quoteName').value=''; document.getElementById('quoteEmail').value=''; document.getElementById('quotePhone').value=''; document.getElementById('quoteNotes').value='';
+  }).catch(err=>{ showToast(currentLang==='en'?'Could not submit — check your connection.':'فشل الإرسال — تحقق من الاتصال'); console.error(err); });
+}
+renderQuoteServices();
+
+/* ═══════════════════════════════════════════
+   ADMIN AUTH (Firebase Auth — UI only asks for a password)
+   ═══════════════════════════════════════════ */
+function openLogin(){ document.getElementById('loginModal').classList.add('show'); document.getElementById('loginPass').focus(); }
+function closeLogin(){ document.getElementById('loginModal').classList.remove('show'); document.getElementById('loginPass').value=''; }
+
+/* Show / hide the password field */
+function toggleLoginPass(){
+  const inp = document.getElementById('loginPass');
+  const icon = document.querySelector('#loginPassToggle .material-symbols-outlined');
+  if(inp.type === 'password'){ inp.type = 'text'; if(icon) icon.textContent = 'visibility_off'; }
+  else { inp.type = 'password'; if(icon) icon.textContent = 'visibility'; }
+}
+
+function enterAdmin(){
+  document.getElementById('public-site').style.display='none';
+  document.getElementById('admin-shell').classList.add('active');
+  closeLogin();
+  refreshAdmin();
+}
+
+function doLogin(){
+  const pass = document.getElementById('loginPass').value;
+  if(!pass){ showToast(currentLang==='en'?'Enter a password.':'أدخل كلمة المرور'); return; }
+  if(pass.length < 6){ showToast(currentLang==='en'?'Password must be at least 6 characters.':'كلمة المرور 6 أحرف على الأقل'); return; }
+
+  auth.signInWithEmailAndPassword(ADMIN_EMAIL, pass)
+    .then(()=>{ enterAdmin(); showToast(i18n[currentLang].toast_login); })
+    .catch(err=>{
+      const code = err && err.code;
+      /* First-time bootstrap: the admin account doesn't exist yet, so create
+         it with the password just typed. (Modern Firebase masks "user not
+         found" as "invalid-credential", so we attempt creation and read the
+         result: email-already-in-use ⇒ the account exists & the password was
+         simply wrong.) */
+      if(code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials'){
+        auth.createUserWithEmailAndPassword(ADMIN_EMAIL, pass)
+          .then(()=>{ enterAdmin(); showToast(currentLang==='en'?'Admin account created — you\'re in ✓':'تم إنشاء حساب المدير — تم الدخول ✓'); })
+          .catch(cErr=>{
+            if(cErr.code === 'auth/email-already-in-use'){
+              showToast(currentLang==='en'?'Wrong password — try again.':'كلمة المرور خاطئة — حاول مجددًا');
+            } else if(cErr.code === 'auth/operation-not-allowed'){
+              showToast(currentLang==='en'?'Enable Email/Password in Firebase Auth first.':'فعّل تسجيل الدخول بالبريد في Firebase أولاً');
+            } else {
+              showToast((currentLang==='en'?'Login error: ':'خطأ: ') + (cErr.message||cErr.code));
+            }
+          });
+      } else if(code === 'auth/wrong-password'){
+        showToast(currentLang==='en'?'Wrong password — try again.':'كلمة المرور خاطئة — حاول مجددًا');
+      } else if(code === 'auth/operation-not-allowed'){
+        showToast(currentLang==='en'?'Enable Email/Password in Firebase Auth first.':'فعّل تسجيل الدخول بالبريد في Firebase أولاً');
+      } else if(code === 'auth/too-many-requests'){
+        showToast(currentLang==='en'?'Too many attempts — wait a minute.':'محاولات كثيرة — انتظر دقيقة');
+      } else {
+        showToast((currentLang==='en'?'Login error: ':'خطأ: ') + (err.message||code||'unknown'));
+      }
+    });
+}
+function logoutAdmin(){
+  auth.signOut();
+  document.getElementById('admin-shell').classList.remove('active');
+  document.getElementById('public-site').style.display='block';
+  showPublicPage('home');
+}
+auth.onAuthStateChanged(user => {
+  if(user && user.email === ADMIN_EMAIL){
+    document.getElementById('public-site').style.display='none';
+    document.getElementById('admin-shell').classList.add('active');
+    refreshAdmin();
+  }
+});
+
+/* ═══════════════════════════════════════════
+   ADMIN TABS
+   ═══════════════════════════════════════════ */
+function adminTab(tab,evt){
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.admin-nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  if(evt) evt.target.closest('button').classList.add('active');
+  if(tab==='dashboard') refreshDashboard();
+  if(tab==='quotations') refreshQuotations();
+  if(tab==='requests') refreshRequests();
+  if(tab==='analytics') refreshAnalytics();
+  if(tab==='pricing') renderPricingEditor();
+}
+let CACHE = { requests:[], quotations:[], visitors:[] };
+function refreshAdmin(){ refreshDashboard(); refreshQuotations(); refreshRequests(); refreshAnalytics(); }
+
+async function refreshDashboard(){
+  const [reqSnap, quoSnap, visSnap] = await Promise.all([
+    db.collection('requests').get(), db.collection('quotations').get(), db.collection('visitors').get()
+  ]);
+  CACHE.requests = reqSnap.docs.map(d=>({id:d.id,...d.data()}));
+  CACHE.quotations = quoSnap.docs.map(d=>({id:d.id,...d.data()}));
+  CACHE.visitors = visSnap.docs.map(d=>({id:d.id,...d.data()}));
+  document.getElementById('statVisitors').textContent = CACHE.visitors.length;
+  document.getElementById('statRequests').textContent = CACHE.requests.length;
+  document.getElementById('statQuotes').textContent = CACHE.quotations.length;
+  document.getElementById('statPending').textContent = CACHE.quotations.filter(q=>q.status==='pending').length;
+  const recent = [...CACHE.requests, ...CACHE.quotations]
+    .sort((a,b)=> (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)).slice(0,5);
+  document.getElementById('recentActivity').innerHTML = recent.length ? recent.map(r => `<div style="padding:12px 0;border-bottom:1px solid rgba(93,95,95,.08);display:flex;justify-content:space-between"><span>${r.name || r.client}</span><span style="color:var(--text-muted);font-size:.8rem">${r.date||''}</span></div>`).join('') : 'No recent activity.';
+}
+async function refreshQuotations(){
+  const snap = await db.collection('quotations').orderBy('createdAt','desc').get();
+  CACHE.quotations = snap.docs.map(d=>({id:d.id,...d.data()}));
+  const tbody = document.getElementById('quotesTableBody');
+  if(!CACHE.quotations.length){ tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No quotations yet.</td></tr>'; return; }
+  tbody.innerHTML = CACHE.quotations.map(q => `
+    <tr>
+      <td>${q.id.slice(0,6)}</td><td>${q.client}</td><td>${(q.services||[]).join(', ')}</td>
+      <td>RO ${(q.total||0).toLocaleString()}</td>
+      <td><span class="status ${q.status}">${i18n[currentLang]['status_'+q.status] || q.status}</span></td>
+      <td>${q.date||''}</td>
+      <td style="white-space:nowrap">
+        <button class="btn-sm btn-accent" onclick="downloadQuotePdfFor('${q.id}', this)" style="padding:4px 10px;font-size:.75rem;margin-${currentLang==='ar'?'left':'right'}:6px"><span class="material-symbols-outlined" style="font-size:15px;vertical-align:-3px">picture_as_pdf</span> PDF</button>
+        <button class="btn-sm btn-outline" onclick="deleteQuote('${q.id}')" style="padding:4px 10px;font-size:.75rem">Delete</button>
+      </td>
+    </tr>`).join('');
+}
+async function refreshRequests(){
+  const snap = await db.collection('requests').orderBy('createdAt','desc').get();
+  CACHE.requests = snap.docs.map(d=>({id:d.id,...d.data()}));
+  const tbody = document.getElementById('requestsTableBody');
+  if(!CACHE.requests.length){ tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No requests yet.</td></tr>'; return; }
+  tbody.innerHTML = CACHE.requests.map(r => `
+    <tr>
+      <td>${r.name}</td><td>${r.email}</td><td>${r.phone || '-'}</td>
+      <td>${r.service}${r.estimatedTotal?` (~RO ${r.estimatedTotal})`:''}</td>
+      <td>${r.message || '-'}</td><td>${r.date||''}</td>
+    </tr>`).join('');
+}
+async function refreshAnalytics(){
+  const snap = await db.collection('visitors').orderBy('createdAt','desc').limit(500).get().catch(()=>db.collection('visitors').get());
+  CACHE.visitors = snap.docs.map(d=>({id:d.id,...d.data()}));
+  const today = new Date().toDateString();
+  document.getElementById('statUnique').textContent = new Set(CACHE.visitors.map(v=>v.sessionId)).size;
+  document.getElementById('statToday').textContent = CACHE.visitors.filter(v=> v.time && v.time.toDate && v.time.toDate().toDateString()===today).length;
+  document.getElementById('statPages').textContent = CACHE.visitors.length;
+  const log = document.getElementById('visitorLog');
+  log.innerHTML = CACHE.visitors.slice(0,50).map(v => `<div style="padding:8px 0;border-bottom:1px solid rgba(93,95,95,.06);font-size:.85rem"><span style="color:var(--text-muted)">${v.time && v.time.toDate ? v.time.toDate().toLocaleString() : ''}</span> — <span>${v.page}</span></div>`).join('') || '<p style="color:var(--text-muted)">No visitor data yet.</p>';
+}
+function deleteQuote(id){ db.collection('quotations').doc(id).delete().then(()=>{ refreshQuotations(); refreshDashboard(); }); }
+
+/* ═══════════════════════════════════════════
+   ADMIN QUOTE BUILDER (formal negotiated pricing — Firestore)
+   ═══════════════════════════════════════════ */
+/* Live price for a catalog item (falls back to its default if PRICING not ready) */
+function svcPrice(s, kind){
+  try {
+    if(kind === 'addon') return (PRICING.addons && PRICING.addons[s.id] != null) ? PRICING.addons[s.id] : s.price;
+    return (PRICING.services && PRICING.services[s.id] != null) ? PRICING.services[s.id] : s.price;
+  } catch(e){ return s.price; }
+}
+function recPrice(r){ try { return (PRICING.maintenance && PRICING.maintenance[r.cycle] != null) ? PRICING.maintenance[r.cycle] : r.price; } catch(e){ return r.price; } }
+
+/* ── Quote Builder rendered from the single-source catalog ── */
+function qbItemHtml(s, kind){
+  const kindAttr = kind === 'addon' ? ' data-kind="addon"' : '';
+  return `<div class="qb-service-item" data-svc="${s.id}"${kindAttr} onclick="toggleQbService(this)">
+      <div><strong>${svcName(s)}</strong><br><span style="font-size:.8rem;color:var(--text-muted)">${svcDesc(s)}</span></div>
+      <input type="number" value="${svcPrice(s, kind)}" onchange="calcQbTotal()" onclick="event.stopPropagation()">
+    </div>`;
+}
+function renderQbServices(){ const g = document.getElementById('qbServices'); if(g){ g.innerHTML = servicesData.map(s => qbItemHtml(s,'service')).join(''); } }
+function renderQbAddons(){ const g = document.getElementById('qbAddons'); if(g){ g.innerHTML = addonsData.map(s => qbItemHtml(s,'addon')).join(''); } }
+function renderQbRecurring(){
+  const g = document.getElementById('qbRecurring'); if(!g) return;
+  const ar = currentLang === 'ar';
+  g.innerHTML = recurringData.map(r => {
+    const cyc = r.cycle === 'weekly' ? (ar?'أسبوعي':'Weekly') : (ar?'شهري':'Monthly');
+    return `<div class="qb-rec-item" data-cycle="${r.cycle}" onclick="selectRecurring(this)">
+        <div><span class="cyc">${cyc}</span><br><strong>${svcName(r)}</strong><br><span style="font-size:.8rem;color:var(--text-muted)">${svcDesc(r)}</span></div>
+        <input type="number" value="${recPrice(r)}" oninput="recurringPriceInput(this)" onclick="event.stopPropagation()">
+      </div>`;
+  }).join('');
+}
+function renderQbAll(){ renderQbServices(); renderQbAddons(); renderQbRecurring(); calcQbTotal(); }
+
+function toggleQbService(el){ el.classList.toggle('selected'); calcQbTotal(); }
+function calcQbTotal(){
+  let total = 0;
+  document.querySelectorAll('.qb-service-item.selected').forEach(item => { total += parseFloat(item.querySelector('input').value) || 0; });
+  const r = getRecurring();
+  if(r) total += r.price;   // recurring plan is now counted in the builder total
+  const el = document.getElementById('qbTotal');
+  if(el) el.textContent = 'RO ' + total.toLocaleString();
+  updateRecurringNote();
+}
+/* Recurring plan — single-select (weekly OR monthly). */
+function selectRecurring(el){
+  const wasSelected = el.classList.contains('selected');
+  document.querySelectorAll('#qbRecurring .qb-rec-item').forEach(i => i.classList.remove('selected'));
+  if(!wasSelected) el.classList.add('selected');
+  calcQbTotal();
+}
+/* Editing a plan's price auto-selects that plan and updates total + note live. */
+function recurringPriceInput(input){
+  const item = input.closest('.qb-rec-item');
+  document.querySelectorAll('#qbRecurring .qb-rec-item').forEach(i => i.classList.remove('selected'));
+  if(item) item.classList.add('selected');
+  calcQbTotal();
+}
+function getRecurring(){
+  const el = document.querySelector('#qbRecurring .qb-rec-item.selected');
+  if(!el) return null;
+  return {
+    label: el.querySelector('strong').textContent.trim(),
+    cycle: el.getAttribute('data-cycle'),
+    price: parseFloat(el.querySelector('input').value) || 0
+  };
+}
+function updateRecurringNote(){
+  const note = document.getElementById('qbRecurringNote');
+  if(!note) return;
+  const el = document.querySelector('#qbRecurring .qb-rec-item.selected');
+  if(!el){ note.style.display = 'none'; note.textContent = ''; return; }
+  const cycle = el.getAttribute('data-cycle');
+  const price = parseFloat(el.querySelector('input').value) || 0;
+  const label = el.querySelector('strong').textContent.trim();
+  const ar = currentLang === 'ar';
+  const per = cycle === 'weekly' ? (ar ? 'أسبوعياً' : 'week') : (ar ? 'شهرياً' : 'month');
+  note.style.display = 'block';
+  note.textContent = ar
+    ? `يشمل ${price.toLocaleString()} ر.ع / ${per} متكرر (${label})`
+    : `Includes ${price.toLocaleString()} RO / ${per} recurring (${label})`;
+}
+function saveQuotation(){
+  const client = document.getElementById('qbClient').value;
+  if(!client){ showToast(currentLang==='en'?'Enter client name.':'أدخل اسم العميل'); return; }
+  const services = [], lineItems = []; let total = 0;
+  document.querySelectorAll('.qb-service-item.selected').forEach(item => {
+    const price = parseFloat(item.querySelector('input').value) || 0;
+    services.push(item.getAttribute('data-svc'));
+    lineItems.push({ name: item.querySelector('strong').textContent.trim(), price, kind: item.getAttribute('data-kind') || 'service' });
+    total += price;
+  });
+  const recurring = getRecurring();
+  let deliveryDays = parseInt(document.getElementById('qbDelivery').value,10) || 5;
+  deliveryDays = Math.max(1, Math.min(7, deliveryDays));
+  const q = {
+    client, email: document.getElementById('qbEmail').value, phone: document.getElementById('qbPhone').value,
+    projectId: document.getElementById('qbProjectId').value,
+    validDays: parseInt(document.getElementById('qbValid').value,10) || 30,
+    services, lineItems, recurring: recurring || null, total, deliveryDays, status:'pending',
+    date: new Date().toLocaleString(), createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  db.collection('quotations').add(q).then(()=>{ refreshQuotations(); refreshDashboard(); showToast(i18n[currentLang].toast_quote_saved); });
+}
+function shareWhatsApp(){
+  const client = document.getElementById('qbClient').value;
+  const phone = document.getElementById('qbPhone').value.replace(/[^0-9]/g,'');
+  const total = document.getElementById('qbTotal').textContent;
+  if(!phone){ showToast(currentLang==='en'?'Enter phone number.':'أدخل رقم الهاتف'); return; }
+  const delivery = Math.max(1, Math.min(7, parseInt(document.getElementById('qbDelivery').value,10) || 5));
+  const msg = `Hello ${client}, here is your quotation from 10 Digital: ${total}. Project ID: ${document.getElementById('qbProjectId').value}. Delivery within ${delivery} day(s). Valid for ${document.getElementById('qbValid').value} days. (The designed PDF is attached.)`;
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+function shareEmail(){
+  const client = document.getElementById('qbClient').value;
+  const email = document.getElementById('qbEmail').value;
+  const total = document.getElementById('qbTotal').textContent;
+  if(!email){ showToast(currentLang==='en'?'Enter client email.':'أدخل بريد العميل'); return; }
+  const subject = `Quotation from 10 Digital - ${document.getElementById('qbProjectId').value}`;
+  const delivery = Math.max(1, Math.min(7, parseInt(document.getElementById('qbDelivery').value,10) || 5));
+  const body = `Dear ${client},%0D%0A%0D%0AThank you for choosing 10 Digital. Your quotation total is: ${total}.%0D%0A%0D%0AProject ID: ${document.getElementById('qbProjectId').value}%0D%0ADelivery: within ${delivery} day(s)%0D%0AValid for: ${document.getElementById('qbValid').value} days.%0D%0A%0D%0APlease find the designed quotation PDF attached.%0D%0A%0D%0ABest regards,%0D%0A10 Digital Team`;
+  window.open(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${body}`, '_blank');
+}
+
+/* ═══════════════════════════════════════════
+   QUOTATION PDF — designed, branded, client-ready (html2pdf, fully client-side)
+   ═══════════════════════════════════════════ */
+function clampQbDelivery(el){
+  let v = parseInt(el.value,10);
+  if(isNaN(v)) return;
+  if(v < 1) el.value = 1; else if(v > 7) el.value = 7;
+}
+/* Map a service/add-on id to its display label in the current language */
+function svcLabel(id){
+  const m = servicesData.find(s => s.id === id) || addonsData.find(s => s.id === id);
+  return m ? svcName(m) : id;
+}
+/* Build a PDF from the live Quote Builder form */
+function downloadQuotePdf(){
+  const ar = currentLang === 'ar';
+  const client = document.getElementById('qbClient').value.trim();
+  if(!client){ showToast(ar?'أدخل اسم العميل':'Enter client name.'); return; }
+  const items = []; let total = 0;
+  document.querySelectorAll('.qb-service-item.selected').forEach(item => {
+    const name  = item.querySelector('strong').textContent.trim();
+    const price = parseFloat(item.querySelector('input').value) || 0;
+    const kind  = item.getAttribute('data-kind') || 'service';
+    total += price; items.push({ name, price, kind });
+  });
+  if(!items.length){ showToast(ar?'اختر خدمة واحدة على الأقل':'Select at least one service.'); return; }
+  generateQuotePdf({
+    client,
+    email: document.getElementById('qbEmail').value.trim(),
+    phone: document.getElementById('qbPhone').value.trim(),
+    projectId: document.getElementById('qbProjectId').value,
+    validDays: document.getElementById('qbValid').value || '30',
+    delivery: parseInt(document.getElementById('qbDelivery').value,10) || 5,
+    items, total, recurring: getRecurring()
+  }, document.getElementById('qbPdfBtn'));
+}
+/* Re-build a PDF from a saved quotation row (uses stored line items, falls back to current pricing) */
+function downloadQuotePdfFor(id, btn){
+  const ar = currentLang === 'ar';
+  const q = ((typeof CACHE !== 'undefined' && CACHE.quotations) || []).find(x => x.id === id);
+  if(!q){ showToast(ar?'تعذّر العثور على العرض':'Quote not found.'); return; }
+  let items;
+  if(Array.isArray(q.lineItems) && q.lineItems.length){
+    items = q.lineItems.map(li => ({ name: li.name, price: Number(li.price) || 0, kind: li.kind || 'service' }));
+  } else {
+    items = (q.services || []).map(sid => ({ name: svcLabel(sid), price: (typeof PRICING !== 'undefined' && PRICING.services[sid]) || 0, kind: /^addon-/.test(sid) ? 'addon' : 'service' }));
+  }
+  generateQuotePdf({
+    client: q.client || '', email: q.email || '', phone: q.phone || '',
+    projectId: q.projectId || '', validDays: q.validDays || 30,
+    delivery: parseInt(q.deliveryDays,10) || 5,
+    items, total: Number(q.total) || items.reduce((a,b)=>a + b.price, 0),
+    recurring: q.recurring || null
+  }, btn);
+}
+/* Company details shown on the quotation letterhead */
+const COMPANY = {
+  name:'10 Digital', tagline:'Digital Design Studio',
+  addr:'Muscat, Sultanate of Oman', phone:'+968 7701 9962 · 7118 9735 · 9818 0442',
+  email:'tendigital910@gmail.com', site:'10digital.om',
+  logo:'assets/img/logo.jpg'
+};
+const QUOTE_VAT = 0.05; /* Oman standard VAT — set to 0 to hide tax */
+
+/* Load the logo as an inline data URL so it always prints (no timing / CORS gaps) */
+async function logoDataUrl(){
+  try {
+    const res = await fetch(COMPANY.logo);
+    const blob = await res.blob();
+    return await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.onerror = () => r(COMPANY.logo); fr.readAsDataURL(blob); });
+  } catch(e){ return COMPANY.logo; }
+}
+
+/* Shared renderer — designed, branded, client-ready PDF (light invoice layout) */
+async function generateQuotePdf(data, btn){
+  const ar = currentLang === 'ar';
+  const client = data.client, email = data.email || '', phone = data.phone || '';
+  const projectId = data.projectId || '', validDays = data.validDays || '30';
+  let delivery = Math.max(1, Math.min(7, parseInt(data.delivery,10) || 5));
+  const items = data.items || [];
+  if(!items.length){ showToast(ar?'لا توجد خدمات في هذا العرض':'No services in this quote.'); return; }
+  const recurring = data.recurring || null;
+
+  const logoSrc = await logoDataUrl();
+
+  const t = ar ? {
+    quotation:'عرض سعر', no:'رقم العرض:', date:'التاريخ:', clientInfo:'بيانات العميل:',
+    startDate:'تاريخ البدء:', deliveryBy:'موعد التسليم:', quoteFor:'العرض إلى:',
+    services:'الخدمات والمخرجات', desc:'الوصف', qty:'الكمية', unit:'سعر الوحدة', lineTotal:'الإجمالي',
+    addon:'إضافة', recurring:'خطة الصيانة والدعم المتكررة', perWeek:'أسبوعياً', perMonth:'شهرياً',
+    payment:'طريقة الدفع', bank:'تحويل بنكي', card:'بطاقة ائتمان', cheque:'شيك',
+    amountDue:'المبلغ المستحق', subtotal:'الإجمالي الفرعي', tax:'الضريبة', total:'الإجمالي',
+    signature:'التوقيع', dateLabel:'التاريخ'
+  } : {
+    quotation:'QUOTATION', no:'Quotation No.:', date:'Date:', clientInfo:'Client Information:',
+    startDate:'Start Date:', deliveryBy:'Delivery By:', quoteFor:'Quotation For:',
+    services:'Services & Deliverables', desc:'Description', qty:'Quantity', unit:'Unit Price', lineTotal:'Total Cost',
+    addon:'Add-on', recurring:'Recurring Maintenance & Support', perWeek:'week', perMonth:'month',
+    payment:'Payment Method', bank:'Bank Transfer', card:'Credit Card', cheque:'Cheque',
+    amountDue:'Amount Due', subtotal:'Subtotal', tax:'Tax', total:'Total',
+    signature:'Signature', dateLabel:'Date'
+  };
+  const G = '#6f7d56', CREAM = '#faf7ec', LINE = '#d9ddd0';
+  const RO = n => 'RO ' + Number(n).toLocaleString('en-US', { minimumFractionDigits:3, maximumFractionDigits:3 });
+  const today = new Date().toLocaleDateString(ar ? 'ar-EG' : 'en-GB', { year:'numeric', month:'short', day:'numeric' });
+  const dDate = new Date(); dDate.setDate(dDate.getDate() + delivery);
+  const deliveryBy = dDate.toLocaleDateString(ar ? 'ar-EG' : 'en-GB', { year:'numeric', month:'short', day:'numeric' });
+  const start = ar ? 'right' : 'left', end = ar ? 'left' : 'right';
+
+  let subtotal = 0;
+  const addonTag = `<span style="display:inline-block;font-size:8.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${G};border:1px solid ${G};border-radius:4px;padding:0 5px;margin-${start}:8px;vertical-align:middle">${t.addon}</span>`;
+  const rows = items.map(it => {
+    const qty = Number(it.qty) || 1, unit = Number(it.price) || 0, line = qty * unit;
+    subtotal += line;
+    return `
+    <tr>
+      <td style="padding:9px 12px;border:1px solid ${LINE};font-size:12px;color:#2b2f24;text-align:${start}">${it.name}${it.kind === 'addon' ? addonTag : ''}</td>
+      <td style="padding:9px 12px;border:1px solid ${LINE};font-size:12px;color:#2b2f24;text-align:center">${qty}</td>
+      <td style="padding:9px 12px;border:1px solid ${LINE};font-size:12px;color:#2b2f24;text-align:center">${RO(unit)}</td>
+      <td style="padding:9px 12px;border:1px solid ${LINE};font-size:12px;color:#2b2f24;font-weight:600;text-align:${end};background:${CREAM}">${RO(line)}</td>
+    </tr>`;
+  }).join('');
+  const vat = subtotal * QUOTE_VAT, grand = subtotal + vat;
+  const taxPct = (QUOTE_VAT * 100).toFixed(1);
+
+  const bar = (label) => `<div style="background:${G};color:#fff;font-size:12px;font-weight:700;letter-spacing:.3px;padding:6px 12px;text-align:${start}">${label}</div>`;
+  const chk = (on) => `<span style="display:inline-block;width:13px;height:13px;border:1.5px solid ${G};background:#fff;text-align:center;line-height:11px;font-size:11px;color:#2b2f24;font-weight:900">${on?'&#10003;':''}</span>`;
+  const hRow = (label, val) => `<tr>
+      <td style="padding:3px 8px;font-size:11px;color:#2b2f24;font-weight:700;text-align:${end};white-space:nowrap">${label}</td>
+      <td style="padding:3px 0"><div style="border:1px solid ${LINE};background:#fff;font-size:11px;color:#2b2f24;padding:4px 10px;min-width:118px;text-align:${start}">${val||'—'}</div></td>
+    </tr>`;
+
+  const recurringBlock = recurring ? `
+    <div style="margin-top:16px;display:flex;align-items:center;justify-content:space-between;gap:16px;background:${CREAM};border:1px solid ${LINE};border-${start}:4px solid ${G};border-radius:6px;padding:12px 16px">
+      <div>
+        <div style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${G}">${t.recurring}</div>
+        <div style="font-size:12.5px;font-weight:700;color:#2b2f24;margin-top:3px">${recurring.label}</div>
+      </div>
+      <div style="font-size:15px;font-weight:800;color:#2b2f24;white-space:nowrap">${RO(recurring.price)} <span style="font-size:11px;font-weight:600;color:#5b6150">/ ${recurring.cycle === 'weekly' ? t.perWeek : t.perMonth}</span></div>
+    </div>` : '';
+
+  const inner = `
+    <!-- Letterhead -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px">
+      <div style="max-width:52%">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <img src="${logoSrc}" style="width:48px;height:48px;object-fit:contain" onerror="this.style.display='none'">
+          <div>
+            <div style="font-size:15px;font-weight:800;color:#2b2f24">${COMPANY.name}</div>
+            <div style="font-size:9px;color:${G};font-weight:600">${COMPANY.tagline}</div>
+          </div>
+        </div>
+        <div style="font-size:10.5px;color:#3a3f30;line-height:1.9">${COMPANY.addr}<br>${COMPANY.phone}<br>${COMPANY.email}</div>
+      </div>
+      <div style="text-align:${end}">
+        <div style="font-size:26px;font-weight:800;letter-spacing:1.5px;color:#1c1c1c;margin-bottom:10px">${t.quotation}</div>
+        <table style="display:inline-table;border-collapse:collapse"><tbody>
+          ${hRow(t.no, projectId)}
+          ${hRow(t.date, today)}
+        </tbody></table>
+      </div>
+    </div>
+
+    <!-- Client information + project dates -->
+    <div style="display:flex;gap:28px;margin-top:24px;align-items:flex-start">
+      <div style="flex:1">
+        ${bar(t.clientInfo)}
+        <div style="padding:10px 2px;font-size:11px;color:#3a3f30;line-height:2">
+          <div style="font-weight:800;color:#2b2f24;font-size:12.5px">${client}</div>
+          ${email ? `<div>${email}</div>` : ''}
+          ${phone ? `<div>${phone}</div>` : ''}
+        </div>
+      </div>
+      <div style="flex:1;padding-top:2px">
+        <table style="width:100%;border-collapse:collapse"><tbody>
+          ${hRow(t.startDate, today)}
+          ${hRow(t.deliveryBy, deliveryBy)}
+          ${hRow(t.quoteFor, client)}
+        </tbody></table>
+      </div>
+    </div>
+
+    <!-- Services table -->
+    <div style="margin:18px 0 8px;font-size:12.5px;font-weight:800;color:#2b2f24">${t.services}:</div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:${G}">
+          <th style="padding:8px 12px;text-align:${start};font-size:11px;color:#fff;font-weight:700;border:1px solid ${G}">${t.desc}</th>
+          <th style="padding:8px 12px;text-align:center;font-size:11px;color:#fff;font-weight:700;border:1px solid ${G}">${t.qty}</th>
+          <th style="padding:8px 12px;text-align:center;font-size:11px;color:#fff;font-weight:700;border:1px solid ${G}">${t.unit}</th>
+          <th style="padding:8px 12px;text-align:${end};font-size:11px;color:#fff;font-weight:700;border:1px solid ${G}">${t.lineTotal}</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${recurringBlock}
+
+    <!-- Payment method + Amount due -->
+    <div style="display:flex;gap:28px;margin-top:24px;align-items:flex-start">
+      <div style="flex:1">
+        ${bar(t.payment)}
+        <div style="padding:12px 4px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:9px;font-size:11.5px;color:#2b2f24">${chk(true)}<span>${t.bank}</span></div>
+          <div style="display:flex;align-items:center;gap:9px;font-size:11.5px;color:#2b2f24">${chk(false)}<span>${t.card}</span></div>
+          <div style="display:flex;align-items:center;gap:9px;font-size:11.5px;color:#2b2f24">${chk(false)}<span>${t.cheque}</span></div>
+        </div>
+      </div>
+      <div style="flex:1">
+        <div style="background:${G};color:#fff;font-size:12px;font-weight:700;text-align:center;padding:6px">${t.amountDue}</div>
+        <table style="width:100%;border-collapse:collapse"><tbody>
+          <tr>
+            <td style="padding:8px 12px;border:1px solid ${LINE};font-size:11.5px;color:#3a3f30">${t.subtotal}</td>
+            <td style="padding:8px 12px;border:1px solid ${LINE};font-size:11.5px;color:#2b2f24;text-align:${end}">${RO(subtotal)}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 12px;border:1px solid ${LINE};font-size:11.5px;color:#3a3f30">${t.tax} <span style="color:#9c2b2b;font-weight:700">${taxPct}%</span></td>
+            <td style="padding:8px 12px;border:1px solid ${LINE};font-size:11.5px;color:#2b2f24;text-align:${end}">${RO(vat)}</td>
+          </tr>
+          <tr>
+            <td style="padding:9px 12px;border:1px solid ${LINE};background:${CREAM};font-size:12.5px;font-weight:800;color:#2b2f24">${t.total}</td>
+            <td style="padding:9px 12px;border:1px solid ${LINE};background:${CREAM};font-size:12.5px;font-weight:800;color:#2b2f24;text-align:${end}">${RO(grand)}</td>
+          </tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <!-- Signature + date (pushed to bottom) -->
+    <div style="margin-top:auto;padding-top:36px">
+      <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:16px">
+        <span style="font-size:11.5px;color:#2b2f24;font-weight:700">${t.signature}:</span>
+        <span style="font-family:'Brush Script MT','Segoe Script',cursive;font-size:22px;color:#2b2f24;border-bottom:1px solid #9aa089;padding:0 26px 2px;min-width:180px">${COMPANY.name}</span>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:12px">
+        <span style="font-size:11.5px;color:#2b2f24;font-weight:700">${t.dateLabel}:</span>
+        <span style="font-size:12px;color:#2b2f24;border-bottom:1px solid #9aa089;padding:0 26px 2px;min-width:180px">${today}</span>
+      </div>
+    </div>`;
+
+  // Render through the browser's native print engine (crisp vector text, never a blank canvas).
+  // Self-contained A4 doc inside a hidden iframe via srcdoc; an inline script auto-triggers print → "Save as PDF".
+  const fileTitle = `Quotation-${projectId||'10D'}-${(client||'client').replace(/[^\w]+/g,'_')}`;
+  const doc = `<!doctype html><html dir="${ar?'rtl':'ltr'}" lang="${ar?'ar':'en'}"><head>
+<meta charset="utf-8"><title>${fileTitle}</title>
+<style>
+  @page { size:A4; margin:0; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; -webkit-print-color-adjust:exact; print-color-adjust:exact; background:#fff; }
+  body { font-family:'Inter','Segoe UI','Noto Sans Arabic',sans-serif; color:#2b2f24; }
+  .page { width:210mm; min-height:296mm; padding:14mm; display:flex; flex-direction:column; }
+  table { border-collapse:collapse; }
+  tr, td, th { page-break-inside:avoid; }
+</style></head>
+<body><div class="page" dir="${ar?'rtl':'ltr'}">${inner}</div>
+<scr`+`ipt>
+(function(){
+  function go(){ try{ window.focus(); window.print(); }catch(e){} }
+  window.addEventListener('afterprint', function(){ try{ parent.__quotePrintDone && parent.__quotePrintDone(); }catch(e){} });
+  function ready(){
+    var imgs = Array.prototype.slice.call(document.images);
+    var pending = imgs.filter(function(i){ return !i.complete; });
+    if(!pending.length){ return setTimeout(go, 80); }
+    var n = pending.length, fired = false;
+    function done(){ if(--n <= 0 && !fired){ fired = true; setTimeout(go, 80); } }
+    pending.forEach(function(i){ i.addEventListener('load', done); i.addEventListener('error', done); });
+    setTimeout(function(){ if(!fired){ fired = true; go(); } }, 2500);
+  }
+  if(document.readyState === 'complete') ready(); else window.addEventListener('load', ready);
+})();
+<\/scr`+`ipt>
+</body></html>`;
+
+  const prev = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.style.opacity = '.6'; }
+
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+
+  let cleaned = false;
+  const cleanup = () => {
+    if(cleaned) return; cleaned = true;
+    try{ iframe.remove(); }catch(e){}
+    try{ window.__quotePrintDone = null; }catch(e){}
+    if(btn){ btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = prev; }
+  };
+  window.__quotePrintDone = () => setTimeout(cleanup, 250);
+
+  document.body.appendChild(iframe);
+  iframe.srcdoc = doc;
+  showToast(ar ? 'في نافذة الطباعة اختر "حفظ كـ PDF"' : 'In the dialog, set destination to "Save as PDF".');
+  setTimeout(cleanup, 120000); // safety net if the dialog is dismissed without afterprint
+}
+
+/* ═══════════════════════════════════════════
+   PORTFOLIO UPLOAD (Cloudinary + Firestore — no Firebase Storage)
+   ═══════════════════════════════════════════ */
+function previewUpload(){
+  const file = document.getElementById('portFile').files[0];
+  if(!file) return;
+  const url = URL.createObjectURL(file);
+  const preview = document.getElementById('uploadPreview');
+  const img = document.getElementById('uploadPreviewImg');
+  const vid = document.getElementById('uploadPreviewVid');
+  preview.style.display = 'block';
+  if(file.type.startsWith('video')){ img.style.display='none'; vid.style.display='block'; vid.src=url; }
+  else { img.style.display='block'; vid.style.display='none'; img.src=url; }
+}
+function uploadPortfolio(){
+  const title = document.getElementById('portTitle').value;
+  const category = document.getElementById('portCategory').value;
+  const file = document.getElementById('portFile').files[0];
+  if(!title || !file){ showToast(currentLang==='en'?'Fill title and select file.':'املأ العنوان واختر ملف'); return; }
+  if(CLOUDINARY_CLOUD_NAME === 'YOUR_CLOUD_NAME'){ showToast(currentLang==='en'?'Set up Cloudinary first — see SETUP.md.':'قم بإعداد Cloudinary أولاً — راجع SETUP.md'); return; }
+  const type = file.type.startsWith('video') ? 'video' : 'image';
+  const btn = document.getElementById('uploadBtn');
+  btn.disabled = true; btn.textContent = currentLang==='en' ? 'Uploading…' : 'جارٍ الرفع…';
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  formData.append('folder', 'portfolio');
+  fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`, { method:'POST', body: formData })
+  .then(res => res.json())
+  .then(data => {
+    if(!data.secure_url) throw new Error(data.error && data.error.message || 'Cloudinary upload failed');
+    return db.collection('portfolio').add({ title, category, url: data.secure_url, type, cloudinaryId: data.public_id, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  }).then(()=>{
+    document.getElementById('portTitle').value=''; document.getElementById('portCategory').value=''; document.getElementById('portFile').value=''; document.getElementById('uploadPreview').style.display='none';
+    showToast(i18n[currentLang].toast_portfolio);
+  }).catch(err=>{ showToast(currentLang==='en'?'Upload failed.':'فشل الرفع'); console.error(err); })
+  .finally(()=>{ btn.disabled=false; btn.textContent = i18n[currentLang].adm_upload_btn; });
+}
+
+/* ═══════════════════════════════════════════
+   NEWSLETTER (footer)
+   ═══════════════════════════════════════════ */
+function subscribeNewsletter(){
+  const email = document.getElementById('newsletterEmail').value.trim();
+  if(!email) return;
+  db.collection('newsletter').add({ email, createdAt: firebase.firestore.FieldValue.serverTimestamp() })
+    .then(()=>{ showToast(i18n[currentLang].toast_newsletter); document.getElementById('newsletterEmail').value=''; })
+    .catch(()=>{ showToast(currentLang==='en'?'Could not subscribe.':'فشل الاشتراك'); });
+}
+
+/* ═══════════════════════════════════════════
+   PRICING — admin-editable, synced live via Firestore (config/pricing)
+   Drives: public estimator, quote builder, package tiers, maintenance.
+   ═══════════════════════════════════════════ */
+/* Default prices derived from the single-source catalog (auto-includes new items) */
+const DEFAULT_PRICING = {
+  services:    Object.fromEntries(servicesData.map(s => [s.id, s.price])),
+  addons:      Object.fromEntries(addonsData.map(s => [s.id, s.price])),
+  packages:    { starter:450, professional:1250 },
+  maintenance: {
+    weekly:  (recurringData.find(r => r.cycle === 'weekly')  || {}).price || 80,
+    monthly: (recurringData.find(r => r.cycle === 'monthly') || {}).price || 250,
+    annual:  2200
+  }
+};
+let PRICING = JSON.parse(JSON.stringify(DEFAULT_PRICING));
+
+function mergePricing(base, over){
+  over = over || {};
+  return {
+    services:    Object.assign({}, base.services,    over.services    || {}),
+    addons:      Object.assign({}, base.addons,      over.addons      || {}),
+    packages:    Object.assign({}, base.packages,    over.packages    || {}),
+    maintenance: Object.assign({}, base.maintenance, over.maintenance || {})
+  };
+}
+function _setText(id,val){ const el=document.getElementById(id); if(el) el.textContent=val; }
+
+/* Push current PRICING into every place a price is shown (keeps builder selections) */
+function applyPricing(){
+  /* Sync catalog price fields */
+  servicesData.forEach(s => { if(PRICING.services[s.id]!=null) s.price = PRICING.services[s.id]; });
+  addonsData.forEach(s => { if(PRICING.addons && PRICING.addons[s.id]!=null) s.price = PRICING.addons[s.id]; });
+  recurringData.forEach(r => { if(PRICING.maintenance[r.cycle]!=null) r.price = PRICING.maintenance[r.cycle]; });
+  /* Public instant estimator (services + add-ons) */
+  if(typeof renderQuoteServices === 'function') renderQuoteServices();
+  /* Admin quote-builder default inputs — update in place so selections survive */
+  document.querySelectorAll('#qbServices .qb-service-item').forEach(item => {
+    const id = item.getAttribute('data-svc'), inp = item.querySelector('input');
+    if(inp && PRICING.services[id]!=null) inp.value = PRICING.services[id];
+  });
+  document.querySelectorAll('#qbAddons .qb-service-item').forEach(item => {
+    const id = item.getAttribute('data-svc'), inp = item.querySelector('input');
+    if(inp && PRICING.addons && PRICING.addons[id]!=null) inp.value = PRICING.addons[id];
+  });
+  document.querySelectorAll('#qbRecurring .qb-rec-item').forEach(item => {
+    const cyc = item.getAttribute('data-cycle'), inp = item.querySelector('input');
+    if(inp && PRICING.maintenance[cyc]!=null) inp.value = PRICING.maintenance[cyc];
+  });
+  if(typeof calcQbTotal === 'function') calcQbTotal();
+  /* Public package tiers */
+  _setText('priceStarter',      Number(PRICING.packages.starter).toLocaleString());
+  _setText('priceProfessional', Number(PRICING.packages.professional).toLocaleString());
+  /* Public maintenance plans */
+  _setText('priceMaintWeekly',  Number(PRICING.maintenance.weekly).toLocaleString());
+  _setText('priceMaintMonthly', Number(PRICING.maintenance.monthly).toLocaleString());
+  _setText('priceMaintAnnual',  Number(PRICING.maintenance.annual).toLocaleString());
+}
+
+/* One editable price field for the Pricing Manager */
+function priceField(s, val, attr){
+  return `<div class="form-group">
+      <label>${svcName(s)}</label>
+      <input type="number" min="0" ${attr}="${s.id}" value="${val != null ? val : (s.price || 0)}">
+    </div>`;
+}
+/* Fill the admin Pricing editor inputs from current PRICING (services + add-ons) */
+function renderPricingEditor(){
+  const sg = document.getElementById('pricingServices');
+  if(sg) sg.innerHTML = servicesData.map(s => priceField(s, PRICING.services[s.id], 'data-price-svc')).join('');
+  const ag = document.getElementById('pricingAddons');
+  if(ag) ag.innerHTML = addonsData.map(s => priceField(s, (PRICING.addons||{})[s.id], 'data-price-addon')).join('');
+  const setV = (id,v) => { const el=document.getElementById(id); if(el) el.value = v; };
+  setV('setStarter',      PRICING.packages.starter);
+  setV('setProfessional', PRICING.packages.professional);
+  setV('setMaintWeekly',  PRICING.maintenance.weekly);
+  setV('setMaintMonthly', PRICING.maintenance.monthly);
+  setV('setMaintAnnual',  PRICING.maintenance.annual);
+}
+
+/* Read editor → save to Firestore (live-syncs to all visitors) */
+function savePricing(){
+  const next = { services:{}, addons:{}, packages:{}, maintenance:{} };
+  document.querySelectorAll('#pricingServices [data-price-svc]').forEach(inp => {
+    next.services[inp.getAttribute('data-price-svc')] = parseFloat(inp.value) || 0;
+  });
+  document.querySelectorAll('#pricingAddons [data-price-addon]').forEach(inp => {
+    next.addons[inp.getAttribute('data-price-addon')] = parseFloat(inp.value) || 0;
+  });
+  next.packages.starter      = parseFloat(document.getElementById('setStarter').value) || 0;
+  next.packages.professional = parseFloat(document.getElementById('setProfessional').value) || 0;
+  next.maintenance.weekly    = parseFloat(document.getElementById('setMaintWeekly').value) || 0;
+  next.maintenance.monthly   = parseFloat(document.getElementById('setMaintMonthly').value) || 0;
+  next.maintenance.annual    = parseFloat(document.getElementById('setMaintAnnual').value) || 0;
+  PRICING = mergePricing(DEFAULT_PRICING, next);
+  applyPricing();
+  db.collection('config').doc('pricing').set(next, { merge:true })
+    .then(()=> showToast(currentLang==='en' ? 'Prices updated — live on site ✓' : 'تم تحديث الأسعار — ظاهرة الآن ✓'))
+    .catch(err => { showToast(currentLang==='en' ? 'Could not save prices.' : 'فشل حفظ الأسعار'); console.error(err); });
+}
+function resetPricingDefaults(){
+  PRICING = JSON.parse(JSON.stringify(DEFAULT_PRICING));
+  renderPricingEditor(); applyPricing();
+  db.collection('config').doc('pricing').set(DEFAULT_PRICING).catch(()=>{});
+  showToast(currentLang==='en' ? 'Prices reset to defaults' : 'تمت استعادة الأسعار الافتراضية');
+}
+
+/* Build the admin Quote Builder from the catalog, then apply current prices */
+renderQbAll();
+applyPricing();
+
+/* Live listener — any admin change reflects instantly for all visitors */
+db.collection('config').doc('pricing').onSnapshot(doc => {
+  if(doc.exists){
+    PRICING = mergePricing(DEFAULT_PRICING, doc.data());
+    applyPricing();
+    const tab = document.getElementById('tab-pricing');
+    if(tab && tab.classList.contains('active')) renderPricingEditor();
+  }
+}, err => console.warn('pricing listener', err));
+
+/* ═══════════════════════════════════════════
+   UTILS
+   ═══════════════════════════════════════════ */
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000); }
+
+const revealObs = new IntersectionObserver((entries)=>{ entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('active'); } }); },{threshold:0.1});
+document.querySelectorAll('.reveal').forEach(el=>revealObs.observe(el));
+
+window.addEventListener('scroll',()=>{ document.getElementById('navbar').classList.toggle('scrolled',window.scrollY>20); });
+
+/* ═══════════════════════════════════════════
+   CINEMATIC HERO — CURSOR EFFECTS & NAVBAR DARK MODE
+   ═══════════════════════════════════════════ */
+
+/* Add translations for new hero keys */
+i18n.en.hero_title_line1 = 'Craft Your';
+i18n.en.hero_title_line2 = 'Digital Legacy';
+i18n.en.hero_prev = 'Previous';
+i18n.en.hero_next = 'Next';
+i18n.en.hero_frame_caption = '10 DIGITAL STUDIO';
+i18n.ar.hero_title_line1 = 'اصنع';
+i18n.ar.hero_title_line2 = 'إرثك الرقمي';
+i18n.ar.hero_prev = 'السابق';
+i18n.ar.hero_next = 'التالي';
+i18n.ar.hero_frame_caption = '10 ديجيتال ستوديو';
+
+/* Admin pricing tab translations */
+i18n.en.adm_pricing = 'Pricing';
+i18n.en.adm_pricing_title = 'Pricing Manager';
+i18n.en.adm_pricing_hint = 'Changes sync live to the public site & quote builder.';
+i18n.en.price_core = 'Core Services';
+i18n.en.price_core_desc = 'Used by the public estimator and the admin Quote Builder.';
+i18n.en.price_addons = 'Add-ons';
+i18n.en.price_addons_desc = 'Optional extras shown in the Quote Builder and public request page.';
+i18n.ar.price_addons = 'الإضافات';
+i18n.ar.price_addons_desc = 'إضافات اختيارية تظهر في منشئ العروض وصفحة طلب الخدمة.';
+i18n.en.price_packages = 'Strategic Packages';
+i18n.en.price_packages_desc = 'Shown on the public Quotation page tiers.';
+i18n.en.price_maint = 'Maintenance Plans';
+i18n.en.price_maint_desc = 'Shown in the public Quotation sidebar.';
+i18n.en.price_save = 'Save Prices';
+i18n.en.price_reset = 'Reset to Defaults';
+i18n.en.login_hint = 'First time? Type the password you want and press Login — it becomes your permanent admin password.';
+i18n.ar.login_hint = 'أول مرة؟ اكتب كلمة المرور التي تريدها واضغط دخول — ستصبح كلمة مرور المدير الدائمة.';
+i18n.ar.adm_pricing = 'الأسعار';
+i18n.ar.adm_pricing_title = 'إدارة الأسعار';
+i18n.ar.adm_pricing_hint = 'التغييرات تظهر مباشرة على الموقع ومنشئ العروض.';
+i18n.ar.price_core = 'الخدمات الأساسية';
+i18n.ar.price_core_desc = 'تُستخدم في الحاسبة العامة ومنشئ العروض.';
+i18n.ar.price_packages = 'الباقات الاستراتيجية';
+i18n.ar.price_packages_desc = 'تظهر في باقات صفحة التسعير.';
+i18n.ar.price_maint = 'خطط الصيانة';
+i18n.ar.price_maint_desc = 'تظهر في الشريط الجانبي لصفحة التسعير.';
+i18n.ar.price_save = 'حفظ الأسعار';
+i18n.ar.price_reset = 'استعادة الافتراضي';
+
+function initCinematicHero(){
+  const glowOrb  = document.getElementById('cursorGlowOrb');
+  const logoWrap = document.getElementById('heroLogoWrap');
+  const logoGlow = document.getElementById('heroLogoGlowEl');
+  const logoVid  = document.getElementById('heroLogoVid');
+  const goldFrame= document.querySelector('.hero-logo-frame .gold-frame');
+  const heroText = document.querySelector('.hero-c-text');
+  const bgVideo  = document.querySelector('.hero-bg-video');
+  const hero     = document.querySelector('.hero-cinematic');
+  if(!hero) return;
+
+  /* Force the logo video to actually play (some browsers block silent autoplay) */
+  if(logoVid){
+    const tryPlay = () => { const p = logoVid.play(); if(p && p.catch) p.catch(()=>{}); };
+    logoVid.muted = true; tryPlay();
+    logoVid.addEventListener('loadeddata', tryPlay);
+    document.addEventListener('click', tryPlay, { once:true });
+  }
+  if(bgVideo){ bgVideo.muted = true; const bp = bgVideo.play(); if(bp && bp.catch) bp.catch(()=>{}); }
+
+  /* ── Continuous mouse-driven parallax (rAF + lerp = never static) ── */
+  /* targetX/Y are -1..1 across the viewport; cur lerps toward target every
+     frame so the whole hero keeps gliding with each mouse movement.        */
+  let targetX = 0, targetY = 0, curX = 0, curY = 0;
+  let rawX = window.innerWidth/2, rawY = window.innerHeight/2;
+  let proxTarget = 0, prox = 0;            /* cursor→logo proximity 0..1 */
+  let inHero = false;
+
+  function onMove(e){
+    rawX = e.clientX; rawY = e.clientY;
+    const w = window.innerWidth, h = window.innerHeight;
+    targetX = (rawX / w) * 2 - 1;          /* -1 (left) … +1 (right) */
+    targetY = (rawY / h) * 2 - 1;          /* -1 (top)  … +1 (bottom) */
+
+    const r = hero.getBoundingClientRect();
+    inHero = rawY >= r.top && rawY <= r.bottom;
+
+    /* proximity to the framed logo */
+    if(logoWrap){
+      const lr = logoWrap.getBoundingClientRect();
+      const dx = rawX - (lr.left + lr.width/2);
+      const dy = rawY - (lr.top  + lr.height/2);
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      proxTarget = Math.max(0, 1 - dist / 460);
+    }
+  }
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseleave', () => { targetX = 0; targetY = 0; proxTarget = 0; inHero = false; });
+
+  /* Touch: let the hero drift as the finger moves too */
+  window.addEventListener('touchmove', e => { if(e.touches[0]) onMove(e.touches[0]); }, {passive:true});
+
+  const lerp = (a,b,n) => a + (b-a)*n;
+
+  function frame(){
+    /* ease current values toward targets */
+    curX = lerp(curX, targetX, 0.08);
+    curY = lerp(curY, targetY, 0.08);
+    prox = lerp(prox, proxTarget, 0.10);
+
+    /* Glow orb trails the cursor smoothly */
+    if(glowOrb){
+      glowOrb.style.opacity = inHero ? '1' : '0';
+      glowOrb.style.left = rawX + 'px';
+      glowOrb.style.top  = rawY + 'px';
+    }
+
+    /* Background video — deepest layer, drifts opposite & gentle */
+    if(bgVideo){
+      bgVideo.style.transform = `scale(1.08) translate(${curX*-14}px,${curY*-10}px)`;
+    }
+
+    /* Text block — mid layer */
+    if(heroText){
+      heroText.style.transform = `translate(${curX*16}px,${curY*10}px)`;
+    }
+
+    /* Logo frame — front layer, moves most + tilts in 3D toward cursor */
+    if(logoWrap){
+      const rotY = curX * 10;         /* horizontal tilt */
+      const rotX = curY * -8;         /* vertical tilt   */
+      logoWrap.style.transform =
+        `perspective(900px) translate(${curX*40}px,${curY*26}px) rotateY(${rotY}deg) rotateX(${rotX}deg) scale(${1 + prox*0.05})`;
+    }
+    /* Gold frame & video drift apart for layered depth (the frame floats
+       further than the video, so they visibly separate as you move). */
+    if(goldFrame){
+      goldFrame.style.transform = `translate(calc(-50% + ${curX*22}px),calc(-50% + ${curY*16}px))`;
+    }
+    if(logoVid){
+      logoVid.style.transform = `translate(${curX*-10}px,${curY*-7}px)`;
+    }
+
+    /* Logo glow + brightness pulse as the cursor nears it */
+    if(logoGlow){
+      const sz = 50 + prox*110;
+      logoGlow.style.inset = `-${sz}px`;
+      logoGlow.style.background =
+        `radial-gradient(circle,rgba(194,163,95,${prox*0.9}) 0%,rgba(194,163,95,${prox*0.32}) 42%,transparent 72%)`;
+    }
+    if(logoVid){
+      logoVid.style.filter = `brightness(${0.95 + prox*0.3}) contrast(${1.05 + prox*0.15}) saturate(${1 + prox*0.4})`;
+      logoVid.style.boxShadow =
+        `0 30px 80px rgba(0,0,0,.6),0 0 ${20 + prox*70}px rgba(194,163,95,${prox*0.75}),0 0 ${8 + prox*26}px rgba(194,163,95,${prox*0.45})`;
+    }
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+/* Hero slide stub */
+function heroNav(dir){
+  const msgs = { en:{'-1':'Explore our previous projects →','1':'See what we\'re building next →'}, ar:{'-1':'استكشف مشاريعنا السابقة →','1':'تعرف على ما نبنيه →'} };
+  showToast(msgs[currentLang][dir]);
+}
+
+/* Voices of Innovation — autoplay muted, tap to toggle sound */
+function toggleVoicesSound(){
+  const v = document.getElementById('voicesVideo');
+  const btn = document.getElementById('voicesSoundBtn');
+  const overlay = document.getElementById('voicesOverlay');
+  if(!v) return;
+  v.muted = !v.muted;
+  if(!v.muted){
+    v.play().catch(()=>{});
+    if(btn) btn.querySelector('.material-symbols-outlined').textContent = 'volume_up';
+    if(overlay) overlay.style.opacity = '0';
+    setTimeout(()=>{ if(overlay && !v.muted) overlay.style.pointerEvents='none'; }, 50);
+  } else {
+    if(btn) btn.querySelector('.material-symbols-outlined').textContent = 'volume_off';
+    if(overlay){ overlay.style.opacity=''; overlay.style.pointerEvents='auto'; }
+  }
+}
+/* Re-show the sound button on hover so users can mute again */
+document.addEventListener('DOMContentLoaded', ()=>{
+  const v = document.getElementById('voicesVideo');
+  const overlay = document.getElementById('voicesOverlay');
+  if(v){ const p=v.play(); if(p&&p.catch) p.catch(()=>{}); }
+  if(v && overlay){
+    v.parentElement.addEventListener('mouseenter', ()=>{ if(!v.muted) overlay.style.opacity='0.85'; });
+    v.parentElement.addEventListener('mouseleave', ()=>{ if(!v.muted) overlay.style.opacity='0'; });
+  }
+});
+
+/* Run after DOM ready */
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', initCinematicHero);
+} else {
+  initCinematicHero();
+}
+</script>
+
+<!-- ═══ SERVICES ASSISTANT — scripted guided chat (no AI, no backend) ═══ -->
+<script>
+(function(){
+  // WhatsApp contact — country code + number, digits only.
+  const SA_WA = '96877019962';
+
+  const S = {
+    en:{ ask:'Ask', title:'Services Assistant', online:'Online',
+      greet:"Hi! 👋 I'm the 10 Digital assistant. Which service would you like to know about?",
+      choose:'Choose a service', what:'What we do', quote:'Get a quote', back:'Back to services',
+      person:'Talk to a person',
+      waMsg:s=>`Hello 10 Digital, I'm interested in: ${s}. Could I get a quote?`,
+      waPerson:"Hello 10 Digital, I'd like to talk to someone about your services." },
+    ar:{ ask:'اسأل', title:'مساعد الخدمات', online:'متصل',
+      greet:'مرحبًا! 👋 أنا مساعد 10 ديجيتال. أي خدمة تود معرفة المزيد عنها؟',
+      choose:'اختر خدمة', what:'ماذا نقدّم', quote:'اطلب عرض سعر', back:'العودة للخدمات',
+      person:'تحدث مع شخص',
+      waMsg:s=>`مرحبًا 10 ديجيتال، أنا مهتم بـ: ${s}. هل يمكنني الحصول على عرض سعر؟`,
+      waPerson:'مرحبًا 10 ديجيتال، أرغب بالتحدث مع أحد أفراد فريقكم بخصوص الخدمات.' }
+  };
+
+  const lang = () => (typeof currentLang !== 'undefined' && currentLang === 'ar') ? 'ar' : 'en';
+  const tr   = () => S[lang()];
+  const list = () => {
+    const svc = (typeof servicesData !== 'undefined' ? servicesData : []);
+    const add = (typeof addonsData !== 'undefined' ? addonsData : []);
+    return svc.concat(add);
+  };
+  const nm   = s => lang() === 'ar' ? s.title_ar : s.title_en;
+  const ds   = s => lang() === 'ar' ? s.desc_ar  : s.desc_en;
+  const wa   = txt => `https://wa.me/${SA_WA}?text=${encodeURIComponent(txt)}`;
+  const esc  = x => String(x).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const mark = sz => `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="7"/><path d="M12 3v5M12 16v5M3 12h5M16 12h5"/></svg>`;
+  let view = 'list';
+
+  function renderList(){
+    const T = tr();
+    const chips = list().map(s =>
+      `<button class="sa-chip" type="button" onclick="saPick('${s.id}')"><span class="material-symbols-outlined">${s.icon}</span>${esc(nm(s))}</button>`
+    ).join('');
+    return `<div class="sa-row"><span class="sa-mini">${mark(16)}</span><div class="sa-bubble">${esc(T.greet)}</div></div>
+      <div class="sa-cap">${esc(T.choose)}</div>
+      <div class="sa-chips">${chips}</div>`;
+  }
+  function renderService(id){
+    const T = tr(); const s = list().find(x => x.id === id);
+    if(!s){ view = 'list'; return renderList(); }
+    return `<div class="sa-row"><span class="sa-mini">${mark(16)}</span><div class="sa-bubble"><strong style="color:var(--accent)">${esc(nm(s))}</strong><br>${esc(ds(s))}</div></div>
+      <div class="sa-cap">${esc(T.what)}</div>
+      <div class="sa-actions">
+        <a class="sa-btn" href="${wa(T.waMsg(nm(s)))}" target="_blank" rel="noopener"><span class="material-symbols-outlined" style="font-size:18px">chat</span>${esc(T.quote)}</a>
+        <button class="sa-btn sa-btn-ghost" type="button" onclick="saBack()">${esc(T.back)}</button>
+      </div>`;
+  }
+  function render(){
+    const body = document.getElementById('saBody'); if(!body) return;
+    body.innerHTML = view === 'list' ? renderList() : renderService(view);
+    body.scrollTop = body.scrollHeight;
+  }
+  function applyLang(){
+    const T = tr(), set = (id,v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
+    set('saFabLabel', T.ask); set('saTitle', T.title); set('saOnline', T.online);
+    const p = document.getElementById('saPerson'); if(p){ p.textContent = T.person; p.href = wa(T.waPerson); }
+    render();
+  }
+
+  window.saToggle = function(){
+    const panel = document.getElementById('saPanel'); if(!panel) return;
+    const open = panel.classList.toggle('open');
+    const fab = document.getElementById('saFab'); if(fab) fab.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if(open) render();
+  };
+  window.saPick = function(id){ view = id; render(); };
+  window.saBack = function(){ view = 'list'; render(); };
+
+  function mount(){
+    if(document.getElementById('saFab')) return;
+    const T = tr();
+    const fab = document.createElement('button');
+    fab.className = 'sa-fab'; fab.id = 'saFab'; fab.type = 'button';
+    fab.setAttribute('aria-label', 'Services Assistant'); fab.setAttribute('aria-expanded', 'false');
+    fab.setAttribute('onclick', 'saToggle()');
+    fab.innerHTML = `<span class="sa-ic">${mark(26)}</span><span class="sa-fab-label" id="saFabLabel">${esc(T.ask)}</span>`;
+
+    const panel = document.createElement('div');
+    panel.className = 'sa-panel'; panel.id = 'saPanel';
+    panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Services Assistant');
+    panel.innerHTML = `<div class="sa-head">
+        <span class="sa-avatar">${mark(20)}</span>
+        <div><div class="sa-title" id="saTitle">${esc(T.title)}</div>
+          <div class="sa-online"><span class="dot"></span><span id="saOnline">${esc(T.online)}</span></div></div>
+        <button class="sa-close" type="button" onclick="saToggle()" aria-label="Close">&#10005;</button>
+      </div>
+      <div class="sa-body" id="saBody"></div>
+      <div class="sa-foot"><a id="saPerson" href="#" target="_blank" rel="noopener">${esc(T.person)}</a></div>`;
+
+    document.body.appendChild(fab);
+    document.body.appendChild(panel);
+    applyLang();
+
+    // Keep the assistant in sync when the site language is toggled (no edit to the original function).
+    if(typeof window.toggleLang === 'function'){
+      const orig = window.toggleLang;
+      window.toggleLang = function(){ orig.apply(this, arguments); applyLang(); };
+    }
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
+})();
+</script>
+
+
+</body>
+</html>
