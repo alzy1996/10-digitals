@@ -3144,6 +3144,481 @@ if(document.readyState === 'loading'){
 })();
 </script>
 
+<!-- ═══════════════════════════════════════════════════════════════════
+     FX ENGINE — ADVANCED ANIMATION SYSTEM (fully additive layer)
+     Cinematic preloader · custom magnetic cursor · particle constellation
+     3D split-text titles · text scramble · tilt + glare cards · magnetic
+     buttons · animated counters · infinite marquee · click spark bursts
+     scroll progress ring · hero scroll parallax · ambient aurora
+     All effects respect prefers-reduced-motion and disable on touch.
+     ═══════════════════════════════════════════════════════════════════ -->
+<style id="fx-styles">
+/* ── Preloader ── */
+#fx-preloader{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;pointer-events:all}
+#fx-preloader .fx-pl-panel{position:absolute;left:0;width:100%;height:50.5%;background:#05070d;transition:transform .9s cubic-bezier(.77,0,.18,1)}
+#fx-preloader .fx-pl-panel.top{top:0}
+#fx-preloader .fx-pl-panel.bot{bottom:0}
+#fx-preloader.fx-done .fx-pl-panel.top{transform:translateY(-101%)}
+#fx-preloader.fx-done .fx-pl-panel.bot{transform:translateY(101%)}
+#fx-preloader .fx-pl-core{position:relative;z-index:2;text-align:center;transition:opacity .35s ease,transform .35s ease}
+#fx-preloader.fx-done .fx-pl-core{opacity:0;transform:scale(.92)}
+#fx-preloader .fx-pl-brand{font-weight:900;font-size:clamp(1.6rem,5vw,2.6rem);letter-spacing:.14em;color:#fff;display:inline-flex}
+#fx-preloader .fx-pl-brand span{display:inline-block;opacity:0;transform:translateY(26px);animation:fxPlCh .7s cubic-bezier(.22,1,.36,1) forwards;white-space:pre}
+#fx-preloader .fx-pl-brand span.gold{color:var(--accent)}
+@keyframes fxPlCh{to{opacity:1;transform:translateY(0)}}
+#fx-preloader .fx-pl-bar{width:min(260px,60vw);height:2px;background:rgba(255,255,255,.12);border-radius:2px;margin:22px auto 12px;overflow:hidden}
+#fx-preloader .fx-pl-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#fff);border-radius:2px}
+#fx-preloader .fx-pl-pct{font-size:.72rem;font-weight:700;letter-spacing:.3em;color:rgba(255,255,255,.55)}
+
+/* ── Scroll progress bar ── */
+#fx-progress{position:fixed;top:0;left:0;height:3px;width:0%;z-index:10050;background:linear-gradient(90deg,var(--accent),#e8d5a8,var(--accent));background-size:200% 100%;animation:fxProgShine 3s linear infinite;box-shadow:0 0 12px var(--accent-glow);pointer-events:none}
+@keyframes fxProgShine{to{background-position:200% 0}}
+
+/* ── Custom cursor ── */
+body.fx-cursor-on{cursor:none}
+body.fx-cursor-on a,body.fx-cursor-on button,body.fx-cursor-on [onclick]{cursor:none}
+body.fx-cursor-on input,body.fx-cursor-on textarea,body.fx-cursor-on select,body.fx-cursor-on [contenteditable]{cursor:auto}
+#fx-cursor-dot,#fx-cursor-ring{position:fixed;top:0;left:0;pointer-events:none;z-index:100000;opacity:0;transition:opacity .3s ease}
+#fx-cursor-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent-glow)}
+#fx-cursor-ring{width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(192,160,96,.9);mix-blend-mode:difference;transition:opacity .3s ease,width .3s cubic-bezier(.22,1,.36,1),height .3s cubic-bezier(.22,1,.36,1),background .3s ease}
+body.fx-cursor-live #fx-cursor-dot,body.fx-cursor-live #fx-cursor-ring{opacity:1}
+body.fx-cursor-hidden #fx-cursor-dot,body.fx-cursor-hidden #fx-cursor-ring{opacity:0}
+#fx-cursor-ring.fx-hover{width:58px;height:58px;background:rgba(192,160,96,.12);border-color:var(--accent)}
+
+/* ── Hero particle constellation ── */
+#fx-hero-canvas{position:absolute;inset:0;z-index:3;pointer-events:none}
+
+/* ── Split-text hero title ── */
+.hero-c-title{perspective:700px}
+.fx-ch{display:inline-block;opacity:0;transform:translateY(.55em) rotateX(85deg);transform-origin:50% 100%;animation:fxChIn .85s cubic-bezier(.22,1,.36,1) forwards;white-space:pre}
+@keyframes fxChIn{to{opacity:1;transform:translateY(0) rotateX(0)}}
+.hero-c-title .accent .fx-ch,.hero-c-title .fx-ch.fx-gold{background:linear-gradient(110deg,var(--accent) 20%,#f4e3bc 50%,var(--accent) 80%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:fxChIn .85s cubic-bezier(.22,1,.36,1) forwards,fxGoldShine 5s linear 1.6s infinite}
+@keyframes fxGoldShine{to{background-position:-220% 0}}
+
+/* ── Tilt cards: glare + spotlight border ── */
+.fx-tilt{will-change:transform}
+.fx-glare{position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .4s ease;background:radial-gradient(420px circle at var(--gx,50%) var(--gy,50%),rgba(255,255,255,.22),rgba(192,160,96,.08) 42%,transparent 65%);z-index:5}
+.fx-tilt:hover .fx-glare{opacity:1}
+
+/* ── Trust logos infinite marquee ── */
+.logo-flex.fx-marquee{overflow:hidden;flex-wrap:nowrap;justify-content:flex-start;gap:0;-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+.fx-marquee-track{display:flex;align-items:center;gap:60px;flex-shrink:0;min-width:100%;animation:fxMarq 26s linear infinite;padding-inline-end:60px}
+.logo-flex.fx-marquee:hover .fx-marquee-track{animation-play-state:paused}
+.fx-marquee-track div{flex-shrink:0;transition:transform .3s ease,opacity .3s ease}
+.fx-marquee-track div:hover{transform:scale(1.15);opacity:1}
+@keyframes fxMarq{to{transform:translateX(-100%)}}
+[dir="rtl"] .fx-marquee-track{animation-name:fxMarqRtl}
+@keyframes fxMarqRtl{to{transform:translateX(100%)}}
+
+/* ── Click spark burst ── */
+.fx-spark{position:fixed;width:6px;height:6px;border-radius:50%;pointer-events:none;z-index:100001;background:var(--accent);box-shadow:0 0 8px var(--accent-glow)}
+
+/* ── Scroll-to-top with progress ring ── */
+#fx-top{position:fixed;bottom:26px;inset-inline-start:26px;width:52px;height:52px;border-radius:50%;border:none;background:rgba(19,27,46,.85);backdrop-filter:blur(10px);color:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:9000;opacity:0;transform:translateY(20px) scale(.8);transition:opacity .4s ease,transform .4s cubic-bezier(.34,1.56,.64,1);box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#fx-top.fx-show{opacity:1;transform:translateY(0) scale(1)}
+#fx-top svg{position:absolute;inset:0;transform:rotate(-90deg)}
+#fx-top svg circle{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linecap:round;stroke-dasharray:151;stroke-dashoffset:151}
+#fx-top .material-symbols-outlined{font-size:22px;position:relative;z-index:1}
+#fx-top:hover{transform:translateY(-4px) scale(1.05)}
+
+/* ── Ambient aurora behind light sections ── */
+body.fx-aurora::before{content:'';position:fixed;inset:-25%;z-index:-1;pointer-events:none;background:radial-gradient(38% 32% at 18% 22%,rgba(192,160,96,.13),transparent 62%),radial-gradient(34% 30% at 82% 72%,rgba(99,132,255,.10),transparent 62%),radial-gradient(30% 26% at 60% 15%,rgba(80,97,107,.08),transparent 60%);filter:blur(48px);animation:fxAurora 28s ease-in-out infinite alternate}
+@keyframes fxAurora{to{transform:rotate(10deg) scale(1.18) translateY(-4%)}}
+
+/* ── Hero meta pills gentle float ── */
+.hero-meta-pill{animation:fxFloat 5s ease-in-out infinite}
+.hero-meta-pill:nth-child(2){animation-delay:.8s}
+.hero-meta-pill:nth-child(3){animation-delay:1.6s}
+@keyframes fxFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+
+/* ── Kill everything for reduced motion ── */
+@media (prefers-reduced-motion:reduce){
+  #fx-preloader,#fx-progress,#fx-cursor-dot,#fx-cursor-ring,#fx-hero-canvas,.fx-glare,.fx-spark{display:none!important}
+  .fx-ch{opacity:1!important;transform:none!important;animation:none!important}
+  .fx-marquee-track,.hero-meta-pill,body.fx-aurora::before{animation:none!important}
+}
+</style>
+
+<script>
+(function(){
+'use strict';
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const FINE    = window.matchMedia('(pointer: fine)').matches;
+const lerp    = (a,b,n)=>a+(b-a)*n;
+const clamp   = (v,mi,ma)=>Math.max(mi,Math.min(ma,v));
+function safe(fn){ try{ fn(); }catch(err){ console.warn('[fx]', err); } }
+
+/* ═══ 1. CINEMATIC PRELOADER — brand letters + counter + curtain reveal ═══ */
+safe(function preloader(){
+  if(REDUCED || sessionStorage.getItem('fxSeen')) return;
+  sessionStorage.setItem('fxSeen','1');
+  const pl = document.createElement('div');
+  pl.id = 'fx-preloader';
+  const brand = '10 DIGITAL';
+  const chars = [...brand].map((c,i)=>
+    `<span class="${i<2?'gold':''}" style="animation-delay:${80+i*55}ms">${c===' '?'&nbsp;':c}</span>`).join('');
+  pl.innerHTML = `<div class="fx-pl-panel top"></div><div class="fx-pl-panel bot"></div>
+    <div class="fx-pl-core">
+      <div class="fx-pl-brand">${chars}</div>
+      <div class="fx-pl-bar"><div class="fx-pl-fill"></div></div>
+      <div class="fx-pl-pct">0%</div>
+    </div>`;
+  document.body.appendChild(pl);
+  document.documentElement.style.overflow = 'hidden';
+  const fill = pl.querySelector('.fx-pl-fill'), pct = pl.querySelector('.fx-pl-pct');
+  const DUR = 1400, t0 = performance.now();
+  (function tick(now){
+    const p = clamp((now-t0)/DUR, 0, 1);
+    const eased = 1 - Math.pow(1-p, 3);
+    const v = Math.round(eased*100);
+    fill.style.width = v+'%'; pct.textContent = v+'%';
+    if(p < 1){ requestAnimationFrame(tick); return; }
+    pl.classList.add('fx-done');
+    document.documentElement.style.overflow = '';
+    setTimeout(()=>pl.remove(), 1000);
+  })(t0);
+});
+
+/* ═══ 2. CUSTOM MAGNETIC CURSOR — dot + blend-mode ring ═══ */
+safe(function cursor(){
+  if(REDUCED || !FINE) return;
+  document.body.classList.add('fx-cursor-on');
+  const dot = document.createElement('div'); dot.id='fx-cursor-dot';
+  const ring= document.createElement('div'); ring.id='fx-cursor-ring';
+  document.body.append(dot, ring);
+  let mx=innerWidth/2, my=innerHeight/2, rx=mx, ry=my, live=false;
+  window.addEventListener('mousemove', e=>{
+    mx=e.clientX; my=e.clientY;
+    if(!live){ live=true; rx=mx; ry=my; document.body.classList.add('fx-cursor-live'); }
+  }, {passive:true});
+  document.addEventListener('mouseleave', ()=>document.body.classList.remove('fx-cursor-live'));
+  document.addEventListener('mouseenter', ()=>{ if(live) document.body.classList.add('fx-cursor-live'); });
+  document.addEventListener('pointerover', e=>{
+    const t = e.target;
+    ring.classList.toggle('fx-hover',
+      !!(t.closest && t.closest('a,button,[onclick],.sa-chip,.port-3d-item,.tilt-card,.maint-item')));
+    document.body.classList.toggle('fx-cursor-hidden',
+      !!(t.closest && t.closest('input,textarea,select,[contenteditable]')));
+  }, {passive:true});
+  (function frame(){
+    rx = lerp(rx, mx, .16); ry = lerp(ry, my, .16);
+    dot.style.transform  = `translate(${mx-3.5}px,${my-3.5}px)`;
+    const s = ring.classList.contains('fx-hover') ? 29 : 19;
+    ring.style.transform = `translate(${rx-s}px,${ry-s}px)`;
+    requestAnimationFrame(frame);
+  })();
+});
+
+/* ═══ 3. HERO PARTICLE CONSTELLATION — cursor-reactive network ═══ */
+safe(function particles(){
+  if(REDUCED) return;
+  const hero = document.querySelector('.hero-cinematic');
+  if(!hero) return;
+  const cv = document.createElement('canvas'); cv.id='fx-hero-canvas';
+  hero.insertBefore(cv, hero.querySelector('.hero-c-inner'));
+  const ctx = cv.getContext('2d');
+  let W=0, H=0, DPR=1, pts=[], visible=true, px=-9999, py=-9999;
+
+  function size(){
+    DPR = Math.min(devicePixelRatio||1, 2);
+    W = hero.clientWidth; H = hero.clientHeight;
+    cv.width = W*DPR; cv.height = H*DPR;
+    cv.style.width = W+'px'; cv.style.height = H+'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    const n = Math.round(clamp(W*H/16000, 30, 110));
+    pts = Array.from({length:n}, ()=>({
+      x:Math.random()*W, y:Math.random()*H,
+      vx:(Math.random()-.5)*.35, vy:(Math.random()-.5)*.35,
+      r:.6+Math.random()*1.7,
+      gold:Math.random()<.35
+    }));
+  }
+  size();
+  window.addEventListener('resize', size);
+  window.addEventListener('mousemove', e=>{
+    const r = cv.getBoundingClientRect();
+    px = e.clientX - r.left; py = e.clientY - r.top;
+  }, {passive:true});
+  new IntersectionObserver(en=>{ visible = en[0].isIntersecting; }).observe(hero);
+
+  const LINK = 115, REPEL = 140;
+  (function frame(){
+    requestAnimationFrame(frame);
+    if(!visible || document.hidden) return;
+    ctx.clearRect(0,0,W,H);
+    for(const p of pts){
+      const dx = p.x-px, dy = p.y-py, d = Math.hypot(dx,dy);
+      if(d < REPEL && d > 0.01){
+        const f = (1 - d/REPEL) * .55;
+        p.vx += (dx/d)*f; p.vy += (dy/d)*f;
+      }
+      p.vx = clamp(p.vx*.985, -1.2, 1.2); p.vy = clamp(p.vy*.985, -1.2, 1.2);
+      if(Math.abs(p.vx)<.08) p.vx += (Math.random()-.5)*.03;
+      if(Math.abs(p.vy)<.08) p.vy += (Math.random()-.5)*.03;
+      p.x += p.vx; p.y += p.vy;
+      if(p.x<-20) p.x=W+20; if(p.x>W+20) p.x=-20;
+      if(p.y<-20) p.y=H+20; if(p.y>H+20) p.y=-20;
+    }
+    ctx.lineWidth = .6;
+    for(let i=0;i<pts.length;i++){
+      const a = pts[i];
+      for(let j=i+1;j<pts.length;j++){
+        const b = pts[j];
+        const dx=a.x-b.x, dy=a.y-b.y;
+        if(Math.abs(dx)>LINK || Math.abs(dy)>LINK) continue;
+        const d = Math.hypot(dx,dy);
+        if(d >= LINK) continue;
+        const o = (1-d/LINK)*.30;
+        ctx.strokeStyle = (a.gold||b.gold) ? `rgba(194,163,95,${o})` : `rgba(180,200,255,${o*.7})`;
+        ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+      }
+    }
+    for(const p of pts){
+      ctx.fillStyle = p.gold ? 'rgba(194,163,95,.85)' : 'rgba(220,232,255,.7)';
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.2832); ctx.fill();
+    }
+  })();
+});
+
+/* ═══ 4. SPLIT-TEXT 3D TITLE — per-char flip-in, per-word for Arabic ═══ */
+function fxSplitHero(){
+  if(REDUCED) return;
+  document.querySelectorAll('.hero-c-title span[data-i18n]').forEach(el=>{
+    if(el.querySelector('.fx-ch')) return;
+    const txt = el.textContent; if(!txt.trim()) return;
+    const isAr = /[؀-ۿ]/.test(txt);
+    const parts = isAr ? txt.split(/(\s+)/) : [...txt];   /* Arabic splits by word to keep cursive joining */
+    el.textContent = '';
+    let i = 0;
+    parts.forEach(p=>{
+      if(/^\s+$/.test(p) || p===''){ el.appendChild(document.createTextNode(p)); return; }
+      const s = document.createElement('span');
+      s.className = 'fx-ch';
+      s.style.animationDelay = (i*(isAr?90:42)) + 'ms';
+      s.textContent = p;
+      el.appendChild(s); i++;
+    });
+  });
+}
+safe(fxSplitHero);
+safe(function rebindLang(){
+  /* re-split (and re-animate) the title whenever the language toggles */
+  if(typeof window.toggleLang !== 'function') return;
+  const orig = window.toggleLang;
+  window.toggleLang = function(){ orig.apply(this, arguments); setTimeout(fxSplitHero, 30); };
+});
+
+/* ═══ 5. TEXT SCRAMBLE — nav brand decodes itself on hover ═══ */
+safe(function scramble(){
+  if(REDUCED || !FINE) return;
+  const el = document.querySelector('.nav-brand span[data-i18n="brand"]');
+  if(!el) return;
+  const GLYPHS = '!<>-_\\/[]{}—=+*^?#01';
+  let timer = null;
+  el.closest('.nav-brand').addEventListener('mouseenter', ()=>{
+    const target = el.textContent;
+    if(timer || /[؀-ۿ]/.test(target)) return;   /* skip while Arabic */
+    let f = 0; const TOTAL = 16;
+    timer = setInterval(()=>{
+      el.textContent = [...target].map((c,i)=>{
+        if(c===' ') return ' ';
+        return i < (f/TOTAL)*target.length ? c : GLYPHS[Math.floor(Math.random()*GLYPHS.length)];
+      }).join('');
+      if(++f > TOTAL){ clearInterval(timer); timer = null; el.textContent = target; }
+    }, 34);
+  });
+});
+
+/* ═══ 6. TILT + GLARE — 3D perspective cards with moving specular light ═══ */
+safe(function tilt(){
+  if(REDUCED || !FINE) return;
+  const SEL = '.about-3d-card,.port-3d-item,.tier-card';
+  const bound = new WeakSet();
+  document.addEventListener('pointerover', e=>{
+    const card = e.target.closest && e.target.closest(SEL);
+    if(!card || bound.has(card)) return;
+    bound.add(card);
+    card.classList.add('fx-tilt');
+    if(getComputedStyle(card).position === 'static') card.style.position = 'relative';
+    const glare = document.createElement('div');
+    glare.className = 'fx-glare';
+    card.appendChild(glare);
+    card.addEventListener('pointermove', ev=>{
+      const r = card.getBoundingClientRect();
+      const nx = (ev.clientX - r.left)/r.width, ny = (ev.clientY - r.top)/r.height;
+      card.style.transition = 'transform .1s ease-out';
+      card.style.transform =
+        `perspective(900px) rotateX(${(ny-.5)*-10}deg) rotateY(${(nx-.5)*12}deg) translateY(-8px) scale(1.02)`;
+      card.style.setProperty('--gx', (nx*100)+'%');
+      card.style.setProperty('--gy', (ny*100)+'%');
+    });
+    card.addEventListener('pointerleave', ()=>{
+      card.style.transition = 'transform .6s cubic-bezier(.22,1,.36,1)';
+      card.style.transform = '';
+      setTimeout(()=>{ card.style.transition = ''; }, 620);
+    });
+  }, {passive:true});
+});
+
+/* ═══ 7. MAGNETIC BUTTONS — CTAs attract toward the cursor ═══ */
+safe(function magnetic(){
+  if(REDUCED || !FINE) return;
+  const SEL = '.btn-hero-solid,.btn-hero-glass,.btn-hero-arrow,.btn-primary,.btn-accent,.lang-btn';
+  const bound = new WeakSet();
+  document.addEventListener('pointerover', e=>{
+    const btn = e.target.closest && e.target.closest(SEL);
+    if(!btn || bound.has(btn)) return;
+    bound.add(btn);
+    btn.addEventListener('pointermove', ev=>{
+      const r = btn.getBoundingClientRect();
+      const dx = ev.clientX - (r.left + r.width/2);
+      const dy = ev.clientY - (r.top  + r.height/2);
+      btn.style.transition = 'transform .12s ease-out';
+      btn.style.transform = `translate(${clamp(dx*.28,-10,10)}px,${clamp(dy*.28,-8,8)}px)`;
+    });
+    btn.addEventListener('pointerleave', ()=>{
+      btn.style.transition = 'transform .45s cubic-bezier(.34,1.56,.64,1)';
+      btn.style.transform = '';
+      setTimeout(()=>{ btn.style.transition = ''; }, 470);
+    });
+  }, {passive:true});
+});
+
+/* ═══ 8. ANIMATED COUNTERS — stats count up with easing on scroll ═══ */
+safe(function counters(){
+  const els = document.querySelectorAll('.stat-item h3');
+  if(!els.length) return;
+  const io = new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      if(!en.isIntersecting) return;
+      io.unobserve(en.target);
+      const m = en.target.textContent.trim().match(/^(\d+)(.*)$/);
+      if(!m) return;
+      const end = +m[1], suffix = m[2];
+      if(REDUCED){ en.target.textContent = end + suffix; return; }
+      const DUR = 1900, t0 = performance.now();
+      (function tick(now){
+        const p = clamp((now-t0)/DUR, 0, 1);
+        const eased = 1 - Math.pow(2, -10*p);              /* easeOutExpo */
+        en.target.textContent = Math.round(end*eased) + suffix;
+        if(p < 1) requestAnimationFrame(tick);
+        else en.target.textContent = end + suffix;
+      })(t0);
+    });
+  }, {threshold:.6});
+  els.forEach(el=>io.observe(el));
+});
+
+/* ═══ 9. INFINITE MARQUEE — trust logos glide forever, pause on hover ═══ */
+safe(function marquee(){
+  const flex = document.querySelector('.trust-logos .logo-flex');
+  if(!flex || REDUCED) return;
+  const items = [...flex.children];
+  flex.classList.add('fx-marquee');
+  flex.innerHTML = '';
+  for(let copy=0; copy<2; copy++){
+    const track = document.createElement('div');
+    track.className = 'fx-marquee-track';
+    if(copy === 1) track.setAttribute('aria-hidden','true');
+    for(let rep=0; rep<3; rep++) items.forEach(it=>track.appendChild(it.cloneNode(true)));
+    flex.appendChild(track);
+  }
+});
+
+/* ═══ 10. CLICK SPARK BURST — gold particles radiate from every click ═══ */
+safe(function sparks(){
+  if(REDUCED) return;
+  document.addEventListener('pointerdown', e=>{
+    if(e.button !== 0) return;
+    if(e.target.closest && e.target.closest('input,textarea,select,.admin-shell,#admin-shell')) return;
+    const n = 9;
+    for(let i=0;i<n;i++){
+      const s = document.createElement('div');
+      s.className = 'fx-spark';
+      const ang = (i/n)*Math.PI*2 + Math.random()*.6;
+      const dist = 34 + Math.random()*40;
+      const sz = 3 + Math.random()*4;
+      s.style.width = s.style.height = sz+'px';
+      s.style.left = e.clientX+'px'; s.style.top = e.clientY+'px';
+      if(Math.random()<.4) s.style.background = '#fff';
+      document.body.appendChild(s);
+      s.animate([
+        { transform:'translate(-50%,-50%) scale(1)',   opacity:1 },
+        { transform:`translate(calc(-50% + ${Math.cos(ang)*dist}px),calc(-50% + ${Math.sin(ang)*dist}px)) scale(0)`, opacity:0 }
+      ], { duration: 550 + Math.random()*250, easing:'cubic-bezier(.22,1,.36,1)' })
+       .onfinish = ()=>s.remove();
+    }
+  }, {passive:true});
+});
+
+/* ═══ 11. SCROLL PROGRESS + ROCKET-BACK-TO-TOP with progress ring ═══ */
+safe(function scrollUI(){
+  const bar = document.createElement('div'); bar.id='fx-progress';
+  document.body.appendChild(bar);
+  const top = document.createElement('button');
+  top.id='fx-top'; top.setAttribute('aria-label','Back to top');
+  top.innerHTML = `<svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/></svg>
+    <span class="material-symbols-outlined">rocket_launch</span>`;
+  top.addEventListener('click', ()=>window.scrollTo({top:0, behavior: REDUCED?'auto':'smooth'}));
+  document.body.appendChild(top);
+  const circ = top.querySelector('circle');
+  let ticking = false;
+  function update(){
+    ticking = false;
+    const max = document.documentElement.scrollHeight - innerHeight;
+    const p = max > 0 ? clamp(scrollY/max, 0, 1) : 0;
+    bar.style.width = (p*100)+'%';
+    circ.style.strokeDashoffset = 151*(1-p);
+    top.classList.toggle('fx-show', scrollY > 500);
+  }
+  window.addEventListener('scroll', ()=>{ if(!ticking){ ticking = true; requestAnimationFrame(update); } }, {passive:true});
+  update();
+});
+
+/* ═══ 12. HERO SCROLL PARALLAX — cinematic depth exit while scrolling away ═══ */
+safe(function heroExit(){
+  if(REDUCED) return;
+  const inner = document.querySelector('.hero-c-inner');
+  const hero  = document.querySelector('.hero-cinematic');
+  if(!inner || !hero) return;
+  let ticking = false;
+  function update(){
+    ticking = false;
+    const h = hero.offsetHeight || innerHeight;
+    if(scrollY > h){ inner.style.transform=''; inner.style.opacity=''; return; }
+    const p = scrollY / h;
+    inner.style.transform = `translateY(${scrollY*.28}px) scale(${1-p*.06})`;
+    inner.style.opacity = clamp(1 - p*1.15, 0, 1);
+  }
+  window.addEventListener('scroll', ()=>{ if(!ticking){ ticking = true; requestAnimationFrame(update); } }, {passive:true});
+});
+
+/* ═══ 13. STAGGERED REVEALS + AMBIENT AURORA ═══ */
+safe(function polish(){
+  if(REDUCED) return;
+  document.body.classList.add('fx-aurora');
+  /* cascade: sibling .reveal cards enter one after another instead of all at once */
+  const groups = new Map();
+  document.querySelectorAll('.reveal:not(.active)').forEach(el=>{
+    const parent = el.parentElement;
+    if(!groups.has(parent)) groups.set(parent, []);
+    groups.get(parent).push(el);
+  });
+  groups.forEach(els=>{
+    if(els.length < 2) return;
+    els.forEach((el,i)=>{
+      el.style.transitionDelay = (i*110)+'ms';
+      /* drop the stagger once revealed so hover transitions stay instant */
+      el.addEventListener('transitionend', function h(){
+        el.style.transitionDelay = '';
+        el.removeEventListener('transitionend', h);
+      });
+    });
+  });
+});
+
+})();
+</script>
 
 </body>
 </html>

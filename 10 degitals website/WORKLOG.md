@@ -57,6 +57,11 @@ These drive ALL of:
 - Pricing Manager now edits services **and** add-ons; total box fonts fixed to black.
 - Added services: **Custom Systems** and **Chatbot Assistant**.
 
+## FX Engine (advanced animation system)
+- Self-contained `<style id="fx-styles">` + `<script>` block at the very end of `<body>` (search `FX ENGINE`). Fully additive — touches no existing HTML/CSS/JS; every module is wrapped in `safe()` try/catch so one failure can't break the rest.
+- **13 effects:** cinematic preloader (brand letters + % counter + curtain reveal, once per session via `sessionStorage.fxSeen`) · custom magnetic cursor (dot + blend-mode ring, hides over form fields) · hero particle constellation canvas (cursor-repel network, pauses off-screen) · 3D split-text hero title (per-char flip for EN, per-WORD for Arabic to keep cursive joining; re-splits on `toggleLang`) · text scramble on nav-brand hover · tilt + glare cards (`.about-3d-card,.port-3d-item,.tier-card`, delegated so injected portfolio items work) · magnetic CTA buttons · animated stat counters (easeOutExpo) · infinite trust-logos marquee (hover-pause, RTL-aware) · gold click spark bursts (skipped in admin/forms) · scroll progress bar + rocket back-to-top with progress ring · hero scroll-exit parallax · staggered reveals + ambient aurora.
+- **Guards:** everything honors `prefers-reduced-motion`; cursor/tilt/magnetic/scramble require `pointer: fine` (disabled on touch).
+
 ## Gotchas
 - `currentLang` controls language; `data-theme` not used — site is a single dark gold theme (second `:root` wins).
 - After ANY change: deploy, then **hard-refresh** — Firebase/browser caches the HTML, which is the usual reason "I can't see the change."
