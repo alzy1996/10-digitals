@@ -1,29 +1,31 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '../lib/i18n'
 
 interface PreloaderProps {
   onDone: () => void
 }
 
-// Full-screen brand curtain: letterspaced wordmark + thin gold bar that
-// fills in 1.2s (assets are light, the pause is choreography), then fades
-// and hands off to the hero entrance.
+// Full-screen brand curtain: letterspaced wordmark + thin gold bar, then a
+// fade into the hero entrance. The bar's duration counts from navigation
+// start, so the choreography absorbs real load time instead of adding to
+// it — slow connections see a short bar, fast ones the full ritual.
 export default function Preloader({ onDone }: PreloaderProps) {
   const { t } = useI18n()
   const [exiting, setExiting] = useState(false)
   const [gone, setGone] = useState(false)
+  const fillMs = useRef(Math.max(250, 950 - Math.round(performance.now()))).current
 
   useEffect(() => {
-    const fill = window.setTimeout(() => setExiting(true), 1200)
+    const fill = window.setTimeout(() => setExiting(true), fillMs)
     return () => window.clearTimeout(fill)
-  }, [])
+  }, [fillMs])
 
   useEffect(() => {
     if (!exiting) return
     const done = window.setTimeout(() => {
       setGone(true)
       onDone()
-    }, 850)
+    }, 600)
     return () => window.clearTimeout(done)
   }, [exiting, onDone])
 
@@ -47,7 +49,7 @@ export default function Preloader({ onDone }: PreloaderProps) {
           className="block h-full w-full origin-left"
           style={{
             background: 'var(--accent)',
-            animation: 'loaderBar 1.2s cubic-bezier(0.16,1,0.3,1) forwards',
+            animation: `loaderBar ${fillMs}ms cubic-bezier(0.16,1,0.3,1) forwards`,
           }}
         />
       </span>

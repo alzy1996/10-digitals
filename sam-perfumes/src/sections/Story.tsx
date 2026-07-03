@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import gsap from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import SectionTitle from '../components/SectionTitle'
 import { useI18n } from '../lib/i18n'
-
-gsap.registerPlugin(ScrollTrigger)
 
 const STORY_IMG = '/img/story-1.jpg'
 
@@ -20,23 +16,32 @@ export default function Story() {
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     if (!imgRef.current || !frameRef.current) return
-    const tween = gsap.fromTo(
-      imgRef.current,
-      { yPercent: -8 },
-      {
-        yPercent: 8,
-        ease: 'none',
-        scrollTrigger: {
-          trigger: frameRef.current,
-          start: 'top bottom',
-          end: 'bottom top',
-          scrub: true,
-        },
+    let cancelled = false
+    let tween: { scrollTrigger?: { kill: () => void }; kill: () => void } | undefined
+    Promise.all([import('gsap'), import('gsap/ScrollTrigger')]).then(
+      ([{ gsap }, { ScrollTrigger }]) => {
+        if (cancelled || !imgRef.current || !frameRef.current) return
+        gsap.registerPlugin(ScrollTrigger)
+        tween = gsap.fromTo(
+          imgRef.current,
+          { yPercent: -8 },
+          {
+            yPercent: 8,
+            ease: 'none',
+            scrollTrigger: {
+              trigger: frameRef.current,
+              start: 'top bottom',
+              end: 'bottom top',
+              scrub: true,
+            },
+          },
+        )
       },
     )
     return () => {
-      tween.scrollTrigger?.kill()
-      tween.kill()
+      cancelled = true
+      tween?.scrollTrigger?.kill()
+      tween?.kill()
     }
   }, [failed])
 

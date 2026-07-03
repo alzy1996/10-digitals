@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import gsap from 'gsap'
 import { heroImages } from '../content/content'
 import { useI18n } from '../lib/i18n'
 
@@ -135,7 +134,14 @@ export default function HeroVisual() {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (reduced) return
 
-    const ctx = gsap.context(() => {
+    let cancelled = false
+    let ctx: { revert: () => void } | undefined
+
+    // gsap arrives via dynamic import (off the critical path); the bottles
+    // are static until then, so nothing looks broken in the interim.
+    import('gsap').then(({ gsap }) => {
+      if (cancelled) return
+      ctx = gsap.context(() => {
       gsap.to(mainFloatRef.current, {
         y: 10,
         duration: 3,
@@ -167,11 +173,15 @@ export default function HeroVisual() {
         backX(nx * -26)
         backY2(ny * -26)
       }
-      window.addEventListener('mousemove', onMove)
-      return () => window.removeEventListener('mousemove', onMove)
-    }, stageRef)
+        window.addEventListener('mousemove', onMove)
+        return () => window.removeEventListener('mousemove', onMove)
+      }, stageRef)
+    })
 
-    return () => ctx.revert()
+    return () => {
+      cancelled = true
+      ctx?.revert()
+    }
   }, [])
 
   return (
