@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Menu, X } from 'lucide-react'
 import { useI18n } from '../lib/i18n'
 import LangToggle from './LangToggle'
+import { scrollToEl } from '../lib/scroll'
 
 interface NavLink {
   label: string
@@ -9,11 +10,7 @@ interface NavLink {
 }
 
 function scrollToHash(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
-  const el = document.querySelector(href)
-  if (el) {
-    e.preventDefault()
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
+  if (scrollToEl(href)) e.preventDefault()
 }
 
 export default function Nav() {

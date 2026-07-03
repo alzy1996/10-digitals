@@ -83,6 +83,7 @@ export function ProductImage({
   width,
   height,
   lazy = true,
+  label = true,
 }: {
   src: string
   alt: string
@@ -92,13 +93,14 @@ export function ProductImage({
   width: number
   height: number
   lazy?: boolean
+  label?: boolean
 }) {
   const [failed, setFailed] = useState(false)
 
   if (failed) {
     return (
       <div className={className} style={{ aspectRatio: `${width} / ${height}` }}>
-        <BottleSilhouette variant={variant} />
+        <BottleSilhouette variant={variant} showLabel={label} />
       </div>
     )
   }

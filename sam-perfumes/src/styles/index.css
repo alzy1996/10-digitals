@@ -14,6 +14,8 @@
   --ink: #f4ead9;               /* cream text on dark */
   --ink-dark: #241811;          /* text on bronze */
   --muted: rgba(244, 234, 217, 0.62);
+  --muted-dark: rgba(36, 24, 17, 0.66);   /* muted text on bronze */
+  --line-dark: rgba(36, 24, 17, 0.28);    /* hairlines on bronze */
   --accent: #d3a05a;            /* gold */
   --accent-deep: #8a5a2b;
   --line: rgba(244, 234, 217, 0.16);
@@ -49,6 +51,7 @@ html[dir='rtl'] body { font-family: var(--font-ar); }
 html[dir='rtl'] .en-tracking { letter-spacing: 0 !important; }
 
 .text-muted { color: var(--muted); }
+.text-muted-dark { color: var(--muted-dark); }
 
 /* House entrance choreography */
 @keyframes revealUp {

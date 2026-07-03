@@ -1,19 +1,17 @@
 import { ArrowRight } from 'lucide-react'
 import Nav from '../components/Nav'
 import HeroVisual from '../components/HeroVisual'
+import BestSellers from './BestSellers'
 import { products } from '../content/content'
 import { useI18n } from '../lib/i18n'
+import { scrollToEl } from '../lib/scroll'
 
 interface HeroProps {
   ready: boolean
 }
 
 function scrollToCollection(e: React.MouseEvent<HTMLAnchorElement>) {
-  const el = document.querySelector('#collection')
-  if (el) {
-    e.preventDefault()
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
+  if (scrollToEl('#collection')) e.preventDefault()
 }
 
 // One big dark rounded panel: nav on top, headline left, floating
@@ -90,8 +88,7 @@ export default function Hero({ ready }: HeroProps) {
           </div>
         </div>
 
-        {/* Bestseller strip mounts here in Phase 2 */}
-        <div id="bestsellers" />
+        <BestSellers />
       </div>
     </section>
   )
