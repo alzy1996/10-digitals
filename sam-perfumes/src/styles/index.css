@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ════════════════════════════════════════════
+   THEME TOKENS V1 — single source of truth.
+   Sam's design examples change ONLY this block.
+   ════════════════════════════════════════════ */
+:root {
+  --page: #c08a5e;              /* warm bronze page bg */
+  --page-glow: #dba876;         /* radial highlight */
+  --panel: #171009;             /* dark hero/section panel */
+  --panel-soft: #241811;
+  --ink: #f4ead9;               /* cream text on dark */
+  --ink-dark: #241811;          /* text on bronze */
+  --muted: rgba(244, 234, 217, 0.62);
+  --accent: #d3a05a;            /* gold */
+  --accent-deep: #8a5a2b;
+  --line: rgba(244, 234, 217, 0.16);
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+  --font-display: 'Fraunces', serif;
+  --font-body: 'Inter', sans-serif;
+  --font-ar: 'IBM Plex Sans Arabic', sans-serif;
+  --font-ar-display: 'Amiri', serif;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: radial-gradient(120% 90% at 70% 10%, var(--page-glow), var(--page)) fixed;
+  color: var(--ink-dark);
+  font-family: var(--font-body);
+  font-weight: 400;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Font utilities driven by tokens — RTL swaps them once, globally. */
+.font-display { font-family: var(--font-display); }
+.font-body { font-family: var(--font-body); }
+html[dir='rtl'] .font-display { font-family: var(--font-ar-display); }
+html[dir='rtl'] .font-body,
+html[dir='rtl'] body { font-family: var(--font-ar); }
+html[dir='rtl'] .en-tracking { letter-spacing: 0 !important; }
+
+.text-muted { color: var(--muted); }
+
+/* House entrance choreography */
+@keyframes revealUp {
+  0% { opacity: 0; transform: translateY(26px); filter: blur(10px); }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+.anim {
+  opacity: 0;
+  animation: revealUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+/* Pre-reveal state: elements wait invisibly until .anim is applied */
+.anim-wait { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .anim { animation: none; opacity: 1; }
+  .anim-wait { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  to { opacity: 0; visibility: hidden; }
+}
+.preloader-exit {
+  animation: fadeOut 0.7s ease 0.15s forwards;
+}
+
+@keyframes loaderBar {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* Hidden scrollbar for drag rows (used by the bestseller strip) */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
