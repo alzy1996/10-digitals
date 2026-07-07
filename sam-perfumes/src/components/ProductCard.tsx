@@ -1,4 +1,4 @@
-import { ProductImage } from './HeroVisual'
+import { ProductImage } from './ProductImage'
 import { waLink } from '../content/content'
 import type { Product } from '../content/content'
 import { useI18n } from '../lib/i18n'

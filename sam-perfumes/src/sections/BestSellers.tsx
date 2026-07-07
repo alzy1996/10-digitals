@@ -1,4 +1,4 @@
-import { ProductImage } from '../components/HeroVisual'
+import { ProductImage } from '../components/ProductImage'
 import { products } from '../content/content'
 import { useI18n } from '../lib/i18n'
 

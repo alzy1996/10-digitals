@@ -1,10 +1,15 @@
+import { lazy, Suspense } from 'react'
 import { ArrowRight } from 'lucide-react'
 import Nav from '../components/Nav'
-import HeroVisual from '../components/HeroVisual'
 import BestSellers from './BestSellers'
 import { products } from '../content/content'
 import { useI18n } from '../lib/i18n'
 import { scrollToEl } from '../lib/scroll'
+
+// Lazy Canvas: the Three.js bundle streams in after the hero text paints,
+// so first paint stays instant. Until it loads, the stage is simply empty
+// dark space (no layout shift — the box reserves its height).
+const HeroScene = lazy(() => import('../components/HeroScene'))
 
 interface HeroProps {
   ready: boolean
@@ -62,9 +67,11 @@ export default function Hero({ ready }: HeroProps) {
             </div>
           </div>
 
-          {/* Bottles */}
+          {/* Bottle — WebGL, streamed in after first paint */}
           <div className={animClass} style={delay(0.35)}>
-            <HeroVisual />
+            <Suspense fallback={<div className="h-[340px] w-full sm:h-[420px] md:h-[480px]" />}>
+              <HeroScene />
+            </Suspense>
           </div>
 
           {/* Featured column */}
