@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import SectionTitle from '../components/SectionTitle'
+import { asset } from '../content/content'
 import { useI18n } from '../lib/i18n'
 
-const STORY_IMG = '/img/story-1.jpg'
+const STORY_IMG = asset('img/story-1.jpg')
 
 // Dark panel split: parallax atelier image left, story copy + stat chips
 // right. Image scrubs ±10% with scroll; a token gradient stands in if the

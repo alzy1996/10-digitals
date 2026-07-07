@@ -7,6 +7,10 @@
 export const WHATSAPP_NUMBER = '968XXXXXXXX' // TODO Sam: real WhatsApp number, digits only with country code
 export const IG_URL = 'https://instagram.com/TODO' // TODO Sam: real Instagram handle
 
+// Prefix a public asset with the deploy base ('/' at root, '/10-digitals/'
+// on GitHub Pages) so /img and /media resolve wherever the site is hosted.
+export const asset = (p: string) => `${import.meta.env.BASE_URL}${p.replace(/^\//, '')}`
+
 export type Lang = 'en' | 'ar'
 
 export interface Product {
@@ -31,7 +35,7 @@ export const products: Product[] = [
       ar: 'أثرٌ عنبريّ مضيء يرافقك من الغسق حتى الفجر.',
     },
     price: '-- OMR',
-    img: '/img/product-01.png',
+    img: asset('img/product-01.png'),
   },
   {
     id: 'product-02',
@@ -43,7 +47,7 @@ export const products: Product[] = [
       ar: 'عودٌ عُماني عميق يكتسي بوشاحٍ من الورد الطائفي.',
     },
     price: '-- OMR',
-    img: '/img/product-02.png',
+    img: asset('img/product-02.png'),
   },
   {
     id: 'product-03',
@@ -55,7 +59,7 @@ export const products: Product[] = [
       ar: 'نسيم الساحل العليل محفوظًا في زجاجة.',
     },
     price: '-- OMR',
-    img: '/img/product-03.png',
+    img: asset('img/product-03.png'),
   },
   {
     id: 'product-04',
@@ -67,13 +71,13 @@ export const products: Product[] = [
       ar: 'لُبان ظفار يعانق حديقةً عند أول الضوء.',
     },
     price: '-- OMR',
-    img: '/img/product-04.png',
+    img: asset('img/product-04.png'),
   },
 ]
 
 export const heroImages = {
-  main: '/img/hero-bottle-1.png',
-  back: '/img/hero-bottle-2.png',
+  main: asset('img/hero-bottle-1.png'),
+  back: asset('img/hero-bottle-2.png'),
 }
 
 export const strings = {
