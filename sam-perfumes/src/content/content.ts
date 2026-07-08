@@ -4,8 +4,8 @@
 // from this file; no strings are hardcoded elsewhere.
 // ════════════════════════════════════════════
 
-export const WHATSAPP_NUMBER = '968XXXXXXXX' // TODO Sam: real WhatsApp number, digits only with country code
-export const IG_URL = 'https://instagram.com/TODO' // TODO Sam: real Instagram handle
+export const WHATSAPP_NUMBER = '96877019962' // +968 7701 9962
+export const IG_URL = 'https://instagram.com/sam.pro.ai'
 
 // Prefix a public asset with the deploy base ('/' at root, '/10-digitals/'
 // on GitHub Pages) so /img and /media resolve wherever the site is hosted.
@@ -34,7 +34,7 @@ export const products: Product[] = [
       en: 'A radiant amber trail that lingers from dusk till dawn.',
       ar: 'أثرٌ عنبريّ مضيء يرافقك من الغسق حتى الفجر.',
     },
-    price: '-- OMR',
+    price: '10 OMR',
     img: asset('img/product-01.png'),
   },
   {
@@ -46,7 +46,7 @@ export const products: Product[] = [
       en: 'Deep Omani oud wrapped in a veil of Taif rose.',
       ar: 'عودٌ عُماني عميق يكتسي بوشاحٍ من الورد الطائفي.',
     },
-    price: '-- OMR',
+    price: '10 OMR',
     img: asset('img/product-02.png'),
   },
   {
@@ -58,7 +58,7 @@ export const products: Product[] = [
       en: 'A crisp coastal breeze remembered in glass.',
       ar: 'نسيم الساحل العليل محفوظًا في زجاجة.',
     },
-    price: '-- OMR',
+    price: '10 OMR',
     img: asset('img/product-03.png'),
   },
   {
@@ -70,7 +70,7 @@ export const products: Product[] = [
       en: 'Dhofari frankincense meets a garden in first light.',
       ar: 'لُبان ظفار يعانق حديقةً عند أول الضوء.',
     },
-    price: '-- OMR',
+    price: '10 OMR',
     img: asset('img/product-04.png'),
   },
 ]
