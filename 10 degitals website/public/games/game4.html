@@ -1,0 +1,2020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>OFM Fleet Management — Mill Site Logistics Trainer</title>
+<style>
+html,body{margin:0;padding:0;overflow:hidden;background:#20242a;height:100%;width:100%;
+  font-family:'Segoe UI',Arial,Helvetica,sans-serif;-webkit-user-select:none;user-select:none;
+  touch-action:none;-webkit-tap-highlight-color:transparent;}
+canvas{display:block;position:fixed;inset:0;}
+.hud{position:fixed;z-index:10;color:#f2ede2;}
+button{font-family:inherit;cursor:pointer;}
+
+/* ---------- top bar ---------- */
+#topbar{top:0;left:0;right:0;height:54px;background:rgba(16,20,26,.92);
+  border-bottom:1px solid #6b5b3e;display:flex;align-items:center;gap:10px;
+  padding:0 10px;z-index:14;box-shadow:0 2px 10px rgba(0,0,0,.4);}
+#topbar .tb{font-size:13px;color:#aeb6bf;white-space:nowrap;}
+#topbar .tb b{color:#f0c060;font-size:16px;}
+#clockBox{background:#262c35;border:1px solid #596270;border-radius:8px;
+  padding:4px 12px;font-size:19px;font-weight:700;color:#f2ede2;letter-spacing:1px;min-width:76px;text-align:center;}
+#omrBox{background:#262c35;border:1px solid #6b5b3e;border-radius:8px;padding:4px 12px;}
+#omrBox b{color:#8fe08f;font-size:17px;}
+#missBox{font-size:16px;letter-spacing:2px;color:#ff7a6a;}
+.tbBtn{min-width:46px;height:46px;border-radius:9px;border:1px solid #596270;
+  background:#2c333d;color:#f2ede2;font-size:17px;font-weight:700;}
+.tbBtn.on{background:#d9a441;color:#20242a;border-color:#d9a441;}
+#btnBook{height:46px;padding:0 16px;border-radius:9px;border:1px solid #6b5b3e;
+  background:#3a3323;color:#f0c060;font-size:14px;font-weight:700;letter-spacing:.5px;}
+#topSpacer{flex:1;}
+
+/* ---------- side panels ---------- */
+.panel{position:fixed;top:62px;bottom:56px;width:302px;background:rgba(16,20,26,.88);
+  border:1px solid #46505c;border-radius:10px;z-index:12;display:flex;flex-direction:column;
+  box-shadow:0 4px 16px rgba(0,0,0,.45);overflow:hidden;}
+#cardsPanel{left:8px;}
+#docsPanel{right:8px;width:322px;}
+.pHead{padding:8px 12px;font-size:13px;font-weight:700;letter-spacing:1.5px;color:#f0c060;
+  border-bottom:1px solid #46505c;background:rgba(28,32,40,.7);}
+.pBody{flex:1;overflow-y:auto;padding:8px;-webkit-overflow-scrolling:touch;}
+
+/* demand cards */
+.dcard{background:#242a33;border:1px solid #4a5361;border-left:6px solid #888;border-radius:8px;
+  padding:8px 10px;margin-bottom:8px;cursor:pointer;transition:border-color .15s;}
+.dcard.sel{border-color:#f0c060;box-shadow:0 0 0 1px #f0c060;}
+.dcard.late{border-left-color:#ff5a4a;background:#332526;}
+.dcard.done{opacity:.45;}
+.dcard .dept{font-size:10px;font-weight:700;letter-spacing:1.2px;}
+.dcard .ttl{font-size:14px;font-weight:700;color:#f2ede2;margin-top:2px;}
+.dcard .sub{font-size:12px;color:#aeb6bf;margin-top:2px;line-height:1.4;}
+.dcard .need{font-size:12px;color:#f0c060;margin-top:3px;font-weight:600;}
+.dcard .due{font-size:12px;margin-top:3px;font-weight:700;color:#8fe08f;}
+.dcard.late .due{color:#ff7a6a;}
+.dcard .why{margin-top:5px;}
+.dcard .whyBtn{font-size:11px;color:#7fb4e0;background:none;border:none;padding:2px 0;text-decoration:underline;}
+.dcard .whyTxt{display:none;font-size:11.5px;color:#c9d2da;line-height:1.45;background:#1c2129;
+  border-radius:6px;padding:6px 8px;margin-top:3px;border:1px solid #39424e;}
+.dcard .whyTxt.open{display:block;}
+.dcard .dispatchBtn{margin-top:7px;width:100%;min-height:44px;border:none;border-radius:8px;
+  background:#2f7d4f;color:#eafff0;font-size:14px;font-weight:700;letter-spacing:.5px;}
+.dcard .dispatchBtn:disabled{background:#3a3f47;color:#7c858f;}
+.dcard .rev{font-size:11px;color:#8fe08f;margin-top:3px;}
+
+/* doc tracker */
+.trow{background:#242a33;border:1px solid #4a5361;border-radius:8px;padding:7px 9px;margin-bottom:8px;cursor:pointer;}
+.trow.sel{border-color:#f0c060;}
+.trow .tid{font-size:13px;font-weight:700;color:#f2ede2;}
+.trow .tst{font-size:11px;color:#aeb6bf;margin-top:1px;}
+.trow.blocked{border-color:#ff5a4a;animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,90,74,.0);}50%{box-shadow:0 0 0 3px rgba(255,90,74,.5);}}
+.chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;}
+.chip{font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:9px;background:#3a3f47;color:#8f97a1;
+  border:1px solid #4a5361;white-space:nowrap;}
+.chip.ok{background:#1e3327;color:#8fe08f;border-color:#2f7d4f;}
+.chip.now{background:#3a3323;color:#f0c060;border-color:#d9a441;}
+.chip.bad{background:#3a2220;color:#ff8a7a;border-color:#ff5a4a;}
+.dnBtn{margin-top:6px;width:100%;min-height:44px;border:none;border-radius:8px;
+  background:#b8862f;color:#1c1a12;font-size:13px;font-weight:700;}
+.dnBtn:disabled{background:#3a3f47;color:#7c858f;}
+
+/* toasts / hint */
+#toast{left:50%;bottom:64px;transform:translateX(-50%);background:rgba(18,22,28,.94);
+  padding:10px 22px;border-radius:22px;font-size:15px;font-weight:600;opacity:0;max-width:88vw;
+  transition:opacity .3s;pointer-events:none;border:1px solid #6b5b3e;z-index:26;position:fixed;
+  color:#f2ede2;text-align:center;}
+#toast.tip{border-color:#2f6d9f;color:#cfe6f7;}
+#toast.bad{border-color:#ff5a4a;color:#ffc9c2;}
+#hint{left:50%;bottom:6px;transform:translateX(-50%);font-size:12px;color:#aeb6bf;z-index:11;
+  background:rgba(18,22,28,.65);padding:5px 14px;border-radius:12px;white-space:nowrap;max-width:96vw;
+  overflow:hidden;text-overflow:ellipsis;position:fixed;}
+
+/* panel toggle buttons (mobile) */
+.ptoggle{position:fixed;bottom:30px;width:52px;height:52px;border-radius:50%;z-index:13;
+  border:2px solid #f0c060;background:rgba(28,32,40,.9);color:#f0c060;font-size:20px;display:none;}
+#togCards{left:12px;}
+#togDocs{right:12px;}
+
+/* overlays */
+.overlay{position:fixed;inset:0;background:rgba(10,13,17,.93);z-index:40;display:flex;
+  align-items:center;justify-content:center;flex-direction:column;color:#f2ede2;text-align:center;
+  padding:18px;overflow-y:auto;}
+.overlay h1{color:#f0c060;margin:0 0 4px;font-size:32px;letter-spacing:1px;}
+.overlay h2{color:#c8a86a;margin:0 0 14px;font-size:16px;font-weight:400;letter-spacing:2px;}
+.overlay p{max-width:600px;line-height:1.6;font-size:14.5px;color:#cfd4da;margin:6px 0;}
+.bigBtn{margin-top:18px;background:#d9a441;border:none;color:#20242a;font-size:20px;font-weight:700;
+  min-height:52px;padding:12px 46px;border-radius:10px;letter-spacing:1px;
+  box-shadow:0 4px 16px rgba(217,164,65,.35);}
+.bigBtn:active{transform:scale(.96);}
+.small{font-size:12.5px;color:#8f97a1;margin-top:12px;}
+.kbd{background:#3a3f47;border-radius:4px;padding:1px 8px;font-size:13px;border:1px solid #596270;}
+
+/* process book */
+#bookOverlay .bookBox{background:#1b2027;border:1px solid #6b5b3e;border-radius:12px;
+  max-width:640px;width:94vw;max-height:86vh;display:flex;flex-direction:column;padding:16px 20px;}
+#bookTitle{color:#f0c060;font-size:21px;font-weight:700;letter-spacing:.5px;margin-bottom:2px;}
+#bookSub{color:#8f97a1;font-size:12px;margin-bottom:10px;letter-spacing:1px;}
+#bookBody{text-align:left;overflow-y:auto;flex:1;font-size:14px;line-height:1.55;color:#d5dae0;}
+#bookBody li{margin-bottom:7px;}
+#bookBody .gp{color:#8f97a1;font-size:11px;}
+.bookNav{display:flex;gap:10px;margin-top:12px;align-items:center;justify-content:space-between;}
+.bookNav button{min-height:48px;padding:8px 20px;border-radius:9px;border:1px solid #596270;
+  background:#2c333d;color:#f2ede2;font-size:15px;font-weight:700;}
+#bookPage{color:#8f97a1;font-size:13px;}
+
+/* report */
+#reportBox{background:#1b2027;border:1px solid #6b5b3e;border-radius:12px;max-width:620px;width:94vw;
+  max-height:86vh;overflow-y:auto;padding:18px 22px;text-align:left;}
+#reportBox h3{color:#f0c060;margin:14px 0 4px;font-size:16px;letter-spacing:1px;}
+#reportBox .rline{font-size:14px;color:#d5dae0;line-height:1.6;}
+#reportBox .rline b{color:#f0c060;}
+#reportBox .lesson{background:#232a33;border-left:4px solid #2f6d9f;border-radius:6px;
+  padding:8px 12px;margin:6px 0;font-size:13.5px;color:#cfe6f7;line-height:1.5;}
+#reportBox .pos{color:#8fe08f;} #reportBox .neg{color:#ff8a7a;}
+
+@media (max-width:900px){
+  .panel{top:auto;bottom:96px;max-height:46vh;width:86vw;display:none;}
+  #cardsPanel{left:7vw;} #docsPanel{right:7vw;width:86vw;}
+  .panel.open{display:flex;}
+  .ptoggle{display:block;}
+  #topbar .hideM{display:none;}
+  .overlay h1{font-size:25px;}
+}
+</style>
+</head>
+<body>
+
+<!-- top bar -->
+<div id="topbar" class="hud">
+  <div id="clockBox">06:00</div>
+  <div id="omrBox"><span class="tb">OMR</span> <b id="omrVal">0</b></div>
+  <div class="tb hideM">ON-TIME <b id="otVal">—</b></div>
+  <div class="tb hideM">TRUCKS <b id="tpVal">0</b></div>
+  <div id="missBox">&#10006;&#10006;&#10006;&#10006;&#10006;</div>
+  <div id="topSpacer"></div>
+  <button id="btnBook" title="Process Book">&#128213; PROCESS BOOK</button>
+  <button class="tbBtn" id="btnPause" title="Pause">&#10074;&#10074;</button>
+  <button class="tbBtn on" id="btnPlay" title="Normal speed">&#9654;</button>
+  <button class="tbBtn" id="btnFast" title="Fast">&#9654;&#9654;</button>
+</div>
+
+<!-- demand cards -->
+<div id="cardsPanel" class="panel">
+  <div class="pHead">DEPARTMENT DEMANDS</div>
+  <div class="pBody" id="cardsBody"></div>
+</div>
+
+<!-- document tracker -->
+<div id="docsPanel" class="panel">
+  <div class="pHead">DOCUMENT TRACKER &mdash; TRUCKS ON SITE</div>
+  <div class="pBody" id="docsBody"><div style="color:#8f97a1;font-size:13px;padding:6px;">No trucks moving yet.<br>Select a demand card, then dispatch a truck.</div></div>
+</div>
+
+<button class="ptoggle" id="togCards">&#128203;</button>
+<button class="ptoggle" id="togDocs">&#128196;</button>
+
+<div id="hint">Drag to orbit &bull; wheel / pinch to zoom &bull; tap a card, then DISPATCH &bull; tap trucks for documents</div>
+<div id="toast"></div>
+
+<!-- process book -->
+<div id="bookOverlay" class="overlay" style="display:none">
+  <div class="bookBox">
+    <div id="bookTitle">PROCESS BOOK</div>
+    <div id="bookSub">OMAN FLOUR MILLS &mdash; HOW THE SITE REALLY RUNS</div>
+    <div id="bookBody"></div>
+    <div class="bookNav">
+      <button id="bookPrev">&#9664; PREV</button>
+      <span id="bookPage">1 / 6</span>
+      <button id="bookClose" style="background:#6b3a2f;border-color:#8a4b3a;">CLOSE &amp; RESUME</button>
+      <button id="bookNext">NEXT &#9654;</button>
+    </div>
+  </div>
+</div>
+
+<!-- start screen -->
+<div id="startScreen" class="overlay">
+  <h1>OFM FLEET MANAGEMENT</h1>
+  <h2>OMAN FLOUR MILLS &mdash; FLEET COORDINATOR TRAINING</h2>
+  <p>You are the <b>Fleet Coordinator</b> on the 06:00&ndash;14:00 shift. Four departments post
+  <b>demand cards</b>: <span style="color:#e0a05a">PRODUCTION</span> needs grain at the silo intake,
+  <span style="color:#7fb4e0">PROCUREMENT / STORES</span> needs supply containers docked, and
+  <span style="color:#8fe08f">DELIVERY</span> needs the right trucks at the right bays &mdash;
+  plus weight-out jobs for trucks already loaded on site.</p>
+  <p>Dispatch trucks from <b>OUTSIDE STAGING</b>. Every truck must pass the
+  <b>GATE</b> and the single <b>WEIGHBRIDGE</b> (twice: tare and gross). One scale, one truck &mdash;
+  your dispatch order <i>is</i> the queue. Roads are single-lane: no overtaking, and a stopped truck
+  blocks everyone behind it.</p>
+  <p>Match the truck to the cargo and the size to the order &mdash; a tipper cannot carry bags, and a
+  7&nbsp;MT truck cannot carry a 45&nbsp;MT SO. Outbound trucks need a <b>Delivery Note</b> before the gate:
+  no document, no movement.</p>
+  <p>Late demand = penalty + an angry department. <b>5 missed deadlines ends the shift.</b>
+  Standing trucks burn demurrage OMR. Read the <b>PROCESS BOOK</b> (top right) any time.</p>
+  <p class="small">HIGH SCORE: OMR <span id="hsStart">0</span> &nbsp;&bull;&nbsp; BEST ON-TIME: <span id="hsOT">—</span></p>
+  <button id="startBtn" class="bigBtn">START SHIFT</button>
+</div>
+
+<!-- shift report -->
+<div id="reportScreen" class="overlay" style="display:none">
+  <div id="reportBox"></div>
+  <button id="nextShiftBtn" class="bigBtn">START NEXT SHIFT</button>
+</div>
+
+<!-- shift failed -->
+<div id="failScreen" class="overlay" style="display:none">
+  <h1>SHIFT FAILED</h1>
+  <h2>5 MISSED DEADLINES &mdash; THE DEPARTMENTS ESCALATED</h2>
+  <div id="failBox" style="max-width:560px;"></div>
+  <button id="retryBtn" class="bigBtn">RETRY SHIFT</button>
+</div>
+
+<!-- CDN fail -->
+<div id="cdnFail" class="overlay" style="display:none">
+  <h1>3D ENGINE FAILED TO LOAD</h1>
+  <p>The 3D engine (vendor/three.min.js) did not load. Make sure the games folder was copied whole, then reload.
+  The game needs vendor/three.min.js (three.js r128, bundled locally) to render the mill site.</p>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="vendor/RGBELoader.js"></script>
+<script>
+'use strict';
+if(typeof THREE==='undefined'){
+  document.getElementById('cdnFail').style.display='flex';
+  document.getElementById('startScreen').style.display='none';
+}else{
+/* ==================================================================
+   OFM FLEET MANAGEMENT — single-file 3D logistics training game
+   ================================================================== */
+
+/* ---------------- helpers ---------------- */
+function clamp(v,a,b){ if(v<a) return a; if(v>b) return b; return v; }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function rand(a,b){ return a+Math.random()*(b-a); }
+function randi(a,b){ return Math.floor(rand(a,b+1)); }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function fmtClock(min){
+  var h=Math.floor(min/60), m=Math.floor(min%60);
+  var hs=String(h); if(hs.length<2) hs='0'+hs;
+  var ms=String(m); if(ms.length<2) ms='0'+ms;
+  return hs+':'+ms;
+}
+function el(id){ return document.getElementById(id); }
+
+/* ---------------- audio (tiny beeps, fully optional) ---------------- */
+var AC=null;
+function ensureAudio(){
+  if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ AC=null; } }
+  if(AC && AC.state==='suspended'){ AC.resume(); }
+}
+function tone(f,d,type,vol,delay){
+  if(!AC) return;
+  var t0=AC.currentTime+(delay||0);
+  var o=AC.createOscillator(), g=AC.createGain();
+  o.type=type; o.frequency.setValueAtTime(f,t0);
+  g.gain.setValueAtTime(vol,t0);
+  g.gain.exponentialRampToValueAtTime(0.001,t0+d);
+  o.connect(g); g.connect(AC.destination);
+  o.start(t0); o.stop(t0+d+0.05);
+}
+function sndGood(){ tone(660,0.1,'square',0.09,0); tone(880,0.12,'square',0.09,0.1); tone(1320,0.2,'square',0.08,0.2); }
+function sndBad(){ tone(300,0.2,'sawtooth',0.09,0); tone(170,0.3,'sawtooth',0.09,0.14); }
+function sndClick(){ tone(520,0.05,'square',0.06,0); }
+function sndStamp(){ tone(980,0.06,'square',0.05,0); }
+function sndAlarm(){ tone(440,0.16,'sawtooth',0.09,0); tone(440,0.16,'sawtooth',0.09,0.24); }
+
+/* ---------------- renderer / scene / lights ---------------- */
+var renderer=null;
+try{
+  renderer=new THREE.WebGLRenderer({antialias:true});
+}catch(e){
+  el('cdnFail').style.display='flex';
+  el('startScreen').style.display='none';
+  throw e;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.05;
+document.body.appendChild(renderer.domElement);
+var MAX_ANISO=renderer.capabilities.getMaxAnisotropy();
+
+var scene=new THREE.Scene();
+scene.background=new THREE.Color(0xcfd9e4);
+scene.fog=new THREE.Fog(0xd8d2c4,180,420);
+
+var camera=new THREE.PerspectiveCamera(52,window.innerWidth/window.innerHeight,0.5,800);
+
+/* warm Omani daylight */
+var hemi=new THREE.HemisphereLight(0xbcd6ff,0xb9a68a,0.35);
+scene.add(hemi);
+var sun=new THREE.DirectionalLight(0xfff2e0,2.0);
+sun.position.set(70,110,45);
+sun.castShadow=true;
+sun.shadow.mapSize.width=2048;
+sun.shadow.mapSize.height=2048;
+sun.shadow.camera.left=-120; sun.shadow.camera.right=120;
+sun.shadow.camera.top=100; sun.shadow.camera.bottom=-100;
+sun.shadow.camera.near=20; sun.shadow.camera.far=320;
+sun.shadow.bias=-0.0004;
+sun.shadow.normalBias=0.02;
+scene.add(sun);
+
+window.addEventListener('resize',function(){
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
+
+/* ---------------- sky: HDRI with procedural fallback ---------------- */
+function proceduralSky(){
+  /* warm-gradient sky dome drawn on a canvas — used if sky.hdr fails */
+  var cv=document.createElement('canvas'); cv.width=1024; cv.height=512;
+  var ctx=cv.getContext('2d');
+  var gr=ctx.createLinearGradient(0,0,0,512);
+  gr.addColorStop(0,'#7fb2e8'); gr.addColorStop(0.45,'#bcd2e8');
+  gr.addColorStop(0.72,'#f0e2c4'); gr.addColorStop(1,'#e8d2a8');
+  ctx.fillStyle=gr; ctx.fillRect(0,0,1024,512);
+  ctx.fillStyle='rgba(255,244,214,0.9)';
+  ctx.beginPath(); ctx.arc(720,150,46,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,250,230,0.35)';
+  ctx.beginPath(); ctx.arc(720,150,90,0,Math.PI*2); ctx.fill();
+  var tex=new THREE.CanvasTexture(cv);
+  tex.encoding=THREE.sRGBEncoding;
+  tex.mapping=THREE.EquirectangularReflectionMapping;
+  scene.background=tex;
+  scene.environment=null;
+}
+try{
+  if(THREE.RGBELoader){
+    new THREE.RGBELoader().load('assets/hdri/sky.hdr',function(tex){
+      try{
+        var pm=new THREE.PMREMGenerator(renderer);
+        pm.compileEquirectangularShader();
+        var env=pm.fromEquirectangular(tex).texture;
+        scene.background=env;
+        scene.environment=env;
+        /* temper the IBL so the warm sun rig keeps contrast */
+        scene.traverse(function(o){
+          if(o.material && o.material.isMeshStandardMaterial) o.material.envMapIntensity=0.5;
+        });
+        tex.dispose(); pm.dispose();
+      }catch(e2){ proceduralSky(); }
+    },undefined,function(){ proceduralSky(); });
+  }else{ proceduralSky(); }
+}catch(eSky){ proceduralSky(); }
+
+/* ---------------- textures: every one has a color fallback ----------------
+   Materials start as plain colors; if the texture loads, the map is
+   swapped in. If it fails, the colored material stays (never magenta). */
+function tryTexture(url,repX,repY,isDiffuse,onOK){
+  new THREE.TextureLoader().load(url,function(tex){
+    tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping;
+    tex.repeat.set(repX,repY);
+    tex.anisotropy=MAX_ANISO;
+    if(isDiffuse) tex.encoding=THREE.sRGBEncoding;
+    onOK(tex);
+  },undefined,function(){ /* fallback: keep plain color material */ });
+}
+function pbrMat(fbColor,rough,metal){
+  return new THREE.MeshStandardMaterial({color:fbColor,roughness:rough,metalness:metal});
+}
+function groundMaterial(){
+  var m=pbrMat(0x97917f,0.96,0.0); /* concrete fallback */
+  tryTexture('assets/tex/concrete/diff.jpg',30,30,true,function(t){ m.map=t; m.needsUpdate=true; });
+  tryTexture('assets/tex/concrete/nor.jpg',30,30,false,function(t){ m.normalMap=t; m.needsUpdate=true; });
+  tryTexture('assets/tex/concrete/rough.jpg',30,30,false,function(t){ m.roughnessMap=t; m.needsUpdate=true; });
+  tryTexture('assets/tex/concrete/ao.jpg',30,30,false,function(t){ m.aoMap=t; m.needsUpdate=true; });
+  return m;
+}
+function asphaltMaterial(){
+  var m=pbrMat(0x4a4d52,0.94,0.0);
+  m.side=THREE.DoubleSide; /* ribbon winding faces down; render both sides */
+  tryTexture('assets/tex/asphalt/diff.jpg',12,6,true,function(t){ m.map=t; m.needsUpdate=true; });
+  tryTexture('assets/tex/asphalt/nor.jpg',12,6,false,function(t){ m.normalMap=t; m.needsUpdate=true; });
+  tryTexture('assets/tex/asphalt/rough.jpg',12,6,false,function(t){ m.roughnessMap=t; m.needsUpdate=true; });
+  return m;
+}
+function steelMaterial(fb,repX,repY){
+  var m=pbrMat(fb,0.62,0.28);
+  tryTexture('assets/tex/steel/diff.jpg',repX,repY,true,function(t){ m.map=t; m.color.set(0xffffff); m.needsUpdate=true; });
+  tryTexture('assets/tex/steel/nor.jpg',repX,repY,false,function(t){ m.normalMap=t; m.needsUpdate=true; });
+  tryTexture('assets/tex/steel/rough.jpg',repX,repY,false,function(t){ m.roughnessMap=t; m.needsUpdate=true; });
+  return m;
+}
+
+/* canvas texture helper (signs, plates, labels) */
+function canvasTex(w,h,draw){
+  var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+  draw(cv.getContext('2d'),w,h);
+  var tex=new THREE.CanvasTexture(cv);
+  tex.encoding=THREE.sRGBEncoding;
+  tex.anisotropy=MAX_ANISO;
+  return tex;
+}
+
+/* ==================================================================
+   WORLD LAYOUT
+   Single one-way loop: STAGING -> GATE -> WEIGHBRIDGE -> ring around
+   the site -> WEIGHBRIDGE again -> GATE -> out. No overtaking.
+   ================================================================== */
+var PTS=[
+  [-118,6],[-96,6],[-72,6],[-58,6],[-50,6],[-44,6],[-34,6],[-28,6],   /* entry road */
+  [-28,-26],[-22,-34],[56,-34],[64,-26],                            /* west + north edge */
+  [64,30],[56,38],[-20,38],[-28,30],                                /* east + south + west edge */
+  [-28,6],                                                          /* loop closes at junction */
+  [-34,6],[-44,6],[-50,6],[-58,6],[-72,6],[-96,6],[-118,6]          /* exit road */
+];
+var segLen=[], cumLen=[0];
+(function(){
+  var i, dx, dz, L=0;
+  for(i=0;i<PTS.length-1;i++){
+    dx=PTS[i+1][0]-PTS[i][0]; dz=PTS[i+1][1]-PTS[i][1];
+    var l=Math.sqrt(dx*dx+dz*dz);
+    segLen.push(l); L+=l; cumLen.push(L);
+  }
+})();
+var PATH_LEN=cumLen[cumLen.length-1];
+
+function pathPos(s){
+  s=clamp(s,0,PATH_LEN-0.001);
+  var i=0;
+  while(i<segLen.length-1 && cumLen[i+1]<s) i++;
+  var t=(s-cumLen[i])/segLen[i];
+  var x=lerp(PTS[i][0],PTS[i+1][0],t);
+  var z=lerp(PTS[i][1],PTS[i+1][1],t);
+  var tx=(PTS[i+1][0]-PTS[i][0])/segLen[i];
+  var tz=(PTS[i+1][1]-PTS[i][1])/segLen[i];
+  return {x:x,z:z,tx:tx,tz:tz};
+}
+/* s-coordinate of the point on the path nearest to (x,z) within segment range */
+function sNear(x,z,segFrom,segTo){
+  var best=0, bestD=1e9, i;
+  for(i=segFrom;i<=segTo && i<segLen.length;i++){
+    var ax=PTS[i][0], az=PTS[i][1];
+    var bx=PTS[i+1][0], bz=PTS[i+1][1];
+    var vx=bx-ax, vz=bz-az;
+    var ll=vx*vx+vz*vz;
+    var t=((x-ax)*vx+(z-az)*vz)/ll;
+    t=clamp(t,0,1);
+    var px=ax+vx*t, pz=az+vz*t;
+    var d=(px-x)*(px-x)+(pz-z)*(pz-z);
+    if(d<bestD){ bestD=d; best=cumLen[i]+Math.sqrt(ll)*t; }
+  }
+  return best;
+}
+
+/* ---------------- zone / station table ---------------- */
+/* seg ranges: north edge = segs 9-10, east edge = 11-12, south edge = 13-14 */
+var ZONES={
+  INTAKE:{name:'SILOS + MILL INTAKE', short:'INTAKE', color:0xc98d4b,
+    sx:2, sz:-34, segA:9, segB:10, bx:2, bz:-41.5, sign:[2,-52]},
+  STORES:{name:'STORES (PP-BAGS / SPARES / LABELS)', short:'STORES', color:0x7fb4e0,
+    sx:40, sz:-34, segA:9, segB:10, bx:40, bz:-41.5, sign:[40,-52]},
+  BAY1:{name:'WAREHOUSE LOADING — BAY 1', short:'BAY 1', color:0x8fe08f,
+    sx:-2, sz:38, segA:13, segB:14, bx:-2, bz:45.5, sign:[-2,55]},
+  BAY2:{name:'WAREHOUSE LOADING — BAY 2', short:'BAY 2', color:0x8fe08f,
+    sx:12, sz:38, segA:13, segB:14, bx:12, bz:45.5, sign:[12,55]},
+  BAY3:{name:'WAREHOUSE LOADING — BAY 3', short:'BAY 3', color:0x8fe08f,
+    sx:26, sz:38, segA:13, segB:14, bx:26, bz:45.5, sign:[26,55]},
+  BULK:{name:'BULK OUTLOADING', short:'BULK', color:0xe0b85a,
+    sx:64, sz:18, segA:11, segB:12, bx:71.5, bz:18, sign:[82,18]}
+};
+var zk;
+for(zk in ZONES){
+  var Z=ZONES[zk];
+  Z.id=zk;
+  Z.s=sNear(Z.sx,Z.sz,Z.segA,Z.segB);
+  var bv={x:Z.bx-Z.sx, z:Z.bz-Z.sz};
+  var bl=Math.sqrt(bv.x*bv.x+bv.z*bv.z);
+  Z.bayVec={x:bv.x/bl, z:bv.z/bl};
+  Z.bayDist=bl;
+  Z.occupant=null;
+}
+var S_GATE_IN  = sNear(-58,6,2,3);
+var S_WB_IN    = sNear(-39,6,4,6);
+var S_WB_OUT   = sNear(-39,6,17,19);
+var S_GATE_OUT = sNear(-58,6,20,21);
+var S_EXIT     = PATH_LEN-2;
+var S_JCT_IN   = cumLen[7];   /* junction, first pass (entering the ring) */
+var S_JCT_OUT  = cumLen[16];  /* junction, second pass (leaving the ring) */
+
+/* ---------------- ground ---------------- */
+var sand=new THREE.Mesh(new THREE.PlaneGeometry(560,400),
+  pbrMat(0xc2ab7e,1.0,0.0)); /* Omani sand beyond the site fence */
+sand.rotation.x=-Math.PI/2; sand.position.y=-0.04;
+sand.receiveShadow=true;
+scene.add(sand);
+var ground=new THREE.Mesh(new THREE.PlaneGeometry(320,220),groundMaterial());
+ground.rotation.x=-Math.PI/2;
+ground.receiveShadow=true;
+scene.add(ground);
+
+/* staging dirt patch */
+var dirt=new THREE.Mesh(new THREE.PlaneGeometry(52,44),
+  pbrMat(0xb59a6e,1.0,0.0));
+dirt.rotation.x=-Math.PI/2; dirt.position.set(-100,0.02,0);
+dirt.receiveShadow=true;
+scene.add(dirt);
+
+/* ---------------- road ribbon ---------------- */
+(function buildRoad(){
+  var w=3.6; /* half width */
+  var pos=[], uv=[], idx=[];
+  var i, n=PTS.length;
+  for(i=0;i<n;i++){
+    var pPrev=PTS[Math.max(0,i-1)], pNext=PTS[Math.min(n-1,i+1)];
+    var dx=pNext[0]-pPrev[0], dz=pNext[1]-pPrev[1];
+    var l=Math.sqrt(dx*dx+dz*dz)||1;
+    var nx=-dz/l*w, nz=dx/l*w;
+    pos.push(PTS[i][0]+nx, 0.05, PTS[i][1]+nz);
+    pos.push(PTS[i][0]-nx, 0.05, PTS[i][1]-nz);
+    uv.push(0, i/(n-1)); uv.push(1, i/(n-1));
+  }
+  for(i=0;i<n-1;i++){
+    var a=i*2, b=i*2+1, c=i*2+2, d=i*2+3;
+    idx.push(a,b,c, b,d,c);
+  }
+  var g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  var road=new THREE.Mesh(g,asphaltMaterial());
+  road.receiveShadow=true;
+  scene.add(road);
+  /* centre dashes */
+  var dashMat=new THREE.MeshBasicMaterial({color:0xd8d2c0,transparent:true,opacity:0.5});
+  var dashGeo=new THREE.PlaneGeometry(2.2,0.28);
+  var s=4;
+  while(s<PATH_LEN-4){
+    var pp=pathPos(s);
+    var dm=new THREE.Mesh(dashGeo,dashMat);
+    dm.rotation.x=-Math.PI/2;
+    dm.rotation.z=-Math.atan2(pp.tz,pp.tx);
+    dm.position.set(pp.x,0.07,pp.z);
+    scene.add(dm);
+    s+=9;
+  }
+})();
+
+/* painted bay + helper for flat strips */
+function flatBox(x,z,w,d,color,y,opacity){
+  var m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),
+    new THREE.MeshBasicMaterial({color:color,transparent:opacity<1,opacity:opacity}));
+  m.rotation.x=-Math.PI/2; m.position.set(x,y||0.06,z);
+  scene.add(m);
+  return m;
+}
+var zoneHitMeshes=[];
+function buildBay(Z){
+  flatBox(Z.bx,Z.bz,11,7,Z.color,0.06,0.5);
+  /* white outline */
+  var bm=new THREE.MeshBasicMaterial({color:0xf2ede2,transparent:true,opacity:0.55});
+  [[0,-3.6,11.4,0.3],[0,3.6,11.4,0.3],[-5.6,0,0.3,7.5],[5.6,0,0.3,7.5]].forEach(function(o){
+    var b=new THREE.Mesh(new THREE.PlaneGeometry(o[2],o[3]),bm);
+    b.rotation.x=-Math.PI/2;
+    b.position.set(Z.bx+o[0],0.07,Z.bz+o[1]);
+    scene.add(b);
+  });
+  /* invisible fat hit plane for tap-to-select-zone */
+  var hit=new THREE.Mesh(new THREE.PlaneGeometry(16,12),
+    new THREE.MeshBasicMaterial({visible:false}));
+  hit.rotation.x=-Math.PI/2; hit.position.set(Z.bx,0.4,Z.bz);
+  hit.userData.zone=Z;
+  scene.add(hit);
+  zoneHitMeshes.push(hit);
+}
+for(zk in ZONES) buildBay(ZONES[zk]);
+
+/* weighbridge deck + kiosk */
+flatBox(-39,6,11,5.4,0x8a8f96,0.08,1.0);
+flatBox(-39,6,10.4,4.8,0xd9c86a,0.09,0.35);
+var wbKiosk=new THREE.Mesh(new THREE.BoxGeometry(3,3.4,2.6),steelMaterial(0x9aa3ad,2,1));
+wbKiosk.position.set(-39,1.7,-0.5); wbKiosk.castShadow=true; scene.add(wbKiosk);
+
+/* gate booth + barrier */
+var booth=new THREE.Mesh(new THREE.BoxGeometry(3.4,3.6,3),steelMaterial(0xb9a68a,2,1));
+booth.position.set(-58,1.8,-1.6); booth.castShadow=true; scene.add(booth);
+var barrier=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.3,8.4),
+  new THREE.MeshStandardMaterial({color:0xd95a4a,roughness:0.6}));
+barrier.position.set(-58,1.5,6); barrier.castShadow=true; scene.add(barrier);
+
+/* ---------------- buildings ---------------- */
+function addBox(x,y,z,w,h,d,mat){
+  var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+  m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true;
+  scene.add(m); return m;
+}
+/* silo battery at intake */
+(function(){
+  var sm=steelMaterial(0xd8d4c8,4,2);
+  var cap=new THREE.MeshStandardMaterial({color:0xb9a68a,roughness:0.7});
+  var i;
+  for(i=0;i<6;i++){
+    var c=new THREE.Mesh(new THREE.CylinderGeometry(3.1,3.1,17,18),sm);
+    c.position.set(-13+i*6,8.5,-53); c.castShadow=true; scene.add(c);
+    var t=new THREE.Mesh(new THREE.ConeGeometry(3.3,2.2,18),cap);
+    t.position.set(-13+i*6,18.1,-53); t.castShadow=true; scene.add(t);
+  }
+  addBox(2,3,-44.5,10,6,5,steelMaterial(0xc0b8a8,3,1)); /* intake shed over pit */
+})();
+/* stores shed */
+addBox(40,5,-52,26,10,13,steelMaterial(0x9fb4c4,4,2));
+/* production / mill floor */
+addBox(84,7,-4,18,14,30,steelMaterial(0xc4b49a,4,3));
+addBox(84,15.4,-4,10,3,10,steelMaterial(0xb0a088,2,1));
+/* warehouse with 3 dock doors */
+addBox(12,5,54,58,10,15,steelMaterial(0xa8b49a,6,2));
+[-2,12,26].forEach(function(dx){
+  addBox(dx,2.6,46.3,7,5.2,0.4,pbrMat(0x3a3f47,0.85,0.1));
+});
+/* bulk outloading silo + shed */
+(function(){
+  var sm=steelMaterial(0xd0c8b8,3,2);
+  var c=new THREE.Mesh(new THREE.CylinderGeometry(3.4,3.4,14,16),sm);
+  c.position.set(82,7,18); c.castShadow=true; scene.add(c);
+  addBox(76,2.5,18,5,5,6,steelMaterial(0xc0b8a8,2,1));
+})();
+/* gate house office + main sign */
+addBox(-66,3,-8,8,6,6,steelMaterial(0xb9a68a,2,1));
+
+/* site fence */
+(function(){
+  var fm=new THREE.MeshStandardMaterial({color:0x8a8478,roughness:0.9});
+  var fence=[[8,-62,180,0.4],[8,66,180,0.4],[-80,2,0.4,128],[96,2,0.4,128]];
+  fence.forEach(function(f){
+    var m=new THREE.Mesh(new THREE.BoxGeometry(f[2],2.2,f[3]),fm);
+    m.position.set(f[0],1.1,f[1]); scene.add(m);
+  });
+})();
+
+/* ---------------- zone signs (billboard sprites) ---------------- */
+function makeSign(text,bg,fg,big){
+  var tex=canvasTex(1024,big?220:180,function(ctx,w,h){
+    ctx.fillStyle=bg; ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle=fg; ctx.lineWidth=10; ctx.strokeRect(8,8,w-16,h-16);
+    ctx.fillStyle=fg; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font='bold '+(big?92:64)+'px Arial';
+    ctx.fillText(text,w/2,h/2);
+  });
+  var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex}));
+  sp.scale.set(big?26:20,big?5.6:3.5,1);
+  return sp;
+}
+function hexCss(c){ return '#'+('000000'+c.toString(16)).slice(-6); }
+for(zk in ZONES){
+  var Z2=ZONES[zk];
+  var sp=makeSign(Z2.short,'rgba(20,26,34,0.92)',hexCss(Z2.color));
+  sp.position.set(Z2.sign[0],9,Z2.sign[1]);
+  scene.add(sp);
+}
+var sGate=makeSign('GATE + WEIGHBRIDGE','rgba(20,26,34,0.92)','#f0c060');
+sGate.position.set(-49,9,14); scene.add(sGate);
+var sStg=makeSign('OUTSIDE STAGING — TRUCKS WAIT HERE','rgba(40,32,20,0.92)','#e0b85a',true);
+sStg.position.set(-100,10,-16); scene.add(sStg);
+var sProd=makeSign('PRODUCTION (MILL FLOOR)','rgba(20,26,34,0.92)','#e0a05a');
+sProd.position.set(84,19,-4); scene.add(sProd);
+var sOfm=makeSign('OMAN FLOUR MILLS — FLEET OPS','rgba(30,38,52,0.95)','#f2ede2',true);
+sOfm.position.set(-30,13,-56); scene.add(sOfm);
+
+/* staging parking slots */
+var STAGE_SPOTS=[];
+(function(){
+  var i, j;
+  for(j=0;j<2;j++){
+    for(i=0;i<5;i++){
+      var x=-112+i*8.4, z=-8+j*22;
+      STAGE_SPOTS.push({x:x,z:z,truck:null});
+      flatBox(x,z,7,4.4,0xf2ede2,0.055,0.14);
+    }
+  }
+})();
+
+/* ==================================================================
+   TRUCKS — box-built low-poly, color-coded per type, yellow plates
+   ================================================================== */
+var TRUCK_TYPES={
+  TIPPER:{label:'TIPPER', body:0xc96a2c, cab:0x8a4b2f, use:'bulk grain / bulk feed'},
+  FLATBED:{label:'FLAT BED', body:0x2f7d6a, cab:0x3a5a8a, use:'bagged cargo on pallets'},
+  BOX:{label:'BOX / REEFER', body:0xdfe3e6, cab:0x5a6a7a, use:'protected bagged goods'},
+  CONTAINER:{label:'CONTAINER', body:0x8a4b2f, cab:0x555f68, use:'inbound supplies'}
+};
+function truckLength(cap){
+  if(cap<=7) return 6.5;
+  if(cap<=15) return 8.5;
+  if(cap<=45) return 11.5;
+  return 13.5;
+}
+function plateTexture(txt){
+  return canvasTex(128,64,function(ctx,w,h){
+    ctx.fillStyle='#f0c60f'; ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle='#1a1a1a'; ctx.lineWidth=6; ctx.strokeRect(3,3,w-6,h-6);
+    ctx.fillStyle='#1a1a1a'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font='bold 38px Arial'; ctx.fillText(txt,w/2,h/2);
+  });
+}
+function sideLabelTexture(txt,sub){
+  return canvasTex(512,128,function(ctx,w,h){
+    ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.fillRect(0,0,w,h);
+    ctx.fillStyle='#20242a'; ctx.textAlign='center';
+    ctx.font='bold 52px Arial'; ctx.fillText(txt,w/2,58);
+    ctx.font='bold 30px Arial'; ctx.fillStyle='#6b5b3e';
+    ctx.fillText(sub,w/2,102);
+  });
+}
+var wheelGeo=new THREE.CylinderGeometry(0.5,0.5,0.4,12);
+var wheelMat=new THREE.MeshStandardMaterial({color:0x22262b,roughness:0.9});
+function buildTruckMesh(type,cap,plateTxt){
+  var T=TRUCK_TYPES[type];
+  var len=truckLength(cap);
+  var g=new THREE.Group();
+  var cabLen=2.4;
+  var trailerLen=len-cabLen-0.4;
+  /* cab at front (+z) */
+  var cab=new THREE.Mesh(new THREE.BoxGeometry(2.5,2.2,cabLen),
+    new THREE.MeshStandardMaterial({color:T.cab,roughness:0.55,metalness:0.25}));
+  cab.position.set(0,1.35,len/2-cabLen/2); cab.castShadow=true; g.add(cab);
+  var glass=new THREE.Mesh(new THREE.BoxGeometry(2.3,0.8,0.2),
+    new THREE.MeshStandardMaterial({color:0x9fc4d8,roughness:0.2,metalness:0.4}));
+  glass.position.set(0,1.75,len/2+0.01-0.1); g.add(glass);
+  /* body per type */
+  var bodyMat=new THREE.MeshStandardMaterial({color:T.body,roughness:0.6,metalness:0.2});
+  var bodyZ=len/2-cabLen-0.4-trailerLen/2;
+  var body=null;
+  if(type==='TIPPER'){
+    body=new THREE.Mesh(new THREE.BoxGeometry(2.6,1.7,trailerLen),bodyMat);
+    body.position.set(0,1.45,bodyZ);
+    g.add(body);
+    var load=new THREE.Mesh(new THREE.BoxGeometry(2.3,0.5,trailerLen-0.5),
+      new THREE.MeshStandardMaterial({color:0xc9a86a,roughness:1}));
+    load.position.set(0,2.45,bodyZ); g.add(load);
+  }else if(type==='FLATBED'){
+    body=new THREE.Mesh(new THREE.BoxGeometry(2.7,0.5,trailerLen),bodyMat);
+    body.position.set(0,1.05,bodyZ);
+    g.add(body);
+    var deck=body;
+    var b1=new THREE.Mesh(new THREE.BoxGeometry(2.2,1.1,trailerLen*0.42),
+      new THREE.MeshStandardMaterial({color:0xe8e2d4,roughness:0.9}));
+    b1.position.set(0,1.85,bodyZ-trailerLen*0.24); g.add(b1);
+    var b2=b1.clone(); b2.position.z=bodyZ+trailerLen*0.24; g.add(b2);
+    deck.castShadow=true;
+  }else if(type==='BOX'){
+    body=new THREE.Mesh(new THREE.BoxGeometry(2.7,2.5,trailerLen),bodyMat);
+    body.position.set(0,1.95,bodyZ);
+    g.add(body);
+    var stripe=new THREE.Mesh(new THREE.BoxGeometry(2.75,0.4,trailerLen-0.2),
+      new THREE.MeshStandardMaterial({color:0x3a5a8a,roughness:0.6}));
+    stripe.position.set(0,1.5,bodyZ); g.add(stripe);
+  }else{ /* CONTAINER */
+    var flat=new THREE.Mesh(new THREE.BoxGeometry(2.7,0.5,trailerLen),
+      new THREE.MeshStandardMaterial({color:0x555f68,roughness:0.7}));
+    flat.position.set(0,1.05,bodyZ); g.add(flat);
+    body=new THREE.Mesh(new THREE.BoxGeometry(2.55,2.3,trailerLen-0.6),bodyMat);
+    body.position.set(0,2.45,bodyZ); g.add(body);
+  }
+  body.castShadow=true;
+  /* side labels */
+  var labTex=sideLabelTexture('OFM · '+T.label,cap+' MT');
+  [-1,1].forEach(function(sd){
+    var lab=new THREE.Mesh(new THREE.PlaneGeometry(trailerLen*0.62,1.1),
+      new THREE.MeshBasicMaterial({map:labTex,transparent:true}));
+    lab.position.set(sd*1.36,1.9,bodyZ);
+    lab.rotation.y=sd>0?Math.PI/2:-Math.PI/2;
+    g.add(lab);
+  });
+  /* Omani yellow plates front + back */
+  var pTex=plateTexture(plateTxt);
+  var pf=new THREE.Mesh(new THREE.PlaneGeometry(1.0,0.5),
+    new THREE.MeshBasicMaterial({map:pTex}));
+  pf.position.set(0,0.7,len/2+0.02); g.add(pf);
+  var pb=pf.clone(); pb.position.set(0,0.9,-len/2-0.02); pb.rotation.y=Math.PI; g.add(pb);
+  /* wheels */
+  var wx=[-1.25,1.25];
+  var wz=[len/2-1.2, bodyZ-trailerLen/2+1.1, bodyZ+trailerLen/2-1.1];
+  if(len>10){ wz.push(bodyZ); }
+  wx.forEach(function(x){
+    wz.forEach(function(z){
+      var w=new THREE.Mesh(wheelGeo,wheelMat);
+      w.rotation.z=Math.PI/2; w.position.set(x,0.5,z);
+      g.add(w);
+    });
+  });
+  g.userData.len=len;
+  return g;
+}
+
+/* ==================================================================
+   GAME STATE
+   ================================================================== */
+var G={
+  state:'menu',           /* menu | play | over | fail */
+  level:1,
+  timeMin:360,            /* 06:00 */
+  endMin:840,             /* 14:00 */
+  speed:1,                /* 0 pause, 1, 2 */
+  prevSpeed:1,
+  omr:0, earned:0, lost:0,
+  misses:0, completed:0, onTime:0, lateDone:0,
+  demurrage:0, wrongFines:0, latePen:0,
+  cards:[], trucks:[],
+  selCard:null, selTruck:null,
+  cardSeq:0, truckSeq:0,
+  wbOccupant:null, westOcc:null,
+  tips:{},                /* fired academy tips */
+  docStops:0,
+  bookOpen:false,
+  podQueue:[],
+  spawnQueue:[],
+  hi:0, hiOT:0
+};
+try{
+  G.hi=parseInt(localStorage.getItem('ofmFleetHi')||'0',10)||0;
+  G.hiOT=parseInt(localStorage.getItem('ofmFleetHiOT')||'0',10)||0;
+}catch(e){ G.hi=0; G.hiOT=0; }
+el('hsStart').textContent=G.hi;
+el('hsOT').textContent=G.hiOT>0?G.hiOT+'%':'—';
+
+var RATE=480/360; /* game-minutes per real second: 8h shift ≈ 6 real minutes */
+var TURBO=1; /* dev/test hook: ?turbo=N accelerates the whole simulation */
+try{
+  var tm=location.search.match(/turbo=(\d+)/);
+  if(tm) TURBO=clamp(parseInt(tm[1],10)||1,1,25);
+}catch(eT){ TURBO=1; }
+var GAP=13;       /* follow-the-leader spacing: no overtaking, jams propagate */
+
+/* departments that issue demand cards (4 departments) */
+var DEPTS={
+  PRODUCTION:{color:'#e0a05a', name:'PRODUCTION'},
+  PROCUREMENT:{color:'#7fb4e0', name:'PROCUREMENT / STORES'},
+  DELIVERY:{color:'#8fe08f', name:'DELIVERY'},
+  SALES:{color:'#e08fc0', name:'SALES / COORDINATION'}
+};
+
+/* ==================================================================
+   DEMAND CARDS — content & generation
+   ================================================================== */
+var GRAINS=['BARLEY','WHEAT','MAIZE','SOY MEAL'];
+var SUPPLIES=['PP-BAGS (25kg)','SPARE PARTS','LABELS + THREAD','ADDITIVES'];
+var CUSTOMERS=[['Sohar Poultry','premix'],['Mazoon Dairy','dairy feed'],['Al Bashayer Meat','finisher feed'],
+  ['Nizwa Farms','layer feed'],['Salalah Broilers','starter crumble'],['Muscat Feed Co','concentrate']];
+var WHY={
+  grain:'Production cannot start the batch without grain at the intake pit — plan the inbound truck BEFORE the line starves. QA also samples every inbound load before it tips.',
+  supplies:'Packing stops without PP-bags, labels and spares. Containers come from the port — book the STORES dock so the box is not grounded on the road.',
+  bagged:'Bagged cargo rides a flat bed or a box — never a tipper. 25 kg bags: 25 MT ≈ 1,000 bags. Warehouse picks the oldest batch first (FIFO/FEFO) while the truck is on the scale.',
+  bulk:'Bulk feed goes out by tipper to farms with silos. The truck is weighed empty (TARE) and full (GROSS): NET = GROSS − TARE must match the SO.',
+  weightout:'A posted truck is already loaded — but it still needs a full weighbridge slot for GROSS weight, then its DN and gate pass. Weight-out jobs block the scale like any other truck: do not forget them.'
+};
+var OUT_CHAIN=['SO','BOOKING','GATE PASS IN','WT1 TARE','LOADING','WT2 GROSS','DN','GATE PASS OUT','POD'];
+var IN_CHAIN=['PO','BOOKING','GATE PASS IN','WT1 GROSS','UNLOADING','WT2 TARE','GRN','GATE PASS OUT'];
+
+function makeCard(kind,appearMin,level){
+  G.cardSeq++;
+  var c={id:'C'+G.cardSeq, kind:kind, appearMin:appearMin, state:'sched',
+    truckId:null, dnDelayed:false, zoneId:null};
+  var dline=appearMin+rand(95,170)-level*5;
+  c.deadlineMin=Math.min(dline,832);
+  if(kind==='grain'){
+    c.dept='PRODUCTION';
+    c.mt=pick([45,45,60]);
+    c.grain=pick(GRAINS);
+    c.reqTypes=['TIPPER'];
+    c.reqLabel='TIPPER · '+c.mt+' MT';
+    c.zoneId='INTAKE';
+    c.title='Mill intake needs '+c.mt+' MT '+c.grain;
+    c.sub='Inbound grain tipper — SILOS + MILL INTAKE';
+    c.rev=c.mt*2;
+  }else if(kind==='supplies'){
+    c.dept='PROCUREMENT';
+    c.mt=pick([15,15,25]);
+    c.cargo=pick(SUPPLIES);
+    c.reqTypes=['CONTAINER'];
+    c.reqLabel='CONTAINER TRUCK';
+    c.zoneId='STORES';
+    c.title=c.cargo+' container arriving';
+    c.sub='Needs STORES dock — packing material keeps the lines running';
+    c.rev=70;
+  }else if(kind==='bagged'){
+    c.dept='DELIVERY';
+    c.mt=pick([7,15,25,25,45]);
+    var cu=pick(CUSTOMERS);
+    c.customer=cu[0];
+    c.soNo='SO-'+(1040+G.cardSeq);
+    c.reqTypes=['FLATBED','BOX'];
+    c.reqLabel='FLAT BED (or BOX) · ≥'+c.mt+' MT';
+    c.zoneId=pick(['BAY1','BAY2','BAY3']);
+    c.title=c.soNo+' '+c.customer+' — '+c.mt+' MT '+cu[1]+' (25kg bags)';
+    c.sub='Load at '+ZONES[c.zoneId].name;
+    c.rev=c.mt*3;
+    c.dnDelayed=Math.random()<0.32;
+  }else if(kind==='bulk'){
+    c.dept='DELIVERY';
+    c.mt=pick([25,45,45,60]);
+    var cu2=pick(CUSTOMERS);
+    c.customer=cu2[0];
+    c.soNo='SO-'+(1040+G.cardSeq);
+    c.reqTypes=['TIPPER'];
+    c.reqLabel='TIPPER · ≥'+c.mt+' MT';
+    c.zoneId='BULK';
+    c.title=c.soNo+' '+c.customer+' — '+c.mt+' MT bulk feed';
+    c.sub='Load at BULK OUTLOADING';
+    c.rev=Math.round(c.mt*2.5);
+    c.dnDelayed=Math.random()<0.32;
+  }else{ /* weightout */
+    c.dept='SALES';
+    c.mt=pick([25,45]);
+    var cu3=pick(CUSTOMERS);
+    c.customer=cu3[0];
+    c.soNo='SO-'+(1040+G.cardSeq);
+    c.reqTypes=['FLATBED','BOX'];
+    c.zoneId=pick(['BAY1','BAY2','BAY3','BULK']);
+    if(c.zoneId==='BULK') c.reqTypes=['TIPPER'];
+    c.reqLabel='posted truck (already loaded)';
+    c.title='Posted truck: '+c.soNo+' '+c.customer+' — weight-out + gate out';
+    c.sub='Truck loaded earlier at '+ZONES[c.zoneId].short+' — needs GROSS weight + documents';
+    c.rev=60;
+    c.dnDelayed=Math.random()<0.4;
+  }
+  c.why=WHY[kind];
+  return c;
+}
+function buildDeck(level){
+  var n=Math.min(6+2*(level-1),12);
+  var kinds=['grain','supplies','bagged','bulk','weightout'];
+  while(kinds.length<n) kinds.push(pick(['grain','bagged','bulk','supplies','weightout','bagged']));
+  /* shuffle tail */
+  var i,j;
+  for(i=kinds.length-1;i>1;i--){ j=randi(1,i); var t=kinds[i]; kinds[i]=kinds[j]; kinds[j]=t; }
+  var span=G.endMin-170-372;
+  var cards=[];
+  for(i=0;i<n;i++){
+    var at=372+(span*i/Math.max(1,n-1))+rand(-12,12);
+    cards.push(makeCard(kinds[i],Math.round(at),level));
+  }
+  return cards;
+}
+
+/* ==================================================================
+   TRUCK LIFECYCLE
+   ================================================================== */
+var trucksGroup=new THREE.Group();
+scene.add(trucksGroup);
+var truckMeshes=[]; /* for raycast */
+
+function freeSpot(){
+  var i;
+  for(i=0;i<STAGE_SPOTS.length;i++){ if(!STAGE_SPOTS[i].truck) return STAGE_SPOTS[i]; }
+  return null;
+}
+function spawnTruck(type,cap,spot){
+  G.truckSeq++;
+  var plate='OFM '+(100+G.truckSeq);
+  var mesh=buildTruckMesh(type,cap,plate);
+  var t={id:'T'+G.truckSeq, plate:plate, type:type, cap:cap,
+    mesh:mesh, len:mesh.userData.len,
+    state:'arrive', s:0, off:0, onRoad:false, speed:0,
+    spot:spot, card:null, dir:null, docs:{}, chain:[],
+    plan:[], step:0, serviceLeft:0, statusTxt:'arriving at staging',
+    queueMin:0, dnRequested:false, dnReadyAt:-1, arriveT:0, fade:1};
+  mesh.position.set(-150,0,spot.z+rand(-2,2));
+  mesh.rotation.y=Math.atan2(1,0);
+  /* selection ring */
+  var ring=new THREE.Mesh(new THREE.RingGeometry(2.2,3.0,24),
+    new THREE.MeshBasicMaterial({color:0x8fe08f,transparent:true,opacity:0.0,side:THREE.DoubleSide}));
+  ring.rotation.x=-Math.PI/2; ring.position.y=0.12;
+  mesh.add(ring);
+  t.ring=ring;
+  trucksGroup.add(mesh);
+  mesh.traverse(function(o){ o.userData.truckRef=t; });
+  truckMeshes.push(mesh);
+  G.trucks.push(t);
+  spot.truck=t;
+  return t;
+}
+function spawnPostedTruck(card){
+  var zone=ZONES[card.zoneId];
+  if(zone.occupant) return null;
+  var type=card.reqTypes[0];
+  var cap=card.mt>=45?45:(card.mt>=25?25:15);
+  if(card.reqTypes[0]==='TIPPER') cap=card.mt>=60?60:45;
+  G.truckSeq++;
+  var plate='OFM '+(100+G.truckSeq);
+  var mesh=buildTruckMesh(type,cap,plate);
+  var t={id:'T'+G.truckSeq, plate:plate, type:type, cap:cap,
+    mesh:mesh, len:mesh.userData.len,
+    state:'posted', s:zone.s, off:1, onRoad:false, speed:0,
+    spot:null, card:null, dir:'out', docs:{}, chain:OUT_CHAIN.slice(),
+    plan:[], step:0, serviceLeft:0, statusTxt:'loaded — posted for weight-out',
+    queueMin:0, dnRequested:false, dnReadyAt:-1, arriveT:0, fade:1, postedZone:zone};
+  mesh.position.set(zone.bx,0,zone.bz);
+  var pp=pathPos(zone.s);
+  mesh.rotation.y=Math.atan2(pp.tx,pp.tz);
+  var ring=new THREE.Mesh(new THREE.RingGeometry(2.2,3.0,24),
+    new THREE.MeshBasicMaterial({color:0x8fe08f,transparent:true,opacity:0.0,side:THREE.DoubleSide}));
+  ring.rotation.x=-Math.PI/2; ring.position.y=0.12;
+  mesh.add(ring); t.ring=ring;
+  trucksGroup.add(mesh);
+  mesh.traverse(function(o){ o.userData.truckRef=t; });
+  truckMeshes.push(mesh);
+  G.trucks.push(t);
+  zone.occupant=t;
+  /* pre-stamped docs: loaded earlier */
+  stamp(t,'SO'); stamp(t,'BOOKING'); stamp(t,'GATE PASS IN');
+  stamp(t,'WT1 TARE'); stamp(t,'LOADING');
+  return t;
+}
+function stamp(t,key){ t.docs[key]=true; }
+
+/* ---------------- mission plans ---------------- */
+function buildPlan(t,card){
+  var zone=ZONES[card.zoneId];
+  var inbound=(card.kind==='grain'||card.kind==='supplies');
+  var plan=[];
+  if(t.state==='posted'){
+    /* weight-out only: WB gross -> gate out -> exit */
+    plan.push({kind:'stop', s:S_WB_OUT, dur:4, name:'WEIGHBRIDGE (GROSS)', wb:true,
+      done:function(){ stamp(t,'WT2 GROSS'); afterWT2(t,card); }});
+    plan.push({kind:'gateout', s:S_GATE_OUT, dur:2, name:'GATE OUT'});
+    plan.push({kind:'exit', s:S_EXIT, name:'EXIT'});
+    return plan;
+  }
+  plan.push({kind:'stop', s:S_GATE_IN, dur:2, name:'GATE IN',
+    done:function(){ stamp(t,'GATE PASS IN'); }});
+  if(inbound){
+    t.dir='in'; t.chain=IN_CHAIN.slice();
+    plan.push({kind:'stop', s:S_WB_IN, dur:4, name:'WEIGHBRIDGE (GROSS IN)', wb:true,
+      done:function(){ stamp(t,'WT1 GROSS'); }});
+    plan.push({kind:'bay', s:zone.s, dur:card.kind==='grain'?10:12, name:zone.short,
+      zone:zone,
+      done:function(){ stamp(t,'UNLOADING'); stamp(t,'GRN'); }});
+    plan.push({kind:'stop', s:S_WB_OUT, dur:4, name:'WEIGHBRIDGE (TARE OUT)', wb:true,
+      done:function(){ stamp(t,'WT2 TARE'); }});
+  }else{
+    t.dir='out'; t.chain=OUT_CHAIN.slice();
+    plan.push({kind:'stop', s:S_WB_IN, dur:4, name:'WEIGHBRIDGE (TARE)', wb:true,
+      done:function(){ stamp(t,'WT1 TARE'); }});
+    plan.push({kind:'bay', s:zone.s, dur:card.kind==='bulk'?12:15, name:zone.short,
+      zone:zone,
+      done:function(){ stamp(t,'LOADING'); }});
+    plan.push({kind:'stop', s:S_WB_OUT, dur:4, name:'WEIGHBRIDGE (GROSS)', wb:true,
+      done:function(){ stamp(t,'WT2 GROSS'); afterWT2(t,card); }});
+  }
+  plan.push({kind:'gateout', s:S_GATE_OUT, dur:2, name:'GATE OUT'});
+  plan.push({kind:'exit', s:S_EXIT, name:'EXIT'});
+  return plan;
+}
+function afterWT2(t,card){
+  tipOnce('net','ACADEMY TIP: NET = GROSS − TARE must match the SO ±2% or the truck does not leave.');
+  if(!card.dnDelayed){
+    t.dnReadyAt=G.timeMin+3; /* paperwork auto-issues */
+  }else{
+    t.statusTxt='needs DN — request it from DELIVERY';
+    showToast(card.soNo+': DN not pre-cleared! Tap REQUEST DN in the tracker before the truck reaches the gate.','bad',4200);
+    tipOnce('preclear','ACADEMY TIP: Pre-clear paperwork — SO, DN and gate pass ready BEFORE the truck arrives.');
+  }
+}
+
+/* ---------------- dispatch validation (the teaching core) ---------------- */
+function validateDispatch(t,card){
+  if(!card || card.state!=='open') return 'This demand is not open any more.';
+  if(card.kind==='weightout'){
+    if(t!==card.postedTruck) return 'This is a posted job — release the truck already loaded at '+ZONES[card.zoneId].short+'.';
+    return null;
+  }
+  if(t.state!=='spot') return t.plate+' is not available at staging.';
+  var okType=card.reqTypes.indexOf(t.type)>=0;
+  if(!okType){
+    if(t.type==='TIPPER') return 'Bagged cargo cannot load on a tipper — bags get crushed and wet. Send a FLAT BED or BOX.';
+    if(card.reqTypes[0]==='TIPPER') return 'Bulk cargo cannot go on a '+TRUCK_TYPES[t.type].label+' — it spills. Send a TIPPER.';
+    if(card.reqTypes[0]==='CONTAINER') return 'A supplies container needs a CONTAINER truck with twist-locks.';
+    return TRUCK_TYPES[t.type].label+' cannot take this cargo — send a '+card.reqTypes.join(' or ')+'.';
+  }
+  if(t.cap<card.mt){
+    return t.cap+' MT truck cannot carry a '+card.mt+' MT SO — overloading risks fines and offloading at roadside checks.';
+  }
+  var zone=ZONES[card.zoneId];
+  if(zone.occupant && zone.occupant!==t) return 'BUSY:'+zone.short+' is occupied — one truck per bay. Wait or re-sequence.';
+  return null;
+}
+function attemptDispatch(t,card){
+  var err=validateDispatch(t,card);
+  if(err && err.indexOf('BUSY:')===0){
+    showToast(err.slice(5),'',2600);
+    sndClick();
+    return false;
+  }
+  if(err){
+    G.omr-=15; G.wrongFines+=15; G.lost+=15;
+    showToast('WRONG TRUCK — '+err+'  (−15 OMR)','bad',4600);
+    sndBad();
+    tipOnce('wrong','ACADEMY TIP: Match the truck to the cargo AND the customer — type and capacity both matter.');
+    refreshUI();
+    return false;
+  }
+  card.state='dispatched';
+  card.truckId=t.id;
+  t.card=card;
+  t.plan=buildPlan(t,card);
+  t.step=0;
+  stamp(t,card.kind==='grain'||card.kind==='supplies'?'PO':'SO');
+  stamp(t,'BOOKING');
+  if(t.state==='posted'){
+    t.statusTxt='releasing for weight-out';
+    t.state='unpark';
+    tipOnce('wo2','ACADEMY TIP: Weight-out posted trucks still need the full weighbridge slot — do not forget them.');
+  }else{
+    t.spot.truck=null; t.spot=null;
+    t.state='merge';
+    t.statusTxt='leaving staging';
+  }
+  showToast(t.plate+' dispatched — '+card.title,'',3000);
+  sndGood();
+  refreshUI();
+  return true;
+}
+function bestTruckFor(card){
+  if(card.kind==='weightout') return card.postedTruck;
+  var best=null;
+  var i;
+  for(i=0;i<G.trucks.length;i++){
+    var t=G.trucks[i];
+    if(t.state!=='spot') continue;
+    if(card.reqTypes.indexOf(t.type)<0) continue;
+    if(t.cap<card.mt) continue;
+    if(!best || t.cap<best.cap) best=t; /* smallest sufficient = cheapest */
+  }
+  return best;
+}
+
+/* ---------------- academy tips / toasts ---------------- */
+var toastTimer=null;
+function showToast(msg,cls,dur){
+  var e=el('toast');
+  e.textContent=msg;
+  e.className=cls||'';
+  e.style.opacity='1';
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){ e.style.opacity='0'; },dur||3000);
+}
+function tipOnce(key,msg){
+  if(G.tips[key]) return;
+  G.tips[key]=true;
+  setTimeout(function(){ showToast(msg,'tip',5200); },600);
+}
+
+/* ---------------- per-frame truck update ---------------- */
+function truckBlocks(u){
+  if(!u.onRoad) return false;
+  if(u.state==='done') return false;
+  if(u.state==='park' && u.off>0.85) return false;
+  return true;
+}
+function currentStep(t){ return t.plan[t.step]||null; }
+
+function updateTruck(t,dtMove,dtGame){
+  var st;
+  switch(t.state){
+  case 'arrive':{
+    t.arriveT+=dtMove;
+    var sp=t.spot;
+    var k=Math.min(1,t.arriveT/2.2);
+    var sx=-150, sz=sp.z;
+    t.mesh.position.set(lerp(sx,sp.x,k),0,lerp(sz,sp.z,k));
+    t.mesh.rotation.y=lerp(Math.PI/2,Math.PI/2,k);
+    if(k>=1){ t.state='spot'; t.statusTxt='idle at OUTSIDE STAGING'; }
+    break;
+  }
+  case 'merge':{
+    /* drive from staging spot onto the path start (s=0) */
+    var gapOK=true, i;
+    for(i=0;i<G.trucks.length;i++){
+      var u=G.trucks[i];
+      if(u!==t && truckBlocks(u) && u.s<16){ gapOK=false; break; }
+    }
+      if(G.westOcc!==null && G.westOcc!==t.id) gapOK=false;
+    if(!gapOK){ t.statusTxt='waiting for the gate road to clear (single lane)'; t.queueMin+=dtGame; chargeDemurrage(t,dtGame); break; }
+    t.arriveT+=dtMove;
+    var k2=Math.min(1,t.arriveT/1.6);
+    var p0=pathPos(0.5);
+    var sp2=t.startMerge||{x:t.mesh.position.x,z:t.mesh.position.z};
+    t.startMerge=sp2;
+    t.mesh.position.set(lerp(sp2.x,p0.x,k2),0,lerp(sp2.z,p0.z,k2));
+    if(k2>=1){
+      t.state='drive'; t.onRoad=true; t.s=0.5; t.arriveT=0;
+      t.westHeld=true; G.westOcc=t.id; /* claims the single-lane gate road */
+      t.statusTxt='en route — GATE';
+    }
+    break;
+  }
+  case 'drive':{
+    st=currentStep(t);
+    if(!st){ t.state='done'; break; }
+    var vmax=20;
+    var lim=st.s, src='stop';
+    /* single-lane gate road: release after passing the junction inbound;
+       leaving the ring, hold at the junction until the gate road is clear */
+    if(t.westHeld && t.s>=S_JCT_IN){ t.westHeld=false; if(G.westOcc===t.id) G.westOcc=null; }
+    if(!t.westHeld && !t.westExitHeld && st.s>S_JCT_OUT && t.s>S_JCT_OUT-80 && t.s<S_JCT_OUT-0.5){
+      if(G.westOcc===null){ t.westExitHeld=true; G.westOcc=t.id; }
+      else if(S_JCT_OUT-1<lim){ lim=S_JCT_OUT-1; src='west'; }
+    }
+    /* follow-the-leader: never close within GAP of the truck ahead — no overtaking */
+    var j;
+    for(j=0;j<G.trucks.length;j++){
+      var v=G.trucks[j];
+      if(v===t || !truckBlocks(v)) continue;
+      if(v.s>t.s+0.01){
+        var l2=v.s-GAP;
+        if(l2<lim){ lim=l2; src='traffic'; }
+      }
+    }
+    /* weighbridge: one truck on the deck */
+    if(st.wb && G.wbOccupant!==t.id){
+      var hold=st.s-14;
+      if(G.wbOccupant===null){
+        if(t.s>=hold-0.6){ G.wbOccupant=t.id; }
+        else if(hold<lim){ lim=hold; src='wb'; }
+      }else{
+        if(hold<lim){ lim=hold; src='wb'; }
+      }
+    }
+    var adv=vmax*dtMove;
+    var newS=Math.min(t.s+adv,lim);
+    var moved=newS-t.s;
+    t.s=newS;
+    var pp=pathPos(t.s);
+    t.mesh.position.set(pp.x,0,pp.z);
+    t.mesh.rotation.y=Math.atan2(pp.tx,pp.tz);
+    if(moved<adv*0.25 && (src==='traffic'||src==='wb'||src==='west')){
+      t.queueMin+=dtGame;
+      t.statusTxt=src==='wb'?'queuing for the WEIGHBRIDGE':(src==='west'?'holding for the single-lane gate road':'in a jam — single lane, no overtaking');
+      chargeDemurrage(t,dtGame);
+      if(src==='wb') tipOnce('queue','ACADEMY TIP: One scale, many trucks — your dispatch order IS the queue.');
+    }
+    if(lim-t.s<=0.05 && src==='stop') arriveStep(t,st);
+    break;
+  }
+  case 'service':{
+    t.serviceLeft-=dtGame;
+    if(t.serviceLeft<=0){
+      st=currentStep(t);
+      if(st.wb && G.wbOccupant===t.id) G.wbOccupant=null;
+      if(st.done) st.done();
+      sndStamp();
+      t.step++;
+      t.state='drive';
+      var nx=currentStep(t);
+      t.statusTxt=nx?('en route — '+nx.name):'en route';
+    }
+    break;
+  }
+  case 'park':{
+    t.off=Math.min(1,t.off+dtMove/1.1);
+    positionParked(t);
+    if(t.off>=1){
+      st=currentStep(t);
+      t.state='service';
+      t.serviceLeft=st.dur;
+      t.statusTxt=st.name+' — working ('+st.dur+' min)';
+    }
+    break;
+  }
+  case 'unpark':{
+    /* wait for a gap on the single lane, then merge back */
+    var ok=true, m;
+    for(m=0;m<G.trucks.length;m++){
+      var w=G.trucks[m];
+      if(w!==t && truckBlocks(w) && Math.abs(w.s-t.s)<15){ ok=false; break; }
+    }
+    if(!ok){ t.statusTxt='waiting for a gap to re-join the lane'; break; }
+    t.off=Math.max(0,t.off-dtMove/1.1);
+    positionParked(t);
+    if(t.off<=0){
+      t.onRoad=true;
+      t.state='drive';
+      var nx2=currentStep(t);
+      t.statusTxt=nx2?('en route — '+nx2.name):'en route';
+    }
+    break;
+  }
+  case 'stopped':{
+    /* doc stop at the gate — blocks everyone behind */
+    t.statusTxt='STOPPED AT GATE — no DN. Request it now!';
+    if(t.docs['DN']){
+      t.state='service';
+      t.serviceLeft=2;
+      t.statusTxt='GATE OUT — documents OK';
+    }
+    break;
+  }
+  case 'exitfade':{
+    t.fade-=dtMove/1.2;
+    t.mesh.position.x-=dtMove*10;
+    if(t.fade<=0){ removeTruck(t); }
+    break;
+  }
+  }
+}
+function positionParked(t){
+  var pp=pathPos(t.s);
+  var st=currentStep(t);
+  var zone=st&&st.zone?st.zone:t.postedZone;
+  if(!zone) return;
+  var d=t.off*zone.bayDist;
+  t.mesh.position.set(pp.x+zone.bayVec.x*d,0,pp.z+zone.bayVec.z*d);
+}
+function arriveStep(t,st){
+  if(st.kind==='stop'){
+    t.state='service'; t.serviceLeft=st.dur;
+    t.statusTxt=st.name+' ('+st.dur+' min)';
+    if(st.wb) tipOnce('scale','ACADEMY TIP: The weighbridge holds one truck — your schedule is the queue.');
+  }else if(st.kind==='bay'){
+    t.state='park';
+    t.statusTxt='docking at '+st.name;
+    if(st.zone) st.zone.occupant=t;
+    tipOnce('bay','ACADEMY TIP: Stage first, then call the truck — product at the dock beats a truck waiting at the dock.');
+  }else if(st.kind==='gateout'){
+    if(t.dir==='out' && !t.docs['DN']){
+      t.state='stopped';
+      G.docStops++;
+      sndAlarm();
+      showToast(t.plate+' STOPPED at the gate — no Delivery Note. Tap REQUEST DN FROM DELIVERY.','bad',5200);
+      tipOnce('stopped','ACADEMY TIP: A stopped truck on a single-lane road stops EVERYONE behind it.');
+    }else{
+      t.state='service'; t.serviceLeft=st.dur;
+      t.statusTxt='GATE OUT — documents OK';
+    }
+  }else if(st.kind==='exit'){
+    finishTruck(t);
+  }
+}
+function chargeDemurrage(t,dtGame){
+  if(t.queueMin>60){
+    var c=dtGame*0.12; /* ≈7 OMR per standing truck-hour after the free hour */
+    G.omr-=c; G.demurrage+=c; G.lost+=c;
+    tipOnce('dem','ACADEMY TIP: Waiting trucks burn money — after the free hour the meter runs at detention rates.');
+  }
+}
+function removeTruck(t){
+  if(G.westOcc===t.id) G.westOcc=null;
+  trucksGroup.remove(t.mesh);
+  var i=truckMeshes.indexOf(t.mesh);
+  if(i>=0) truckMeshes.splice(i,1);
+  t.state='done';
+}
+function finishTruck(t){
+  var card=t.card;
+  t.onRoad=false;
+  t.state='exitfade';
+  if(G.westOcc===t.id) G.westOcc=null;
+  stamp(t,'GATE PASS OUT');
+  if(card){
+    var onTime=G.timeMin<=card.deadlineMin;
+    if(card.state==='dispatched' && onTime){
+      card.state='done';
+      G.omr+=card.rev; G.earned+=card.rev;
+      G.completed++; G.onTime++;
+      showToast('ON TIME — '+card.title+'  (+'+card.rev+' OMR)','',3200);
+      sndGood();
+    }else{
+      card.state='done';
+      var part=Math.round(card.rev*0.4);
+      G.omr+=part; G.earned+=part;
+      G.completed++; G.lateDone++;
+      showToast('Delivered LATE — partial credit only (+'+part+' OMR)','bad',3200);
+    }
+    /* POD returns later — it triggers invoicing in the real flow */
+    G.podQueue.push({truck:t, at:G.timeMin+30});
+    if(t.dir==='out') stamp(t,'POD_PENDING');
+  }
+  refreshUI();
+}
+
+/* ==================================================================
+   GAME TICK — clock, card queue, spawns, deadlines
+   ================================================================== */
+function openCard(card){
+  card.state='open';
+  if(card.kind==='weightout'){
+    var pt=spawnPostedTruck(card);
+    if(!pt){ /* zone busy — move the job to a free bay */
+      var alts=['BAY1','BAY2','BAY3','BULK'], k;
+      for(k=0;k<alts.length;k++){
+        if(!ZONES[alts[k]].occupant){ card.zoneId=alts[k]; break; }
+      }
+      if(card.zoneId==='BULK') card.reqTypes=['TIPPER']; else card.reqTypes=['FLATBED','BOX'];
+      pt=spawnPostedTruck(card);
+    }
+    card.postedTruck=pt;
+    tipOnce('wo','ACADEMY TIP: Weight-out posted trucks still need the full weighbridge slot — do not forget them.');
+  }else{
+    /* a matching truck drives to staging a few minutes after the demand lands */
+    G.spawnQueue.push({at:G.timeMin+rand(4,12),card:card});
+    if(Math.random()<0.35){
+      G.spawnQueue.push({at:G.timeMin+rand(8,20),decoy:true});
+    }
+  }
+  showToast(DEPTS[card.dept].name+': '+card.title,'',3600);
+  refreshUI();
+}
+function spawnForCard(card){
+  var spot=freeSpot();
+  if(!spot){ G.spawnQueue.push({at:G.timeMin+6,card:card}); return; }
+  var type=card.reqTypes[0];
+  if(card.kind==='bagged' && Math.random()<0.4) type='BOX';
+  var cap=45;
+  if(card.mt<=7) cap=7; else if(card.mt<=15) cap=15; else if(card.mt<=25) cap=pick([25,45]); else if(card.mt<=45) cap=45; else cap=60;
+  if(type==='CONTAINER') cap=pick([15,45]);
+  spawnTruck(type,cap,spot);
+}
+function spawnDecoy(){
+  var spot=freeSpot();
+  if(!spot) return;
+  spawnTruck(pick(['TIPPER','FLATBED','BOX','CONTAINER']),pick([7,15,45,60]),spot);
+}
+function gameTick(dtReal){
+  var dtGame=dtReal*RATE*G.speed*TURBO;
+  var dtMove=dtReal*G.speed*TURBO;
+  G.timeMin+=dtGame;
+  /* open scheduled cards */
+  var i;
+  for(i=0;i<G.cards.length;i++){
+    var c=G.cards[i];
+    if(c.state==='sched' && G.timeMin>=c.appearMin) openCard(c);
+    else if(c.state==='open' && G.timeMin>c.deadlineMin) missCard(c);
+  }
+  /* spawns */
+  for(i=G.spawnQueue.length-1;i>=0;i--){
+    if(G.timeMin>=G.spawnQueue[i].at){
+      var q=G.spawnQueue.splice(i,1)[0];
+      if(q.card){
+        if(q.card.state==='open') spawnForCard(q.card);
+      }else spawnDecoy();
+    }
+  }
+  /* DN paperwork ready */
+  for(i=0;i<G.trucks.length;i++){
+    var t=G.trucks[i];
+    if(t.dnReadyAt>0 && G.timeMin>=t.dnReadyAt && !t.docs['DN']){
+      stamp(t,'DN'); t.dnReadyAt=-1;
+      showToast(t.plate+': Delivery Note received from DELIVERY.','',2600);
+      sndStamp();
+      refreshUI();
+    }
+  }
+  /* PODs returning */
+  for(i=G.podQueue.length-1;i>=0;i--){
+    if(G.timeMin>=G.podQueue[i].at){
+      var pq=G.podQueue.splice(i,1)[0];
+      stamp(pq.truck,'POD');
+    }
+  }
+  /* trucks */
+  for(i=0;i<G.trucks.length;i++) updateTruck(G.trucks[i],dtMove,dtGame);
+  /* end of shift */
+  if(G.timeMin>=G.endMin && G.state==='play') endShift();
+}
+function missCard(c){
+  c.state='late';
+  G.misses++;
+  G.omr-=40; G.latePen+=40; G.lost+=40;
+  sndAlarm();
+  showToast('DEADLINE MISSED — '+DEPTS[c.dept].name+' escalates: '+c.title+'  (−40 OMR)','bad',5200);
+  if(c.dept==='PRODUCTION') tipOnce('starve','ACADEMY TIP: Production cannot start the batch without grain at intake — plan the inbound truck BEFORE the line starves.');
+  if(G.misses>=5){ failShift(); return; }
+  refreshUI();
+}
+
+/* ---------------- request DN ---------------- */
+function requestDN(t){
+  if(!t || t.dir!=='out' || t.docs['DN'] || t.dnReadyAt>0) return;
+  t.dnReadyAt=G.timeMin+20;
+  t.dnRequested=true;
+  showToast('DN requested from DELIVERY for '+t.plate+' — ready in ~20 min.','',3000);
+  sndClick();
+  refreshUI();
+}
+
+/* ==================================================================
+   UI RENDERING
+   ================================================================== */
+var cardsBody=el('cardsBody'), docsBody=el('docsBody');
+function activeTrucks(){
+  return G.trucks.filter(function(t){
+    return t.state!=='done' && t.state!=='spot' && t.state!=='arrive';
+  });
+}
+function refreshUI(){
+  renderCards(); renderDocs(); renderTop();
+}
+function renderTop(){
+  el('clockBox').textContent=fmtClock(G.timeMin);
+  el('omrVal').textContent=Math.round(G.omr);
+  var done=G.onTime+G.lateDone+G.misses;
+  el('otVal').textContent=done>0?Math.round(100*G.onTime/done)+'%':'—';
+  el('tpVal').textContent=G.completed;
+  var x='';
+  for(var i=0;i<5;i++) x+=i<G.misses?'✖':'<span style="opacity:.25">✖</span>';
+  el('missBox').innerHTML=x;
+}
+function renderCards(){
+  var open=G.cards.filter(function(c){ return c.state!=='sched'; });
+  open.sort(function(a,b){ return a.deadlineMin-b.deadlineMin; });
+  var html='';
+  var i;
+  for(i=0;i<open.length;i++){
+    var c=open[i];
+    if(c.state==='done') continue;
+    var dept=DEPTS[c.dept];
+    var cls='dcard';
+    if(G.selCard===c) cls+=' sel';
+    if(c.state==='late') cls+=' late';
+    var due;
+    if(c.state==='late') due='MISSED — complete for partial credit';
+    else{
+      var left=Math.max(0,c.deadlineMin-G.timeMin);
+      due='due '+fmtClock(c.deadlineMin)+' ('+Math.floor(left/60)+'h'+String(Math.floor(left%60)).padStart(2,'0')+' left)';
+    }
+    html+='<div class="'+cls+'" data-card="'+c.id+'">';
+    html+='<div class="dept" style="color:'+dept.color+'">'+dept.name+'</div>';
+    html+='<div class="ttl">'+c.title+'</div>';
+    html+='<div class="sub">'+c.sub+'</div>';
+    html+='<div class="need">NEEDS: '+c.reqLabel+'</div>';
+    html+='<div class="due">'+due+'</div>';
+    html+='<div class="rev">REVENUE +'+c.rev+' OMR on time</div>';
+    html+='<div class="why"><button class="whyBtn" data-why="'+c.id+'">WHY? (the real workflow)</button>';
+    html+='<div class="whyTxt" id="why_'+c.id+'">'+c.why+'</div></div>';
+    if(c.state==='open'){
+      var bt=bestTruckFor(c);
+      var dis=bt?'':'disabled';
+      var lab=c.kind==='weightout'?'RELEASE POSTED TRUCK':'DISPATCH TRUCK';
+      html+='<button class="dispatchBtn" data-disp="'+c.id+'" '+dis+'>'+lab+'</button>';
+    }else if(c.state==='dispatched'){
+      html+='<div class="sub" style="color:#8fe08f;margin-top:5px;">▸ truck dispatched — track documents on the right</div>';
+    }
+    html+='</div>';
+  }
+  if(html==='') html='<div style="color:#8f97a1;font-size:13px;padding:6px;">No open demands right now.<br>Departments post new cards through the shift.</div>';
+  cardsBody.innerHTML=html;
+}
+function chipRow(t){
+  var html='<div class="chips">';
+  var i, hitNow=false;
+  for(i=0;i<t.chain.length;i++){
+    var k=t.chain[i];
+    if(k==='POD_PENDING') continue;
+    var cls='chip';
+    if(t.docs[k]) cls+=' ok';
+    else if(!hitNow){ cls+=' now'; hitNow=true; }
+    if(k==='DN' && !t.docs[k] && t.state==='stopped') cls='chip bad';
+    if(k==='POD' && t.docs['POD_PENDING'] && !t.docs['POD']){ cls='chip'; }
+    html+='<span class="'+cls+'">'+k+'</span>';
+  }
+  html+='</div>';
+  return html;
+}
+function renderDocs(){
+  var act=activeTrucks();
+  var html='';
+  var i;
+  for(i=0;i<act.length;i++){
+    var t=act[i];
+    var cls='trow';
+    if(G.selTruck===t) cls+=' sel';
+    if(t.state==='stopped') cls+=' blocked';
+    html+='<div class="'+cls+'" data-truck="'+t.id+'">';
+    html+='<div class="tid">'+t.plate+' · '+TRUCK_TYPES[t.type].label+' '+t.cap+'T'+(t.card?'':' (unassigned)')+'</div>';
+    html+='<div class="tst">'+t.statusTxt+'</div>';
+    if(t.chain.length) html+=chipRow(t);
+    if(t.dir==='out' && !t.docs['DN'] && t.docs['WT1 TARE']){
+      if(t.dnReadyAt>0){
+        var left=Math.max(0,t.dnReadyAt-G.timeMin);
+        html+='<button class="dnBtn" disabled>DN REQUESTED — '+Math.ceil(left)+' min</button>';
+      }else{
+        html+='<button class="dnBtn" data-dn="'+t.id+'">REQUEST DN FROM DELIVERY (20 min)</button>';
+      }
+    }
+    html+='</div>';
+  }
+  if(html==='') html='<div style="color:#8f97a1;font-size:13px;padding:6px;">No trucks moving yet.<br>Select a demand card, then dispatch a truck.</div>';
+  docsBody.innerHTML=html;
+}
+/* panel clicks (event delegation) */
+cardsBody.addEventListener('click',function(ev){
+  var w=ev.target.getAttribute('data-why');
+  if(w){ el('why_'+w).classList.toggle('open'); sndClick(); return; }
+  var d=ev.target.getAttribute('data-disp');
+  if(d){
+    var c=findCard(d);
+    var bt=bestTruckFor(c);
+    if(bt) attemptDispatch(bt,c);
+    return;
+  }
+  var cid=ev.target.getAttribute('data-card');
+  var node=ev.target;
+  while(node && !cid){ node=node.parentNode; if(node) cid=node.getAttribute('data-card'); }
+  if(cid){
+    var card=findCard(cid);
+    G.selCard=(G.selCard===card)?null:card;
+    sndClick();
+    refreshUI();
+  }
+});
+docsBody.addEventListener('click',function(ev){
+  var dn=ev.target.getAttribute('data-dn');
+  if(dn){ requestDN(findTruck(dn)); return; }
+  var node=ev.target, tid=null;
+  while(node){ tid=node.getAttribute&&node.getAttribute('data-truck'); if(tid) break; node=node.parentNode; }
+  if(tid){ G.selTruck=findTruck(tid); sndClick(); refreshUI(); }
+});
+function findCard(id){ var i; for(i=0;i<G.cards.length;i++) if(G.cards[i].id===id) return G.cards[i]; return null; }
+function findTruck(id){ var i; for(i=0;i<G.trucks.length;i++) if(G.trucks[i].id===id) return G.trucks[i]; return null; }
+
+/* ==================================================================
+   PROCESS BOOK — 6 pages, built from the OFM SCM research brief
+   ================================================================== */
+var BOOK=[
+ {title:'1 · PROCUREMENT & INBOUND',sub:'GRAIN & PACKAGING SUPPLY — PO TO SILO',items:[
+  'Buyer raises a Purchase Order (PO) for wheat / feed grains — imported via the Port Sultan Qaboos silos (OFM holds ~120,000 MT there) or bought locally.',
+  'Supplier confirms quantity, quality spec and delivery window; the inbound schedule goes to Security so the gate expects the truck.',
+  'At arrival the gate checks the supplier Delivery Note against the PO — no reference, no entry.',
+  'QA/Lab draws a representative grain sample BEFORE unloading: moisture, foreign matter, damaged kernels.',
+  'Wheat over ~14% moisture is rejected — wet grain means mold in your silo. Cleaned wheat purity target is above 99.5%.',
+  'Pass → truck tips at the intake pit and grain is elevated to silo bins by grade/lot. Fail → rejected, or accepted with a price/weight deduction per contract.',
+  'The silo bin card records lot number, weight and moisture — traceability starts here. <span class="gp">(GENERAL PRACTICE)</span>'
+ ]},
+ {title:'2 · WEIGHBRIDGE & GATE',sub:'THE SERIAL BOTTLENECK THAT SETS YOUR RHYTHM',items:[
+  'One truck fully on the deck — two trucks on the scale means wrong weights and an invalid ticket.',
+  'Inbound cycle: weigh GROSS in (loaded), TARE out (empty). Outbound: TARE in, GROSS out.',
+  'NET = GROSS − TARE. NET is what the customer is billed and what stock is reduced by — it must match the SO inside tolerance (about ±5% contract band; this game drills ±2% discipline).',
+  'Weighbridge ticket records truck ID, timestamp, GROSS and TARE — automated capture into the ERP is standard practice.',
+  'At ~5–8 minutes per pass, one bridge weighs only 8–12 trucks per hour — that number caps your whole yard.',
+  'Security owns the gate log, seals and gate passes: valid PO / DN / SO reference required before any truck moves in or out. No document, no movement.',
+  'Log every timestamp — gate-in, scale-in, dock-in, scale-out, gate-out. You cannot fix a bottleneck you do not timestamp. <span class="gp">(GENERAL PRACTICE)</span>'
+ ]},
+ {title:'3 · PRODUCTION',sub:'MILLING & FEED BATCHING',items:[
+  'Production owns the milling / feed batching plan and signs the batch records.',
+  'Grain is drawn from silos oldest-suitable-lot first; the mill issues a raw-material transfer request per batch.',
+  'Feed mill: batch, grind, mix, pellet. Flour mill: clean, temper, mill, sieve. QA samples in-process and finished product.',
+  'Production DEMANDS: timely raw material at the intake, packaging material from Stores, lab clearance from QA.',
+  'A line starved of barley stops the whole batch — that is why the intake demand card has a hard deadline.',
+  'Oman Flour Mills runs roughly 800+ MT/day flour and 1,000–1,500 MT/day feed capacity — every truck hour matters at that tempo.'
+ ]},
+ {title:'4 · PACKING & WAREHOUSE',sub:'BAGGING, PALLETS, FIFO/FEFO CUSTODY',items:[
+  'Finished product is packed in 25 kg PP woven bags (also 50 kg / bulk tote); bags are counted, batch/date-coded and palletized.',
+  'Packing signs the packing log and pallet tags (batch, date, count) — and demands PP-bags, labels and thread from Stores on time.',
+  'Warehouse / Stores owns custody of ALL stock: raw, packaging, finished. It signs the Goods Received Note (GRN) and keeps bin cards.',
+  'Dispatch picks the oldest batch first — FIFO for everything, FEFO for anything with an expiry date.',
+  'Stage pallets at the dock BEFORE the truck arrives — staging early cuts turnaround more than any other habit.',
+  'Bag math sanity check: 25 kg bags → 7 MT ≈ 280 bags, 15 MT ≈ 600, 45 MT ≈ 1,800. Count and scale must reconcile. <span class="gp">(GENERAL PRACTICE)</span>'
+ ]},
+ {title:'5 · DELIVERY & DISPATCH',sub:'TRUCKS, SLOTS, ON-TIME — AND THE COST OF WAITING',items:[
+  'Sales Order → transport booking → loading order: transporter, plate, driver, capacity class, pickup slot.',
+  'Dock scheduling: assign bays and time slots; trucks without slots wait OFF-SITE at staging, never on the public road.',
+  'Truck turnaround time (gate-in to gate-out) target: under ~60–90 min for bagged loads.',
+  'Demurrage is real money: after 1–2 free hours, detention runs roughly $50–150/hour internationally — and chronic waiting pushes transporters to raise your rates.',
+  'Separate inbound and outbound peaks: grain tippers and dispatch flatbeds should not queue for the same scale window.',
+  'Match truck class to the customer: a 60 MT jumbo cannot dock at a small bakery or farm — send the right size or the truck comes back loaded.',
+  'Overloading risks fines and roadside offloading; enforcement allows only ~5% GVW tolerance. <span class="gp">(GENERAL PRACTICE)</span>'
+ ]},
+ {title:'6 · DOCUMENTS — THE CHAIN OF CUSTODY',sub:'SO → DN → GATE PASS → POD',items:[
+  'Sales Order (SO): the commercial trigger — customer, product, quantity, delivery date. Every later document traces back to the SO number.',
+  'Booking / transport order converts the SO into a truck assignment: plate, driver, capacity, slot.',
+  'Gate pass: Security\u2019s entry/exit authorization, issued only against a valid SO/DN plus weighbridge ticket.',
+  'Delivery Note (DN) travels WITH the truck: SO ref, product, batch, quantity, weights. The customer\u2019s gate asks for it first.',
+  'NET = GROSS − TARE must match the SO — a mismatch means over-billing, short shipment, or leakage in custody.',
+  'POD (Proof of Delivery): the signed DN returned to the mill. No POD → no invoice → no revenue. The POD is the paycheck.',
+  'Shortage / damage must be noted on the POD at delivery time — claims raised later rarely succeed.',
+  'Modern sites replace paper with sequential e-sign-offs: gate log → scale auto-capture → loading confirm → driver e-sign → customer e-sign. Each step timestamps custody. <span class="gp">(GENERAL PRACTICE)</span>'
+ ]}
+];
+var bookPage=0;
+function renderBook(){
+  var p=BOOK[bookPage];
+  el('bookTitle').textContent=p.title;
+  el('bookSub').textContent=p.sub;
+  var html='<ul>';
+  var i;
+  for(i=0;i<p.items.length;i++) html+='<li>'+p.items[i]+'</li>';
+  html+='</ul>';
+  el('bookBody').innerHTML=html;
+  el('bookPage').textContent=(bookPage+1)+' / '+BOOK.length;
+}
+function openBook(){
+  G.bookOpen=true;
+  renderBook();
+  el('bookOverlay').style.display='flex';
+}
+function closeBook(){
+  G.bookOpen=false;
+  el('bookOverlay').style.display='none';
+}
+el('btnBook').addEventListener('click',function(){ sndClick(); if(G.bookOpen) closeBook(); else openBook(); });
+el('bookClose').addEventListener('click',function(){ sndClick(); closeBook(); });
+el('bookPrev').addEventListener('click',function(){ sndClick(); bookPage=(bookPage+BOOK.length-1)%BOOK.length; renderBook(); });
+el('bookNext').addEventListener('click',function(){ sndClick(); bookPage=(bookPage+1)%BOOK.length; renderBook(); });
+
+/* ==================================================================
+   SHIFT END / FAIL — READ → PLAN → CHECK → PROVE report
+   ================================================================== */
+function ledgerLine(label,val,cls){
+  return '<div class="rline"><span class="'+cls+'">'+label+'</span> <b>'+val+'</b></div>';
+}
+function topLessons(){
+  var L=[];
+  if(G.demurrage>25) L.push('Demurrage cost you '+Math.round(G.demurrage)+' OMR. The scale sets the rhythm: 8–12 weighings/hour max — stagger your dispatches instead of releasing trucks in bursts.');
+  if(G.docStops>0) L.push(G.docStops+' truck(s) stopped at the gate for a missing DN — and a stopped truck blocks everyone behind it. Request the DN while the truck is still loading (pre-clear the paperwork).');
+  if(G.wrongFines>0) L.push('Wrong-truck attempts cost '+G.wrongFines+' OMR. Match type AND capacity: bags never ride a tipper, and a small truck cannot carry a big SO.');
+  if(G.misses>0) L.push(G.misses+' deadline(s) missed. Read the demand card the moment it lands — plan the inbound truck BEFORE the line starves, and keep one weighbridge slot in reserve for weight-out jobs.');
+  if(L.length<2) L.push('Good sequencing. Next level: keep bays working while the scale queues — a bay sitting idle while trucks wait is lost throughput.');
+  if(L.length<2) L.push('Oldest batch ships first (FIFO/FEFO) and the POD is the paycheck — no signed POD, no invoice.');
+  return L.slice(0,2);
+}
+function endShift(){
+  G.state='over';
+  G.speed=0;
+  var i;
+  for(i=0;i<G.cards.length;i++){
+    var c=G.cards[i];
+    if(c.state==='open'||c.state==='dispatched'){ /* unfinished business counts against the shift */
+      if(c.state==='open'){ c.state='late'; }
+    }
+  }
+  var total=G.onTime+G.lateDone+G.misses;
+  var ot=total>0?Math.round(100*G.onTime/total):100;
+  var net=Math.round(G.omr);
+  /* high scores */
+  var newHi=false;
+  if(net>G.hi){ G.hi=net; newHi=true; }
+  if(ot>G.hiOT) G.hiOT=ot;
+  try{
+    localStorage.setItem('ofmFleetHi',String(G.hi));
+    localStorage.setItem('ofmFleetHiOT',String(G.hiOT));
+  }catch(e){}
+  var grade='C';
+  if(ot>=95&&net>0) grade='S'; else if(ot>=85) grade='A'; else if(ot>=70) grade='B';
+  var lessons=topLessons();
+  var html='';
+  html+='<h2 style="text-align:center;margin-top:0;">SHIFT REPORT — '+fmtClock(360)+' to '+fmtClock(G.endMin)+' (LEVEL '+G.level+')</h2>';
+  html+='<h3>READ — what happened</h3>';
+  html+=ledgerLine('Revenue earned:','+'+Math.round(G.earned)+' OMR','pos');
+  html+=ledgerLine('Late penalties:','−'+Math.round(G.latePen)+' OMR','neg');
+  html+=ledgerLine('Demurrage / standing time:','−'+Math.round(G.demurrage)+' OMR','neg');
+  html+=ledgerLine('Wrong-truck fines:','−'+Math.round(G.wrongFines)+' OMR','neg');
+  html+=ledgerLine('NET SHIFT RESULT:',''+net+' OMR','pos');
+  html+='<h3>CHECK — the KPIs a real mill tracks</h3>';
+  html+='<div class="rline">On-time dispatch: <b>'+ot+'%</b> (world-class ≥ 95%)</div>';
+  html+='<div class="rline">Throughput: <b>'+G.completed+'</b> trucks completed · '+G.onTime+' on time · '+G.lateDone+' late · '+G.misses+' missed</div>';
+  html+='<div class="rline">Document stops at gate: <b>'+G.docStops+'</b> · PODs returned: <b>'+G.podQueue.length+' pending at shift end</b></div>';
+  html+='<h3>PLAN — top lessons for the next shift</h3>';
+  for(i=0;i<lessons.length;i++) html+='<div class="lesson">'+(i+1)+'. '+lessons[i]+'</div>';
+  html+='<h3>PROVE — grade &amp; record</h3>';
+  html+='<div class="rline">Shift grade: <b>'+grade+'</b> · Level '+G.level+' cleared</div>';
+  html+='<div class="rline">HIGH SCORE: <b>'+G.hi+' OMR</b>'+(newHi?' <span class="pos">NEW RECORD!</span>':'')+' · best on-time <b>'+G.hiOT+'%</b></div>';
+  el('reportBox').innerHTML=html;
+  el('reportScreen').style.display='flex';
+  sndGood();
+}
+function failShift(){
+  G.state='fail';
+  G.speed=0;
+  var lessons=topLessons();
+  var html='<p style="color:#cfd4da;line-height:1.6;">Five deadlines were missed and the departments escalated to management. The shift is stopped.</p>';
+  html+='<div class="lesson">1. '+lessons[0]+'</div>';
+  if(lessons[1]) html+='<div class="lesson">2. '+lessons[1]+'</div>';
+  el('failBox').innerHTML=html;
+  el('failScreen').style.display='flex';
+  sndBad();
+}
+
+/* ==================================================================
+   INPUT — orbit camera + tap selection (mouse & touch)
+   ================================================================== */
+var cam={theta:-1.5, phi:0.55, r:150, tx:-8, tz:-2};
+function applyCam(){
+  var sp=Math.sin(cam.phi), cp=Math.cos(cam.phi);
+  camera.position.set(
+    cam.tx+cam.r*sp*Math.sin(cam.theta),
+    cam.r*cp,
+    cam.tz+cam.r*sp*Math.cos(cam.theta));
+  camera.lookAt(cam.tx,0,cam.tz);
+}
+applyCam();
+var ray=new THREE.Raycaster();
+var pointers=new Map();
+var dragMoved=0, pinchD0=0, pinchR0=0;
+var dom=renderer.domElement;
+dom.addEventListener('pointerdown',function(ev){
+  ensureAudio();
+  pointers.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+  dragMoved=0;
+  if(pointers.size===2){
+    var p=[...pointers.values()];
+    pinchD0=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);
+    pinchR0=cam.r;
+  }
+  dom.setPointerCapture(ev.pointerId);
+});
+dom.addEventListener('pointermove',function(ev){
+  if(!pointers.has(ev.pointerId)) return;
+  var prev=pointers.get(ev.pointerId);
+  var dx=ev.clientX-prev.x, dy=ev.clientY-prev.y;
+  pointers.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+  dragMoved+=Math.abs(dx)+Math.abs(dy);
+  if(pointers.size===1){
+    cam.theta-=dx*0.005;
+    cam.phi=clamp(cam.phi-dy*0.004,0.28,1.15);
+    applyCam();
+  }else if(pointers.size===2){
+    var p=[...pointers.values()];
+    var d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);
+    if(pinchD0>0) cam.r=clamp(pinchR0*pinchD0/Math.max(40,d),60,240);
+    applyCam();
+  }
+});
+dom.addEventListener('pointerup',function(ev){
+  pointers.delete(ev.pointerId);
+  if(dragMoved<8) handleTap(ev.clientX,ev.clientY);
+});
+dom.addEventListener('pointercancel',function(ev){ pointers.delete(ev.pointerId); });
+dom.addEventListener('wheel',function(ev){
+  ev.preventDefault();
+  cam.r=clamp(cam.r+ev.deltaY*0.08,60,240);
+  applyCam();
+},{passive:false});
+function handleTap(px,py){
+  var nd=new THREE.Vector2((px/window.innerWidth)*2-1,-(py/window.innerHeight)*2+1);
+  ray.setFromCamera(nd,camera);
+  /* trucks first */
+  var hits=ray.intersectObjects(truckMeshes,true);
+  var i;
+  for(i=0;i<hits.length;i++){
+    var tr=hits[i].object.userData.truckRef;
+    if(tr && tr.state!=='done'){
+      tapTruck(tr);
+      return;
+    }
+  }
+  /* zones */
+  var zh=ray.intersectObjects(zoneHitMeshes,false);
+  if(zh.length){ tapZone(zh[0].object.userData.zone); return; }
+  G.selTruck=null;
+  refreshUI();
+}
+function tapTruck(t){
+  ensureAudio();
+  if(G.selCard && G.selCard.state==='open'){
+    /* card selected + truck tapped = dispatch attempt (teaching blocks fire here) */
+    attemptDispatch(t,G.selCard);
+    if(G.selCard.state!=='open') G.selCard=null;
+    return;
+  }
+  G.selTruck=(G.selTruck===t)?null:t;
+  if(G.selTruck) showToast(t.plate+' · '+TRUCK_TYPES[t.type].label+' '+t.cap+' MT — '+t.statusTxt,'',2600);
+  sndClick();
+  refreshUI();
+}
+function tapZone(zone){
+  ensureAudio();
+  if(G.selTruck && G.selTruck.state==='spot'){
+    /* truck selected + zone tapped: find an open demand for that zone */
+    var i, card=null;
+    for(i=0;i<G.cards.length;i++){
+      var c=G.cards[i];
+      if(c.state==='open' && c.zoneId===zone.id && c.kind!=='weightout'){ card=c; break; }
+    }
+    if(card){ attemptDispatch(G.selTruck,card); G.selTruck=null; return; }
+    showToast('No open demand for '+zone.short+' right now.','',2400);
+    return;
+  }
+  if(G.selCard && G.selCard.state==='open'){
+    var bt=bestTruckFor(G.selCard);
+    if(G.selCard.zoneId!==zone.id){
+      showToast('This demand needs '+ZONES[G.selCard.zoneId].short+', not '+zone.short+'.','bad',3000);
+      sndBad(); return;
+    }
+    if(bt) attemptDispatch(bt,G.selCard);
+    return;
+  }
+  showToast(zone.name,'',2200);
+}
+
+/* ==================================================================
+   SPEED CONTROLS / START / RESTART
+   ================================================================== */
+function setSpeed(s){
+  G.speed=s;
+  el('btnPause').className='tbBtn'+(s===0?' on':'');
+  el('btnPlay').className='tbBtn'+(s===1?' on':'');
+  el('btnFast').className='tbBtn'+(s===2?' on':'');
+}
+el('btnPause').addEventListener('click',function(){ if(G.speed!==0) G.prevSpeed=G.speed; setSpeed(0); });
+el('btnPlay').addEventListener('click',function(){ setSpeed(1); });
+el('btnFast').addEventListener('click',function(){ setSpeed(2); });
+
+function clearWorldRun(){
+  var i;
+  for(i=G.trucks.length-1;i>=0;i--) removeTruck(G.trucks[i]);
+  G.trucks=[];
+  for(i=0;i<STAGE_SPOTS.length;i++) STAGE_SPOTS[i].truck=null;
+  for(var zk2 in ZONES) ZONES[zk2].occupant=null;
+  G.cards=[]; G.spawnQueue=[]; G.podQueue=[];
+  G.selCard=null; G.selTruck=null; G.wbOccupant=null; G.westOcc=null;
+}
+function startShift(level){
+  clearWorldRun();
+  G.state='play';
+  G.level=level;
+  G.timeMin=360;
+  G.speed=1; G.prevSpeed=1;
+  G.omr=0; G.earned=0; G.lost=0;
+  G.misses=0; G.completed=0; G.onTime=0; G.lateDone=0;
+  G.demurrage=0; G.wrongFines=0; G.latePen=0; G.docStops=0;
+  G.tips={};
+  G.cards=buildDeck(level);
+  /* a few trucks already waiting off-site at shift start */
+  spawnTruck('FLATBED',45,freeSpot());
+  spawnTruck('TIPPER',45,freeSpot());
+  spawnTruck(pick(['BOX','CONTAINER']),pick([7,15]),freeSpot());
+  setSpeed(1);
+  el('startScreen').style.display='none';
+  el('reportScreen').style.display='none';
+  el('failScreen').style.display='none';
+  closeBook();
+  showToast('SHIFT '+level+' — 06:00. Departments are posting demand cards. Read the PROCESS BOOK if you get stuck.','',4200);
+  tipOnce('start','ACADEMY TIP: Read the card → match the truck → respect the scale. One scale, many trucks — your dispatch order IS the queue.');
+  refreshUI();
+}
+el('startBtn').addEventListener('click',function(){ ensureAudio(); sndGood(); startShift(1); });
+el('nextShiftBtn').addEventListener('click',function(){ ensureAudio(); sndGood(); startShift(G.level+1); });
+el('retryBtn').addEventListener('click',function(){ ensureAudio(); sndGood(); startShift(G.level); });
+
+/* panel toggles (mobile) */
+el('togCards').addEventListener('click',function(){
+  el('cardsPanel').classList.toggle('open');
+  el('docsPanel').classList.remove('open');
+});
+el('togDocs').addEventListener('click',function(){
+  el('docsPanel').classList.toggle('open');
+  el('cardsPanel').classList.remove('open');
+});
+
+/* keyboard */
+window.addEventListener('keydown',function(ev){
+  if(ev.key===' '){ ev.preventDefault(); if(G.speed===0) setSpeed(G.prevSpeed||1); else { G.prevSpeed=G.speed; setSpeed(0);} }
+  if(ev.key==='1') setSpeed(1);
+  if(ev.key==='2') setSpeed(2);
+  if(ev.key==='b'||ev.key==='B'){ if(G.bookOpen) closeBook(); else openBook(); }
+});
+
+/* ==================================================================
+   SELECTION HIGHLIGHTS + MAIN LOOP
+   ================================================================== */
+function updateRings(){
+  var i;
+  for(i=0;i<G.trucks.length;i++){
+    var t=G.trucks[i];
+    var op=0, col=0x8fe08f;
+    if(G.selTruck===t){ op=0.85; col=0xf0c060; }
+    else if(G.selCard && G.selCard.state==='open'){
+      if(G.selCard.kind==='weightout'){
+        if(t===G.selCard.postedTruck) op=0.8;
+      }else if(t.state==='spot'){
+        var okType=G.selCard.reqTypes.indexOf(t.type)>=0;
+        if(okType && t.cap>=G.selCard.mt) op=0.7;
+        else op=0.18, col=0xff5a4a;
+      }
+    }else if(t.state==='stopped'){
+      op=0.8; col=0xff5a4a;
+    }
+    t.ring.material.opacity=op;
+    t.ring.material.color.setHex(col);
+  }
+}
+var lastT=0, uiAcc=0;
+function loop(ts){
+  requestAnimationFrame(loop);
+  var dt=(ts-lastT)/1000;
+  lastT=ts;
+  if(dt>0.06) dt=0.06;
+  if(dt<0) dt=0;
+  if(G.state==='play' && !G.bookOpen){
+    gameTick(dt);
+    uiAcc+=dt;
+    if(uiAcc>0.5){ uiAcc=0; refreshUI(); }
+  }
+  updateRings();
+  renderer.render(scene,camera);
+}
+requestAnimationFrame(loop);
+renderTop();
+/* debug/testing handle (also handy in devtools for training demos) */
+window.OFM={G:G,ZONES:ZONES,startShift:startShift,attemptDispatch:attemptDispatch,
+  bestTruckFor:bestTruckFor,requestDN:requestDN,setSpeed:setSpeed,openBook:openBook};
+} /* end THREE-present guard */
+</script>
+</body>
+</html>

@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>OFM Loading Line Rush — Oman Flour Mills Feed Mill</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; overflow: hidden; height: 100%;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #e8dfc9;
+    -webkit-user-select: none; user-select: none;
+    touch-action: none;
+  }
+  #gameContainer { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  /* ---------- HUD top bar ---------- */
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+    display: flex; justify-content: space-around; align-items: center;
+    background: rgba(22, 34, 27, 0.88);
+    color: #f3ecd8; padding: 6px 4px; flex-wrap: wrap;
+    border-bottom: 3px solid #c9a24b;
+    pointer-events: none;
+  }
+  .hudItem { text-align: center; min-width: 70px; }
+  .hudLabel { font-size: 11px; letter-spacing: 2px; color: #c9d6b4; }
+  .hudValue { font-size: 26px; font-weight: bold; line-height: 1.1; }
+  #strikesVal { color: #ff7b6b; letter-spacing: 2px; }
+  #scoreVal { color: #ffe9a8; }
+  #omrVal { color: #a8e6a1; }
+
+  /* ---------- queue chips bar ---------- */
+  #queueBar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+    min-height: 72px; background: rgba(22, 34, 27, 0.88);
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; overflow-x: auto;
+    border-top: 3px solid #c9a24b;
+  }
+  #queueBar:empty::after {
+    content: 'No trucks waiting — get ready!';
+    color: #9db08f; font-size: 15px; margin: auto;
+  }
+  .chip {
+    flex: 0 0 auto; width: 92px; padding: 6px 8px; border-radius: 10px;
+    background: #2c3a30; color: #f3ecd8; cursor: pointer;
+    border: 3px solid #4a5c4e; text-align: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .chip.selected { border-color: #ffd24d; background: #3d5142; box-shadow: 0 0 12px #ffd24d; }
+  .chip .so { font-size: 15px; font-weight: bold; }
+  .chip .prod { font-size: 11px; display: block; margin-top: 1px; }
+  .chip .pbarOuter { height: 8px; background: #17211a; border-radius: 4px; margin-top: 5px; overflow: hidden; }
+  .chip .pbarInner { height: 100%; width: 100%; background: #7ed27e; border-radius: 4px; }
+  .chip.urgent { animation: chipBlink 0.5s infinite alternate; }
+  @keyframes chipBlink { from { border-color: #ff5340; } to { border-color: #ffb3a8; } }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 30;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    background: rgba(15, 24, 18, 0.86); color: #f3ecd8; text-align: center;
+    padding: 20px; box-sizing: border-box;
+  }
+  .overlay h1 {
+    font-size: 44px; margin: 0 0 4px 0; color: #ffd24d;
+    text-shadow: 3px 3px 0 #203328; letter-spacing: 2px;
+  }
+  .overlay h2 { font-size: 20px; margin: 0 0 18px 0; color: #a8c69a; font-weight: normal; letter-spacing: 3px; }
+  .howto {
+    background: rgba(255,255,255,0.07); border: 2px solid #c9a24b; border-radius: 14px;
+    padding: 14px 22px; max-width: 520px; text-align: left; font-size: 17px; line-height: 1.55;
+    margin-bottom: 22px;
+  }
+  .howto b { color: #ffd24d; }
+  .bigBtn {
+    font-size: 28px; font-weight: bold; padding: 18px 60px; border-radius: 14px;
+    background: linear-gradient(#e8b93e, #c9922a); color: #20301f;
+    border: none; cursor: pointer; letter-spacing: 2px;
+    box-shadow: 0 6px 0 #7a5c14, 0 8px 18px rgba(0,0,0,0.5);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bigBtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #7a5c14; }
+  #gameOverScreen { display: none; }
+  #finalStats { font-size: 24px; margin-bottom: 20px; line-height: 1.6; }
+  #finalStats span { color: #ffd24d; font-weight: bold; }
+  #newHi { color: #a8e6a1; font-weight: bold; font-size: 20px; margin-bottom: 14px; display: none; }
+
+  /* ---------- toast & flashes ---------- */
+  #toast {
+    position: fixed; top: 74px; left: 50%; transform: translateX(-50%);
+    z-index: 20; background: rgba(22, 34, 27, 0.92); color: #ffd24d;
+    font-size: 22px; font-weight: bold; padding: 10px 26px; border-radius: 12px;
+    border: 2px solid #c9a24b; opacity: 0; transition: opacity 0.25s;
+    pointer-events: none; white-space: nowrap;
+  }
+  #flash {
+    position: fixed; inset: 0; z-index: 15; pointer-events: none; opacity: 0;
+    transition: opacity 0.45s;
+  }
+  .floatScore {
+    position: fixed; z-index: 18; pointer-events: none;
+    font-size: 26px; font-weight: bold; color: #ffe9a8;
+    text-shadow: 2px 2px 3px rgba(0,0,0,0.7);
+    transition: transform 1.2s ease-out, opacity 1.2s ease-out;
+  }
+  #hint {
+    position: fixed; bottom: 86px; left: 50%; transform: translateX(-50%);
+    z-index: 9; color: rgba(32,48,31,0.85); font-size: 14px; font-weight: bold;
+    background: rgba(243,236,216,0.6); padding: 4px 14px; border-radius: 10px;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="gameContainer"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hudItem"><div class="hudLabel">SCORE</div><div class="hudValue" id="scoreVal">0</div></div>
+  <div class="hudItem"><div class="hudLabel">OMR</div><div class="hudValue" id="omrVal">0</div></div>
+  <div class="hudItem"><div class="hudLabel">LEVEL</div><div class="hudValue" id="levelVal">1</div></div>
+  <div class="hudItem"><div class="hudLabel">QUEUE</div><div class="hudValue" id="queueVal">0</div></div>
+  <div class="hudItem"><div class="hudLabel">STRIKES</div><div class="hudValue" id="strikesVal">—</div></div>
+  <div class="hudItem"><div class="hudLabel">BEST</div><div class="hudValue" id="hiVal">0</div></div>
+</div>
+
+<div id="hint">Tap a truck, then tap a free loading line &nbsp;•&nbsp; drag to rotate, pinch/scroll to zoom</div>
+<div id="queueBar"></div>
+<div id="toast"></div>
+<div id="flash"></div>
+
+<!-- START SCREEN -->
+<div class="overlay" id="startScreen">
+  <h1>OFM LOADING LINE RUSH</h1>
+  <h2>OMAN FLOUR MILLS — FEED MILL DISPATCH</h2>
+  <div class="howto">
+    <b>HOW TO PLAY</b><br>
+    1. Trucks arrive and queue at the mill gate, each with an SO number and a product:
+    <b>BRAN</b> (brown), <b>BARLEY FEED</b> (yellow) or <b>FLOUR</b> (white).<br>
+    2. <b>Tap a waiting truck</b> (in the yard or its chip below), then <b>tap a free loading line</b> (LINE 1–3) to dispatch it.<br>
+    3. The loader fills the truck — fast dispatches earn bonus points and OMR, and build your <b>combo</b>.<br>
+    4. Every truck has patience. If it waits too long it leaves <b>angry</b>: you lose your combo and get a strike.<br>
+    5. <b>5 strikes = GAME OVER.</b> Each level, trucks arrive faster!
+  </div>
+  <button class="bigBtn" id="startBtn">START SHIFT</button>
+</div>
+
+<!-- GAME OVER SCREEN -->
+<div class="overlay" id="gameOverScreen">
+  <h1>SHIFT OVER</h1>
+  <h2>TOO MANY ANGRY TRUCKS LEFT THE MILL</h2>
+  <div id="newHi">★ NEW HIGH SCORE! ★</div>
+  <div id="finalStats"></div>
+  <button class="bigBtn" id="restartBtn">RESTART</button>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="vendor/RGBELoader.js"></script>
+<script>
+/* =========================================================
+   OFM LOADING LINE RUSH  (V2)
+   A 3D dispatch game set at the Oman Flour Mills feed mill.
+   Single-file, vanilla JS + Three.js r128.
+   V2: realistic no-overtake traffic (follow-the-leader) +
+       PBR texture / HDRI sky visual upgrade with full
+       procedural fallback when assets are unavailable.
+   ========================================================= */
+(function () {
+'use strict';
+
+/* ---------------- Audio: tiny WebAudio beeps ---------------- */
+var audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+  }
+  if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); }
+}
+function tone(freq, dur, type, vol, delay) {
+  if (!audioCtx) return;
+  var t0 = audioCtx.currentTime + (delay || 0);
+  var o = audioCtx.createOscillator();
+  var g = audioCtx.createGain();
+  o.type = type || 'sine';
+  o.frequency.value = freq;
+  g.gain.setValueAtTime(vol || 0.12, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(t0); o.stop(t0 + dur + 0.02);
+}
+function sfxSelect()   { tone(660, 0.08, 'square', 0.07); }
+function sfxDispatch() { tone(520, 0.09, 'square', 0.09); tone(780, 0.12, 'square', 0.09, 0.09); }
+function sfxError()    { tone(180, 0.18, 'sawtooth', 0.10); }
+function sfxCash()     { tone(880, 0.1, 'triangle', 0.12); tone(1175, 0.1, 'triangle', 0.12, 0.09); tone(1568, 0.16, 'triangle', 0.12, 0.18); }
+function sfxAngry()    { tone(220, 0.25, 'sawtooth', 0.13); tone(160, 0.3, 'sawtooth', 0.13, 0.18); }
+function sfxLevel()    { tone(523, 0.1, 'square', 0.1); tone(659, 0.1, 'square', 0.1, 0.1); tone(784, 0.2, 'square', 0.1, 0.2); }
+
+/* ---------------- Renderer / scene / camera ---------------- */
+var container = document.getElementById('gameContainer');
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(0xe9dcc0);
+scene.fog = new THREE.Fog(new THREE.Color(0xe9dcc0).convertSRGBToLinear(), 120, 240);
+
+var camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
+
+var renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+container.appendChild(renderer.domElement);
+
+/* lights — warm key + cool sky fill */
+var hemi = new THREE.HemisphereLight(0xbcd6ff, 0xb9a68a, 0.35);
+scene.add(hemi);
+var sun = new THREE.DirectionalLight(0xfff2e0, 2.0);
+sun.position.set(45, 70, 35);
+sun.castShadow = true;
+sun.shadow.mapSize.width = 2048;
+sun.shadow.mapSize.height = 2048;
+sun.shadow.camera.left = -80; sun.shadow.camera.right = 80;
+sun.shadow.camera.top = 80; sun.shadow.camera.bottom = -80;
+sun.shadow.camera.near = 10; sun.shadow.camera.far = 200;
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.02;
+scene.add(sun);
+
+/* manual orbit camera state */
+var camTheta = 0.0;          // azimuth
+var camPhi = 0.62;           // elevation angle
+var camDist = 74;            // zoom distance
+var camTarget = new THREE.Vector3(0, 0, 6);
+function updateCamera() {
+  var y = Math.sin(camPhi) * camDist;
+  var r = Math.cos(camPhi) * camDist;
+  camera.position.set(
+    camTarget.x + Math.sin(camTheta) * r,
+    y,
+    camTarget.z + Math.cos(camTheta) * r
+  );
+  camera.lookAt(camTarget);
+}
+updateCamera();
+
+/* =========================================================
+   TEXTURE / HDRI LOADING (with procedural fallback)
+   Materials are created with the original flat colors first;
+   maps are attached only when an asset loads successfully.
+   ========================================================= */
+function lin(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
+
+var maxAniso = renderer.capabilities.getMaxAnisotropy();
+var texLoader = new THREE.TextureLoader();
+
+/* verify the decoded image is actually usable for WebGL
+   (file:// pages in some browsers load <img> but taint it) */
+function textureUsable(tex) {
+  try {
+    var img = tex.image;
+    if (!img || !img.width) { return false; }
+    var c = document.createElement('canvas');
+    c.width = 2; c.height = 2;
+    var cx = c.getContext('2d');
+    cx.drawImage(img, 0, 0, 2, 2);
+    cx.getImageData(0, 0, 1, 1);
+    return true;
+  } catch (e) { return false; }
+}
+
+function loadTex(url, opts) {
+  try {
+    texLoader.load(url, function (tex) {
+      if (!textureUsable(tex)) { return; }   // keep procedural fallback
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.anisotropy = maxAniso;
+      if (opts.srgb) { tex.encoding = THREE.sRGBEncoding; }
+      if (opts.repeat) { tex.repeat.set(opts.repeat[0], opts.repeat[1]); }
+      opts.onOK(tex);
+    }, undefined, function () { /* asset missing: keep procedural material */ });
+  } catch (e) { /* keep procedural material */ }
+}
+
+/* HDRI sky -> PMREM environment + background.
+   Any failure leaves the original sky color / lighting untouched. */
+(function loadSky() {
+  if (!THREE.RGBELoader) { return; }
+  try {
+    var pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+    new THREE.RGBELoader().setDataType(THREE.HalfFloatType).load(
+      'assets/hdri/sky.hdr',
+      function (hdr) {
+        try {
+          var env = pmrem.fromEquirectangular(hdr).texture;
+          scene.environment = env;
+          hdr.mapping = THREE.EquirectangularReflectionMapping;
+          scene.background = hdr;
+        } catch (e) { /* keep existing sky/lighting */ }
+      },
+      undefined,
+      function () { /* keep existing sky/lighting */ }
+    );
+  } catch (e) { /* keep existing sky/lighting */ }
+})();
+
+/* helper: canvas -> texture (for signs and labels) */
+function makeTextTexture(w, h, drawFn) {
+  var c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  drawFn(c.getContext('2d'), w, h);
+  var tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+
+/* =========================================================
+   WORLD BUILDING
+   ========================================================= */
+
+/* ---------- ground (concrete yard) ---------- */
+var groundGeo = new THREE.PlaneGeometry(260, 260);
+groundGeo.setAttribute('uv2', new THREE.BufferAttribute(groundGeo.attributes.uv.array, 2));
+var groundMat = new THREE.MeshStandardMaterial({ color: 0xcfc2a0, roughness: 0.95, metalness: 0.0 });
+loadTex('assets/tex/concrete/diff.jpg', { srgb: true, repeat: [30, 30], onOK: function (t) {
+  groundMat.map = t; groundMat.needsUpdate = true;
+} });
+loadTex('assets/tex/concrete/nor.jpg', { repeat: [30, 30], onOK: function (t) {
+  groundMat.normalMap = t; groundMat.needsUpdate = true;
+} });
+loadTex('assets/tex/concrete/rough.jpg', { repeat: [30, 30], onOK: function (t) {
+  groundMat.roughnessMap = t; groundMat.roughness = 1.0; groundMat.needsUpdate = true;
+} });
+loadTex('assets/tex/concrete/ao.jpg', { repeat: [30, 30], onOK: function (t) {
+  groundMat.aoMap = t; groundMat.needsUpdate = true;
+} });
+var ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* ---------- shared asphalt texture set (all roads) ---------- */
+var roadMats = [];
+var asphaltMap = null, asphaltNor = null, asphaltRough = null;
+function refreshRoadMats() {
+  for (var ri = 0; ri < roadMats.length; ri++) {
+    var m = roadMats[ri];
+    if (asphaltMap) { m.map = asphaltMap; m.color.setHex(0xffffff); }
+    if (asphaltNor) { m.normalMap = asphaltNor; }
+    if (asphaltRough) { m.roughnessMap = asphaltRough; m.roughness = 1.0; }
+    m.needsUpdate = true;
+  }
+}
+loadTex('assets/tex/asphalt/diff.jpg', { srgb: true, repeat: [12, 6], onOK: function (t) { asphaltMap = t; refreshRoadMats(); } });
+loadTex('assets/tex/asphalt/nor.jpg', { repeat: [12, 6], onOK: function (t) { asphaltNor = t; refreshRoadMats(); } });
+loadTex('assets/tex/asphalt/rough.jpg', { repeat: [12, 6], onOK: function (t) { asphaltRough = t; refreshRoadMats(); } });
+
+/* ---------- shared steel texture set (mill + sheds) ---------- */
+var steelMats = [];
+var steelMap = null, steelNor = null, steelRough = null;
+function refreshSteelMats() {
+  for (var si2 = 0; si2 < steelMats.length; si2++) {
+    var sm = steelMats[si2];
+    if (steelMap) { sm.map = steelMap; }
+    if (steelNor) { sm.normalMap = steelNor; }
+    if (steelRough) { sm.roughnessMap = steelRough; sm.roughness = 1.0; }
+    sm.needsUpdate = true;
+  }
+}
+loadTex('assets/tex/steel/diff.jpg', { srgb: true, repeat: [10, 3], onOK: function (t) { steelMap = t; refreshSteelMats(); } });
+loadTex('assets/tex/steel/nor.jpg', { repeat: [10, 3], onOK: function (t) { steelNor = t; refreshSteelMats(); } });
+loadTex('assets/tex/steel/rough.jpg', { repeat: [10, 3], onOK: function (t) { steelRough = t; refreshSteelMats(); } });
+
+/* roads — entry/main road (z=30), exit road (z=12), queue lane (z=38), bay lanes */
+function addRoad(w, d, x, z, col) {
+  var geo = new THREE.BoxGeometry(w, 0.15, d);
+  geo.setAttribute('uv2', new THREE.BufferAttribute(geo.attributes.uv.array, 2));
+  var mat = new THREE.MeshStandardMaterial({ color: col || 0x9a938a, roughness: 0.9, metalness: 0.0 });
+  roadMats.push(mat);
+  var m = new THREE.Mesh(geo, mat);
+  m.position.set(x, 0.07, z);
+  m.receiveShadow = true;
+  scene.add(m);
+  return m;
+}
+addRoad(230, 9, 0, 30);           // main road (west entry -> east exit)
+addRoad(230, 8, 0, 38, 0xa39c90); // queue lane
+addRoad(230, 8, 0, 12, 0x948d83); // exit road for loaded trucks
+
+/* ---------- products & bays ---------- */
+var PRODUCTS = [
+  { key: 'BRAN',        color: 0x8a5a2b, css: '#8a5a2b' },
+  { key: 'BARLEY FEED', color: 0xd9b23a, css: '#d9b23a' },
+  { key: 'FLOUR',       color: 0xf2eee2, css: '#f2eee2' }
+];
+var BAY_X = [-24, 0, 24];
+var BAY_Z = -14;
+var bays = [];
+var clickables = [];   // raycast targets (truck hitboxes + bay pads)
+
+/* bay approach lanes */
+for (var bi = 0; bi < 3; bi++) {
+  addRoad(8, 44, BAY_X[bi], 8, 0x8f887e);
+}
+
+/* build one loading bay: pad, shed roof on pillars, loader tower + chute, label */
+for (var i = 0; i < 3; i++) {
+  (function (idx) {
+    var bx = BAY_X[idx];
+    var bayGroup = new THREE.Group();
+    bayGroup.position.set(bx, 0, BAY_Z);
+    scene.add(bayGroup);
+
+    // clickable pad
+    var pad = new THREE.Mesh(
+      new THREE.BoxGeometry(10, 0.3, 13),
+      new THREE.MeshLambertMaterial({ color: 0x7d776d, emissive: 0x000000 })
+    );
+    pad.position.set(0, 0.15, 0);
+    pad.receiveShadow = true;
+    pad.userData.bayIndex = idx;
+    bayGroup.add(pad);
+    clickables.push(pad);
+
+    // shed pillars
+    var pillarGeo = new THREE.BoxGeometry(0.5, 7, 0.5);
+    var pillarMat = new THREE.MeshStandardMaterial({ color: 0x6d7a72, roughness: 0.7, metalness: 0.35 });
+    var px = [-4.4, 4.4], pz = [-5, 5];
+    for (var a = 0; a < 2; a++) {
+      for (var b = 0; b < 2; b++) {
+        var p = new THREE.Mesh(pillarGeo, pillarMat);
+        p.position.set(px[a], 3.5, pz[b]);
+        p.castShadow = true;
+        bayGroup.add(p);
+      }
+    }
+    // shed roof (OFM green steel)
+    var roofGeo = new THREE.BoxGeometry(11.5, 0.6, 12.5);
+    roofGeo.setAttribute('uv2', new THREE.BufferAttribute(roofGeo.attributes.uv.array, 2));
+    var roofMat = new THREE.MeshStandardMaterial({ color: 0x3f6b4f, roughness: 0.75, metalness: 0.15 });
+    steelMats.push(roofMat);
+    var roof = new THREE.Mesh(roofGeo, roofMat);
+    roof.position.set(0, 7.2, 0);
+    roof.castShadow = true;
+    bayGroup.add(roof);
+
+    // loader tower + overhead chute
+    var towerGeo = new THREE.BoxGeometry(2, 9.5, 2);
+    towerGeo.setAttribute('uv2', new THREE.BufferAttribute(towerGeo.attributes.uv.array, 2));
+    var towerMat = new THREE.MeshStandardMaterial({ color: 0xb9b0a0, roughness: 0.8, metalness: 0.1 });
+    steelMats.push(towerMat);
+    var tower = new THREE.Mesh(towerGeo, towerMat);
+    tower.position.set(-3.4, 4.75, -5);
+    tower.castShadow = true;
+    bayGroup.add(tower);
+    var chute = new THREE.Mesh(
+      new THREE.BoxGeometry(1.1, 1.1, 6),
+      new THREE.MeshStandardMaterial({ color: 0xcabfae, roughness: 0.7, metalness: 0.2 })
+    );
+    chute.position.set(-1.2, 6.4, -2.4);
+    chute.rotation.x = 0.25;
+    chute.castShadow = true;
+    bayGroup.add(chute);
+
+    // floating "LINE n" label (sprite always faces camera)
+    var labelTex = makeTextTexture(256, 80, function (ctx, w, h) {
+      ctx.fillStyle = '#20301f';
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#ffd24d'; ctx.lineWidth = 6;
+      ctx.strokeRect(4, 4, w - 8, h - 8);
+      ctx.fillStyle = '#ffd24d';
+      ctx.font = 'bold 44px Arial';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('LINE ' + (idx + 1), w / 2, h / 2 + 2);
+    });
+    var label = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex }));
+    label.scale.set(9, 2.8, 1);
+    label.position.set(0, 10.4, 0);
+    bayGroup.add(label);
+
+    // 3D loading progress bar above the shed
+    var barBg = new THREE.Mesh(
+      new THREE.BoxGeometry(8.4, 0.7, 0.3),
+      new THREE.MeshBasicMaterial({ color: 0x1a2620 })
+    );
+    barBg.position.set(0, 8.6, 0);
+    barBg.visible = false;
+    bayGroup.add(barBg);
+    var barFg = new THREE.Mesh(
+      new THREE.BoxGeometry(8, 0.5, 0.34),
+      new THREE.MeshBasicMaterial({ color: 0x7ed27e })
+    );
+    barFg.position.set(0, 8.6, 0.01);
+    barFg.visible = false;
+    bayGroup.add(barFg);
+
+    bays.push({
+      index: idx, x: bx, z: BAY_Z, group: bayGroup, pad: pad,
+      truck: null, progress: 0, loadTime: 6,
+      barBg: barBg, barFg: barFg, flashT: 0, flashCol: new THREE.Color(0x00ff00)
+    });
+  })(i);
+}
+
+/* ---------- mill building with OFM sign ---------- */
+var millGeo = new THREE.BoxGeometry(74, 20, 26);
+millGeo.setAttribute('uv2', new THREE.BufferAttribute(millGeo.attributes.uv.array, 2));
+var millMat = new THREE.MeshStandardMaterial({ color: 0xd6cdb8, roughness: 0.85, metalness: 0.05 });
+steelMats.push(millMat);
+var mill = new THREE.Mesh(millGeo, millMat);
+mill.position.set(0, 10, -44);
+mill.castShadow = true; mill.receiveShadow = true;
+scene.add(mill);
+// roof trim
+var millRoof = new THREE.Mesh(
+  new THREE.BoxGeometry(76, 1.4, 28),
+  new THREE.MeshStandardMaterial({ color: 0x3f6b4f, roughness: 0.8, metalness: 0.1 })
+);
+millRoof.position.set(0, 20.6, -44);
+millRoof.castShadow = true;
+scene.add(millRoof);
+// big sign on the front face
+var signTex = makeTextTexture(1024, 192, function (ctx, w, h) {
+  ctx.fillStyle = '#1e4630';
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = '#c9a24b'; ctx.lineWidth = 8;
+  ctx.strokeRect(6, 6, w - 12, h - 12);
+  ctx.fillStyle = '#f3ecd8';
+  ctx.font = 'bold 74px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('OMAN FLOUR MILLS', w / 2, h / 2 - 34);
+  ctx.fillStyle = '#ffd24d';
+  ctx.font = 'bold 52px Arial';
+  ctx.fillText('— FEED MILL —', w / 2, h / 2 + 48);
+});
+var sign = new THREE.Mesh(
+  new THREE.PlaneGeometry(40, 7.5),
+  new THREE.MeshLambertMaterial({ map: signTex })
+);
+sign.position.set(0, 15.5, -30.8);
+scene.add(sign);
+// windows strip
+var winMat = new THREE.MeshLambertMaterial({ color: 0x7f95a3 });
+for (var wi = 0; wi < 9; wi++) {
+  var win = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 0.4), winMat);
+  win.position.set(-32 + wi * 8, 6, -30.8);
+  scene.add(win);
+}
+
+/* ---------- silos ---------- */
+var siloMat = new THREE.MeshStandardMaterial({ color: 0xdcd5c3, roughness: 0.85, metalness: 0.1 });
+var siloCapMat = new THREE.MeshStandardMaterial({ color: 0x3f6b4f, roughness: 0.8, metalness: 0.1 });
+for (var si = 0; si < 4; si++) {
+  var silo = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 24, 14), siloMat);
+  silo.position.set(-56 + si * 10.5, 12, -46);
+  silo.castShadow = true; silo.receiveShadow = true;
+  scene.add(silo);
+  var cap = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 4.4, 3, 14), siloCapMat);
+  cap.position.set(-56 + si * 10.5, 25.4, -46);
+  cap.castShadow = true;
+  scene.add(cap);
+}
+
+/* ---------- decorative bits: fence, gate office, trees, pallets ---------- */
+var office = new THREE.Mesh(
+  new THREE.BoxGeometry(8, 5, 6),
+  new THREE.MeshStandardMaterial({ color: 0xc4b291, roughness: 0.9, metalness: 0.0 })
+);
+office.position.set(-58, 2.5, 26);
+office.castShadow = true;
+scene.add(office);
+var officeRoof = new THREE.Mesh(
+  new THREE.BoxGeometry(9, 0.5, 7),
+  new THREE.MeshStandardMaterial({ color: 0x3f6b4f, roughness: 0.8, metalness: 0.1 })
+);
+officeRoof.position.set(-58, 5.2, 26);
+officeRoof.castShadow = true;
+scene.add(officeRoof);
+
+function addTree(x, z) {
+  var trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.35, 0.45, 2.4, 6),
+    new THREE.MeshLambertMaterial({ color: 0x7a5a38 })
+  );
+  trunk.position.set(x, 1.2, z); trunk.castShadow = true;
+  scene.add(trunk);
+  var crown = new THREE.Mesh(
+    new THREE.ConeGeometry(2.2, 4.5, 8),
+    new THREE.MeshLambertMaterial({ color: 0x5d7f4e })
+  );
+  crown.position.set(x, 4.6, z); crown.castShadow = true;
+  scene.add(crown);
+}
+addTree(52, -18); addTree(60, -26); addTree(-68, 4); addTree(68, 40); addTree(-72, -20);
+
+/* pallet stacks near the mill (bagged feed ready for loading) */
+var palletMat = new THREE.MeshStandardMaterial({ color: 0xb9a06a, roughness: 0.9, metalness: 0.0 });
+loadTex('assets/tex/pallet/diff.jpg', { srgb: true, repeat: [1, 1], onOK: function (t) {
+  palletMat.map = t; palletMat.color.setHex(0xffffff); palletMat.needsUpdate = true;
+} });
+function addPalletStack(x, z, n) {
+  for (var pi2 = 0; pi2 < n; pi2++) {
+    var pm2 = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.55, 2.6), palletMat);
+    pm2.position.set(x + (pi2 % 2) * 0.15, 0.28 + pi2 * 0.58, z + (pi2 % 2) * 0.12);
+    pm2.rotation.y = (pi2 % 2) * 0.12;
+    pm2.castShadow = true; pm2.receiveShadow = true;
+    scene.add(pm2);
+  }
+}
+addPalletStack(40, -25.5, 3);
+addPalletStack(44.6, -25, 2);
+addPalletStack(-44, -25.5, 3);
+addPalletStack(-48.6, -25, 2);
+
+/* convert all static material colors to linear space so the original
+   palette stays faithful under sRGB output + ACES tone mapping */
+(function convertSceneColors() {
+  scene.traverse(function (obj) {
+    if (!obj.material) { return; }
+    var mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (var mi = 0; mi < mats.length; mi++) {
+      if (mats[mi].color) { mats[mi].color.convertSRGBToLinear(); }
+    }
+  });
+})();
+
+/* =========================================================
+   TRUCK FACTORY
+   ========================================================= */
+var CAB_COLORS = [0x9fb4c7, 0xc7a89f, 0xa9c7a2, 0xb8b0d0, 0xd0c39a, 0x93b8b0];
+var truckCounter = 1000;
+var trucks = [];   // all active trucks
+
+/* shared product-heap materials (bag texture applied when available) */
+var heapMats = {};
+for (var hi2 = 0; hi2 < PRODUCTS.length; hi2++) {
+  heapMats[PRODUCTS[hi2].key] = new THREE.MeshStandardMaterial({
+    color: lin(PRODUCTS[hi2].color), roughness: 0.95, metalness: 0.0
+  });
+}
+loadTex('assets/tex/bag/diff.jpg', { srgb: true, repeat: [2, 2], onOK: function (t) {
+  for (var k in heapMats) {
+    if (heapMats.hasOwnProperty(k)) {
+      heapMats[k].map = t;
+      heapMats[k].needsUpdate = true;
+    }
+  }
+} });
+
+function makeTrailerTexture(so, product) {
+  return makeTextTexture(512, 192, function (ctx, w, h) {
+    ctx.fillStyle = '#e5e0d2';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = product.css;
+    ctx.fillRect(0, h - 44, w, 44);
+    ctx.fillStyle = '#20301f';
+    ctx.font = 'bold 72px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(so, w / 2, h / 2 - 18);
+    ctx.font = 'bold 34px Arial';
+    ctx.fillStyle = '#20301f';
+    ctx.fillText(product.key, w / 2, h - 22);
+  });
+}
+
+/* Omani yellow license plate */
+function makePlateTexture(so) {
+  return makeTextTexture(160, 48, function (ctx, w, h) {
+    ctx.fillStyle = '#f7d116';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#1c1c1c'; ctx.lineWidth = 5;
+    ctx.strokeRect(3, 3, w - 6, h - 6);
+    ctx.fillStyle = '#1c1c1c';
+    ctx.font = 'bold 28px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(so, w / 2, h / 2 + 1);
+  });
+}
+
+function buildTruck(product, soNumber) {
+  var g = new THREE.Group();
+  var cabColor = CAB_COLORS[Math.floor(Math.random() * CAB_COLORS.length)];
+
+  // cab (front is +z)
+  var cab = new THREE.Mesh(
+    new THREE.BoxGeometry(2.4, 2.2, 2.4),
+    new THREE.MeshLambertMaterial({ color: lin(cabColor) })
+  );
+  cab.position.set(0, 1.35, 2.2);
+  cab.castShadow = true;
+  g.add(cab);
+  // windshield
+  var shield = new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 0.9, 0.2),
+    new THREE.MeshLambertMaterial({ color: lin(0x5a7386) })
+  );
+  shield.position.set(0, 1.85, 3.35);
+  g.add(shield);
+
+  // trailer with SO texture on both sides
+  var sideTex = makeTrailerTexture(soNumber, product);
+  var sideMat = new THREE.MeshLambertMaterial({ map: sideTex });
+  var plainMat = new THREE.MeshLambertMaterial({ color: lin(0xe5e0d2) });
+  var trailerMats = [sideMat, sideMat, plainMat, plainMat, plainMat, plainMat];
+  var trailer = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.4, 6), trailerMats);
+  trailer.position.set(0, 1.45, -1.4);
+  trailer.castShadow = true;
+  g.add(trailer);
+
+  // product heap on top — grows while loading
+  var heap = new THREE.Mesh(
+    new THREE.BoxGeometry(2.1, 1.0, 5.4),
+    heapMats[product.key]
+  );
+  heap.position.set(0, 2.65, -1.4);
+  heap.scale.set(0.9, 0.03, 0.9);
+  heap.castShadow = true;
+  g.add(heap);
+
+  // wheels
+  var wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.5, 10);
+  var wheelMat = new THREE.MeshLambertMaterial({ color: lin(0x2b2b2b) });
+  var wheelZ = [2.4, -0.6, -2.0, -3.4];
+  for (var wz = 0; wz < wheelZ.length; wz++) {
+    for (var side = -1; side <= 1; side += 2) {
+      var wh = new THREE.Mesh(wheelGeo, wheelMat);
+      wh.rotation.z = Math.PI / 2;
+      wh.position.set(side * 1.2, 0.55, wheelZ[wz]);
+      g.add(wh);
+    }
+  }
+
+  // brake lights — small red rectangles at the trailer rear,
+  // glowing emissive while the truck is braking behind traffic
+  var brakeMat = new THREE.MeshLambertMaterial({ color: lin(0x3a0d0d), emissive: 0x000000 });
+  var brakeGeo = new THREE.BoxGeometry(0.55, 0.28, 0.1);
+  for (var bl = -1; bl <= 1; bl += 2) {
+    var bm = new THREE.Mesh(brakeGeo, brakeMat);
+    bm.position.set(bl * 0.85, 1.15, -4.44);
+    g.add(bm);
+  }
+
+  // Omani yellow license plates (front + rear)
+  var plateTex = makePlateTexture(soNumber);
+  var plateMatF = new THREE.MeshBasicMaterial({ map: plateTex });
+  var plateF = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.45), plateMatF);
+  plateF.position.set(0, 0.8, 3.42);
+  g.add(plateF);
+  var plateMatR = new THREE.MeshBasicMaterial({ map: plateTex });
+  var plateR = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.45), plateMatR);
+  plateR.position.set(0, 1.0, -4.46);
+  plateR.rotation.y = Math.PI;
+  g.add(plateR);
+
+  // invisible hitbox for easy tapping (mobile friendly)
+  var hit = new THREE.Mesh(
+    new THREE.BoxGeometry(4.6, 4.6, 10.5),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+  );
+  hit.position.set(0, 2, -0.5);
+  g.add(hit);
+
+  // selection ring
+  var ring = new THREE.Mesh(
+    new THREE.RingGeometry(2.6, 3.3, 24),
+    new THREE.MeshBasicMaterial({ color: lin(0xffd24d), side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(0, 0.12, -0.5);
+  ring.visible = false;
+  g.add(ring);
+
+  scene.add(g);
+  clickables.push(hit);
+
+  var truck = {
+    mesh: g, hit: hit, ring: ring, heap: heap, brakeMat: brakeMat,
+    product: product, so: soNumber,
+    tid: truckCounter,             // unique id — traffic priority tie-break
+    state: 'arriving',           // arriving | queued | toBay | loading | leaving | angryLeaving | queueShift
+    path: [], speed: 15,
+    curSpeed: 15,                  // smoothed actual speed (no teleport stops)
+    braking: false, blockedTime: 0, yieldingTo: null,
+    entryX: -1,                    // reserved queue-lane entry slot
+    patience: 1, patienceMax: 1, // seconds, set on arrival
+    queueIndex: -1,
+    chip: null, chipBar: null,
+    pbar: null, pbarFg: null     // floating patience bar (3D)
+  };
+  hit.userData.truck = truck;
+
+  // floating patience bar above the truck (billboarded each frame)
+  var pb = new THREE.Group();
+  var pbBg = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.4, 0.4),
+    new THREE.MeshBasicMaterial({ color: lin(0x1a2620), transparent: true, opacity: 0.85 })
+  );
+  pb.add(pbBg);
+  var pbFg = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.2, 0.26),
+    new THREE.MeshBasicMaterial({ color: lin(0x7ed27e) })
+  );
+  pbFg.position.z = 0.01;
+  pb.add(pbFg);
+  pb.position.set(0, 4.4, -0.5);
+  pb.visible = false;
+  g.add(pb);
+  truck.pbar = pb; truck.pbarFg = pbFg;
+
+  trucks.push(truck);
+  return truck;
+}
+
+/* ---------- pour particles (shared pool) ---------- */
+var particles = [];
+var particleGeo = new THREE.BoxGeometry(0.22, 0.22, 0.22);
+for (var pi = 0; pi < 60; pi++) {
+  var pm = new THREE.Mesh(particleGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  pm.visible = false;
+  scene.add(pm);
+  particles.push({ mesh: pm, life: 0, vy: 0 });
+}
+var particleCursor = 0;
+function spawnParticle(x, y, z, color) {
+  var p = particles[particleCursor];
+  particleCursor = (particleCursor + 1) % particles.length;
+  p.mesh.visible = true;
+  p.mesh.material.color.copy(lin(color));
+  p.mesh.position.set(x + (Math.random() - 0.5) * 1.4, y, z + (Math.random() - 0.5) * 4.2);
+  p.life = 0.55 + Math.random() * 0.2;
+  p.vy = -9;
+}
+function updateParticles(dt) {
+  for (var k = 0; k < particles.length; k++) {
+    var p = particles[k];
+    if (!p.mesh.visible) continue;
+    p.life -= dt;
+    p.mesh.position.y += p.vy * dt;
+    if (p.life <= 0 || p.mesh.position.y < 2.6) { p.mesh.visible = false; }
+  }
+}
+
+/* =========================================================
+   GAME STATE & LOGIC
+   ========================================================= */
+var HI_KEY = 'ofm_llr_hiscore';
+var game = {
+  running: false,
+  score: 0, omr: 0, level: 1, combo: 0, strikes: 0,
+  completed: 0,
+  hi: 0,
+  spawnTimer: 2.0,
+  queue: []      // trucks currently in the queue lane (ordered)
+};
+try { game.hi = parseInt(localStorage.getItem(HI_KEY) || '0', 10) || 0; } catch (e) { game.hi = 0; }
+
+var selectedTruck = null;
+
+function queueSlotX(idx) { return -30 + idx * 11; }
+function spawnInterval() { return Math.max(2.4, 7.0 - game.level * 0.55); }
+function truckPatience() { return Math.max(14, 27 - game.level * 1.1) * (0.85 + Math.random() * 0.3); }
+function bayLoadTime()   { return Math.max(3.2, 6.5 - game.level * 0.35); }
+
+/* keep the spawn point clear so a new truck never appears on top of traffic */
+function entryRoadClear() {
+  for (var i = 0; i < trucks.length; i++) {
+    var p = trucks[i].mesh.position;
+    var dx = p.x + 115, dz = p.z - 30;
+    if (dx * dx + dz * dz < 18 * 18) { return false; }
+  }
+  return true;
+}
+
+/* ---------- spawning ---------- */
+function spawnTruck() {
+  var product = PRODUCTS[Math.floor(Math.random() * PRODUCTS.length)];
+  truckCounter++;
+  var so = 'SO-' + truckCounter;
+  var truck = buildTruck(product, so);
+  var slotX = queueSlotX(game.queue.length);
+  truck.mesh.position.set(-115, 0, 30);
+  truck.path = [{ x: slotX, z: 30 }, { x: slotX, z: 38 }];
+  truck.entryX = slotX;          // reserved queue-lane entry slot
+  truck.queueIndex = game.queue.length;
+  game.queue.push(truck);
+  rebuildQueueBar();
+}
+
+/* ---------- queue shifting when a slot frees up ---------- */
+function compactQueue() {
+  for (var q = 0; q < game.queue.length; q++) {
+    var t = game.queue[q];
+    var targetX = queueSlotX(q);
+    t.queueIndex = q;
+    if (Math.abs(t.mesh.position.x - targetX) > 0.4) {
+      if (t.state === 'queued' || t.state === 'queueShift') {
+        t.state = 'queueShift';
+        t.speed = 6;
+        t.path = [{ x: targetX, z: t.mesh.position.z }];
+      } else if (t.state === 'arriving') {
+        // slots only ever move west; the truck keeps its reserved entry
+        // slot and creeps west inside the queue lane afterwards — single
+        // file everywhere, never a reversal into oncoming traffic
+        var px = t.mesh.position;
+        if (px.z > 30.5 || (t.path.length > 0 && t.path[0].z > px.z + 0.5)) {
+          t.path = [{ x: t.entryX, z: 38 }];
+        } else {
+          t.path = [{ x: t.entryX, z: 30 }, { x: t.entryX, z: 38 }];
+        }
+      }
+    }
+  }
+}
+
+/* ---------- selection & dispatch ---------- */
+function selectTruck(truck) {
+  if (selectedTruck === truck) { deselect(); return; }
+  deselect();
+  selectedTruck = truck;
+  truck.ring.visible = true;
+  sfxSelect();
+  updateBayHighlights();
+  refreshChipSelection();
+}
+function deselect() {
+  if (selectedTruck) { selectedTruck.ring.visible = false; selectedTruck = null; }
+  updateBayHighlights();
+  refreshChipSelection();
+}
+
+function dispatchTo(bay) {
+  if (!selectedTruck) {
+    toast('Tap a waiting truck first!');
+    sfxError();
+    return;
+  }
+  if (bay.truck) {
+    flashBay(bay, 0xff4030);
+    toast('LINE ' + (bay.index + 1) + ' is busy!');
+    sfxError();
+    return;
+  }
+  var truck = selectedTruck;
+  deselect();
+  // remove from queue
+  var qi = game.queue.indexOf(truck);
+  if (qi >= 0) { game.queue.splice(qi, 1); }
+  truck.state = 'toBay';
+  truck.speed = 16;
+  truck.pbar.visible = false;
+  var startX = truck.mesh.position.x;
+  if (bay.x < startX - 0.5) {
+    // westbound leg runs on its own lane well south of the main road, so
+    // it never meets eastbound traffic head-on and a turning trailer can
+    // never sweep into the road lane (corner swing needs ~4.2 units)
+    truck.path = [
+      { x: startX, z: 23 },
+      { x: bay.x, z: 23 },
+      { x: bay.x, z: bay.z }
+    ];
+  } else {
+    truck.path = [
+      { x: startX, z: 30 },
+      { x: bay.x, z: 30 },
+      { x: bay.x, z: bay.z }
+    ];
+  }
+  bay.truck = truck;
+  bay.progress = 0;
+  bay.loadTime = bayLoadTime();
+  flashBay(bay, 0x30ff60);
+  sfxDispatch();
+  compactQueue();
+  rebuildQueueBar();
+  updateBayHighlights();
+}
+
+/* ---------- loading completion ---------- */
+function finishLoading(bay) {
+  var truck = bay.truck;
+  bay.truck = null;
+  bay.barBg.visible = false; bay.barFg.visible = false;
+
+  // scoring: speed bonus from remaining patience + combo
+  var bonus = Math.round(truck.patience * 4);
+  var pts = 100 + bonus + game.combo * 15;
+  game.combo++;
+  var money = 8 + game.level * 2 + game.combo * 2;
+  game.score += pts;
+  game.omr += money;
+  game.completed++;
+
+  truck.state = 'leaving';
+  truck.speed = 17;
+  truck.path = [{ x: bay.x, z: 12 }, { x: 118, z: 12 }];
+  sfxCash();
+  floatScore(bay.x, 8, bay.z, '+' + pts + '  •  ' + money + ' OMR');
+  updateHUD();
+
+  // level up every 6 completed trucks
+  if (game.completed % 6 === 0) {
+    game.level++;
+    sfxLevel();
+    toast('LEVEL ' + game.level + ' — trucks arrive faster!');
+    updateHUD();
+  }
+}
+
+/* ---------- angry leave ---------- */
+function truckGoesAngry(truck) {
+  var qi = game.queue.indexOf(truck);
+  if (qi >= 0) { game.queue.splice(qi, 1); }
+  if (selectedTruck === truck) { deselect(); }
+  truck.state = 'angryLeaving';
+  truck.speed = 18;
+  truck.pbar.visible = false;
+  truck.path = [
+    { x: truck.mesh.position.x, z: 30 },
+    { x: 118, z: 30 }
+  ];
+  game.strikes++;
+  game.combo = 0;
+  sfxAngry();
+  screenFlash('rgba(255,60,40,0.28)');
+  toast('Truck ' + truck.so + ' left ANGRY! Strike ' + game.strikes + '/5');
+  compactQueue();
+  rebuildQueueBar();
+  updateHUD();
+  if (game.strikes >= 5) { gameOver(); }
+}
+
+/* =========================================================
+   MOVEMENT — follow-the-leader (NO OVERTAKING)
+   Every moving truck scans a corridor ahead along its lane.
+   If the gap to the truck ahead closes below a safe distance
+   it brakes smoothly and waits; crossing/converging traffic
+   is resolved deterministically (older truck goes first), so
+   trucks can never pass through or around each other.
+   ========================================================= */
+var LOOKAHEAD = 26;       // corridor scan distance
+var LANE_LAT = 3.5;       // corridor half-width: truck width (2.9) + margin,
+                          // so two trucks can never side-graze undetected
+var BRAKE_DECEL = 32;     // braking deceleration (units / s^2)
+var ACCEL_RATE = 9;       // acceleration (units / s^2)
+var CROSS_SCAN = 20;      // scan radius for crossing traffic
+var CROSS_SAFE = 14;      // keep-out distance for crossing paths
+
+function dirOf(t) {
+  var p = t.mesh.position;
+  if (t.path.length > 0) {
+    var dx = t.path[0].x - p.x, dz = t.path[0].z - p.z;
+    var d = Math.sqrt(dx * dx + dz * dz);
+    if (d > 0.001) { return { x: dx / d, z: dz / d }; }
+  }
+  return { x: Math.sin(t.mesh.rotation.y), z: Math.cos(t.mesh.rotation.y) };
+}
+
+/* nearest truck ahead inside my lane corridor.
+   The other truck's oriented body is projected onto my travel axis and
+   across it, so perpendicular trucks are measured by their real extents
+   (a long trailer swung across my lane still counts as blocking). */
+var TRUCK_HL = 3.95;   // body half-length
+var TRUCK_HW = 1.45;   // body half-width (incl. wheels)
+var MY_FRONT = 3.4;    // my front bumper offset from group origin
+function findBlocker(t, fx, fz) {
+  var p = t.mesh.position;
+  var bestGap = Infinity;
+  var best = null;
+  var bestYield = true;
+  for (var i = 0; i < trucks.length; i++) {
+    var o = trucks[i];
+    if (o === t) continue;
+    var op = o.mesh.position;
+    var rx = op.x - p.x, rz = op.z - p.z;
+    var fd = rx * fx + rz * fz;
+    if (fd < 0.2 || fd > LOOKAHEAD + 8) { continue; }
+    var od = dirOf(o);
+    var parX = od.x * fx + od.z * fz;        // o's heading along my axis
+    var perX = od.x * -fz + od.z * fx;       // o's heading across my axis
+    var along = Math.abs(parX) * TRUCK_HL + Math.abs(perX) * TRUCK_HW;
+    var across = Math.abs(perX) * TRUCK_HL + Math.abs(parX) * TRUCK_HW;
+    // a truck angled across my lane may still be turning: treat it by its
+    // swept circle (body diagonal + margin) so its trailer swing can
+    // never clip me
+    if (across + 0.5 > along) { along = across + 0.5; }
+    var latThresh = LANE_LAT + (across - TRUCK_HW);
+    var lx = rx - fx * fd, lz = rz - fz * fd;
+    if (lx * lx + lz * lz > latThresh * latThresh) { continue; }
+    var gap = fd - MY_FRONT - along;
+    var mustYield = true;
+    if ((o.curSpeed || 0) > 0.6 && o.path.length > 0) {
+      // both moving: if I am also in its corridor, the older truck goes first
+      var fd2 = -(rx * od.x + rz * od.z);
+      if (fd2 > 0.2 && fd2 < LOOKAHEAD) {
+        var l2x = -rx - od.x * fd2, l2z = -rz - od.z * fd2;
+        if (l2x * l2x + l2z * l2z <= LANE_LAT * LANE_LAT && t.tid < o.tid) { mustYield = false; }
+      }
+    }
+    if (gap < bestGap) { bestGap = gap; best = o; bestYield = mustYield; }
+  }
+  if (!best) { return null; }
+  return { truck: best, gap: bestGap, mustYield: bestYield };
+}
+
+/* converging / crossing moving traffic that I must yield to.
+   Priority is a strict total order (older truck first), so two trucks
+   can never deadlock each other at a crossing. Stopped trucks are not
+   crossing threats — physical blocking is the corridor rule's job. */
+function findCrossingThreat(t, fx, fz) {
+  var p = t.mesh.position;
+  var cs = t.curSpeed || 0;
+  var bestDist = Infinity;
+  var best = null;
+  for (var i = 0; i < trucks.length; i++) {
+    var o = trucks[i];
+    if (o === t) { continue; }
+    if ((o.curSpeed || 0) < 0.6) { continue; }   // stopped: corridor's job
+    var op = o.mesh.position;
+    var rx = op.x - p.x, rz = op.z - p.z;
+    var dist = Math.sqrt(rx * rx + rz * rz);
+    if (dist > CROSS_SCAN) { continue; }
+    var od = dirOf(o);
+    var dot = fx * od.x + fz * od.z;
+    if (dot > 0.7) { continue; }                 // same direction: corridor rule handles it
+    if (dot < -0.7) {
+      // near head-on: only a threat when sharing the same line
+      var cross = Math.abs(rx * fz - rz * fx);
+      if (cross > 2.4) { continue; }             // offset parallel lanes pass safely
+    }
+    // when cruising, only react while actually closing in; when pulling
+    // out from near-standstill, yield to all moving cross traffic in range
+    if (cs >= 4) {
+      var rvx = od.x * o.curSpeed - fx * cs;
+      var rvz = od.z * o.curSpeed - fz * cs;
+      if (rx * rvx + rz * rvz >= 0) { continue; }
+    }
+    if (t.tid < o.tid) { continue; }             // I am older: right of way
+    if (dist < bestDist) { bestDist = dist; best = o; }
+  }
+  if (!best) { return null; }
+  return { truck: best, gap: bestDist - CROSS_SAFE };
+}
+
+/* junction yield: before my path crosses/enters a road lane (main road or
+   exit road) within the next few units, hold until that lane section is
+   clear — a queued road lane never gets blocked inside a crossing */
+var JUNCTION_LANES = [30, 23, 12];
+function junctionHold(truck) {
+  var p = truck.mesh.position;
+  var w0 = truck.path[0], w1 = truck.path.length > 1 ? truck.path[1] : null;
+  for (var li = 0; li < JUNCTION_LANES.length; li++) {
+    var lz = JUNCTION_LANES[li];
+    // skip when already committed mid-crossing, but NOT when sitting
+    // exactly on the lane line about to turn off it
+    if (Math.abs(p.z - lz) > 0.01 && Math.abs(p.z - lz) < 3.0) { continue; }
+    var travelled = 0;
+    for (var s = 0; s < 2; s++) {
+      var a = s === 0 ? p : w0;
+      var b = s === 0 ? w0 : w1;
+      if (!a || !b) { break; }
+      var dx = b.x - a.x, dz = b.z - a.z;
+      var segLen = Math.sqrt(dx * dx + dz * dz);
+      var za = a.z - lz, zb = b.z - lz;
+      var crosses = (za === 0 && zb !== 0) || (zb === 0 && za !== 0) || (za * zb < 0);
+      if (crosses) {
+        var frac = Math.abs(za) / (Math.abs(za) + Math.abs(zb));
+        var cx = a.x + dx * frac;
+        var crossDist = travelled + segLen * frac;
+        if (crossDist <= 16) {
+          for (var i = 0; i < trucks.length; i++) {
+            var o = trucks[i];
+            if (o === truck) { continue; }
+            var op = o.mesh.position;
+            if (Math.abs(op.z - lz) >= 2.5 || Math.abs(op.x - cx) >= 14) { continue; }
+            if ((o.curSpeed || 0) < 0.6) {
+              // a stopped truck already yielding to me does not hold me,
+              // and neither does any stopped younger truck (the oldest
+              // waiter always goes first — cycles are impossible; the
+              // corridor rule still keeps bodies physically apart)
+              if (o.yieldingTo === truck) { continue; }
+              if (o.tid > truck.tid) { continue; }
+            }
+            return true;
+          }
+        }
+      }
+      travelled += segLen;
+    }
+  }
+  return false;
+}
+
+/* ---------- movement helper: follow waypoint path ---------- */
+function moveAlongPath(truck, dt) {
+  if (truck.path.length === 0) {
+    truck.curSpeed = Math.max(0, (truck.curSpeed || 0) - BRAKE_DECEL * dt);
+    truck.braking = false;
+    return true;
+  }
+  var p = truck.mesh.position;
+  var t = truck.path[0];
+  var dx = t.x - p.x, dz = t.z - p.z;
+  var dist = Math.sqrt(dx * dx + dz * dz);
+  // smooth steering toward waypoint
+  var targetAngle = Math.atan2(dx, dz);
+  var dAng = targetAngle - truck.mesh.rotation.y;
+  while (dAng > Math.PI) { dAng -= Math.PI * 2; }
+  while (dAng < -Math.PI) { dAng += Math.PI * 2; }
+  truck.mesh.rotation.y += dAng * Math.min(1, dt * 5);
+  if (dist < 0.001) {
+    truck.path.shift();
+    return truck.path.length === 0;
+  }
+  var fx = dx / dist, fz = dz / dist;
+
+  /* follow-the-leader: brake smoothly for traffic ahead or crossing */
+  var blk = findBlocker(truck, fx, fz);
+  var crx = findCrossingThreat(truck, fx, fz);
+  var desired = truck.speed;
+  truck.braking = false;
+  if (blk) {
+    if (blk.mustYield) {
+      var d1 = blk.gap <= 1.6 ? 0 : Math.max(0, (blk.gap - 1.6) * 1.8);
+      if (d1 < desired) { desired = d1; }
+    } else if (blk.gap < 1.6) {
+      // right of way, but physically too close to proceed safely
+      desired = 0;
+    }
+  }
+  if (crx) {
+    var d2 = crx.gap <= 0.4 ? 0 : Math.max(0, crx.gap * 2.5);
+    if (d2 < desired) { desired = d2; }
+  }
+  // junction yield before crossing/entering a road lane
+  if (desired > 0 && junctionHold(truck)) { desired = 0; truck.braking = true; }
+  // slow down for a sharp corner ahead (drivers don't turn at full speed)
+  if (truck.path.length > 1) {
+    var nx = truck.path[1];
+    var d2x = nx.x - t.x, d2z = nx.z - t.z;
+    var dl = Math.sqrt(d2x * d2x + d2z * d2z);
+    if (dl > 0.001) {
+      var cDot = fx * (d2x / dl) + fz * (d2z / dl);
+      if (cDot < 0.6) {
+        var cornerCap = Math.max(6, dist * 1.2);
+        if (cornerCap < desired) { desired = cornerCap; }
+      }
+    }
+  }
+  if ((blk || crx) && desired < truck.speed * 0.98) { truck.braking = true; }
+  // remember who I'm giving way to (lets a junction holder skip me: if I'm
+  // stopped to let it pass, it must not wait on me in turn — no deadlocks)
+  truck.yieldingTo = null;
+  if (desired < truck.speed * 0.98) {
+    if (blk && blk.mustYield) { truck.yieldingTo = blk.truck; }
+    else if (crx) { truck.yieldingTo = crx.truck; }
+  }
+  truck._dbg = {
+    desired: desired,
+    blkGap: blk ? blk.gap : null, blkYield: blk ? blk.mustYield : null,
+    blkSo: blk ? blk.truck.so : null,
+    crxGap: crx ? crx.gap : null, crxSo: crx ? crx.truck.so : null
+  };
+  // standstill insurance: if somehow deadlocked, creep (never overlap)
+  if (desired <= 0.01 && blk && blk.gap < 2) { truck.blockedTime += dt; } else { truck.blockedTime = 0; }
+  if (truck.blockedTime > 10 && blk && (blk.truck.curSpeed || 0) < 0.3) {
+    var minGap = truck.tid < blk.truck.tid ? 0.6 : 1.6;  // older creeps out first
+    if (blk.gap > minGap) {
+      desired = Math.min(3, (blk.gap - minGap) * 2);
+      truck.braking = true;
+    }
+  }
+
+  /* smooth acceleration / braking — never a teleport stop */
+  var delta = desired - truck.curSpeed;
+  var rate = delta < 0 ? BRAKE_DECEL : ACCEL_RATE;
+  var mx = rate * dt;
+  if (delta > mx) { delta = mx; } else if (delta < -mx) { delta = -mx; }
+  truck.curSpeed += delta;
+  var step = truck.curSpeed * dt;
+  if (step <= 0) { return false; }
+  if (dist <= step) {
+    p.x = t.x; p.z = t.z;
+    truck.path.shift();
+    return truck.path.length === 0;
+  }
+  p.x += fx * step;
+  p.z += fz * step;
+  return false;
+}
+
+function removeTruck(truck) {
+  scene.remove(truck.mesh);
+  var ci = clickables.indexOf(truck.hit);
+  if (ci >= 0) { clickables.splice(ci, 1); }
+  var ti = trucks.indexOf(truck);
+  if (ti >= 0) { trucks.splice(ti, 1); }
+}
+
+/* patience bar colours (linear space) */
+var PBAR_OK = lin(0x7ed27e);
+var PBAR_WARN = lin(0xe8b93e);
+var PBAR_CRIT = lin(0xff5340);
+
+/* ---------- per-frame truck updates ---------- */
+function updateTrucks(dt) {
+  for (var k = trucks.length - 1; k >= 0; k--) {
+    var t = trucks[k];
+
+    if (t.state === 'arriving' || t.state === 'queueShift') {
+      if (moveAlongPath(t, dt)) {
+        if (t.state === 'arriving') {
+          t.state = 'queued';
+          t.braking = false;
+          t.patienceMax = truckPatience();
+          t.patience = t.patienceMax;
+          t.pbar.visible = true;
+          compactQueue(); // creep to the correct slot if it shifted mid-arrival
+        } else {
+          t.state = 'queued';
+          t.speed = 15;
+          t.braking = false;
+        }
+      }
+    }
+    else if (t.state === 'queued') {
+      // patience drains while waiting
+      t.patience -= dt;
+      var frac = Math.max(0, t.patience / t.patienceMax);
+      t.pbarFg.scale.x = Math.max(0.001, frac);
+      t.pbarFg.position.x = -1.6 * (1 - frac);
+      if (frac > 0.5) { t.pbarFg.material.color.copy(PBAR_OK); }
+      else if (frac > 0.25) { t.pbarFg.material.color.copy(PBAR_WARN); }
+      else { t.pbarFg.material.color.copy(PBAR_CRIT); }
+      if (t.chipBar) {
+        t.chipBar.style.width = (frac * 100) + '%';
+        var cssCol = '#ff5340';
+        if (frac > 0.5) { cssCol = '#7ed27e'; } else if (frac > 0.25) { cssCol = '#e8b93e'; }
+        t.chipBar.style.background = cssCol;
+        if (frac <= 0.25) { t.chip.classList.add('urgent'); } else { t.chip.classList.remove('urgent'); }
+      }
+      if (t.patience <= 0) { truckGoesAngry(t); }
+    }
+    else if (t.state === 'toBay') {
+      if (moveAlongPath(t, dt)) {
+        t.state = 'loading';
+        t.braking = false;
+        var bay = bayOfTruck(t);
+        if (bay) { bay.barBg.visible = true; bay.barFg.visible = true; }
+      }
+    }
+    else if (t.state === 'loading') {
+      var b = bayOfTruck(t);
+      if (b) {
+        b.progress += dt / b.loadTime;
+        if (b.progress > 1) { b.progress = 1; }
+        b.barFg.scale.x = Math.max(0.001, b.progress);
+        b.barFg.position.x = -4 * (1 - b.progress);
+        // heap grows + pour particles
+        t.heap.scale.y = 0.03 + b.progress * 1.0;
+        t.heap.position.y = 2.65 + t.heap.scale.y * 0.5;
+        if (Math.random() < dt * 30) {
+          spawnParticle(b.x, 6.2, b.z - 1.4, t.product.color);
+        }
+        if (b.progress >= 1) { finishLoading(b); }
+      } else {
+        t.state = 'leaving';
+      }
+    }
+    else if (t.state === 'leaving' || t.state === 'angryLeaving') {
+      if (moveAlongPath(t, dt)) { removeTruck(t); }
+    }
+
+    // brake light glow while held back by traffic
+    if (t.brakeMat) { t.brakeMat.emissive.setHex(t.braking ? 0xff2a1a : 0x000000); }
+    // billboard the patience bar
+    if (t.pbar.visible) { t.pbar.quaternion.copy(camera.quaternion); }
+    // pulse selection ring
+    if (t.ring.visible) {
+      var s = 1 + Math.sin(performance.now() * 0.008) * 0.1;
+      t.ring.scale.set(s, s, 1);
+    }
+  }
+}
+
+function bayOfTruck(truck) {
+  for (var b = 0; b < bays.length; b++) {
+    if (bays[b].truck === truck) { return bays[b]; }
+  }
+  return null;
+}
+
+/* ---------- bay flash & highlight feedback ---------- */
+var EM_BLACK = new THREE.Color(0x000000);
+var EM_BUSY = lin(0x551512);
+var EM_FREE = lin(0x1a4d22);
+function flashBay(bay, color) {
+  bay.flashT = 0.6;
+  bay.flashCol = lin(color);
+}
+function updateBays(dt) {
+  for (var b = 0; b < bays.length; b++) {
+    var bay = bays[b];
+    if (bay.flashT > 0) {
+      bay.flashT -= dt;
+      var on = Math.sin(bay.flashT * 25) > 0;
+      bay.pad.material.emissive.copy(on ? bay.flashCol : EM_BLACK);
+      if (bay.flashT <= 0) { bay.pad.material.emissive.copy(EM_BLACK); }
+    }
+  }
+}
+function updateBayHighlights() {
+  for (var b = 0; b < bays.length; b++) {
+    var bay = bays[b];
+    if (bay.flashT > 0) { continue; }
+    if (selectedTruck) {
+      bay.pad.material.emissive.copy(bay.truck ? EM_BUSY : EM_FREE);
+    } else {
+      bay.pad.material.emissive.copy(EM_BLACK);
+    }
+  }
+}
+
+/* =========================================================
+   HUD / UI
+   ========================================================= */
+var scoreEl = document.getElementById('scoreVal');
+var omrEl = document.getElementById('omrVal');
+var levelEl = document.getElementById('levelVal');
+var queueEl = document.getElementById('queueVal');
+var strikesEl = document.getElementById('strikesVal');
+var hiEl = document.getElementById('hiVal');
+var queueBarEl = document.getElementById('queueBar');
+var toastEl = document.getElementById('toast');
+var flashEl = document.getElementById('flash');
+
+function updateHUD() {
+  scoreEl.textContent = game.score;
+  omrEl.textContent = game.omr;
+  levelEl.textContent = game.level;
+  queueEl.textContent = game.queue.length;
+  var s = '';
+  for (var i = 0; i < 5; i++) { s += (i < game.strikes) ? '✖' : '·'; }
+  strikesEl.textContent = s;
+  hiEl.textContent = Math.max(game.hi, game.score);
+}
+
+var toastTimer = null;
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.style.opacity = '1';
+  if (toastTimer) { clearTimeout(toastTimer); }
+  toastTimer = setTimeout(function () { toastEl.style.opacity = '0'; }, 2200);
+}
+
+function screenFlash(color) {
+  flashEl.style.background = color;
+  flashEl.style.transition = 'none';
+  flashEl.style.opacity = '1';
+  setTimeout(function () {
+    flashEl.style.transition = 'opacity 0.45s';
+    flashEl.style.opacity = '0';
+  }, 30);
+}
+
+/* floating "+pts" text projected from 3D world position */
+function floatScore(x, y, z, text) {
+  var v = new THREE.Vector3(x, y, z).project(camera);
+  var sx = (v.x * 0.5 + 0.5) * window.innerWidth;
+  var sy = (-v.y * 0.5 + 0.5) * window.innerHeight;
+  var el = document.createElement('div');
+  el.className = 'floatScore';
+  el.textContent = text;
+  el.style.left = (sx - 60) + 'px';
+  el.style.top = (sy - 20) + 'px';
+  document.body.appendChild(el);
+  requestAnimationFrame(function () {
+    el.style.transform = 'translateY(-90px)';
+    el.style.opacity = '0';
+  });
+  setTimeout(function () { if (el.parentNode) { el.parentNode.removeChild(el); } }, 1300);
+}
+
+/* queue chips (tap to select a truck) */
+function rebuildQueueBar() {
+  queueBarEl.innerHTML = '';
+  for (var q = 0; q < game.queue.length; q++) {
+    (function (truck) {
+      var chip = document.createElement('div');
+      chip.className = 'chip';
+      var so = document.createElement('div');
+      so.className = 'so';
+      so.textContent = truck.so;
+      chip.appendChild(so);
+      var prod = document.createElement('span');
+      prod.className = 'prod';
+      prod.textContent = truck.product.key;
+      prod.style.color = truck.product.css === '#f2eee2' ? '#cfc9ba' : truck.product.css;
+      chip.appendChild(prod);
+      var outer = document.createElement('div');
+      outer.className = 'pbarOuter';
+      var inner = document.createElement('div');
+      inner.className = 'pbarInner';
+      outer.appendChild(inner);
+      chip.appendChild(outer);
+      chip.addEventListener('pointerdown', function (ev) {
+        ev.stopPropagation();
+        ensureAudio();
+        if (truck.state === 'queued' || truck.state === 'queueShift' || truck.state === 'arriving') {
+          selectTruck(truck);
+        }
+      });
+      queueBarEl.appendChild(chip);
+      truck.chip = chip;
+      truck.chipBar = inner;
+    })(game.queue[q]);
+  }
+  refreshChipSelection();
+  queueEl.textContent = game.queue.length;
+}
+function refreshChipSelection() {
+  for (var q = 0; q < game.queue.length; q++) {
+    var t = game.queue[q];
+    if (t.chip) {
+      if (t === selectedTruck) { t.chip.classList.add('selected'); }
+      else { t.chip.classList.remove('selected'); }
+    }
+  }
+}
+
+/* =========================================================
+   INPUT: tap (raycast) + manual orbit (drag / pinch / wheel)
+   ========================================================= */
+var raycaster = new THREE.Raycaster();
+var pointerNDC = new THREE.Vector2();
+var pointers = {};        // active pointers for pinch
+var dragInfo = { down: false, moved: 0, x: 0, y: 0, time: 0, pinchDist: 0 };
+
+function handleTap(clientX, clientY) {
+  pointerNDC.x = (clientX / window.innerWidth) * 2 - 1;
+  pointerNDC.y = -(clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(pointerNDC, camera);
+  var hits = raycaster.intersectObjects(clickables, false);
+  if (hits.length === 0) { deselect(); return; }
+  var obj = hits[0].object;
+  if (obj.userData.truck) {
+    var t = obj.userData.truck;
+    if (t.state === 'queued' || t.state === 'queueShift' || t.state === 'arriving') {
+      ensureAudio();
+      selectTruck(t);
+    }
+    return;
+  }
+  if (obj.userData.bayIndex !== undefined) {
+    ensureAudio();
+    dispatchTo(bays[obj.userData.bayIndex]);
+  }
+}
+
+var cvs = renderer.domElement;
+cvs.addEventListener('pointerdown', function (e) {
+  ensureAudio();
+  pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+  dragInfo.down = true; dragInfo.moved = 0;
+  dragInfo.x = e.clientX; dragInfo.y = e.clientY;
+  dragInfo.time = performance.now();
+  var ids = Object.keys(pointers);
+  if (ids.length === 2) {
+    var a = pointers[ids[0]], b = pointers[ids[1]];
+    dragInfo.pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+  }
+});
+cvs.addEventListener('pointermove', function (e) {
+  if (!pointers[e.pointerId]) { return; }
+  var prevX = pointers[e.pointerId].x, prevY = pointers[e.pointerId].y;
+  pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+  var ids = Object.keys(pointers);
+  if (ids.length === 2) {
+    // pinch zoom
+    var a = pointers[ids[0]], b = pointers[ids[1]];
+    var d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (dragInfo.pinchDist > 0) {
+      camDist *= dragInfo.pinchDist / d;
+      camDist = Math.max(32, Math.min(130, camDist));
+      updateCamera();
+    }
+    dragInfo.pinchDist = d;
+    dragInfo.moved += 10;
+  } else if (dragInfo.down) {
+    // orbit rotate
+    var dx = e.clientX - prevX, dy = e.clientY - prevY;
+    dragInfo.moved += Math.abs(dx) + Math.abs(dy);
+    camTheta -= dx * 0.005;
+    camPhi += dy * 0.004;
+    camPhi = Math.max(0.3, Math.min(1.25, camPhi));
+    updateCamera();
+  }
+});
+function endPointer(e) {
+  var wasTap = dragInfo.down && dragInfo.moved < 9 && (performance.now() - dragInfo.time) < 600;
+  delete pointers[e.pointerId];
+  if (Object.keys(pointers).length === 0) { dragInfo.down = false; }
+  if (wasTap && e.type === 'pointerup') { handleTap(e.clientX, e.clientY); }
+}
+cvs.addEventListener('pointerup', endPointer);
+cvs.addEventListener('pointercancel', function (e) { delete pointers[e.pointerId]; dragInfo.down = false; });
+cvs.addEventListener('wheel', function (e) {
+  e.preventDefault();
+  camDist *= (e.deltaY > 0) ? 1.09 : 0.92;
+  camDist = Math.max(32, Math.min(130, camDist));
+  updateCamera();
+}, { passive: false });
+
+/* =========================================================
+   GAME FLOW: start / game over / restart
+   ========================================================= */
+var startScreen = document.getElementById('startScreen');
+var gameOverScreen = document.getElementById('gameOverScreen');
+var finalStats = document.getElementById('finalStats');
+var newHiEl = document.getElementById('newHi');
+
+function clearWorld() {
+  for (var k = trucks.length - 1; k >= 0; k--) { removeTruck(trucks[k]); }
+  for (var b = 0; b < bays.length; b++) {
+    bays[b].truck = null; bays[b].progress = 0; bays[b].flashT = 0;
+    bays[b].barBg.visible = false; bays[b].barFg.visible = false;
+    bays[b].pad.material.emissive.copy(EM_BLACK);
+  }
+  game.queue = [];
+  deselect();
+  rebuildQueueBar();
+}
+
+function startGame() {
+  clearWorld();
+  game.running = true;
+  game.score = 0; game.omr = 0; game.level = 1;
+  game.combo = 0; game.strikes = 0; game.completed = 0;
+  game.spawnTimer = 1.2;
+  startScreen.style.display = 'none';
+  gameOverScreen.style.display = 'none';
+  updateHUD();
+  toast('Shift started — first trucks incoming!');
+}
+
+function gameOver() {
+  game.running = false;
+  deselect();
+  var isNewHi = game.score > game.hi;
+  if (isNewHi) {
+    game.hi = game.score;
+    try { localStorage.setItem(HI_KEY, String(game.hi)); } catch (e) { /* private mode */ }
+  }
+  newHiEl.style.display = isNewHi ? 'block' : 'none';
+  finalStats.innerHTML =
+    'SCORE: <span>' + game.score + '</span><br>' +
+    'EARNED: <span>' + game.omr + ' OMR</span><br>' +
+    'TRUCKS LOADED: <span>' + game.completed + '</span><br>' +
+    'BEST: <span>' + game.hi + '</span>';
+  setTimeout(function () { gameOverScreen.style.display = 'flex'; }, 600);
+}
+
+document.getElementById('startBtn').addEventListener('click', function () {
+  ensureAudio(); sfxDispatch(); startGame();
+});
+document.getElementById('restartBtn').addEventListener('click', function () {
+  ensureAudio(); sfxDispatch(); startGame();
+});
+
+/* =========================================================
+   MAIN LOOP
+   ========================================================= */
+function stepGame(dt) {
+  // spawn new trucks (cap queue at 8)
+  game.spawnTimer -= dt;
+  if (game.spawnTimer <= 0) {
+    if (game.queue.length < 8 && entryRoadClear()) {
+      spawnTruck();
+      game.spawnTimer = spawnInterval() * (0.8 + Math.random() * 0.4);
+    } else {
+      game.spawnTimer = 0.8; // yard full (or entry blocked), try again soon
+    }
+  }
+  updateTrucks(dt);
+  updateBays(dt);
+  updateParticles(dt);
+  // keep queue-lane assignments fresh even when nothing else happens
+  game.compactTimer = (game.compactTimer || 0) - dt;
+  if (game.compactTimer <= 0) { compactQueue(); game.compactTimer = 3; }
+  queueEl.textContent = game.queue.length;
+}
+
+var lastTime = performance.now();
+function animate() {
+  requestAnimationFrame(animate);
+  var now = performance.now();
+  var dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+
+  if (game.running) {
+    stepGame(dt);
+  } else {
+    // gentle idle camera drift behind menus
+    camTheta += dt * 0.05;
+    updateCamera();
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', function () {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ---------- minimal hooks for automated smoke/stress tests ---------- */
+window.__ofm = {
+  THREE: THREE, scene: scene, camera: camera, renderer: renderer,
+  game: game, trucks: trucks, bays: bays,
+  spawnTruck: spawnTruck, selectTruck: selectTruck, deselect: deselect,
+  dispatchTo: dispatchTo, startGame: startGame, compactQueue: compactQueue,
+  tick: function (dt) { if (game.running) { stepGame(dt); } }
+};
+
+})();
+</script>
+</body>
+</html>

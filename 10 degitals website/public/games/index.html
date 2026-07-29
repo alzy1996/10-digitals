@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>OFM Logistics Arcade — Oman Flour Mills</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f4f1ea;
+    color: #3d3830;
+    overflow-x: hidden;
+  }
+  .hero {
+    background: linear-gradient(160deg, #f8f5ee 0%, #efe8da 60%, #e8ddc8 100%);
+    padding: 48px 20px 36px;
+    text-align: center;
+    border-bottom: 4px solid #c8a96a;
+  }
+  .badge {
+    display: inline-block;
+    background: #7a6a4a;
+    color: #fdf9f0;
+    font-size: 13px;
+    letter-spacing: 3px;
+    padding: 6px 18px;
+    border-radius: 20px;
+    margin-bottom: 18px;
+  }
+  h1 {
+    font-size: 44px;
+    color: #4a3f2d;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  h1 span { color: #b08d4f; }
+  .sub {
+    font-size: 17px;
+    color: #7d7462;
+    max-width: 560px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+  .grid {
+    max-width: 1060px;
+    margin: 40px auto 60px;
+    padding: 0 18px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 22px;
+  }
+  .card {
+    background: #fffdf8;
+    border: 1px solid #e3d9c3;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(120, 100, 60, 0.10);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    display: flex;
+    flex-direction: column;
+  }
+  .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 26px rgba(120, 100, 60, 0.18);
+  }
+  .card-top {
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 52px;
+  }
+  .t1 { background: linear-gradient(135deg, #e9dfc8, #d9c9a4); }
+  .t2 { background: linear-gradient(135deg, #e5d8c2, #cdb894); }
+  .t3 { background: linear-gradient(135deg, #ece2d0, #d5c4a8); }
+  .card-body { padding: 20px 22px 24px; flex: 1; display: flex; flex-direction: column; }
+  .card h2 { font-size: 21px; color: #4a3f2d; margin-bottom: 6px; }
+  .tag {
+    font-size: 11px; letter-spacing: 2px; color: #b08d4f;
+    font-weight: 700; margin-bottom: 10px;
+  }
+  .card p { font-size: 14px; color: #776d59; line-height: 1.55; flex: 1; }
+  .play {
+    margin-top: 16px;
+    display: block;
+    text-align: center;
+    background: #a5824f;
+    color: #fffdf6;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 1px;
+    padding: 13px 0;
+    border-radius: 10px;
+    transition: background 0.15s;
+  }
+  .play:hover { background: #8f7040; }
+  .footer {
+    text-align: center;
+    padding: 26px 16px 36px;
+    color: #9a8f79;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .howto {
+    max-width: 720px;
+    margin: 0 auto 10px;
+    padding: 0 20px;
+    text-align: center;
+    color: #7d7462;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  @media (max-width: 600px) {
+    h1 { font-size: 30px; }
+    .hero { padding: 36px 16px 28px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="badge">OMAN FLOUR MILLS — FEED MILLS DEPT</div>
+  <h1>OFM LOGISTICS <span>ARCADE</span></h1>
+  <div class="sub">Four 3D games built from our real daily work — loading lines, the weighbridge, the warehouse, and fleet management. 5 truck types (grain tipper, supplies container, bulk outbound, reefer, flat bed) in 7 / 15 / 45 / 60 MT classes, real single-file traffic (no overtaking), FIFO stock discipline, the HSE layer and the full SO &rarr; DN &rarr; gate pass document chain. Runs fully offline, on PC or phone — learn the operation while you climb the high score.</div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <div class="card-top t1">&#128666;</div>
+    <div class="card-body">
+      <div class="tag">GAME 1 &mdash; DISPATCHING</div>
+      <h2>Loading Line Rush</h2>
+      <p>Trucks are queuing at the gate with their SO numbers. You are the dispatcher: send each truck to a free loading line before the driver loses patience. Bran, barley feed, flour — keep the lines moving, keep the queue short, earn your OMR.</p>
+      <a class="play" href="game1.html">&#9654; PLAY</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-top t2">&#9878;&#65039;</div>
+    <div class="card-body">
+      <div class="tag">GAME 2 &mdash; RECEIVING</div>
+      <h2>Weighbridge Master</h2>
+      <p>Barley, wheat and corn trucks are rolling in. Weigh them, check the quality report (moisture and impurity — accept or reject!), then send each load to the correct silo. One weighbridge, many trucks — do not let the yard jam.</p>
+      <a class="play" href="game2.html">&#9654; PLAY</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-top t3">&#128668;</div>
+    <div class="card-body">
+      <div class="tag">GAME 3 &mdash; WAREHOUSE &mdash; NEW</div>
+      <h2>Forklift Warehouse 3D</h2>
+      <p>Drive the forklift on the dispatch shift. Every pallet carries a product code and a batch age, and the rule is <b>oldest batch first</b> — the newest stock is always the closest, which is exactly why it is the wrong one. Break FIFO and the old batch ages out and gets written off. Forks down to travel, horn at the walkway, DN then gate pass before the truck moves.</p>
+      <a class="play" href="game3.html">&#9654; PLAY</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-top t1">&#128203;</div>
+    <div class="card-body">
+      <div class="tag">GAME 4 &mdash; FLEET MANAGEMENT &mdash; NEW</div>
+      <h2>Fleet Management</h2>
+      <p>You are the fleet coordinator. Production demands raw material trucks, Stores expects supply containers, Delivery posts SOs and weight-out jobs — and there is only ONE weighbridge. Sequence every truck, avoid road jams, keep the documents flowing. This one teaches the real operation.</p>
+      <a class="play" href="game4.html">&#9654; PLAY</a>
+    </div>
+  </div>
+</div>
+
+<div class="howto">
+  <b>How to play:</b> tap a game above. Each game has a START screen with its own instructions.
+  Works with mouse + keyboard on PC and touch on mobile. High scores are saved on your device.
+  Everything runs locally — no install, no login, and no internet needed.
+</div>
+
+<div class="footer">
+  Built for the Oman Flour Mills team &mdash; Feed Mills / Delivery &amp; Receiving<br>
+  Runs fully in the browser. No install. No login.
+</div>
+
+</body>
+</html>

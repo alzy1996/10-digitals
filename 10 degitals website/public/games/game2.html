@@ -1,0 +1,2348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>OFM Weighbridge Master v2</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: #efe2c4;
+    font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; }
+  #scene canvas { display: block; }
+
+  .panel {
+    background: rgba(56, 42, 26, 0.86);
+    color: #fff3dd;
+    border: 2px solid rgba(255, 214, 140, 0.45);
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  }
+
+  #hud {
+    position: fixed; top: 10px; left: 10px; z-index: 20;
+    padding: 10px 14px; pointer-events: none;
+    font-size: 19px; line-height: 1.45; min-width: 170px;
+  }
+  #hud .big { font-size: 26px; font-weight: 800; color: #ffd98a; }
+  #hud .lbl { font-size: 13px; letter-spacing: 1px; color: #d8c39a; }
+  #hudHigh { margin-top: 4px; font-size: 14px; color: #cfe0b5; }
+  #strikes { letter-spacing: 3px; font-size: 20px; }
+  #strikes .on { color: #ff6a55; }
+  #strikes .off { color: rgba(255,255,255,0.25); }
+  #io { font-size: 16px; color: #ffe9b8; }
+  #jamHud { font-size: 16px; font-weight: 800; color: #ff8a75; display: none; }
+
+  #led {
+    position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+    z-index: 20; padding: 8px 18px; text-align: center; pointer-events: none;
+    background: rgba(20, 22, 18, 0.92);
+    border: 2px solid #6f7d5a; border-radius: 10px;
+    font-family: "Courier New", monospace;
+  }
+  #led .cap { font-size: 12px; letter-spacing: 2px; color: #9db07f; }
+  #led .val { font-size: 30px; font-weight: 800; color: #a5e06b; text-shadow: 0 0 8px rgba(120,220,80,0.6); }
+  #led .sub { font-size: 14px; color: #e8d9a8; }
+
+  #toast {
+    position: fixed; top: 96px; left: 50%; transform: translateX(-50%);
+    z-index: 30; padding: 12px 22px; border-radius: 10px;
+    font-size: 21px; font-weight: 800; text-align: center;
+    max-width: 86vw; opacity: 0; transition: opacity 0.25s;
+    pointer-events: none; border: 3px solid transparent;
+  }
+  #toast.good { background: rgba(38, 92, 42, 0.94); color: #d8ffd0; border-color: #7fce6f; }
+  #toast.bad  { background: rgba(122, 30, 22, 0.95); color: #ffd9d2; border-color: #ff7a66; }
+
+  #tip {
+    position: fixed; left: 10px; bottom: 14px; z-index: 28;
+    max-width: 320px; padding: 10px 34px 10px 12px;
+    display: none; font-size: 14px; line-height: 1.35;
+    background: rgba(30, 48, 64, 0.92); color: #d8ecff;
+    border: 2px solid rgba(140, 200, 255, 0.55); border-radius: 10px;
+  }
+  #tip .ttl { font-size: 12px; letter-spacing: 1.5px; color: #8cc8ff; font-weight: 800; display: block; margin-bottom: 3px; }
+  #tipX {
+    position: absolute; top: 4px; right: 6px; border: 0; background: transparent;
+    color: #8cc8ff; font-size: 18px; font-weight: 800; cursor: pointer; padding: 2px 6px;
+  }
+
+  #actions {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    z-index: 25; display: flex; flex-wrap: wrap; gap: 10px;
+    justify-content: center; align-items: center; max-width: 96vw;
+  }
+  #actions .selinfo {
+    width: 100%; text-align: center; color: #fff3dd;
+    background: rgba(56, 42, 26, 0.85); border-radius: 10px;
+    padding: 6px 14px; font-size: 17px; font-weight: 700;
+  }
+  #actions .docs {
+    width: 100%; text-align: center; font-size: 14px; font-weight: 800;
+    letter-spacing: 1px; margin-top: -4px;
+  }
+  #actions .docs .ok { color: #9fe08a; }
+  #actions .docs .no { color: #ff8a75; }
+  #actions .hint {
+    color: #6b5836; background: rgba(255, 246, 224, 0.85);
+    border-radius: 10px; padding: 8px 16px; font-size: 16px; font-weight: 600;
+  }
+  .abtn {
+    font-size: 21px; font-weight: 800; letter-spacing: 0.5px;
+    padding: 14px 22px; border-radius: 12px; border: 3px solid #4c3a22;
+    background: #f2b544; color: #3a2a12; cursor: pointer;
+    box-shadow: 0 4px 0 #4c3a22; min-width: 150px; text-align: center;
+  }
+  .abtn:active { transform: translateY(3px); box-shadow: 0 1px 0 #4c3a22; }
+  .abtn.go { background: #79c25f; color: #12300c; border-color: #2f5423; box-shadow: 0 4px 0 #2f5423; }
+  .abtn.siloB { background: #d9a441; }
+  .abtn.siloW { background: #cbb27a; }
+  .abtn.siloC { background: #e08a2e; }
+  .abtn:disabled { background: #9b938a; color: #5b554e; border-color: #4c463f; box-shadow: 0 4px 0 #4c463f; cursor: default; }
+
+  .decision {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    z-index: 40; width: 88vw; max-width: 440px; padding: 18px;
+    display: none; text-align: center;
+  }
+  .decision h2 { margin: 0 0 4px 0; font-size: 25px; color: #ffd98a; }
+  .decision .mat { font-size: 20px; font-weight: 800; margin-bottom: 8px; }
+  .decision table { width: 100%; border-collapse: collapse; font-size: 19px; margin: 8px 0; }
+  .decision td { padding: 7px 6px; border-bottom: 1px solid rgba(255,220,150,0.25); text-align: left; }
+  .decision td:last-child { text-align: right; font-weight: 800; }
+  .decision .limits { font-size: 15px; color: #d8c39a; margin: 6px 0 12px 0; }
+  .decision .row { display: flex; gap: 12px; }
+  .decision .abtn { flex: 1; min-width: 0; }
+  .decision .ok { background: #79c25f; color: #12300c; border-color: #2f5423; box-shadow: 0 4px 0 #2f5423; }
+  .decision .no { background: #d95b43; color: #3d0f06; border-color: #6e2318; box-shadow: 0 4px 0 #6e2318; }
+
+  #teach {
+    position: fixed; top: 90px; right: 10px; z-index: 35;
+    width: 86vw; max-width: 360px; padding: 14px 16px; display: none;
+    background: rgba(94, 34, 24, 0.94); color: #ffe9dd;
+    border: 3px solid #ff9a66; border-radius: 12px; text-align: center;
+  }
+  #teach h2 { margin: 0 0 6px 0; font-size: 21px; color: #ffc9a8; }
+  #teach p { margin: 0 0 12px 0; font-size: 16px; line-height: 1.4; }
+  #teach .abtn { min-width: 0; width: 100%; }
+
+  .overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 50; display: flex; align-items: center; justify-content: center;
+    background: rgba(40, 28, 14, 0.78);
+  }
+  .card {
+    width: 88vw; max-width: 560px; max-height: 90vh; overflow-y: auto;
+    padding: 26px; text-align: center;
+  }
+  .card h1 { margin: 0 0 6px 0; font-size: 34px; color: #ffd98a; }
+  .card h3 { margin: 0 0 14px 0; font-size: 17px; color: #cfe0b5; font-weight: 600; }
+  .card p, .card li { font-size: 16px; line-height: 1.5; color: #f3e6c8; text-align: left; }
+  .card ul { padding-left: 20px; margin: 8px 0 16px 0; }
+  .card .scoreLine { font-size: 24px; font-weight: 800; color: #ffd98a; margin: 8px 0; }
+  .card .highLine { font-size: 18px; color: #cfe0b5; margin-bottom: 14px; }
+  .bigbtn {
+    font-size: 26px; font-weight: 900; letter-spacing: 1px;
+    padding: 16px 44px; border-radius: 14px; border: 3px solid #4c3a22;
+    background: #f2b544; color: #3a2a12; cursor: pointer;
+    box-shadow: 0 5px 0 #4c3a22;
+  }
+  .bigbtn:active { transform: translateY(3px); box-shadow: 0 1px 0 #4c3a22; }
+</style>
+</head>
+<body>
+<div id="scene"></div>
+
+<div id="hud" class="panel">
+  <div class="lbl">SCORE</div>
+  <div class="big" id="score">0 OMR</div>
+  <div>LEVEL <b id="level">1</b> &nbsp; QUEUE <b id="qlen">0</b></div>
+  <div id="io">IN: <b id="inCnt">0</b> &nbsp; OUT: <b id="outCnt">0</b></div>
+  <div id="jamHud">JAM: <b id="jamCnt">0</b> - demurrage ticking!</div>
+  <div id="strikes"></div>
+  <div id="hudHigh">BEST: 0 OMR</div>
+</div>
+
+<div id="led">
+  <div class="cap">WEIGHBRIDGE</div>
+  <div class="val" id="ledVal">--</div>
+  <div class="sub" id="ledSub">EMPTY</div>
+</div>
+
+<div id="toast"></div>
+
+<div id="tip"><span class="ttl">ACADEMY TIP</span><span id="tipTxt"></span><button id="tipX">&times;</button></div>
+
+<div id="actions"></div>
+
+<div id="qc" class="panel decision">
+  <h2>QUALITY CHECK</h2>
+  <div class="mat" id="qcMat">WHEAT</div>
+  <table>
+    <tr><td>Gross weight</td><td id="qcGross">--</td></tr>
+    <tr><td>Moisture</td><td id="qcMoist">--</td></tr>
+    <tr><td>Impurity</td><td id="qcImp">--</td></tr>
+  </table>
+  <div class="limits">Limits: moisture &le; 14% &middot; impurity &le; 2%</div>
+  <div class="row">
+    <button class="abtn ok" id="qcAccept">ACCEPT</button>
+    <button class="abtn no" id="qcReject">REJECT</button>
+  </div>
+</div>
+
+<div id="mc" class="panel decision">
+  <h2>MANIFEST CHECK</h2>
+  <div class="mat" id="mcMat">CONTAINER</div>
+  <table>
+    <tr><td>Gross weight</td><td id="mcGross">--</td></tr>
+    <tr><td>Manifest declares</td><td id="mcDecl">--</td></tr>
+    <tr><td>Goods observed</td><td id="mcAct">--</td></tr>
+  </table>
+  <div class="limits">Container inbound = factory supplies (PP-bags, spare parts, labels). Accept only if the manifest matches the goods.</div>
+  <div class="row">
+    <button class="abtn ok" id="mcAccept">ACCEPT</button>
+    <button class="abtn no" id="mcReject">REJECT</button>
+  </div>
+</div>
+
+<div id="teach">
+  <h2 id="teachTitle">STOPPED</h2>
+  <p id="teachBody">...</p>
+  <button class="abtn go" id="teachBtn">OK</button>
+</div>
+
+<div id="startOv" class="overlay">
+  <div class="card panel">
+    <h1>OFM WEIGHBRIDGE MASTER</h1>
+    <h3>V2 &mdash; OMAN FLOUR MILLS &middot; ALL TRAFFIC &middot; ONE BRIDGE</h3>
+    <p>You run the weighbridge. Five truck categories cross your scale:</p>
+    <ul>
+      <li><b>RAW GRAIN INBOUND</b> (tipper): GROSS weigh &rarr; quality check (moisture &le;14%, impurity &le;2%) &rarr; correct silo &rarr; TARE weigh.</li>
+      <li><b>CONTAINER INBOUND</b>: factory supplies (PP-bags, spare parts, labels). Check the manifest, send to STORES dock.</li>
+      <li><b>BULK FEED OUTBOUND</b> (tipper) &amp; <b>REEFER / FLAT BED</b> customers (bagged): TARE &rarr; load &rarr; GROSS. NET must match the SO &plusmn;2%.</li>
+      <li>Truck classes: <b>60 / 45 / 15 / 7 MT</b>. A truck too small for its Sales Order is rejected at the bay.</li>
+      <li><b>NO OVERTAKING:</b> single-lane roads &mdash; trucks queue nose-to-tail. Jams cost demurrage.</li>
+      <li>Outbound trucks need <b>DN + GATE PASS</b> before the gate. 5 strikes = fired.</li>
+    </ul>
+    <button class="bigbtn" id="btnStart">START SHIFT</button>
+  </div>
+</div>
+
+<div id="overOv" class="overlay" style="display:none;">
+  <div class="card panel">
+    <h1>SHIFT OVER</h1>
+    <h3>5 strikes &mdash; the mill manager is not amused.</h3>
+    <div class="scoreLine" id="finalScore">0 OMR</div>
+    <div class="highLine" id="finalHigh">BEST: 0 OMR</div>
+    <button class="bigbtn" id="btnRestart">RESTART</button>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="vendor/RGBELoader.js"></script>
+<script>
+"use strict";
+/* ================= OFM WEIGHBRIDGE MASTER v2 =================
+   Five truck categories, four size classes, one-way site loop,
+   NO OVERTAKING follow-the-leader traffic, documentation chain.
+   ============================================================ */
+
+/* On file:// most browsers taint/block local images for WebGL and XHR,
+   so we skip asset loading there and keep the procedural fallback look. */
+var ASSETS_OK = (location.protocol !== "file:");
+
+if (typeof THREE === "undefined") {
+  document.getElementById("startOv").innerHTML =
+    '<div class="card panel"><h1>OFFLINE</h1><p>The 3D engine (vendor/three.min.js) did not load. Make sure the games folder was copied whole, then reload.</p></div>';
+  throw new Error("THREE missing");
+}
+
+/* ---------------- data ---------------- */
+var MATS = {
+  BARLEY: { color: 0xd9a441, css: "#d9a441", price: 70 },
+  WHEAT:  { color: 0xcbb27a, css: "#cbb27a", price: 100 },
+  CORN:   { color: 0xe08a2e, css: "#e08a2e", price: 85 }
+};
+var MAT_NAMES = ["BARLEY", "WHEAT", "CORN"];
+var SUPPLY_NAMES = ["PP-BAGS", "SPARE PARTS", "LABELS"];
+var SUPPLY_COLORS = { "PP-BAGS": 0x3f6fa8, "SPARE PARTS": 0xb0552f, "LABELS": 0x4e8a4c };
+var CUSTOMERS = ["MAZOON DAIRY", "OMAN LIVESTOCK", "SALALAH FEEDS", "AL BASHAYER"];
+
+/* the five truck categories */
+var CATS = {
+  GRAIN:  { dir: "IN",  label: "GRAIN",     classes: [45, 60] },
+  SUPPLY: { dir: "IN",  label: "SUPPLIES",  classes: [15, 45] },
+  BULK:   { dir: "OUT", label: "BULK FEED", classes: [45, 60] },
+  REEFER: { dir: "OUT", label: "REEFER",    classes: [7, 15, 45] },
+  FLAT:   { dir: "OUT", label: "FLAT BED",  classes: [7, 15, 45] }
+};
+var CAT_KEYS = ["GRAIN", "SUPPLY", "BULK", "REEFER", "FLAT"];
+var CAT_W = [0.34, 0.18, 0.18, 0.15, 0.15];
+
+/* four capacity classes with visibly different lengths */
+var CLASS_LEN = { 7: 7.6, 15: 9.8, 45: 12.2, 60: 14.2 };
+
+var TIPS = {
+  net: "NET = GROSS - TARE. The scale never lies twice.",
+  wb: "The weighbridge holds ONE truck - your schedule IS the queue.",
+  container: "Container inbound = supplies (PP-bags, spare parts, labels), not grain - send it to STORES.",
+  form: "Bagged -> flat bed or reefer. Bulk -> tipper. Truck type is decided by cargo form, never by customer.",
+  jam: "A blocked bridge or bay pushes the queue backwards - jams travel upstream and burn demurrage.",
+  docs: "No DN + Gate Pass, no exit. Paperwork is part of the payload.",
+  cls: "Match truck class to the Sales Order: you cannot pour 45 MT into a 15 MT truck."
+};
+var AMBIENT_TIPS = ["net", "wb", "container", "form", "jam", "docs", "cls"];
+
+/* ---------------- globals ---------------- */
+var scene, camera, renderer, raycaster;
+var trucksRoot, selRing;
+
+var camTheta = -0.55, camPhi = 0.92, camR = 62;
+var camTarget = new THREE.Vector3(-2, 0, 4);
+
+var trucks = [];
+var line = [];            // the single-file line for the weighbridge (index 0 = front)
+var selected = null;
+var wbTruck = null;
+var weighLed = null;
+var particles = [];
+var idCounter = 1;
+
+/* bays: silos + stores dock (north side), bulk outloading + bag bay (south side) */
+var bays = {
+  BARLEY: { x: -20, z: -10, side: "n", kind: "silo",   truck: null },
+  WHEAT:  { x: 0,   z: -10, side: "n", kind: "silo",   truck: null },
+  CORN:   { x: 20,  z: -10, side: "n", kind: "silo",   truck: null },
+  STORES: { x: -30, z: -10, side: "n", kind: "stores", truck: null },
+  BULK:   { x: 10,  z: 8,   side: "s", kind: "bulk",   truck: null },
+  BAG:    { x: -14, z: 8,   side: "s", kind: "bag",    truck: null }
+};
+
+var game = {
+  state: "start",
+  score: 0,
+  strikes: 0,
+  level: 1,
+  processed: 0,
+  high: 0,
+  spawnT: 3,
+  spawned: 0,
+  tipT: 24,
+  tipIdx: 0
+};
+
+var audioCtx = null;
+var maxAniso = 1;
+
+/* shared textured materials (created in buildWorld, used by trucks too) */
+var bagMat = null;
+var palletMat = null;
+
+/* ---------------- helpers ---------------- */
+function el(id) { return document.getElementById(id); }
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+function fmt(n) { return n.toLocaleString("en-US"); }
+/* author colors in sRGB, convert once so the procedural look survives sRGB output */
+function col(h) { return new THREE.Color(h).convertSRGBToLinear(); }
+
+function spawnInterval() { return Math.max(6, 16 - game.level * 1.1); }
+function truckPatience() { return Math.max(30, 70 - game.level * 3); }
+
+function beep(freq, dur, type, vol) {
+  try {
+    if (!audioCtx) return;
+    var o = audioCtx.createOscillator();
+    var g = audioCtx.createGain();
+    o.type = type || "square";
+    o.frequency.value = freq;
+    g.gain.value = vol || 0.05;
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + dur);
+  } catch (e) {}
+}
+function sndGood() { beep(660, 0.12, "square", 0.05); setTimeout(function(){ beep(880, 0.16, "square", 0.05); }, 110); }
+function sndBad() { beep(180, 0.3, "sawtooth", 0.07); }
+function sndTick() { beep(1200, 0.03, "square", 0.02); }
+
+var toastTimer = null;
+function showToast(msg, good) {
+  var t = el("toast");
+  t.textContent = msg;
+  t.className = good ? "good" : "bad";
+  t.style.opacity = "1";
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.style.opacity = "0"; }, 2800);
+  if (good) sndGood(); else sndBad();
+}
+
+/* ---------------- academy tips ---------------- */
+var tipSeen = {};
+var tipTimer = null;
+function showTip(txt) {
+  el("tipTxt").textContent = txt;
+  el("tip").style.display = "block";
+  if (tipTimer) clearTimeout(tipTimer);
+  tipTimer = setTimeout(function(){ el("tip").style.display = "none"; }, 14000);
+}
+function academy(key) {
+  if (tipSeen[key]) return;
+  tipSeen[key] = true;
+  showTip(TIPS[key]);
+}
+
+/* ---------------- teaching card (non-modal) ---------------- */
+var teachTruck = null;
+var teachCb = null;
+function showTeach(title, body, btnLabel, truck, cb) {
+  teachTruck = truck;
+  teachCb = cb;
+  el("teachTitle").textContent = title;
+  el("teachBody").textContent = body;
+  el("teachBtn").textContent = btnLabel;
+  el("teach").style.display = "block";
+}
+function hideTeach() {
+  teachTruck = null;
+  teachCb = null;
+  el("teach").style.display = "none";
+}
+
+/* ---------------- textures (procedural fallback first) ---------------- */
+function loadTex(url, rx, ry, srgb, cb) {
+  if (!ASSETS_OK) return;
+  try {
+    new THREE.TextureLoader().load(url, function (tex) {
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(rx, ry);
+      tex.anisotropy = maxAniso;
+      if (srgb) tex.encoding = THREE.sRGBEncoding;
+      cb(tex);
+    }, undefined, function () { /* onError: keep the procedural material */ });
+  } catch (e) {}
+}
+
+function pbrMat(color, dir, rx, ry, useAo) {
+  var mat = new THREE.MeshStandardMaterial({ color: col(color), roughness: 0.92, metalness: 0.02 });
+  mat.envMapIntensity = 0.55;
+  loadTex(dir + "/diff.jpg", rx, ry, true, function (tex) {
+    mat.map = tex; mat.color.set(0xffffff); mat.needsUpdate = true;
+  });
+  loadTex(dir + "/nor.jpg", rx, ry, false, function (tex) {
+    mat.normalMap = tex; mat.needsUpdate = true;
+  });
+  loadTex(dir + "/rough.jpg", rx, ry, false, function (tex) {
+    mat.roughnessMap = tex; mat.roughness = 1.0; mat.needsUpdate = true;
+  });
+  if (useAo) {
+    loadTex(dir + "/ao.jpg", rx, ry, false, function (tex) {
+      mat.aoMap = tex; mat.needsUpdate = true;
+    });
+  }
+  return mat;
+}
+
+function concreteMat(rx, ry) { return pbrMat(0xd3c39c, "assets/tex/concrete", rx, ry, true); }
+function asphaltMat(w, d) {
+  return pbrMat(0x8a8478, "assets/tex/asphalt", Math.max(1, Math.round(w / 15)), Math.max(1, Math.round(d / 1.5)), false);
+}
+function steelMat(w, h) {
+  return pbrMat(0xb5a685, "assets/tex/steel", Math.max(1, Math.round(w / 1.8)), Math.max(1, Math.round(h / 2.7)), false);
+}
+
+/* ---------------- sky: HDR with procedural warm-gradient fallback ---------------- */
+function setupSky() {
+  /* procedural warm-gradient sky (always installed first = the fallback) */
+  var c = document.createElement("canvas");
+  c.width = 4; c.height = 256;
+  var g = c.getContext("2d");
+  var gr = g.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0.0, "#8fb8e8");
+  gr.addColorStop(0.5, "#cfd6c2");
+  gr.addColorStop(0.72, "#f0dfba");
+  gr.addColorStop(1.0, "#ecd9b2");
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 4, 256);
+  var grad = new THREE.CanvasTexture(c);
+  grad.encoding = THREE.sRGBEncoding;
+  scene.background = grad;
+  scene.fog = new THREE.Fog(col(0xf0dfba), 100, 210);
+
+  if (!ASSETS_OK) return;
+  if (typeof THREE.RGBELoader === "undefined") return;
+  try {
+    new THREE.RGBELoader().load("assets/hdri/sky.hdr", function (hdr) {
+      try {
+        var pm = new THREE.PMREMGenerator(renderer);
+        pm.compileEquirectangularShader();
+        var env = pm.fromEquirectangular(hdr).texture;
+        hdr.mapping = THREE.EquirectangularReflectionMapping;
+        scene.environment = env;
+        scene.background = hdr;
+        pm.dispose();
+      } catch (e) { /* keep procedural sky */ }
+    }, undefined, function () { /* keep procedural sky */ });
+  } catch (e) { /* keep procedural sky */ }
+}
+
+/* ---------------- scene setup ---------------- */
+function initScene() {
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 600);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  maxAniso = renderer.capabilities.getMaxAnisotropy();
+  el("scene").appendChild(renderer.domElement);
+
+  setupSky();
+
+  /* hemisphere fill */
+  var hemi = new THREE.HemisphereLight(col(0xbcd6ff), col(0xb9a68a), 0.35);
+  scene.add(hemi);
+
+  /* warm key sun */
+  var sun = new THREE.DirectionalLight(col(0xfff2e0), 1.8);
+  sun.position.set(45, 70, 30);
+  sun.castShadow = true;
+  sun.shadow.mapSize.width = 2048;
+  sun.shadow.mapSize.height = 2048;
+  sun.shadow.camera.left = -85; sun.shadow.camera.right = 85;
+  sun.shadow.camera.top = 85; sun.shadow.camera.bottom = -85;
+  sun.shadow.camera.far = 240;
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.02;
+  scene.add(sun);
+
+  raycaster = new THREE.Raycaster();
+  trucksRoot = new THREE.Group();
+  scene.add(trucksRoot);
+
+  buildWorld();
+
+  selRing = new THREE.Mesh(
+    new THREE.RingGeometry(4.6, 5.5, 36),
+    new THREE.MeshBasicMaterial({ color: col(0xffd23e), side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+  );
+  selRing.rotation.x = -Math.PI / 2;
+  selRing.position.y = 0.06;
+  selRing.visible = false;
+  scene.add(selRing);
+}
+
+/* ---------------- canvas label helpers ---------------- */
+function makeTextPlane(text, w, h, bg, fg, fontPx) {
+  var c = document.createElement("canvas");
+  c.width = 512; c.height = 128;
+  var g = c.getContext("2d");
+  g.fillStyle = bg; g.fillRect(0, 0, 512, 128);
+  g.strokeStyle = "rgba(0,0,0,0.3)"; g.lineWidth = 8;
+  g.strokeRect(4, 4, 504, 120);
+  g.fillStyle = fg;
+  g.font = "bold " + fontPx + "px Arial";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(text, 256, 68);
+  var tex = new THREE.CanvasTexture(c);
+  tex.encoding = THREE.sRGBEncoding;
+  var m = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, h),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true })
+  );
+  return m;
+}
+
+function makeLabelSprite(text, bg) {
+  var c = document.createElement("canvas");
+  c.width = 256; c.height = 128;
+  var g = c.getContext("2d");
+  g.fillStyle = bg; g.fillRect(0, 0, 256, 128);
+  g.strokeStyle = "rgba(0,0,0,0.3)"; g.lineWidth = 8;
+  g.strokeRect(4, 4, 248, 120);
+  g.fillStyle = "#fff8ea";
+  g.font = "bold 60px Arial";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(text, 128, 68);
+  var tex = new THREE.CanvasTexture(c);
+  tex.encoding = THREE.sRGBEncoding;
+  var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  sp.scale.set(11, 5.5, 1);
+  return sp;
+}
+
+function lamb(c) {
+  var m = new THREE.MeshLambertMaterial({ color: col(c) });
+  m.envMapIntensity = 0.5;
+  return m;
+}
+
+function box(w, h, d, color, x, y, z, parent, cast, recv, mat) {
+  var m = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    mat || lamb(color)
+  );
+  m.position.set(x, y, z);
+  if (cast !== false) m.castShadow = true;
+  if (recv !== false) m.receiveShadow = true;
+  (parent || scene).add(m);
+  return m;
+}
+
+/* ---------------- world ----------------
+   One-way rectangular traffic loop (NO OVERTAKING, single lane):
+   main road z=18 eastbound (weighbridge at x=0) -> east connector x=34
+   north -> yard lane z=-2 westbound -> west connector x=-40 south ->
+   merge back onto the main road behind the queue. Nobody ever meets
+   head-on; jams propagate backwards from any blockage. */
+function buildWorld() {
+  // ground (concrete yard)
+  var groundGeo = new THREE.PlaneGeometry(260, 260);
+  groundGeo.setAttribute("uv2", groundGeo.attributes.uv);
+  var ground = new THREE.Mesh(groundGeo, concreteMat(30, 30));
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // main road (asphalt, along x at z=18)
+  box(190, 0.15, 10, 0x7d776b, 0, 0.08, 18, scene, false, true, asphaltMat(190, 10));
+  // yard lane (along x at z=-2, spans x -44..38)
+  box(82, 0.12, 8, 0x9a917e, -3, 0.07, -2, scene, false, true, asphaltMat(82, 8));
+  // east connector (x=34)
+  box(8, 0.12, 24, 0x9a917e, 34, 0.07, 6, scene, false, true, asphaltMat(8, 24));
+  // west connector (x=-40)
+  box(8, 0.12, 24, 0x9a917e, -40, 0.07, 6, scene, false, true, asphaltMat(8, 24));
+  // north bay stubs (stores -30, silos -20/0/20)
+  var nx = [-30, -20, 0, 20];
+  var i;
+  for (i = 0; i < nx.length; i++) {
+    box(6, 0.12, 10, 0x9a917e, nx[i], 0.07, -7, scene, false, true, asphaltMat(6, 10));
+  }
+  // south bay stubs (bag -14, bulk 10)
+  box(6, 0.12, 10, 0x9a917e, -14, 0.07, 4, scene, false, true, asphaltMat(6, 10));
+  box(6, 0.12, 10, 0x9a917e, 10, 0.07, 4, scene, false, true, asphaltMat(6, 10));
+
+  // ---- weighbridge ----
+  box(16, 0.5, 6, 0x5a5f66, 0, 0.25, 18, scene, false, true);
+  for (i = -7; i <= 7; i += 2) {
+    box(1, 0.55, 0.5, 0xe6c23c, i, 0.28, 15.3, scene, false, true);
+    box(1, 0.55, 0.5, 0xe6c23c, i, 0.28, 20.7, scene, false, true);
+  }
+  // cabin (corrugated steel walls)
+  box(4.2, 3.4, 3.6, 0xcfc3a8, 10.5, 1.7, 10.5, scene, true, true, steelMat(4.2, 3.4));
+  box(4.8, 0.5, 4.2, 0x8a6f4d, 10.5, 3.65, 10.5);
+  box(3.0, 1.2, 0.2, 0x6f89a0, 10.5, 2.0, 12.4, scene, false, false); // window
+  // LED pole board
+  box(0.4, 4.5, 0.4, 0x555555, -9.5, 2.25, 12.5);
+  var ledBoard = makeTextPlane("WEIGHBRIDGE", 6, 1.5, "#22261e", "#a5e06b", 44);
+  ledBoard.position.set(-9.5, 5.2, 12.5);
+  scene.add(ledBoard);
+
+  // ---- mill sign (kept) ----
+  box(0.6, 9, 0.6, 0x6b543a, -9, 4.5, 27.5);
+  box(0.6, 9, 0.6, 0x6b543a, 9, 4.5, 27.5);
+  var sign = makeTextPlane("OMAN FLOUR MILLS — RECEIVING", 20, 4, "#7a3f22", "#ffe9b8", 40);
+  sign.position.set(0, 8.2, 27.5);
+  scene.add(sign);
+  box(20.4, 4.4, 0.3, 0x5a3a20, 0, 8.2, 27.35);
+
+  // ---- gate sign at exit ----
+  var gateSign = makeTextPlane("GATE — DOCS CHECK", 8, 2, "#223a5a", "#cfe4ff", 44);
+  gateSign.position.set(58, 5.4, 23.6);
+  scene.add(gateSign);
+  box(0.5, 6, 0.5, 0x44506a, 54.5, 3, 23.6);
+  box(0.5, 6, 0.5, 0x44506a, 61.5, 3, 23.6);
+
+  // ---- silos + grain bays (kept) ----
+  var siloDefs = [
+    { name: "BARLEY", x: -20, body: 0xc79a52, roof: 0xa87b3a },
+    { name: "WHEAT",  x: 0,   body: 0xbfae85, roof: 0x99885e },
+    { name: "CORN",   x: 20,  body: 0xd08a45, roof: 0xa86a2e }
+  ];
+  var si;
+  for (si = 0; si < siloDefs.length; si++) {
+    var sd = siloDefs[si];
+    var bodyMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(5, 5, 16, 20),
+      new THREE.MeshStandardMaterial({ color: col(sd.body), roughness: 0.85, metalness: 0.1, envMapIntensity: 0.55 })
+    );
+    bodyMesh.position.set(sd.x, 8, -24);
+    bodyMesh.castShadow = true; bodyMesh.receiveShadow = true;
+    scene.add(bodyMesh);
+    var roof = new THREE.Mesh(
+      new THREE.ConeGeometry(5.4, 4, 20),
+      lamb(sd.roof)
+    );
+    roof.position.set(sd.x, 18, -24);
+    roof.castShadow = true;
+    scene.add(roof);
+    var lbl = makeLabelSprite(sd.name, MATS[sd.name].css);
+    lbl.position.set(sd.x, 23.5, -24);
+    scene.add(lbl);
+    // bay pad + canopy
+    box(7, 0.4, 7, 0x6f675a, sd.x, 0.2, -10, scene, false, true);
+    box(0.4, 4.4, 0.4, 0x6b543a, sd.x - 3, 2.2, -13);
+    box(0.4, 4.4, 0.4, 0x6b543a, sd.x + 3, 2.2, -13);
+    box(0.4, 4.4, 0.4, 0x6b543a, sd.x - 3, 2.2, -7);
+    box(0.4, 4.4, 0.4, 0x6b543a, sd.x + 3, 2.2, -7);
+    box(7.6, 0.4, 7.6, MATS[sd.name].color, sd.x, 4.6, -10);
+    var pipe = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.35, 0.35, 12, 8),
+      lamb(0x8a8276)
+    );
+    pipe.rotation.x = Math.PI / 2.6;
+    pipe.position.set(sd.x, 7.5, -16);
+    scene.add(pipe);
+  }
+
+  // ---- warehouse (corrugated steel) + STORES dock ----
+  box(18, 8, 13, 0xb5a685, -36, 4, -18, scene, true, true, steelMat(18, 8));
+  var whRoof = new THREE.Mesh(
+    new THREE.CylinderGeometry(7.2, 7.2, 18.6, 3, 1),
+    lamb(0x8a6f4d)
+  );
+  whRoof.rotation.z = Math.PI / 2;
+  whRoof.rotation.y = Math.PI / 2;
+  whRoof.position.set(-36, 8.6, -18);
+  whRoof.castShadow = true;
+  scene.add(whRoof);
+  // roller door facing the stores dock
+  box(4.4, 4.6, 0.3, 0x5a6672, -30, 2.3, -11.4, scene, false, false);
+  // stores dock pad + canopy
+  box(7, 0.4, 7, 0x6f675a, -30, 0.2, -10, scene, false, true);
+  box(0.4, 4.2, 0.4, 0x44506a, -33, 2.1, -13);
+  box(0.4, 4.2, 0.4, 0x44506a, -27, 2.1, -13);
+  box(0.4, 4.2, 0.4, 0x44506a, -33, 2.1, -7);
+  box(0.4, 4.2, 0.4, 0x44506a, -27, 2.1, -7);
+  box(7.4, 0.35, 7.4, 0x44506a, -30, 4.3, -10);
+  var stLbl = makeLabelSprite("STORES", "#44506a");
+  stLbl.position.set(-30, 7.6, -10);
+  scene.add(stLbl);
+  // pallets stacked at the stores dock
+  buildPalletStack(-33.5, -12.5);
+  buildPalletStack(-26.5, -12.5);
+
+  // ---- BULK OUTLOADING bay (south side) ----
+  var bulkTank = new THREE.Mesh(
+    new THREE.CylinderGeometry(3, 3, 11, 18),
+    new THREE.MeshStandardMaterial({ color: col(0x3f8f7a), roughness: 0.7, metalness: 0.25, envMapIntensity: 0.55 })
+  );
+  bulkTank.position.set(11, 5.5, 13);
+  bulkTank.castShadow = true;
+  scene.add(bulkTank);
+  var bulkRoof = new THREE.Mesh(new THREE.ConeGeometry(3.3, 2.2, 18), lamb(0x2c6355));
+  bulkRoof.position.set(11, 12.2, 13);
+  bulkRoof.castShadow = true;
+  scene.add(bulkRoof);
+  // downspout over the pad
+  var spout = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.55, 6.5, 10), lamb(0x8a8276));
+  spout.position.set(10.5, 6, 10.5);
+  spout.rotation.x = 0.45;
+  scene.add(spout);
+  box(7, 0.4, 7, 0x6f675a, 10, 0.2, 8, scene, false, true);
+  var bkLbl = makeLabelSprite("BULK OUT", "#3f8f7a");
+  bkLbl.position.set(11, 15, 13);
+  scene.add(bkLbl);
+
+  // ---- BAG LOADING bay (south side) ----
+  box(11, 2.6, 3.4, 0xa89a7c, -14, 1.3, 12.6, scene, true, true, steelMat(11, 2.6));
+  box(11.6, 0.4, 4, 0x8a6f4d, -14, 2.8, 12.6);
+  box(7, 0.4, 7, 0x6f675a, -14, 0.2, 8, scene, false, true);
+  box(0.4, 3.6, 0.4, 0x6b543a, -17, 1.8, 5.5);
+  box(0.4, 3.6, 0.4, 0x6b543a, -11, 1.8, 5.5);
+  box(7.6, 0.3, 4, 0xc9b98a, -14, 3.7, 7.5);
+  var bgLbl = makeLabelSprite("BAG BAY", "#a8894c");
+  bgLbl.position.set(-14, 6.4, 12.6);
+  scene.add(bgLbl);
+  // staged bag stacks waiting for customer trucks
+  buildBagStack(-17.5, 11.5);
+  buildBagStack(-10.5, 11.5);
+
+  // ---- fences (gate gaps widened for the two-lane road) ----
+  buildFence(-46, 30, 46, 30);
+  buildFence(-46, -34, 46, -34);
+  buildFence(-46, -34, -46, 12);
+  buildFence(-46, 24, -46, 30);
+  buildFence(46, -34, 46, 12);
+  buildFence(46, 24, 46, 30);
+
+  // ---- trees (kept) ----
+  var treeSpots = [[-52, 8], [-56, -12], [54, -20], [58, 4], [42, 36], [-30, 38]];
+  for (i = 0; i < treeSpots.length; i++) {
+    var tx = treeSpots[i][0], tz = treeSpots[i][1];
+    var trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.4, 0.5, 2.5, 6),
+      lamb(0x7a5c3a)
+    );
+    trunk.position.set(tx, 1.25, tz);
+    trunk.castShadow = true;
+    scene.add(trunk);
+    var top = new THREE.Mesh(
+      new THREE.ConeGeometry(2.2, 4.5, 7),
+      lamb(0x8a9a5e)
+    );
+    top.position.set(tx, 4.5, tz);
+    top.castShadow = true;
+    scene.add(top);
+  }
+}
+
+function buildPalletStack(x, z) {
+  if (!palletMat) {
+    palletMat = new THREE.MeshStandardMaterial({ color: col(0xa8834f), roughness: 0.9, envMapIntensity: 0.55 });
+    loadTex("assets/tex/pallet/diff.jpg", 1, 1, true, function (tex) {
+      palletMat.map = tex; palletMat.color.set(0xffffff); palletMat.needsUpdate = true;
+    });
+  }
+  box(2.4, 0.25, 2.4, 0xa8834f, x, 0.35, z, scene, true, true, palletMat);
+  box(2.2, 1.1, 2.2, 0xcbb27a, x, 1.05, z, scene, true, true, palletMat);
+}
+
+function buildBagStack(x, z) {
+  if (!bagMat) {
+    bagMat = new THREE.MeshStandardMaterial({ color: col(0xd8c9a8), roughness: 0.95, envMapIntensity: 0.55 });
+    loadTex("assets/tex/bag/diff.jpg", 2, 1, true, function (tex) {
+      bagMat.map = tex; bagMat.color.set(0xffffff); bagMat.needsUpdate = true;
+    });
+  }
+  var i, j;
+  for (j = 0; j < 3; j++) {
+    for (i = 0; i < 2; i++) {
+      box(1.5, 0.55, 1.0, 0xd8c9a8, x + i * 1.6 - 0.8, 0.55 + j * 0.55, z, scene, true, true, bagMat);
+    }
+  }
+}
+
+function buildFence(x1, z1, x2, z2) {
+  var dx = x2 - x1, dz = z2 - z1;
+  var len = Math.sqrt(dx * dx + dz * dz);
+  var ang = Math.atan2(-dz, dx);
+  var cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
+  var railMat = lamb(0x9a8a70);
+  var r1 = new THREE.Mesh(new THREE.BoxGeometry(len, 0.18, 0.18), railMat);
+  r1.position.set(cx, 1.5, cz); r1.rotation.y = ang; scene.add(r1);
+  var r2 = new THREE.Mesh(new THREE.BoxGeometry(len, 0.18, 0.18), railMat);
+  r2.position.set(cx, 0.8, cz); r2.rotation.y = ang; scene.add(r2);
+  var n = Math.max(2, Math.floor(len / 8));
+  var i;
+  for (i = 0; i <= n; i++) {
+    var px = x1 + dx * (i / n), pz = z1 + dz * (i / n);
+    var post = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.8, 0.3), railMat);
+    post.position.set(px, 0.9, pz);
+    post.castShadow = true;
+    scene.add(post);
+  }
+}
+
+/* ---------------- trucks ---------------- */
+function plateTexture(id) {
+  var c = document.createElement("canvas");
+  c.width = 128; c.height = 64;
+  var g = c.getContext("2d");
+  g.fillStyle = "#f7c531"; g.fillRect(0, 0, 128, 64);
+  g.strokeStyle = "#3a2f10"; g.lineWidth = 6;
+  g.strokeRect(3, 3, 122, 58);
+  g.fillStyle = "#3a2f10";
+  g.font = "bold 30px Arial";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(String(100 + id), 64, 24);
+  g.font = "bold 18px Arial";
+  g.fillText("OMAN", 64, 48);
+  var tex = new THREE.CanvasTexture(c);
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+
+function trailerLabelTexture(text, sub, bgCss) {
+  var c = document.createElement("canvas");
+  c.width = 512; c.height = 128;
+  var g = c.getContext("2d");
+  g.fillStyle = bgCss; g.fillRect(0, 0, 512, 128);
+  g.strokeStyle = "rgba(255,255,255,0.55)"; g.lineWidth = 6;
+  g.strokeRect(5, 5, 502, 118);
+  g.fillStyle = "#ffffff";
+  g.font = "bold 52px Arial";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(text, 256, 44);
+  g.font = "bold 40px Arial";
+  g.fillText(sub, 256, 96);
+  var tex = new THREE.CanvasTexture(c);
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+
+/* build a truck mesh for category + capacity class (visibly different lengths) */
+function buildTruckMesh(t) {
+  var L = CLASS_LEN[t.cap];
+  var g = new THREE.Group();
+  var cabX = L / 2 - 1.4;
+  var rearX = -L / 2;
+  var tl = (cabX - 1.3) - rearX - 0.3;         // trailer length
+  var tcx = rearX + 0.3 + tl / 2;              // trailer centre x
+
+  // chassis + cab
+  box(L * 0.96, 0.4, 2.4, 0x3c3a36, 0, 0.85, 0, g);
+  box(2.4, 2.1, 2.7, 0xa8bcc8, cabX, 2.1, 0, g);
+  box(2.0, 0.9, 2.5, 0x3d4a55, cabX + 0.2, 2.6, 0, g);
+  box(0.6, 0.5, 2.2, 0xd8cfa8, cabX + 1.35, 1.35, 0, g);
+
+  var pivot = null;
+  var cargo = null;
+  var trailerColor = 0x999999;
+  var labelBg = "#666666";
+
+  if (t.cat === "GRAIN" || t.cat === "BULK") {
+    // tipper on a rear pivot
+    if (t.cat === "GRAIN") { trailerColor = MATS[t.mat].color; labelBg = MATS[t.mat].css; }
+    else { trailerColor = 0x3f8f7a; labelBg = "#3f8f7a"; }
+    pivot = new THREE.Group();
+    pivot.position.set(rearX + 0.4, 1.1, 0);
+    g.add(pivot);
+    var tipLen = tl - 0.2;
+    box(tipLen, 2.3, 2.8, trailerColor, tipLen / 2 + 0.1, 1.35, 0, pivot);
+    box(tipLen + 0.2, 0.25, 3.0, 0x8a8276, tipLen / 2 + 0.1, 2.6, 0, pivot);
+    // cargo mound (visible only when loaded)
+    var moundColor = t.cat === "GRAIN" ? MATS[t.mat].color : 0xd8c9a0;
+    cargo = box(tipLen * 0.85, 0.7, 2.3, moundColor, tipLen / 2 + 0.1, 2.6, 0, pivot);
+  } else if (t.cat === "SUPPLY") {
+    // container on a flat skeletal trailer
+    trailerColor = SUPPLY_COLORS[t.mat] || 0x3f6fa8;
+    labelBg = "#33465e";
+    box(tl, 0.35, 2.6, 0x4c4a44, tcx, 1.35, 0, g);
+    box(tl * 0.92, 2.4, 2.5, trailerColor, tcx, 2.75, 0, g);
+    box(tl * 0.92, 0.18, 2.54, 0x2c2c2c, tcx, 3.98, 0, g);
+  } else if (t.cat === "REEFER") {
+    // closed reefer box
+    trailerColor = 0xe9e9e4; labelBg = "#3f6fa8";
+    box(tl, 2.7, 2.7, trailerColor, tcx, 2.6, 0, g);
+    box(tl * 0.98, 0.5, 2.74, 0x3f6fa8, tcx, 2.1, 0, g); // blue stripe
+    box(0.9, 1.1, 1.6, 0x8a9298, tcx + tl / 2 - 0.6, 3.4, 0, g); // cooling unit
+  } else {
+    // FLAT bed with removable bag load
+    trailerColor = 0x8a5a2e; labelBg = "#8a5a2e";
+    box(tl, 0.35, 2.8, 0x6b4a26, tcx, 1.4, 0, g);
+    box(tl, 0.5, 0.18, 0x8a5a2e, tcx, 1.85, 1.36, g);
+    box(tl, 0.5, 0.18, 0x8a5a2e, tcx, 1.85, -1.36, g);
+    cargo = new THREE.Group();
+    var nb = Math.max(2, Math.floor(tl / 1.7));
+    var bi;
+    for (bi = 0; bi < nb; bi++) {
+      var bx = rearX + 0.9 + bi * 1.65;
+      box(1.5, 0.55, 1.15, 0xd8c9a8, bx, 1.85, 0.62, cargo, true, true, bagMat || undefined);
+      box(1.5, 0.55, 1.15, 0xd8c9a8, bx, 1.85, -0.62, cargo, true, true, bagMat || undefined);
+      box(1.5, 0.5, 1.15, 0xcfc09c, bx, 2.38, 0, cargo, true, true, bagMat || undefined);
+    }
+    g.add(cargo);
+  }
+
+  // category + capacity label on the trailer sides
+  var lblTex = trailerLabelTexture(CATS[t.cat].label, t.cap + " MT", labelBg);
+  var lblW = Math.min(tl * 0.62, 5.2);
+  var lblGeo = new THREE.PlaneGeometry(lblW, lblW * 0.25);
+  var lblMat = new THREE.MeshBasicMaterial({ map: lblTex, transparent: true });
+  var s1 = new THREE.Mesh(lblGeo, lblMat);
+  s1.position.set(tcx, 2.7, 1.42);
+  g.add(s1);
+  var s2 = new THREE.Mesh(lblGeo, lblMat);
+  s2.position.set(tcx, 2.7, -1.42);
+  s2.rotation.y = Math.PI;
+  g.add(s2);
+
+  // Omani YELLOW license plates, front + rear
+  var plateTex = plateTexture(t.id);
+  var plateGeo = new THREE.PlaneGeometry(1.05, 0.52);
+  var plateMat = new THREE.MeshBasicMaterial({ map: plateTex });
+  var pf = new THREE.Mesh(plateGeo, plateMat);
+  pf.position.set(cabX + 1.67, 1.35, 0);
+  pf.rotation.y = Math.PI / 2;
+  g.add(pf);
+  var pr = new THREE.Mesh(plateGeo, plateMat);
+  pr.position.set(rearX + 0.28, 1.0, 0);
+  pr.rotation.y = -Math.PI / 2;
+  g.add(pr);
+
+  // wheels: axle count grows with class
+  var wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.45, 10);
+  var wheelMat = lamb(0x2a2825);
+  var axles = [cabX];
+  var nRear = t.cap === 7 ? 1 : (t.cap === 15 ? 2 : (t.cap === 45 ? 2 : 3));
+  var ri;
+  for (ri = 0; ri < nRear; ri++) {
+    axles.push(rearX + 1.1 + ri * ((cabX - 3.4 - rearX) / Math.max(1, nRear - 1) || 0));
+  }
+  var ai, side;
+  for (ai = 0; ai < axles.length; ai++) {
+    for (side = -1; side <= 1; side += 2) {
+      var w = new THREE.Mesh(wheelGeo, wheelMat);
+      w.rotation.x = Math.PI / 2;
+      w.position.set(axles[ai], 0.55, side * 1.25);
+      w.castShadow = true;
+      g.add(w);
+    }
+  }
+
+  g.userData.pivot = pivot;
+  g.userData.cargo = cargo;
+  return g;
+}
+
+/* per-truck floating sprites: document badges + JAM indicator */
+function makeTruckSprites(t) {
+  var c = document.createElement("canvas");
+  c.width = 256; c.height = 72;
+  var tex = new THREE.CanvasTexture(c);
+  tex.encoding = THREE.sRGBEncoding;
+  var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  sp.scale.set(6.4, 1.8, 1);
+  sp.position.y = 5.6;
+  t.mesh.add(sp);
+  t.docCanvas = c;
+  t.docTex = tex;
+  updateDocSprite(t);
+
+  var jc = document.createElement("canvas");
+  jc.width = 128; jc.height = 64;
+  var jg = jc.getContext("2d");
+  jg.fillStyle = "#c0392b"; jg.fillRect(0, 0, 128, 64);
+  jg.strokeStyle = "#ffb0a0"; jg.lineWidth = 6;
+  jg.strokeRect(3, 3, 122, 58);
+  jg.fillStyle = "#ffffff";
+  jg.font = "bold 36px Arial";
+  jg.textAlign = "center"; jg.textBaseline = "middle";
+  jg.fillText("JAM", 64, 34);
+  var jtex = new THREE.CanvasTexture(jc);
+  jtex.encoding = THREE.sRGBEncoding;
+  var jsp = new THREE.Sprite(new THREE.SpriteMaterial({ map: jtex, transparent: true, depthTest: false }));
+  jsp.scale.set(3.4, 1.7, 1);
+  jsp.position.y = 7.4;
+  jsp.visible = false;
+  t.mesh.add(jsp);
+  t.jamSprite = jsp;
+}
+
+function updateDocSprite(t) {
+  var g = t.docCanvas.getContext("2d");
+  g.clearRect(0, 0, 256, 72);
+  var badges = ["WT x" + t.docs.wt];
+  if (t.dir === "OUT") {
+    badges.push("DN " + (t.docs.dn ? "OK" : "--"));
+    badges.push("GP " + (t.docs.gp ? "OK" : "--"));
+  }
+  var w = Math.floor(236 / badges.length);
+  var i;
+  for (i = 0; i < badges.length; i++) {
+    var x = 10 + i * w;
+    var ok = true;
+    if (badges[i].indexOf("--") >= 0) ok = false;
+    if (badges[i].indexOf("x0") >= 0) ok = false;
+    g.fillStyle = ok ? "rgba(46,110,50,0.92)" : "rgba(90,90,90,0.85)";
+    g.fillRect(x, 8, w - 8, 56);
+    g.fillStyle = "#ffffff";
+    g.font = "bold 26px Arial";
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(badges[i], x + (w - 8) / 2, 38);
+  }
+  t.docTex.needsUpdate = true;
+}
+
+function makeQuality(good) {
+  var moisture, impurity;
+  if (good) {
+    moisture = rnd(9.0, 13.9);
+    impurity = rnd(0.3, 1.9);
+  } else {
+    var mode = Math.random();
+    if (mode < 0.4) {
+      moisture = rnd(14.3, 17.5);
+      impurity = rnd(0.3, 1.9);
+    } else if (mode < 0.8) {
+      moisture = rnd(9.0, 13.9);
+      impurity = rnd(2.3, 4.5);
+    } else {
+      moisture = rnd(14.3, 17.5);
+      impurity = rnd(2.3, 4.5);
+    }
+  }
+  return { moisture: Math.round(moisture * 10) / 10, impurity: Math.round(impurity * 10) / 10 };
+}
+
+function pickCat() {
+  var r = Math.random(), acc = 0, i;
+  for (i = 0; i < CAT_KEYS.length; i++) {
+    acc += CAT_W[i];
+    if (r < acc) return CAT_KEYS[i];
+  }
+  return "GRAIN";
+}
+
+function spawnTruck(forceCat) {
+  var cat = forceCat || pickCat();
+  var def = CATS[cat];
+  var cap = pick(def.classes);
+  var t = {
+    id: idCounter++,
+    cat: cat,
+    dir: def.dir,
+    cap: cap,
+    len: CLASS_LEN[cap],
+    tare: 0, load: 0, gross: 0,
+    state: "line",
+    wbPurpose: def.dir === "IN" ? "grossIn" : "tareIn",
+    path: [], pi: 0,
+    speed: 9,
+    wait: 0,
+    patience: truckPatience(),
+    fumed: false,
+    standT: 0,
+    demAcc: 0,
+    lastMove: 1,
+    wantsMove: true,
+    docs: { wt: 0, dn: false, gp: false },
+    docPending: false, docT: 0,
+    born: performance.now(),
+    bayKey: null,
+    rejectedAtBay: false,
+    unloadT: 0,
+    adjustT: 0,
+    mesh: null,
+    dead: false
+  };
+  t.tare = Math.round((4 + cap * 0.24 + rnd(0, 2)) * 10) / 10;
+
+  if (cat === "GRAIN") {
+    t.mat = pick(MAT_NAMES);
+    var good = Math.random() < 0.68;
+    var q = makeQuality(good);
+    t.good = good;
+    t.moisture = q.moisture;
+    t.impurity = q.impurity;
+    t.load = Math.round(cap * rnd(0.72, 0.92) * 10) / 10;
+  } else if (cat === "SUPPLY") {
+    t.mat = pick(SUPPLY_NAMES);
+    var match = Math.random() < 0.65;
+    t.manifestMatch = match;
+    t.declared = t.mat;
+    if (match) {
+      t.actual = t.mat;
+    } else {
+      var others = [];
+      var si;
+      for (si = 0; si < SUPPLY_NAMES.length; si++) {
+        if (SUPPLY_NAMES[si] !== t.mat) others.push(SUPPLY_NAMES[si]);
+      }
+      t.actual = pick(others);
+    }
+    t.load = Math.round(cap * rnd(0.5, 0.8) * 10) / 10;
+  } else {
+    // outbound: arrives empty with a Sales Order
+    t.customer = pick(CUSTOMERS);
+    if (Math.random() < 0.72) {
+      t.soQty = Math.round(cap * rnd(0.82, 0.98));
+    } else {
+      t.soQty = cap + pick([8, 12, 15, 20, 30]);
+    }
+    t.mat = cat === "BULK" ? "BULK FEED" : "BAGGED FEED";
+    t.load = 0;
+  }
+  t.gross = Math.round((t.tare + t.load) * 10) / 10;
+
+  t.mesh = buildTruckMesh(t);
+  t.mesh.position.set(-88, 0, 18);
+  trucksRoot.add(t.mesh);
+  t.mesh.userData.tid = t.id;
+  setCargoVisible(t);
+  makeTruckSprites(t);
+  trucks.push(t);
+  insertIntoLine(t);
+  if (cat === "SUPPLY") academy("container");
+  if (def.dir === "OUT") academy("form");
+  return t;
+}
+
+function setCargoVisible(t) {
+  var cargo = t.mesh.userData.cargo;
+  if (!cargo) return;
+  var loaded;
+  if (t.dir === "IN") loaded = t.wbPurpose === "grossIn" || t.state === "toBay" || t.state === "bayWait" || t.state === "toPad" || t.state === "unload";
+  else loaded = t.load > 0 && t.wbPurpose === "grossOut";
+  cargo.visible = !!loaded;
+}
+
+/* insert keeping the line sorted east -> west by position.
+   WB-committed trucks (state toWb) stay in the line until they mount the
+   deck, and a merging truck may never insert ahead of them: line order =
+   physical order = weighbridge priority, so nobody can park in front of a
+   truck that was already released (that would deadlock the bridge). */
+function insertIntoLine(t) {
+  var x = t.mesh.position.x;
+  var i = 0;
+  var committed = 0;
+  var j;
+  for (j = 0; j < line.length; j++) {
+    if (line[j].state === "toWb") committed++;
+  }
+  while (i < line.length && line[i].mesh.position.x > x) i++;
+  if (i < committed) i = committed;
+  line.splice(i, 0, t);
+}
+
+function removeFromLine(t) {
+  var idx = line.indexOf(t);
+  if (idx >= 0) line.splice(idx, 1);
+}
+
+function despawnTruck(t) {
+  t.dead = true;
+  trucksRoot.remove(t.mesh);
+  var idx = trucks.indexOf(t);
+  if (idx >= 0) trucks.splice(idx, 1);
+  removeFromLine(t);
+  if (selected === t) { selected = null; refreshActions(); }
+  if (wbTruck === t) wbTruck = null;
+}
+
+/* ---------------- movement: NO OVERTAKING follow-the-leader ----------------
+   Single-lane roads. Every truck keeps a safe gap to the truck directly
+   ahead on its lane (spacing check, no lateral bypass). If the leader
+   brakes for a queue, a busy weighbridge or a busy bay, followers brake
+   and wait in line - jams visibly propagate backwards. */
+function followLeaderStep(t, step) {
+  var p = t.mesh.position;
+  var yaw = t.mesh.rotation.y;
+  var fx = Math.cos(yaw), fz = -Math.sin(yaw);
+  var out = step;
+  var blocked = false;
+  var i;
+  for (i = 0; i < trucks.length; i++) {
+    var o = trucks[i];
+    if (o === t || o.dead) continue;
+    var dx = o.mesh.position.x - p.x;
+    var dz = o.mesh.position.z - p.z;
+    var fwd = dx * fx + dz * fz;          // how far ahead on my heading
+    if (fwd < 0.2) continue;
+    var lat = Math.abs(fx * dz - fz * dx); // lateral offset (same lane?)
+    if (lat > 3.3) continue;
+    var gap = (t.len + o.len) * 0.32 + 1.8;
+    var allow = fwd - gap;
+    if (allow < out) {
+      out = Math.max(0, allow);
+      blocked = true;
+    }
+  }
+  t.blockedAhead = blocked && out < step * 0.25;
+  return out;
+}
+
+function yawToward(t, dx, dz, dt) {
+  var targetYaw = Math.atan2(-dz, dx);
+  var dy = targetYaw - t.mesh.rotation.y;
+  while (dy > Math.PI) dy -= Math.PI * 2;
+  while (dy < -Math.PI) dy += Math.PI * 2;
+  t.mesh.rotation.y += dy * Math.min(1, dt * 7);
+}
+
+function moveToward(t, tx, tz, dt) {
+  var p = t.mesh.position;
+  var dx = tx - p.x;
+  var dz = tz - p.z;
+  var dist = Math.sqrt(dx * dx + dz * dz);
+  if (dist < 0.15) { t.lastMove = 0; return true; }
+  var step = Math.min(dist, t.speed * dt);
+  step = followLeaderStep(t, step);
+  p.x += dx / dist * step;
+  p.z += dz / dist * step;
+  yawToward(t, dx, dz, dt);
+  t.lastMove = step;
+  return (dist - step) < 0.15;
+}
+
+function setPath(t, pts) {
+  t.path = pts;
+  t.pi = 0;
+}
+
+function updatePathTruck(t, dt) {
+  if (!t.path || t.pi >= t.path.length) { t.lastMove = 0; return; }
+  var wp = t.path[t.pi];
+  var arrived = moveToward(t, wp.x, wp.z, dt);
+  if (arrived) {
+    t.pi++;
+    if (wp.act) handleAct(t, wp.act);
+  }
+}
+
+/* the single-file weighbridge line: leader aims at the approach point,
+   everyone else keeps gap behind the truck in front. No bypass, ever. */
+function updateLineTruck(t, dt) {
+  var i = line.indexOf(t);
+  if (i < 0) { t.lastMove = 0; return; }
+  var tx = -16;
+  if (i > 0) {
+    var L = line[i - 1];
+    tx = L.mesh.position.x - (L.len + t.len) * 0.35 - 3.4;
+    if (tx > -16) tx = -16;
+  }
+  var dx = tx - t.mesh.position.x;
+  if (dx < 0.05) {
+    // never reverse in the line; a leader holding for a busy bridge still "wants" to move
+    t.lastMove = 0;
+    t.wantsMove = (i === 0 && wbTruck !== null);
+    return;
+  }
+  t.wantsMove = true;
+  moveToward(t, tx, 18, dt);
+}
+
+function handleAct(t, act) {
+  if (act === "offWb") {
+    if (wbTruck === t) { wbTruck = null; weighLed = null; }
+  } else if (act === "onWb") {
+    startWeigh(t);
+  } else if (act === "bayEntry") {
+    tryEnterBay(t);
+  } else if (act === "pad") {
+    startPad(t);
+  } else if (act === "mergeTry") {
+    tryMerge(t);
+  } else if (act === "gateCheck") {
+    gateCheck(t);
+  } else if (act === "despawn") {
+    despawnTruck(t);
+  }
+}
+
+/* ---------------- weighbridge ---------------- */
+function isFirstWeigh(t) {
+  return t.wbPurpose === "grossIn" || t.wbPurpose === "tareIn";
+}
+
+function releaseToWb(t) {
+  if (!t || t.dead) return;
+  if (line.indexOf(t) !== 0) return; // NO OVERTAKING: only the front truck may go
+  if (wbTruck !== null) return;
+  wbTruck = t;
+  t.state = "toWb"; // stays in the line until onWb - followers keep gap behind it
+  t.speed = 8;
+  setPath(t, [{ x: 0, z: 18, act: "onWb" }]);
+  refreshActions();
+}
+
+function startWeigh(t) {
+  removeFromLine(t);
+  t.state = "weigh";
+  var label = "GROSS";
+  var target = t.gross;
+  if (t.wbPurpose === "tareIn" || t.wbPurpose === "tareOut") {
+    label = "TARE";
+    target = t.tare;
+  }
+  weighLed = { truck: t, label: label, target: target, t: 0, shown: 0, cb: onWeighDone };
+}
+
+function onWeighDone(t) {
+  t.docs.wt++;
+  updateDocSprite(t);
+  if (t.wbPurpose === "grossIn") {
+    academy("net");
+    if (t.cat === "GRAIN") {
+      t.state = "qc";
+      showQc(t);
+    } else {
+      t.state = "manifest";
+      showManifest(t);
+    }
+  } else if (t.wbPurpose === "tareIn") {
+    showToast("TARE " + t.tare.toFixed(1) + " t noted - SO " + t.soQty + " t for " + t.customer, true);
+    routeToBay(t);
+  } else if (t.wbPurpose === "tareOut") {
+    var net = Math.round((t.gross - t.tare) * 10) / 10;
+    showToast("TARE " + t.tare.toFixed(1) + " t - NET " + net.toFixed(1) + " t confirmed", true);
+    finishTruck(t);
+  } else { // grossOut
+    checkGrossOut(t);
+  }
+  refreshActions();
+}
+
+/* exit east for trucks that are done (weight ticket already issued) */
+function finishTruck(t) {
+  game.processed++;
+  checkLevel();
+  t.state = "exit";
+  t.speed = 11;
+  var pts = [];
+  if (wbTruck === t) pts.push({ x: 14, z: 18, act: "offWb" });
+  pts.push({ x: 34, z: 18 });
+  pts.push({ x: 90, z: 18, act: "despawn" });
+  setPath(t, pts);
+  if (selected === t) selected = null;
+  refreshActions();
+}
+
+/* ---------------- quality check (grain inbound) ---------------- */
+var qcTruck = null;
+
+function showQc(t) {
+  qcTruck = t;
+  el("qcMat").textContent = t.mat + " #" + t.id + " (" + t.cap + " MT)";
+  el("qcMat").style.color = MATS[t.mat].css;
+  el("qcGross").textContent = t.gross.toFixed(1) + " t";
+  el("qcMoist").textContent = t.moisture.toFixed(1) + " %";
+  el("qcImp").textContent = t.impurity.toFixed(1) + " %";
+  el("qcMoist").style.color = t.moisture <= 14 ? "#9fe08a" : "#ff8a75";
+  el("qcImp").style.color = t.impurity <= 2 ? "#9fe08a" : "#ff8a75";
+  el("qc").style.display = "block";
+}
+
+function hideQc() {
+  qcTruck = null;
+  el("qc").style.display = "none";
+}
+
+function resolveAccept() {
+  var t = qcTruck;
+  if (!t) return;
+  hideQc();
+  if (t.good) {
+    addScore(100);
+    showToast("QUALITY OK - lab bonus +100 OMR. Pick the silo!", true);
+  } else {
+    addScore(-800);
+    addStrike("CONTAMINATED " + t.mat + " ACCEPTED! (-800 OMR)");
+  }
+  t.state = "waitSilo";
+  selected = t;
+  refreshActions();
+}
+
+function resolveReject() {
+  var t = qcTruck;
+  if (!t) return;
+  hideQc();
+  if (!t.good) {
+    addScore(150);
+    showToast("GOOD CALL - contaminated " + t.mat + " sent away (+150 OMR)", true);
+  } else {
+    addScore(-300);
+    addStrike("PERFECTLY GOOD " + t.mat + " REJECTED! (-300 OMR)");
+  }
+  finishTruck(t);
+}
+
+/* ---------------- manifest check (container inbound) ---------------- */
+var mcTruck = null;
+
+function showManifest(t) {
+  mcTruck = t;
+  el("mcMat").textContent = "CONTAINER #" + t.id + " (" + t.cap + " MT)";
+  el("mcMat").style.color = "#9db8d8";
+  el("mcGross").textContent = t.gross.toFixed(1) + " t";
+  el("mcDecl").textContent = t.declared;
+  el("mcAct").textContent = t.actual;
+  el("mcAct").style.color = t.manifestMatch ? "#9fe08a" : "#ff8a75";
+  el("mc").style.display = "block";
+}
+
+function hideManifest() {
+  mcTruck = null;
+  el("mc").style.display = "none";
+}
+
+function resolveManifest(accept) {
+  var t = mcTruck;
+  if (!t) return;
+  hideManifest();
+  if (accept) {
+    if (t.manifestMatch) {
+      showToast("MANIFEST OK - send it to the STORES dock", true);
+    } else {
+      addScore(-600);
+      addStrike("ACCEPTED A MISMATCHED MANIFEST (" + t.declared + " vs " + t.actual + ")! (-600 OMR)");
+    }
+    routeToBay(t);
+  } else {
+    if (!t.manifestMatch) {
+      addScore(150);
+      showToast("GOOD CALL - fraudulent manifest turned away (+150 OMR)", true);
+    } else {
+      addScore(-300);
+      addStrike("VALID DELIVERY REJECTED! (-300 OMR)");
+    }
+    finishTruck(t);
+  }
+}
+
+/* ---------------- bays ---------------- */
+function chooseSilo(t, siloName) {
+  if (!t || t.dead || t.state !== "waitSilo") return;
+  t.bayKey = siloName;
+  routeToBay(t);
+}
+
+function routeToBay(t) {
+  var key = t.bayKey;
+  if (!key) {
+    if (t.cat === "SUPPLY") key = "STORES";
+    else if (t.cat === "BULK") key = "BULK";
+    else key = "BAG";
+    t.bayKey = key;
+  }
+  var b = bays[key];
+  t.state = "toBay";
+  t.speed = 9;
+  var entryZ = b.side === "n" ? -4 : 1;
+  var pts = [];
+  if (wbTruck === t) pts.push({ x: 14, z: 18, act: "offWb" });
+  pts.push({ x: 34, z: 18 });
+  pts.push({ x: 34, z: -2 });
+  pts.push({ x: b.x, z: -2 });
+  pts.push({ x: b.x, z: entryZ, act: "bayEntry" });
+  setPath(t, pts);
+  setCargoVisible(t);
+  refreshActions();
+}
+
+function tryEnterBay(t) {
+  var b = bays[t.bayKey];
+  if (b.truck === null) {
+    b.truck = t;
+    t.state = "toPad";
+    setPath(t, [{ x: b.x, z: b.z, act: "pad" }]);
+  } else {
+    t.state = "bayWait";
+  }
+}
+
+function startPad(t) {
+  if (t.dir === "IN") {
+    startUnload(t);
+    return;
+  }
+  // outbound: size class vs Sales Order gate
+  if (t.soQty > t.cap) {
+    addScore(-250);
+    t.rejectedAtBay = true;
+    academy("cls");
+    showTeach(
+      "LOADING REJECTED",
+      "You cannot load " + t.soQty + " MT into a " + t.cap + " MT truck. Truck class must cover the Sales Order. The truck leaves empty (-250 OMR).",
+      "UNDERSTOOD",
+      t,
+      null
+    );
+    var b = bays[t.bayKey];
+    if (b.truck === t) b.truck = null;
+    t.wbPurpose = "grossOut"; // weighed out empty; SO check skipped
+    routeToReturnLine(t);
+    return;
+  }
+  if (t.cap > t.soQty * 1.5) {
+    addScore(-50);
+    showToast("OVERSIZED: " + t.cap + " MT truck for a " + t.soQty + " MT SO - wasted capacity (-50 OMR)", false);
+  }
+  startLoad(t);
+}
+
+function startUnload(t) {
+  t.state = "unload";
+  t.unloadT = 3.2;
+}
+
+function finishUnload(t) {
+  var b = bays[t.bayKey];
+  if (b.truck === t) b.truck = null;
+  var pivot = t.mesh.userData.pivot;
+  if (pivot) pivot.rotation.z = 0;
+
+  var net = Math.round((t.gross - t.tare) * 10) / 10;
+  var elapsed = (performance.now() - t.born) / 1000;
+  var bonus = Math.max(0, 120 - Math.floor(elapsed));
+
+  if (t.cat === "GRAIN") {
+    var correct = t.bayKey === t.mat;
+    if (correct) {
+      var earn = Math.round(net * MATS[t.mat].price);
+      addScore(earn + bonus);
+      showToast("NET " + net.toFixed(1) + " t " + t.mat + " received! +" + fmt(earn) + " OMR (+" + bonus + " speed)", true);
+    } else {
+      addScore(-500);
+      addStrike("WRONG SILO! " + t.mat + " dumped into the " + t.bayKey + " silo (-500 OMR)");
+    }
+  } else {
+    // SUPPLY: stored at the STORES dock
+    if (t.manifestMatch) {
+      addScore(400 + bonus);
+      showToast(t.mat + " stored at STORES dock! +400 OMR (+" + bonus + " speed)", true);
+    } else {
+      showToast("Mismatched goods dumped in STORES - no payment", false);
+    }
+  }
+
+  t.wbPurpose = "tareOut";
+  setCargoVisible(t);
+  routeToReturnLine(t);
+  refreshActions();
+}
+
+function startLoad(t) {
+  t.state = "load";
+  t.unloadT = 3.2;
+  // the loader is usually accurate, sometimes off beyond the 2% tolerance
+  var r = Math.random();
+  var f = 1;
+  if (r < 0.20) f = rnd(1.035, 1.07);
+  else if (r < 0.30) f = rnd(0.93, 0.965);
+  t.load = Math.round(t.soQty * f * 10) / 10;
+  t.gross = Math.round((t.tare + t.load) * 10) / 10;
+}
+
+function finishLoad(t) {
+  var b = bays[t.bayKey];
+  if (b.truck === t) b.truck = null;
+  t.wbPurpose = "grossOut";
+  setCargoVisible(t);
+  showToast("Loaded - back to the weighbridge for GROSS", true);
+  routeToReturnLine(t);
+  refreshActions();
+}
+
+/* ---------------- return to the line (one-way loop) ---------------- */
+function routeToReturnLine(t) {
+  var b = bays[t.bayKey];
+  t.state = "toMerge";
+  t.speed = 9;
+  setPath(t, [
+    { x: b.x, z: -2 },
+    { x: -40, z: -2 },
+    { x: -40, z: 14, act: "mergeTry" }
+  ]);
+}
+
+function mergeZoneClear(t) {
+  var i;
+  for (i = 0; i < trucks.length; i++) {
+    var o = trucks[i];
+    if (o === t || o.dead) continue;
+    if (Math.abs(o.mesh.position.z - 18) < 3.4 &&
+        Math.abs(o.mesh.position.x - (-40)) < (o.len + t.len) * 0.35 + 4) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function tryMerge(t) {
+  if (mergeZoneClear(t)) {
+    insertIntoLine(t);
+    t.state = "line";
+  } else {
+    t.state = "merge"; // hold and retry - jams propagate backwards here too
+  }
+}
+
+/* ---------------- outbound: SO check, docs, gate ---------------- */
+function checkGrossOut(t) {
+  if (t.rejectedAtBay) {
+    finishTruck(t);
+    return;
+  }
+  var net = Math.round((t.gross - t.tare) * 10) / 10;
+  var tol = Math.max(0.5, t.soQty * 0.02);
+  if (Math.abs(net - t.soQty) <= tol) {
+    var price = t.cat === "BULK" ? 120 : 150;
+    var earn = Math.round(net * price);
+    var elapsed = (performance.now() - t.born) / 1000;
+    var bonus = Math.max(0, 120 - Math.floor(elapsed));
+    addScore(earn + bonus);
+    game.processed++;
+    checkLevel();
+    showToast("NET " + net.toFixed(1) + " t matches SO " + t.soQty + " t - +" + fmt(earn) + " OMR (+" + bonus + ")", true);
+    t.state = "needDocs";
+    t.speed = 10;
+    academy("docs");
+    setPath(t, [
+      { x: 14, z: 18, act: "offWb" },
+      { x: 34, z: 18 },
+      { x: 58, z: 18, act: "gateCheck" },
+      { x: 90, z: 18, act: "despawn" }
+    ]);
+  } else {
+    // STOP: blocked on the bridge, penalty ticking until fixed
+    t.state = "soStop";
+    academy("wb");
+    showTeach(
+      "STOPPED - LOAD MISMATCH",
+      "NET " + net.toFixed(1) + " t vs SO " + t.soQty + " t (tolerance +/-2%). This truck cannot leave, the bridge is BLOCKED and demurrage is ticking. Fix the load!",
+      "ADJUST LOAD",
+      t,
+      function (tt) { fixLoad(tt); }
+    );
+    sndBad();
+  }
+  refreshActions();
+}
+
+function fixLoad(t) {
+  if (!t || t.dead || t.state !== "soStop") return;
+  t.state = "adjust";
+  t.adjustT = 2.2;
+  showToast("Loader adjusting to SO quantity...", true);
+  refreshActions();
+}
+
+function gateCheck(t) {
+  if (t.dir === "OUT" && !(t.docs.dn && t.docs.gp)) {
+    // STOPPED at the gate: missing Delivery Note / Gate Pass
+    t.state = "gateHold";
+    t.path = [];
+    showTeach(
+      "STOPPED AT THE GATE",
+      "Outbound truck #" + t.id + " has no DN / GATE PASS. The documentation chain is: WEIGHT TICKET -> DN -> GATE PASS -> exit. Issue the documents (costs time).",
+      "ISSUE DOCUMENTS",
+      t,
+      function (tt) { issueDocs(tt); }
+    );
+    sndBad();
+    refreshActions();
+  }
+}
+
+function issueDocs(t) {
+  if (!t || t.dead) return;
+  if (t.dir !== "OUT") return;
+  if (t.docs.dn && t.docs.gp) return;
+  if (t.docPending) return;
+  t.docPending = true;
+  t.docT = 1.5;
+  showToast("Printing DN + GATE PASS for truck #" + t.id + "...", true);
+  refreshActions();
+}
+
+/* ---------------- scoring ---------------- */
+function addScore(n) {
+  game.score += n;
+  updateHud();
+}
+
+function addStrike(reason) {
+  game.strikes++;
+  showToast("STRIKE " + game.strikes + "/5 - " + reason, false);
+  updateHud();
+  if (game.strikes >= 5) gameOver();
+}
+
+function checkLevel() {
+  var nl = 1 + Math.floor(game.processed / 4);
+  if (nl > game.level) {
+    game.level = nl;
+    showToast("LEVEL " + game.level + " - trucks arriving faster!", true);
+  }
+  updateHud();
+}
+
+function updateHud() {
+  el("score").textContent = fmt(game.score) + " OMR";
+  el("level").textContent = game.level;
+  el("qlen").textContent = line.length;
+  el("hudHigh").textContent = "BEST: " + fmt(game.high) + " OMR";
+  var inN = 0, outN = 0, jamN = 0, i;
+  for (i = 0; i < trucks.length; i++) {
+    if (trucks[i].dir === "IN") inN++; else outN++;
+    if (trucks[i].jamSprite && trucks[i].jamSprite.visible) jamN++;
+  }
+  el("inCnt").textContent = inN;
+  el("outCnt").textContent = outN;
+  el("jamCnt").textContent = jamN;
+  el("jamHud").style.display = jamN > 0 ? "block" : "none";
+  var s = "";
+  for (i = 0; i < 5; i++) {
+    if (i < game.strikes) s += '<span class="on">X</span>';
+    else s += '<span class="off">X</span>';
+  }
+  el("strikes").innerHTML = s;
+}
+
+/* ---------------- particles ---------------- */
+function spawnParticle(t, colorHex, fromTop) {
+  var geo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
+  var m = new THREE.Mesh(geo, lamb(colorHex));
+  var off;
+  if (fromTop) {
+    off = new THREE.Vector3(rnd(-2, 1), 6.5, rnd(-0.8, 0.8));
+  } else {
+    off = new THREE.Vector3(-t.len / 2 - 0.2, 2.6, 0);
+  }
+  off.applyEuler(t.mesh.rotation);
+  off.add(t.mesh.position);
+  m.position.copy(off);
+  scene.add(m);
+  particles.push({
+    mesh: m,
+    vx: rnd(-1, 1), vy: fromTop ? rnd(-1, 0) : rnd(-1, 0.5), vz: rnd(-1.5, 1.5),
+    life: rnd(0.8, 1.4)
+  });
+}
+
+function updateParticles(dt) {
+  var i;
+  for (i = particles.length - 1; i >= 0; i--) {
+    var p = particles[i];
+    p.vy -= 12 * dt;
+    p.mesh.position.x += p.vx * dt;
+    p.mesh.position.y += p.vy * dt;
+    p.mesh.position.z += p.vz * dt;
+    p.life -= dt;
+    if (p.mesh.position.y < 0.2 || p.life <= 0) {
+      scene.remove(p.mesh);
+      particles.splice(i, 1);
+    }
+  }
+}
+
+function particleColor(t) {
+  if (t.cat === "GRAIN") return MATS[t.mat].color;
+  if (t.cat === "SUPPLY") return 0xa8834f;
+  return 0xd8c9a8;
+}
+
+/* ---------------- action buttons ---------------- */
+function statusText(t) {
+  var s = t.state;
+  if (s === "line") {
+    if (isFirstWeigh(t)) return "in line for the bridge";
+    return "returning for " + (t.wbPurpose === "tareOut" ? "TARE" : "GROSS") + " weigh";
+  }
+  if (s === "merge") return "waiting to merge into the line";
+  if (s === "toWb") return "driving to weighbridge";
+  if (s === "weigh") return "weighing...";
+  if (s === "qc") return "awaiting quality decision";
+  if (s === "manifest") return "awaiting manifest decision";
+  if (s === "waitSilo") return "choose destination silo";
+  if (s === "toBay") return "driving to " + t.bayKey + " bay";
+  if (s === "bayWait") return "bay busy - waiting in line";
+  if (s === "toPad") return "entering bay";
+  if (s === "unload") return "unloading...";
+  if (s === "load") return "loading...";
+  if (s === "toMerge") return "looping back to the bridge";
+  if (s === "soStop") return "STOPPED - load mismatch";
+  if (s === "adjust") return "adjusting load...";
+  if (s === "needDocs") return "needs DN + GATE PASS";
+  if (s === "gateHold") return "HELD AT GATE - no documents";
+  if (s === "exit") return "leaving the mill";
+  return s;
+}
+
+function docsHtml(t) {
+  var h = '<div class="docs">';
+  h += 'WT <span class="' + (t.docs.wt > 0 ? "ok" : "no") + '">x' + t.docs.wt + '</span>';
+  if (t.dir === "OUT") {
+    h += ' &middot; DN <span class="' + (t.docs.dn ? "ok" : "no") + '">' + (t.docs.dn ? "OK" : "--") + '</span>';
+    h += ' &middot; GP <span class="' + (t.docs.gp ? "ok" : "no") + '">' + (t.docs.gp ? "OK" : "--") + '</span>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function refreshActions() {
+  var boxEl = el("actions");
+  if (game.state !== "playing") { boxEl.style.display = "none"; return; }
+  boxEl.style.display = "flex";
+  var html = "";
+  if (!selected || selected.dead) {
+    html = '<div class="hint">Tap a truck to select it</div>';
+  } else {
+    var t = selected;
+    var what;
+    if (t.dir === "OUT") what = "SO " + t.soQty + " t -> " + t.customer;
+    else what = t.mat;
+    html += '<div class="selinfo">' + CATS[t.cat].label + " #" + t.id + " &middot; " + t.cap + " MT &middot; " + what + " &middot; " + statusText(t) + "</div>";
+    html += docsHtml(t);
+    if (t.state === "line") {
+      if (line.indexOf(t) === 0) {
+        if (isFirstWeigh(t)) {
+          if (wbTruck === null) {
+            html += '<button class="abtn go" id="btnWb">TO WEIGHBRIDGE</button>';
+          } else {
+            html += '<button class="abtn" disabled>WEIGHBRIDGE BUSY</button>';
+          }
+        } else {
+          html += '<button class="abtn" disabled>AUTO - WAITING FOR BRIDGE</button>';
+        }
+      } else {
+        html += '<button class="abtn" disabled>NO OVERTAKING - WAIT IN LINE</button>';
+      }
+    }
+    if (t.state === "waitSilo") {
+      html += '<button class="abtn siloB" data-silo="BARLEY">SILO: BARLEY</button>';
+      html += '<button class="abtn siloW" data-silo="WHEAT">SILO: WHEAT</button>';
+      html += '<button class="abtn siloC" data-silo="CORN">SILO: CORN</button>';
+    }
+    if ((t.state === "needDocs" || t.state === "gateHold") && !(t.docs.dn && t.docs.gp)) {
+      if (t.docPending) {
+        html += '<button class="abtn" disabled>PRINTING DOCS...</button>';
+      } else {
+        html += '<button class="abtn go" id="btnDocs">ISSUE DN + GATE PASS</button>';
+      }
+    }
+    if (t.state === "soStop") {
+      html += '<button class="abtn go" id="btnFix">ADJUST LOAD</button>';
+    }
+  }
+  boxEl.innerHTML = html;
+  var btnWb = el("btnWb");
+  if (btnWb) btnWb.addEventListener("click", function () { releaseToWb(selected); });
+  var btnDocs = el("btnDocs");
+  if (btnDocs) btnDocs.addEventListener("click", function () { issueDocs(selected); });
+  var btnFix = el("btnFix");
+  if (btnFix) btnFix.addEventListener("click", function () { fixLoad(selected); });
+  var siloBtns = boxEl.querySelectorAll("[data-silo]");
+  var i;
+  for (i = 0; i < siloBtns.length; i++) {
+    (function (btn) {
+      btn.addEventListener("click", function () {
+        chooseSilo(selected, btn.getAttribute("data-silo"));
+      });
+    })(siloBtns[i]);
+  }
+}
+
+/* ---------------- camera + input ---------------- */
+var pointers = {};
+var dragMoved = 0;
+var downTime = 0;
+var pinchDist = 0;
+
+function onPointerDown(e) {
+  pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+  dragMoved = 0;
+  downTime = performance.now();
+  var ids = Object.keys(pointers);
+  if (ids.length === 2) {
+    var a = pointers[ids[0]], b = pointers[ids[1]];
+    pinchDist = Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+  }
+}
+
+function onPointerMove(e) {
+  if (!pointers[e.pointerId]) return;
+  var prev = pointers[e.pointerId];
+  var dx = e.clientX - prev.x;
+  var dy = e.clientY - prev.y;
+  pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+  dragMoved += Math.abs(dx) + Math.abs(dy);
+  var ids = Object.keys(pointers);
+  if (ids.length === 2) {
+    var a = pointers[ids[0]], b = pointers[ids[1]];
+    var nd = Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+    if (pinchDist > 0) camR = clamp(camR * (pinchDist / nd), 26, 130);
+    pinchDist = nd;
+  } else if (ids.length === 1) {
+    camTheta -= dx * 0.006;
+    camPhi = clamp(camPhi - dy * 0.006, 0.22, 1.4);
+  }
+}
+
+function onPointerUp(e) {
+  var wasTap = dragMoved < 8 && (performance.now() - downTime) < 600;
+  delete pointers[e.pointerId];
+  if (wasTap && game.state === "playing") handleTap(e.clientX, e.clientY);
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  camR = clamp(camR * (1 + e.deltaY * 0.0012), 26, 130);
+}
+
+function handleTap(px, py) {
+  var ndc = new THREE.Vector2(
+    (px / window.innerWidth) * 2 - 1,
+    -(py / window.innerHeight) * 2 + 1
+  );
+  raycaster.setFromCamera(ndc, camera);
+  var hits = raycaster.intersectObjects(trucksRoot.children, true);
+  var i, obj, t;
+  for (i = 0; i < hits.length; i++) {
+    obj = hits[i].object;
+    while (obj && obj.userData.tid === undefined) obj = obj.parent;
+    if (obj) {
+      var tid = obj.userData.tid;
+      var j;
+      for (j = 0; j < trucks.length; j++) {
+        if (trucks[j].id === tid) { t = trucks[j]; break; }
+      }
+      if (t) {
+        if (t.state === "exit") return;
+        selected = t;
+        beep(520, 0.07, "square", 0.04);
+        refreshActions();
+        return;
+      }
+    }
+  }
+  selected = null;
+  refreshActions();
+}
+
+function updateCamera() {
+  var sp = Math.sin(camPhi), cp = Math.cos(camPhi);
+  camera.position.set(
+    camTarget.x + camR * sp * Math.cos(camTheta),
+    camTarget.y + camR * cp,
+    camTarget.z + camR * sp * Math.sin(camTheta)
+  );
+  camera.lookAt(camTarget);
+}
+
+/* ---------------- game flow ---------------- */
+function startGame() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch (e) {}
+  game.state = "playing";
+  game.score = 0;
+  game.strikes = 0;
+  game.level = 1;
+  game.processed = 0;
+  game.spawnT = 1.5;
+  game.spawned = 0;
+  game.tipT = 24;
+  el("startOv").style.display = "none";
+  el("overOv").style.display = "none";
+  updateHud();
+  refreshActions();
+}
+
+function resetWorld() {
+  var i;
+  for (i = trucks.length - 1; i >= 0; i--) despawnTruck(trucks[i]);
+  for (i = particles.length - 1; i >= 0; i--) {
+    scene.remove(particles[i].mesh);
+    particles.splice(i, 1);
+  }
+  line = [];
+  selected = null;
+  wbTruck = null;
+  weighLed = null;
+  qcTruck = null;
+  mcTruck = null;
+  var k;
+  for (k in bays) bays[k].truck = null;
+  el("qc").style.display = "none";
+  el("mc").style.display = "none";
+  hideTeach();
+}
+
+function gameOver() {
+  game.state = "over";
+  if (game.score > game.high) {
+    game.high = game.score;
+    try { localStorage.setItem("ofmWbHigh", String(game.high)); } catch (e) {}
+  }
+  el("finalScore").textContent = fmt(game.score) + " OMR";
+  el("finalHigh").textContent = "BEST: " + fmt(game.high) + " OMR";
+  el("overOv").style.display = "flex";
+  el("qc").style.display = "none";
+  el("mc").style.display = "none";
+  refreshActions();
+  updateHud();
+}
+
+/* ---------------- main update ---------------- */
+var lastTime = 0;
+
+function update(dt) {
+  var i, t;
+
+  // spawning
+  game.spawnT -= dt;
+  if (game.spawnT <= 0) {
+    var tail = line.length ? line[line.length - 1] : null;
+    var room = (!tail || tail.mesh.position.x > -70) && line.length < 8;
+    if (room) {
+      var force = null;
+      if (game.spawned < 2) force = "GRAIN"; // gentle tutorial opening
+      spawnTruck(force);
+      game.spawned++;
+      game.spawnT = spawnInterval();
+    } else {
+      game.spawnT = 1.5;
+    }
+    updateHud();
+  }
+
+  // ambient academy tips
+  game.tipT -= dt;
+  if (game.tipT <= 0) {
+    showTip(TIPS[AMBIENT_TIPS[game.tipIdx % AMBIENT_TIPS.length]]);
+    game.tipIdx++;
+    game.tipT = 38;
+  }
+
+  // auto-release returning trucks (tare-out / gross-out need no decision)
+  if (line.length && wbTruck === null) {
+    var head = line[0];
+    if (!isFirstWeigh(head) && head.mesh.position.x > -34) releaseToWb(head);
+  }
+
+  for (i = trucks.length - 1; i >= 0; i--) {
+    t = trucks[i];
+
+    // movement by state
+    if (t.state === "line") {
+      updateLineTruck(t, dt);
+    } else if (t.state === "toWb" || t.state === "toBay" || t.state === "toPad" ||
+               t.state === "toMerge" || t.state === "needDocs" || t.state === "exit") {
+      t.wantsMove = t.path && t.pi < t.path.length;
+      updatePathTruck(t, dt);
+    } else if (t.state === "merge" || t.state === "bayWait" || t.state === "soStop" ||
+               t.state === "gateHold") {
+      t.wantsMove = true;
+      t.lastMove = 0;
+    } else {
+      t.wantsMove = false;
+      t.lastMove = 0;
+    }
+
+    // standstill tracking: JAM badge + demurrage ticking
+    var standing = t.lastMove < 0.02 && t.wantsMove;
+    if (standing) {
+      t.standT += dt;
+      if (t.standT > 8 && !t.jamSprite.visible) {
+        t.jamSprite.visible = true;
+        academy("jam");
+        updateHud();
+      }
+      if (t.standT > 15) {
+        t.demAcc += dt; // 1 OMR / second of avoidable standing
+        var d = Math.floor(t.demAcc);
+        if (d > 0) {
+          t.demAcc -= d;
+          addScore(-d);
+        }
+      }
+    } else if (t.standT > 0) {
+      t.standT = 0;
+      t.demAcc = 0;
+      if (t.jamSprite.visible) {
+        t.jamSprite.visible = false;
+        updateHud();
+      }
+    }
+
+    // SO stop penalty (blocked bridge burns money)
+    if (t.state === "soStop") {
+      t.demAcc += dt * 2; // extra -2 OMR/s on top of standing demurrage
+    }
+
+    // queue patience (arrivals waiting for their first weigh)
+    if (t.state === "line" && isFirstWeigh(t)) {
+      t.wait += dt;
+      if (t.wait > t.patience) {
+        t.wait = 0;
+        if (!t.fumed) {
+          t.fumed = true;
+          addScore(-150);
+          addStrike("TRUCK #" + t.id + " (" + CATS[t.cat].label + ") FUMING in the queue - no way out, no overtaking! (-150 OMR)");
+        }
+        t.patience *= 1.8;
+      }
+    }
+
+    // bay wait retry
+    if (t.state === "bayWait") {
+      var b = bays[t.bayKey];
+      if (b.truck === null) {
+        b.truck = t;
+        t.state = "toPad";
+        setPath(t, [{ x: b.x, z: b.z, act: "pad" }]);
+      }
+    }
+
+    // merge retry (yields until the zone is clear - never cuts in)
+    if (t.state === "merge") tryMerge(t);
+
+    // unloading / loading animation
+    if (t.state === "unload" || t.state === "load") {
+      t.unloadT -= dt;
+      var pivot = t.mesh.userData.pivot;
+      if (t.state === "unload" && pivot) {
+        if (t.unloadT > 1.2) {
+          pivot.rotation.z = Math.min(0.55, pivot.rotation.z + dt * 0.8);
+          if (Math.random() < 0.5) spawnParticle(t, particleColor(t), false);
+        } else {
+          pivot.rotation.z = Math.max(0, pivot.rotation.z - dt * 0.8);
+        }
+      } else {
+        if (Math.random() < 0.45) spawnParticle(t, particleColor(t), true);
+      }
+      if (t.unloadT <= 0) {
+        if (t.state === "unload") finishUnload(t);
+        else finishLoad(t);
+      }
+    }
+
+    // load adjustment after an SO stop
+    if (t.state === "adjust") {
+      t.adjustT -= dt;
+      if (t.adjustT <= 0) {
+        t.load = t.soQty;
+        t.gross = Math.round((t.tare + t.load) * 10) / 10;
+        setCargoVisible(t);
+        startWeigh(t); // re-weigh on the still-blocked bridge
+      }
+    }
+
+    // document printing
+    if (t.docPending) {
+      t.docT -= dt;
+      if (t.docT <= 0) {
+        t.docPending = false;
+        t.docs.dn = true;
+        t.docs.gp = true;
+        updateDocSprite(t);
+        showToast("DN + GATE PASS issued for truck #" + t.id, true);
+        if (t.state === "gateHold") {
+          t.state = "exit";
+          t.speed = 11;
+          setPath(t, [{ x: 90, z: 18, act: "despawn" }]);
+        }
+        refreshActions();
+      }
+    }
+  }
+
+  // weighbridge LED animation
+  if (weighLed) {
+    weighLed.t += dt;
+    var k = Math.min(1, weighLed.t / 1.5);
+    weighLed.shown = weighLed.target * (1 - Math.pow(1 - k, 2));
+    if (weighLed.t > 0.05 && Math.floor(weighLed.t * 12) !== Math.floor((weighLed.t - dt) * 12)) sndTick();
+    if (k >= 1 && weighLed.t > 1.7) {
+      var cb = weighLed.cb;
+      var wt = weighLed.truck;
+      weighLed.shown = weighLed.target;
+      weighLed = null;
+      cb(wt);
+      refreshActions();
+    }
+  }
+
+  updateParticles(dt);
+
+  // selection ring
+  if (selected && !selected.dead) {
+    selRing.visible = true;
+    selRing.position.x = selected.mesh.position.x;
+    selRing.position.z = selected.mesh.position.z;
+    selRing.rotation.z += dt * 1.2;
+  } else {
+    selRing.visible = false;
+  }
+}
+
+function updateLed() {
+  var val = el("ledVal");
+  var sub = el("ledSub");
+  if (weighLed) {
+    val.textContent = weighLed.shown.toFixed(1) + " t";
+    sub.textContent = CATS[weighLed.truck.cat].label + " " + weighLed.truck.cap + "MT - " + weighLed.label;
+  } else if (wbTruck) {
+    var t = wbTruck;
+    var tag = CATS[t.cat].label + " " + t.cap + "MT";
+    if (t.wbPurpose === "tareIn" || t.wbPurpose === "tareOut") {
+      val.textContent = t.tare.toFixed(1) + " t";
+      sub.textContent = tag + " - TARE";
+    } else {
+      val.textContent = t.gross.toFixed(1) + " t";
+      sub.textContent = tag + " - GROSS";
+    }
+    if (t.state === "soStop") sub.textContent = tag + " - HOLD";
+  } else {
+    val.textContent = "--";
+    sub.textContent = "EMPTY";
+  }
+}
+
+function loop(ts) {
+  requestAnimationFrame(loop);
+  var dt = Math.min(0.05, (ts - lastTime) / 1000 || 0.016);
+  lastTime = ts;
+  if (game.state === "playing") update(dt);
+  updateLed();
+  updateCamera();
+  renderer.render(scene, camera);
+}
+
+/* ---------------- boot ---------------- */
+function init() {
+  try {
+    game.high = parseInt(localStorage.getItem("ofmWbHigh") || "0", 10) || 0;
+  } catch (e) { game.high = 0; }
+
+  try {
+    initScene();
+  } catch (e) {
+    el("startOv").innerHTML =
+      '<div class="card panel"><h1>NO WEBGL</h1><p>This device/browser could not create a WebGL context.</p></div>';
+    return;
+  }
+  updateHud();
+  refreshActions();
+
+  var dom = renderer.domElement;
+  dom.addEventListener("pointerdown", onPointerDown);
+  dom.addEventListener("pointermove", onPointerMove);
+  dom.addEventListener("pointerup", onPointerUp);
+  dom.addEventListener("pointercancel", onPointerUp);
+  dom.addEventListener("wheel", onWheel, { passive: false });
+
+  el("btnStart").addEventListener("click", startGame);
+  el("btnRestart").addEventListener("click", function () {
+    resetWorld();
+    startGame();
+  });
+  el("qcAccept").addEventListener("click", resolveAccept);
+  el("qcReject").addEventListener("click", resolveReject);
+  el("mcAccept").addEventListener("click", function () { resolveManifest(true); });
+  el("mcReject").addEventListener("click", function () { resolveManifest(false); });
+  el("teachBtn").addEventListener("click", function () {
+    var cb = teachCb;
+    var tr = teachTruck;
+    hideTeach();
+    if (cb && tr && !tr.dead) cb(tr);
+  });
+  el("tipX").addEventListener("click", function () {
+    el("tip").style.display = "none";
+  });
+
+  window.addEventListener("resize", function () {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // keep action buttons (busy states) fresh
+  setInterval(function () {
+    if (game.state === "playing" && selected && !selected.dead) refreshActions();
+  }, 700);
+
+  requestAnimationFrame(loop);
+}
+
+init();
+</script>
+</body>
+</html>
