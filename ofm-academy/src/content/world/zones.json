@@ -1,0 +1,12 @@
+{
+  "_source": "PRD 4.2 - departments modelled in game and the zone each one owns.",
+  "zones": [
+    { "id": "orderdesk",  "nameEn": "Order Desk",     "nameAr": "مكتب الطلبات",  "dept": "Sales / Coordination", "ownsEn": "Customer orders, SO issue, deadlines",              "ownsAr": "طلبات العملاء وإصدار أوامر البيع والمواعيد" },
+    { "id": "millfloor",  "nameEn": "Mill Floor",     "nameAr": "أرضية المصنع",  "dept": "Production",           "ownsEn": "Raw materials, premix, formulation, batch readiness","ownsAr": "المواد الخام والبريمكس وجاهزية الدفعة" },
+    { "id": "packing",    "nameEn": "Packing Hall",   "nameAr": "قاعة التعبئة",  "dept": "Packing",              "ownsEn": "Bagging lines, bag weight, pallets, bag count",      "ownsAr": "خطوط التعبئة ووزن الأكياس والمنصات والعدد" },
+    { "id": "warehouse",  "nameEn": "Warehouse",      "nameAr": "المخزن",        "dept": "Warehouse / Stores",   "ownsEn": "FIFO stock, forklift movement, physical inventory",  "ownsAr": "مخزون الأقدم أولاً وحركة الرافعة والجرد" },
+    { "id": "yard",       "nameEn": "Dispatch + Yard","nameAr": "مكتب التوصيل والساحة","dept": "Delivery / Logistics","ownsEn": "Truck booking, queue, loading lines, documents, POD","ownsAr": "حجز الشاحنات والطابور وخطوط التحميل والمستندات" },
+    { "id": "gate",       "nameEn": "Gate",           "nameAr": "البوابة",       "dept": "Security / Gate",      "ownsEn": "Gate pass, in/out log, weighbridge",                 "ownsAr": "تصريح الخروج وسجل الدخول والخروج والميزان" },
+    { "id": "lab",        "nameEn": "Lab",            "nameAr": "المختبر",       "dept": "QA / Lab",             "ownsEn": "Sampling and hold/release - modelled as an optional gate", "ownsAr": "أخذ العينات والحجز/الإفراج" }
+  ]
+}

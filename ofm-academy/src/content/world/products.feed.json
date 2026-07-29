@@ -1,0 +1,22 @@
+{
+  "_source": "PRD Appendix B - the 16 core Buhler codes, LOCKED. The full 45-product master with ERP codes and EN/AR names must be exported from OFM Smart Fleet v5.1 into this file. Never regenerate, never invent (PRD 0.3, 4.5).",
+  "_status": "PARTIAL - codes confirmed, every other field awaits the Smart Fleet export",
+  "products": [
+    { "id": "P716", "buhlerCode": "716", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true },
+    { "id": "P715", "buhlerCode": "715", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true },
+    { "id": "P941", "buhlerCode": "941", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true },
+    { "id": "P940", "buhlerCode": "940", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true },
+    { "id": "P835", "buhlerCode": "835", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true },
+    { "id": "P920", "buhlerCode": "920", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true },
+    { "id": "P883", "buhlerCode": "883", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true },
+    { "id": "P706", "buhlerCode": "706", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true },
+    { "id": "P951", "buhlerCode": "951", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true },
+    { "id": "P704", "buhlerCode": "704", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true },
+    { "id": "P751", "buhlerCode": "751", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true },
+    { "id": "P709", "buhlerCode": "709", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true },
+    { "id": "P711", "buhlerCode": "711", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true },
+    { "id": "P826", "buhlerCode": "826", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true },
+    { "id": "P600", "buhlerCode": "600", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true },
+    { "id": "P892", "buhlerCode": "892", "erpCode": null, "nameEn": null, "nameAr": null, "species": null, "form": null, "bagWeightKg": 25, "premixRequired": null, "shelfLifeDays": null, "needsConfirm": true }
+  ]
+}
