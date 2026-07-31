@@ -1,0 +1,17 @@
+{
+  "_source": "PRD 4.11 - confirmed named customers and destinations from real dispatch traffic.",
+  "customers": [
+    { "id": "mazoon",     "nameEn": "Mazoon Dairy",          "nameAr": "ألبان مزون",        "destination": "Sunainah", "requiresFerry": false },
+    { "id": "soharpoult", "nameEn": "Sohar Poultry",         "nameAr": "دواجن صحار",         "destination": "Sohar",    "requiresFerry": false },
+    { "id": "punjnad",    "nameEn": "Punjnad",               "nameAr": "بنجناد",             "destination": "Muscat",   "requiresFerry": false },
+    { "id": "atyab",      "nameEn": "Atyab (SBB)",           "nameAr": "أطياب",              "destination": "Muscat",   "requiresFerry": false },
+    { "id": "kawther",    "nameEn": "Al Kawther",            "nameAr": "الكوثر",             "destination": "Kabura",   "requiresFerry": false },
+    { "id": "sallan",     "nameEn": "Al Sallan",             "nameAr": "الصلان",             "destination": "Sohar",    "requiresFerry": false },
+    { "id": "sfm",        "nameEn": "SFM",                   "nameAr": "SFM",                "destination": "Liwa",     "requiresFerry": false },
+    { "id": "royalcourt", "nameEn": "Royal Court",           "nameAr": "الديوان",            "destination": "Muscat",   "requiresFerry": false },
+    { "id": "minagribar", "nameEn": "Ministry of Agriculture","nameAr": "وزارة الزراعة",     "destination": "Barka",    "requiresFerry": false },
+    { "id": "minagrisal", "nameEn": "Ministry of Agriculture","nameAr": "وزارة الزراعة",     "destination": "Salalah",  "requiresFerry": false },
+    { "id": "osool",      "nameEn": "Osool",                 "nameAr": "أصول",               "destination": "Haima",    "requiresFerry": false },
+    { "id": "masirah",    "nameEn": "Masirah drop",          "nameAr": "توصيل مصيرة",        "destination": "Masirah",  "requiresFerry": true }
+  ]
+}

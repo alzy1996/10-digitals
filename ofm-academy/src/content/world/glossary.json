@@ -1,0 +1,26 @@
+{
+  "_source": "PRD Appendix A - the 30 core terms every role in the chain uses.",
+  "terms": [
+    { "id": "so",       "en": "SO / Sales Order",  "ar": "أمر البيع",      "meaningEn": "The order document that starts everything",  "meaningAr": "المستند الذي يبدأ كل شيء" },
+    { "id": "dn",       "en": "DN / Delivery Note","ar": "إشعار التسليم",  "meaningEn": "Travels with the truck",                     "meaningAr": "يرافق الشاحنة" },
+    { "id": "pod",      "en": "POD",               "ar": "إثبات التسليم",  "meaningEn": "Signed proof the customer received it",      "meaningAr": "إثبات موقّع باستلام العميل" },
+    { "id": "gatepass", "en": "Gate Pass",         "ar": "تصريح الخروج",   "meaningEn": "Lets the truck leave the site",              "meaningAr": "يسمح للشاحنة بمغادرة الموقع" },
+    { "id": "mt",       "en": "MT",                "ar": "طن متري",        "meaningEn": "1,000 kg = 40 bags",                         "meaningAr": "١٠٠٠ كجم = ٤٠ كيس" },
+    { "id": "bag",      "en": "Bag",               "ar": "كيس",            "meaningEn": "25 kg standard",                             "meaningAr": "٢٥ كجم قياسي" },
+    { "id": "bulk",     "en": "Bulk",              "ar": "سائب",           "meaningEn": "Unbagged, tipper cargo",                     "meaningAr": "غير معبأ، حمولة قلاب" },
+    { "id": "premix",   "en": "Premix",            "ar": "بريمكس",         "meaningEn": "Concentrate - both an ingredient and a bagged product", "meaningAr": "مركّز — مادة خام ومنتج معبأ في آن" },
+    { "id": "tare",     "en": "Tare",              "ar": "الوزن الفارغ",   "meaningEn": "Empty truck weight",                         "meaningAr": "وزن الشاحنة فارغة" },
+    { "id": "gross",    "en": "Gross",             "ar": "الوزن القائم",   "meaningEn": "Loaded truck weight",                        "meaningAr": "وزن الشاحنة محمّلة" },
+    { "id": "net",      "en": "Net",               "ar": "الوزن الصافي",   "meaningEn": "Gross minus Tare",                           "meaningAr": "القائم ناقص الفارغ" },
+    { "id": "fifo",     "en": "FIFO",              "ar": "الأقدم أولاً",   "meaningEn": "Oldest stock leaves first",                  "meaningAr": "المخزون الأقدم يخرج أولاً" },
+    { "id": "flatbed",  "en": "Flat Bed",          "ar": "سطحة",           "meaningEn": "Bagged cargo truck (40 ft)",                 "meaningAr": "شاحنة البضائع المعبأة" },
+    { "id": "tipper",   "en": "Tipper",            "ar": "قلاب",           "meaningEn": "Bulk cargo truck",                           "meaningAr": "شاحنة البضائع السائبة" },
+    { "id": "line",     "en": "Line / Belt",       "ar": "خط / سير",       "meaningEn": "Bagging and loading line (13 of them)",      "meaningAr": "خط التعبئة والتحميل (١٣ خطاً)" },
+    { "id": "bay",      "en": "Bay",               "ar": "رصيف التحميل",   "meaningEn": "Loading position",                           "meaningAr": "موقع التحميل" },
+    { "id": "handover", "en": "Handover",          "ar": "تسليم الوردية",  "meaningEn": "Shift-to-shift transfer",                    "meaningAr": "نقل العمل بين الورديات" },
+    { "id": "overfill", "en": "Overfill",          "ar": "زيادة التعبئة",  "meaningEn": "Extra grams per bag = money given away",     "meaningAr": "جرامات زائدة في كل كيس = مال يُهدى" },
+    { "id": "oscill",   "en": "Oscillation",       "ar": "التذبذب",        "meaningEn": "Over-correcting crew size shift to shift",   "meaningAr": "المبالغة في تعديل حجم الطاقم" },
+    { "id": "demurrage","en": "Demurrage",         "ar": "غرامة الانتظار", "meaningEn": "Cost of a waiting truck",                    "meaningAr": "تكلفة انتظار الشاحنة" },
+    { "id": "chainrep", "en": "Chain replacement", "ar": "سلسلة الإحلال",  "meaningEn": "Leave cover chain across teams",             "meaningAr": "سلسلة تغطية الإجازات بين الفرق" }
+  ]
+}

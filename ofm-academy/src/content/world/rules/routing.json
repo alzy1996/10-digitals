@@ -1,0 +1,60 @@
+{
+  "_source": "PRD 4.6 and 4.10 - the LOCKED routing laws. Sam can correct any of these without a developer touching TypeScript; the same file can later drive real Smart Fleet validation.",
+  "rules": [
+    {
+      "id": "R-TRUCKTYPE-01",
+      "when": { "cargoForm": "bag" },
+      "require": { "truckType": "flatbed" },
+      "onViolation": {
+        "severity": "hard",
+        "costOMR": 90,
+        "messageEn": "Bagged cargo cannot load on a tipper. Cargo form decides the truck, never the customer.",
+        "messageAr": "البضاعة المعبأة بالأكياس لا تُحمّل على القلاب. شكل البضاعة هو ما يحدد نوع الشاحنة، وليس العميل."
+      }
+    },
+    {
+      "id": "R-TRUCKTYPE-02",
+      "when": { "cargoForm": "bulk" },
+      "require": { "truckType": "tipper" },
+      "onViolation": {
+        "severity": "hard",
+        "costOMR": 90,
+        "messageEn": "Bulk cargo needs a tipper. A flat bed cannot carry it.",
+        "messageAr": "البضاعة السائبة تحتاج قلاباً. السطحة لا تستطيع نقلها."
+      }
+    },
+    {
+      "id": "R-SCOPE-01",
+      "when": { "bookedTruckType": "tipper" },
+      "require": { "withinScope": true },
+      "onViolation": {
+        "severity": "hard",
+        "costOMR": 0,
+        "messageEn": "Tipper routes belong to another department. Your scope is bags and flat bed only - do not book it, escalate it.",
+        "messageAr": "مسارات القلاب تخص قسماً آخر. نطاقك هو الأكياس والسطحة فقط — لا تحجزها، بل صعّدها."
+      }
+    },
+    {
+      "id": "R-CONTRACT-01",
+      "when": { "hasContract": false },
+      "require": { "action": "escalate" },
+      "onViolation": {
+        "severity": "hard",
+        "costOMR": 120,
+        "messageEn": "No contract covers this route. The correct answer is to stop and flag NO CONTRACT - handle manually, not to improvise a price.",
+        "messageAr": "لا يوجد عقد يغطي هذا المسار. الإجراء الصحيح هو التوقف ورفع \"لا يوجد عقد — يُعالج يدوياً\"، وليس الارتجال."
+      }
+    },
+    {
+      "id": "R-FERRY-01",
+      "when": { "requiresFerry": true },
+      "require": { "ferryBooked": true },
+      "onViolation": {
+        "severity": "hard",
+        "costOMR": 170,
+        "messageEn": "Masirah is reached via the Shannah ferry. Transit is not distance - miss the ferry and you lose a day.",
+        "messageAr": "مصيرة تُخدم عبر عبّارة شنّة. زمن النقل ليس المسافة — تفويت العبّارة يكلفك يوماً كاملاً."
+      }
+    }
+  ]
+}

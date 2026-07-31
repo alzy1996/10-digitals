@@ -1,0 +1,27 @@
+{
+  "_source": "PRD 4.10 - the Routing Board answer key. Contracts valid Jul 2026 to Jun 2028.",
+  "validFrom": "2026-07-01",
+  "validTo": "2028-06-30",
+  "contracts": [
+    { "transporterId": "gwc",    "route": "soharpoult", "truckType": "flatbed", "capacityMt": [25, 35], "rateOmr": 90,  "perMt": false },
+    { "transporterId": "gwc",    "route": "kawther",    "truckType": "flatbed", "capacityMt": [25, 35], "rateOmr": 85,  "perMt": false },
+    { "transporterId": "gwc",    "route": "Liwa",       "truckType": "flatbed", "capacityMt": [25, 35], "rateOmr": 110, "perMt": false },
+    { "transporterId": "gwc",    "route": "sallan",     "truckType": "flatbed", "capacityMt": [25, 35], "rateOmr": 90,  "perMt": false },
+    { "transporterId": "gwc",    "route": "minagribar", "truckType": "flatbed", "capacityMt": [25, 35], "rateOmr": 65,  "perMt": false },
+    { "transporterId": "gwc",    "route": "royalcourt", "truckType": "flatbed", "capacityMt": [25, 35], "rateOmr": null,"perMt": false },
+
+    { "transporterId": "kunooz", "route": "mazoon",     "truckType": "tipper",  "capacityMt": [35],     "rateOmr": 270, "perMt": false },
+    { "transporterId": "kunooz", "route": "osool",      "truckType": "tipper",  "capacityMt": [35],     "rateOmr": 230, "perMt": false },
+    { "transporterId": "kunooz", "route": "minagrisal", "truckType": "tipper",  "capacityMt": [35],     "rateOmr": 252, "perMt": false },
+    { "transporterId": "kunooz", "route": "Thamrait",   "truckType": "tipper",  "capacityMt": [35],     "rateOmr": 240, "perMt": false },
+
+    { "transporterId": "blue",   "route": "atyab",      "truckType": "flatbed", "capacityMt": [25, 35], "rateOmr": null,"perMt": true },
+    { "transporterId": "blue",   "route": "Muscat",     "truckType": "flatbed", "capacityMt": [25, 35], "rateOmr": 55,  "perMt": false },
+    { "transporterId": "blue",   "route": "Sur",        "truckType": "flatbed", "capacityMt": [25, 35], "rateOmr": 130, "perMt": false },
+    { "transporterId": "blue",   "route": "masirah",    "truckType": "flatbed", "capacityMt": [25, 35], "rateOmr": 240, "perMt": false },
+
+    { "transporterId": "sahab",  "route": "soharpoult", "truckType": "tipper",  "capacityMt": [35],     "rateOmr": 160, "perMt": false },
+    { "transporterId": "sahab",  "route": "sfm",        "truckType": "tipper",  "capacityMt": [35],     "rateOmr": 45,  "perMt": false }
+  ],
+  "ferry": { "leg": "Shannah", "surchargeOmr": 170, "appliesToRoute": "masirah" }
+}

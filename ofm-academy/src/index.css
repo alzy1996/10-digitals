@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Phone-first, glove-friendly, sunlight-readable (PRD 2.3).
+ * Layout mirrors via logical properties and dir=rtl, not a text flip.
+ */
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-ofm-bg text-slate-900 antialiased;
+    /* stop iOS rubber-banding under the fixed HUD */
+    overscroll-behavior-y: none;
+  }
+
+  /* Arabic is a mode, not a translation: swap the whole type stack. */
+  [dir="rtl"] body,
+  [dir="rtl"] {
+    @apply font-ar;
+  }
+
+  /* Numbers always tabular so columns of MT and OMR line up (PRD 5.11). */
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Keyboard focus must stay visible - trainers demo this on a laptop. */
+  :focus-visible {
+    @apply outline-none ring-4 ring-ofm-blue/40;
+  }
+}
+
+@layer components {
+  /* Minimum 44px touch target, every interactive element. */
+  .tap {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  .card {
+    @apply rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5;
+  }
+
+  .btn {
+    @apply tap inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3
+           text-base font-semibold transition
+           disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .btn-primary {
+    @apply btn bg-sls-ink text-white hover:bg-sls-blue active:translate-y-px;
+  }
+
+  .btn-ghost {
+    @apply btn bg-white text-slate-700 ring-1 ring-slate-900/10 hover:bg-slate-50;
+  }
+
+  .btn-choice {
+    @apply tap w-full rounded-xl bg-white px-4 py-4 text-start text-lg font-semibold
+           ring-1 ring-slate-900/10 transition hover:bg-slate-50 active:translate-y-px;
+  }
+
+  .btn-choice-good {
+    @apply bg-ofm-green/10 ring-2 ring-ofm-green;
+  }
+
+  .btn-choice-bad {
+    @apply bg-ofm-red/10 ring-2 ring-ofm-red;
+  }
+
+  /* Never colour alone - the badge always carries text too (PRD 5.13). */
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold
+           uppercase tracking-wider;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

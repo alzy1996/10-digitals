@@ -1,0 +1,49 @@
+{
+  "_source": "PRD 3 (L01, L02, L03) and 4.7 - the order-reading laws that Chapter 1 drills.",
+  "rules": [
+    {
+      "id": "R-PRODUCT-01",
+      "when": { "stage": "load" },
+      "require": { "loadedCodeMatchesSo": true },
+      "onViolation": {
+        "severity": "hard",
+        "costOMR": 250,
+        "messageEn": "You just loaded a different product than the SO ordered. That truck comes back from the customer at your cost.",
+        "messageAr": "لقد حمّلت منتجاً غير الذي طلبه أمر البيع. ستعود تلك الشاحنة من العميل على حسابك."
+      }
+    },
+    {
+      "id": "R-QTY-01",
+      "when": { "stage": "convert" },
+      "require": { "bagsMatchMt": true },
+      "onViolation": {
+        "severity": "soft",
+        "costOMR": 40,
+        "messageEn": "Bags and tonnes do not agree. One MT is 40 bags of 25 kg - get this wrong and the truck leaves short.",
+        "messageAr": "الأكياس والأطنان غير متطابقة. الطن الواحد = ٤٠ كيساً من ٢٥ كجم — والخطأ هنا يعني نقصاً في الحمولة."
+      }
+    },
+    {
+      "id": "R-DEADLINE-01",
+      "when": { "stage": "sequence" },
+      "require": { "sequencedByUrgency": true },
+      "onViolation": {
+        "severity": "soft",
+        "costOMR": 60,
+        "messageEn": "You sequenced by arrival order, not by real urgency. Deadline, production readiness and transit time decide the queue.",
+        "messageAr": "رتّبت حسب وقت الوصول لا حسب الإلحاح الحقيقي. الموعد النهائي وجاهزية الإنتاج وزمن النقل هي ما يحدد الطابور."
+      }
+    },
+    {
+      "id": "R-GHOSTSO-01",
+      "when": { "stage": "reconcile" },
+      "require": { "reportedMissingSo": true },
+      "onViolation": {
+        "severity": "soft",
+        "costOMR": 80,
+        "messageEn": "An order existed that never reached the list, and it went unreported. Always cross-check the system against reality.",
+        "messageAr": "كان هناك أمر بيع لم يظهر في القائمة ولم يُبلَّغ عنه. قابل النظام بالواقع دائماً."
+      }
+    }
+  ]
+}

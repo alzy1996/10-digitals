@@ -1,0 +1,2068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>OFM Forklift Warehouse v2</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: #efe2c4;
+    font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+  }
+  #scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; }
+  #scene canvas { display: block; }
+
+  .panel {
+    background: rgba(56, 42, 26, 0.86);
+    color: #fff3dd;
+    border: 2px solid rgba(255, 214, 140, 0.45);
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  }
+
+  /* ---------- SO card (left) ---------- */
+  #so {
+    position: fixed; top: 10px; left: 10px; z-index: 20;
+    padding: 10px 13px; pointer-events: none;
+    min-width: 208px; max-width: 47vw;
+  }
+  #so .lbl { font-size: 12px; letter-spacing: 1.5px; color: #d8c39a; }
+  #soNum { font-size: 22px; font-weight: 800; color: #ffd98a; line-height: 1.15; }
+  #soCust { font-size: 14px; color: #cfe0b5; margin-bottom: 5px; }
+  #soCode {
+    font-family: "Courier New", monospace; font-size: 27px; font-weight: 800;
+    color: #ffe9b8; letter-spacing: 2px;
+  }
+  #soQty { font-size: 14px; color: #e8d9a8; margin-bottom: 6px; }
+  #soProg { font-size: 17px; font-weight: 800; color: #fff3dd; }
+  #soProg .got { color: #9fe08a; }
+  #barWrap { margin-top: 7px; height: 9px; background: #3a3226; border-radius: 5px; overflow: hidden; border: 1px solid #6b5b3e; }
+  #bar { height: 100%; width: 100%; background: #7fc46a; transition: background 0.2s; }
+  #docs { margin-top: 7px; font-size: 13px; font-weight: 800; letter-spacing: 1px; }
+  #docs .ok { color: #9fe08a; }
+  #docs .no { color: #ff8a75; }
+
+  /* ---------- stats (right) ---------- */
+  #hud {
+    position: fixed; top: 10px; right: 10px; z-index: 20;
+    padding: 10px 13px; pointer-events: none; text-align: right;
+    font-size: 15px; line-height: 1.5; min-width: 148px;
+  }
+  #hud .big { font-size: 25px; font-weight: 800; color: #ffd98a; }
+  #hud .lbl { font-size: 12px; letter-spacing: 1.5px; color: #d8c39a; }
+  #hud .neg { color: #ff8a75; }
+  #strikes { letter-spacing: 3px; font-size: 18px; }
+  #strikes .on { color: #ff6a55; }
+  #strikes .off { color: rgba(255,255,255,0.25); }
+  #hudHigh { font-size: 13px; color: #cfe0b5; }
+  #fifoHud { font-size: 13px; color: #cfe0b5; }
+
+  /* ---------- safety banner ---------- */
+  #safety {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    z-index: 26; display: none; pointer-events: none;
+    background: rgba(140, 26, 14, 0.92); color: #ffe4dc;
+    border: 3px solid #ff8a66; border-radius: 12px;
+    padding: 10px 22px; font-size: 20px; font-weight: 900; letter-spacing: 1px;
+    text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  }
+  #safety .sub { font-size: 14px; font-weight: 600; letter-spacing: 0; margin-top: 2px; }
+
+  #toast {
+    position: fixed; top: 118px; left: 50%; transform: translateX(-50%);
+    z-index: 30; padding: 11px 20px; border-radius: 10px;
+    font-size: 19px; font-weight: 800; text-align: center;
+    max-width: 86vw; opacity: 0; transition: opacity 0.25s;
+    pointer-events: none; border: 3px solid transparent;
+  }
+  #toast.good { background: rgba(38, 92, 42, 0.94); color: #d8ffd0; border-color: #7fce6f; }
+  #toast.bad  { background: rgba(122, 30, 22, 0.95); color: #ffd9d2; border-color: #ff7a66; }
+
+  #tip {
+    position: fixed; left: 10px; bottom: 176px; z-index: 28;
+    max-width: 310px; padding: 10px 34px 10px 12px;
+    display: none; font-size: 14px; line-height: 1.35;
+    background: rgba(30, 48, 64, 0.92); color: #d8ecff;
+    border: 2px solid rgba(140, 200, 255, 0.55); border-radius: 10px;
+  }
+  #tip .ttl { font-size: 12px; letter-spacing: 1.5px; color: #8cc8ff; font-weight: 800; display: block; margin-bottom: 3px; }
+  #tipX {
+    position: absolute; top: 4px; right: 6px; border: 0; background: transparent;
+    color: #8cc8ff; font-size: 18px; font-weight: 800; cursor: pointer; padding: 2px 6px;
+  }
+
+  #teach {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    z-index: 35; width: 86vw; max-width: 400px; padding: 16px 18px; display: none;
+    background: rgba(94, 34, 24, 0.95); color: #ffe9dd;
+    border: 3px solid #ff9a66; border-radius: 12px; text-align: center;
+  }
+  #teach h2 { margin: 0 0 6px 0; font-size: 21px; color: #ffc9a8; }
+  #teach p { margin: 0 0 12px 0; font-size: 16px; line-height: 1.42; }
+  #teach .cost { font-size: 18px; font-weight: 800; color: #ffb0a0; margin-bottom: 10px; }
+  #teach .abtn { min-width: 0; width: 100%; }
+
+  /* ---------- controls ---------- */
+  .abtn {
+    font-size: 17px; font-weight: 800; letter-spacing: 0.5px;
+    padding: 12px 16px; border-radius: 12px; border: 3px solid #4c3a22;
+    background: #f2b544; color: #3a2a12; cursor: pointer;
+    box-shadow: 0 4px 0 #4c3a22; text-align: center; font-family: inherit;
+  }
+  .abtn:active { transform: translateY(3px); box-shadow: 0 1px 0 #4c3a22; }
+  .abtn.go { background: #79c25f; color: #12300c; border-color: #2f5423; box-shadow: 0 4px 0 #2f5423; }
+  .abtn:disabled, .abtn.off {
+    background: #9b938a; color: #5b554e; border-color: #4c463f;
+    box-shadow: 0 4px 0 #4c463f; cursor: default;
+  }
+
+  #docRow {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    z-index: 25; display: flex; gap: 10px; justify-content: center;
+    max-width: 96vw; flex-wrap: wrap;
+  }
+  #docRow .abtn { min-width: 118px; }
+
+  #action {
+    position: fixed; right: 18px; bottom: 26px; width: 104px; height: 104px;
+    border-radius: 50%; border: 3px solid #4c3a22; background: #f2b544; color: #3a2a12;
+    font-size: 18px; font-weight: 900; z-index: 25; cursor: pointer;
+    font-family: inherit; box-shadow: 0 5px 0 #4c3a22; letter-spacing: 0.5px;
+  }
+  #action:active { transform: translateY(3px); box-shadow: 0 1px 0 #4c3a22; }
+  #action.off { background: #9b938a; color: #5b554e; border-color: #4c463f; box-shadow: 0 5px 0 #4c463f; }
+
+  #forkCol { position: fixed; right: 22px; bottom: 142px; z-index: 25; display: flex; flex-direction: column; gap: 8px; }
+  #forkCol .abtn { width: 96px; padding: 11px 0; font-size: 16px; }
+
+  #hornBtn { position: fixed; left: 168px; bottom: 40px; z-index: 25; width: 88px; padding: 13px 0; font-size: 16px; }
+
+  #joy {
+    position: fixed; left: 20px; bottom: 26px; width: 130px; height: 130px;
+    border-radius: 50%; background: rgba(56, 42, 26, 0.45);
+    border: 3px solid rgba(255, 214, 140, 0.5); z-index: 25; display: none;
+  }
+  #joyKnob {
+    position: absolute; left: 40px; top: 40px; width: 44px; height: 44px;
+    border-radius: 50%; background: rgba(242, 181, 68, 0.9);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+
+  #hint {
+    position: fixed; left: 50%; bottom: 88px; transform: translateX(-50%);
+    z-index: 22; font-size: 14px; color: #6b5836; pointer-events: none;
+    background: rgba(255, 246, 224, 0.88); border-radius: 10px;
+    padding: 6px 14px; font-weight: 600; max-width: 88vw; text-align: center;
+  }
+
+  #flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 24; transition: opacity 0.55s; }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 50; display: flex; align-items: center; justify-content: center;
+    background: rgba(40, 28, 14, 0.8);
+  }
+  .card {
+    width: 88vw; max-width: 580px; max-height: 92vh; overflow-y: auto;
+    padding: 24px; text-align: center;
+  }
+  .card h1 { margin: 0 0 6px 0; font-size: 32px; color: #ffd98a; }
+  .card h3 { margin: 0 0 14px 0; font-size: 16px; color: #cfe0b5; font-weight: 600; letter-spacing: 1px; }
+  .card p, .card li { font-size: 15.5px; line-height: 1.5; color: #f3e6c8; text-align: left; }
+  .card ul { padding-left: 20px; margin: 8px 0 14px 0; }
+  .card .kbd {
+    background: #4c3a22; border: 1px solid #7a5f36; border-radius: 4px;
+    padding: 1px 7px; font-size: 13px; color: #ffe9b8; font-weight: 700;
+  }
+  .card .scoreLine { font-size: 26px; font-weight: 800; color: #ffd98a; margin: 6px 0; }
+  .card .highLine { font-size: 17px; color: #cfe0b5; margin-bottom: 12px; }
+  .bigbtn {
+    font-size: 24px; font-weight: 900; letter-spacing: 1px;
+    padding: 15px 40px; border-radius: 14px; border: 3px solid #4c3a22;
+    background: #f2b544; color: #3a2a12; cursor: pointer;
+    box-shadow: 0 5px 0 #4c3a22; font-family: inherit; margin-top: 10px;
+  }
+  .bigbtn:active { transform: translateY(3px); box-shadow: 0 1px 0 #4c3a22; }
+
+  /* shift report table */
+  #report { width: 100%; border-collapse: collapse; font-size: 16px; margin: 6px 0 12px 0; }
+  #report td { padding: 6px 4px; border-bottom: 1px solid rgba(255,220,150,0.22); text-align: left; color: #f3e6c8; }
+  #report td:last-child { text-align: right; font-weight: 800; color: #ffe9b8; }
+  #report tr.bad td:last-child { color: #ff9a85; }
+  #report tr.good td:last-child { color: #9fe08a; }
+  .todo {
+    display: inline-block; font-size: 10px; letter-spacing: 1px; font-weight: 800;
+    background: rgba(255, 170, 60, 0.18); color: #ffbe63;
+    border: 1px solid rgba(255, 170, 60, 0.5); border-radius: 4px;
+    padding: 0 4px; margin-left: 5px; vertical-align: middle;
+  }
+  .note { font-size: 12.5px; color: #c3b391; line-height: 1.45; margin-top: 10px; text-align: left; }
+
+  @media (max-width: 480px) {
+    #so { min-width: 168px; font-size: 13px; padding: 8px 10px; }
+    #soNum { font-size: 19px; }
+    #soCode { font-size: 23px; }
+    #hud { font-size: 13px; min-width: 122px; padding: 8px 10px; }
+    #hud .big { font-size: 21px; }
+    #action { width: 92px; height: 92px; font-size: 16px; }
+    #forkCol { bottom: 128px; }
+    #forkCol .abtn { width: 86px; }
+  }
+</style>
+</head>
+<body>
+<div id="scene"></div>
+
+<div id="so" class="panel">
+  <div class="lbl">SALES ORDER</div>
+  <div id="soNum">SO-0000</div>
+  <div id="soCust">&mdash;</div>
+  <div class="lbl">PRODUCT CODE</div>
+  <div id="soCode">---</div>
+  <div id="soQty">&mdash;</div>
+  <div id="soProg">0 / 0 PALLETS</div>
+  <div id="barWrap"><div id="bar"></div></div>
+  <div id="docs"></div>
+</div>
+
+<div id="hud" class="panel">
+  <div class="lbl">LEDGER</div>
+  <div class="big" id="omr">0 OMR</div>
+  <div>SCORE <b id="score">0</b></div>
+  <div>SHIFT <b id="level">1</b></div>
+  <div id="fifoHud">FIFO 100%</div>
+  <div id="strikes"></div>
+  <div id="hudHigh">BEST: 0 OMR</div>
+</div>
+
+<div id="safety"></div>
+<div id="toast"></div>
+<div id="flash"></div>
+
+<div id="tip"><span class="ttl">ACADEMY TIP</span><span id="tipTxt"></span><button id="tipX">&times;</button></div>
+
+<div id="teach">
+  <h2 id="teachTitle">STOPPED</h2>
+  <p id="teachBody">...</p>
+  <div class="cost" id="teachCost"></div>
+  <button class="abtn go" id="teachBtn">UNDERSTOOD</button>
+</div>
+
+<div id="hint">WASD / arrows drive &middot; SPACE pick &amp; drop &middot; Q/E forks &middot; H horn</div>
+
+<div id="joy"><div id="joyKnob"></div></div>
+<button id="action" class="off">PICK</button>
+<div id="forkCol">
+  <button class="abtn" id="btnRaise">RAISE &#9650;</button>
+  <button class="abtn" id="btnLower">LOWER &#9660;</button>
+</div>
+<button class="abtn" id="hornBtn">HORN</button>
+
+<div id="docRow">
+  <button class="abtn off" id="btnDN">ISSUE DN</button>
+  <button class="abtn off" id="btnPass">GATE PASS</button>
+</div>
+
+<div id="startOv" class="overlay">
+  <div class="card panel">
+    <h1>OFM FORKLIFT WAREHOUSE</h1>
+    <h3>V2 &mdash; FIFO &middot; SAFETY &middot; DOCUMENTS</h3>
+    <p>You are the forklift operator on the Feed Mills dispatch shift. A Sales Order names a
+    <b>product code</b> and a quantity. Pull those pallets out of the racking and load the truck
+    on the <b>DISPATCH DOCK</b>.</p>
+    <ul>
+      <li><b>FIFO &mdash; oldest batch first.</b> Every pallet carries a batch age. The newest stock
+      sits nearest the aisle mouth; the oldest is deeper in. Taking the easy one costs you.</li>
+      <li><b>Right code only.</b> 716 is not 715. A wrong pallet on the truck is a rejected load.</li>
+      <li><b>Stock ages.</b> A batch past its shelf life is written off &mdash; straight out of the ledger.</li>
+      <li><b>Forks down to travel.</b> Driving with a raised load is an unsafe act.</li>
+      <li><b>Pedestrians have right of way.</b> Sound the <span class="kbd">HORN</span> at the walkway.
+      Striking someone ends the shift immediately &mdash; no partial credit, ever.</li>
+      <li><b>Documents.</b> The truck leaves on <b>DN</b> then <b>GATE PASS</b>, in that order.
+      Until it does, demurrage runs.</li>
+    </ul>
+    <p><span class="kbd">W A S D</span> or <span class="kbd">&#8592;&#8593;&#8595;&#8594;</span> drive &middot;
+    <span class="kbd">SPACE</span> pick / drop &middot; <span class="kbd">Q</span><span class="kbd">E</span> forks
+    &middot; <span class="kbd">H</span> horn &middot; <span class="kbd">R</span> reset if stuck.
+    On a phone: left stick to drive, right button to pick, fork buttons on the right.</p>
+    <div class="note">Product codes are OFM's real core B&uuml;hler codes and the customers are real
+    dispatch destinations. Shelf life, write-off value and demurrage rate are placeholders pending
+    confirmation and are marked <span class="todo">TODO_CONFIRM</span> in the shift report.</div>
+    <button class="bigbtn" id="btnStart">START SHIFT</button>
+  </div>
+</div>
+
+<div id="overOv" class="overlay" style="display:none;">
+  <div class="card panel">
+    <h1 id="overTitle">SHIFT OVER</h1>
+    <h3 id="overSub">5 strikes &mdash; the supervisor called it.</h3>
+    <div class="scoreLine" id="finalScore">0 OMR</div>
+    <table id="report"></table>
+    <div class="highLine" id="finalHigh">BEST: 0 OMR</div>
+    <button class="bigbtn" id="btnRestart">RESTART SHIFT</button>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="vendor/RGBELoader.js"></script>
+<script>
+"use strict";
+/* ================= OFM FORKLIFT WAREHOUSE v2 =================
+   FIFO batch discipline, real product codes, HSE safety layer,
+   document chain and an OMR ledger, on a PBR/HDR warehouse.
+   ============================================================= */
+
+/* On file:// most browsers taint/block local images for WebGL and XHR,
+   so we skip asset loading there and keep the procedural fallback look. */
+var ASSETS_OK = (location.protocol !== "file:");
+
+if (typeof THREE === "undefined") {
+  document.getElementById("startOv").innerHTML =
+    '<div class="card panel"><h1>ENGINE MISSING</h1><p>The 3D engine (vendor/three.min.js) did not load. ' +
+    'Make sure the games folder was copied whole, then reload.</p></div>';
+  throw new Error("THREE missing");
+}
+
+/* ---------------- world data (OFM canon) ---------------- */
+/* the 16 core Buhler codes the department works with daily */
+var CORE_CODES = ["716", "715", "941", "940", "835", "920", "883", "706",
+                  "951", "704", "751", "709", "711", "826", "600", "892"];
+/* confirmed dispatch destinations */
+var CUSTOMERS = ["MAZOON DAIRY", "SOHAR POULTRY", "PUNJNAD", "ATYAB SBB",
+                 "AL KAWTHER", "AL SALLAN", "SFM LIWA", "ROYAL COURT",
+                 "MINISTRY AGRI BARKA", "OSOOL HAIMA"];
+
+var BAGS_PER_PALLET = 40;   /* 40 x 25 kg = 1 MT per pallet */
+var KG_PER_BAG = 25;
+
+/* placeholders pending confirmation - surfaced with a TODO_CONFIRM badge */
+var SHELF_DAYS = 45;             /* stock age at which a batch is written off */
+var WRITEOFF_OMR = 35;           /* value lost per written-off pallet */
+var DEMURRAGE_OMR_PER_MIN = 6;   /* cost of a truck waiting on paperwork */
+var DAY_SECONDS = 7;             /* one stock-age "day" per 7 seconds of shift */
+
+var TIPS = {
+  fifo: "FIFO: the oldest batch leaves first. The newest pallet is always the closest one - that is exactly why it is the wrong one.",
+  code: "716 is not 715. Read the code on the pallet, not the colour of the bags.",
+  age: "Stock does not wait. A batch past its shelf life is written off at full value and nobody gets it back.",
+  forks: "Travel with the forks down. A raised load blocks your view and tips the truck at the first turn.",
+  ped: "Pedestrians own the walkway. Horn at every crossing and let them pass - an injury is not a score, it is the end of the shift.",
+  docs: "The truck leaves on DN then GATE PASS, in that order. Paperwork is part of the payload.",
+  mt: "One pallet = 40 bags = 1 MT. 25 MT on the order means 1,000 bags on the truck.",
+  spill: "A spill is an incident waiting for a witness. Clear it when you see it - it pays better than driving round it."
+};
+var AMBIENT_TIPS = ["fifo", "code", "age", "forks", "ped", "docs", "mt", "spill"];
+
+/* ---------------- globals ---------------- */
+var scene, camera, renderer;
+var maxAniso = 1;
+var audioCtx = null;
+
+var colliders = [];   /* {minX,maxX,minZ,maxZ} rack + building blockers */
+var slots = [];       /* {x,y,z,pallet,depth} */
+var pallets = [];     /* pickable pallet records */
+var loaded = [];      /* pallets already on the truck */
+var peds = [];        /* pedestrian NPCs */
+var spills = [];      /* floor hazards */
+
+var bagMat = null, palletMat = null, steelRackMat = null;
+
+var G = {
+  state: "start",
+  score: 0, omr: 0, strikes: 0, level: 1,
+  carried: null, so: null,
+  picks: 0, fifoBad: 0, writeOffs: 0, moved: 0, sosDone: 0,
+  unsafeT: 0, safetyClean: true,
+  demurrageT: 0, demurragePaid: 0,
+  seenCodes: {},
+  high: 0, tipT: 26, tipIdx: 0,
+  hornT: 0
+};
+
+/* ---------------- helpers ---------------- */
+function el(id) { return document.getElementById(id); }
+function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function randi(a, b) { return Math.floor(a + Math.random() * (b - a + 1)); }
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+/* author colours in sRGB and convert once, so the procedural look survives sRGB output */
+function col(h) { return new THREE.Color(h).convertSRGBToLinear(); }
+/* keep every standard material at the same, non-blown-out env response */
+function tame(m) { m.envMapIntensity = 0.5; return m; }
+
+/* ---------------- audio ---------------- */
+function ensureAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch (e) { audioCtx = null; }
+}
+function beep(freq, dur, type, vol, delay) {
+  try {
+    if (!audioCtx) return;
+    var t0 = audioCtx.currentTime + (delay || 0);
+    var o = audioCtx.createOscillator();
+    var g = audioCtx.createGain();
+    o.type = type || "square";
+    o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(vol || 0.05, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  } catch (e) {}
+}
+function sndGood() { beep(660, 0.11, "square", 0.05, 0); beep(880, 0.15, "square", 0.05, 0.1); }
+function sndBad() { beep(190, 0.28, "sawtooth", 0.07, 0); beep(140, 0.3, "sawtooth", 0.06, 0.16); }
+function sndPick() { beep(240, 0.08, "square", 0.05, 0); beep(460, 0.09, "square", 0.04, 0.07); }
+function sndDrop() { beep(150, 0.13, "sine", 0.07, 0); }
+function sndCoin() { beep(880, 0.09, "square", 0.05, 0); beep(1318, 0.15, "square", 0.05, 0.09); }
+function sndHorn() { beep(420, 0.26, "square", 0.08, 0); beep(330, 0.26, "square", 0.07, 0.02); }
+function sndAlarm() { beep(880, 0.16, "sawtooth", 0.08, 0); beep(660, 0.16, "sawtooth", 0.08, 0.18); beep(880, 0.16, "sawtooth", 0.08, 0.36); }
+function sndCrash() {
+  try {
+    if (!audioCtx) return;
+    var len = Math.floor(audioCtx.sampleRate * 0.22);
+    var buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) { d[i] = (Math.random() * 2 - 1) * (1 - i / len); }
+    var n = audioCtx.createBufferSource(); n.buffer = buf;
+    var g = audioCtx.createGain(); g.gain.value = 0.2;
+    n.connect(g); g.connect(audioCtx.destination); n.start();
+  } catch (e) {}
+  beep(85, 0.22, "sawtooth", 0.12, 0);
+}
+
+/* ---------------- UI helpers ---------------- */
+var toastTimer = null;
+function showToast(msg, good) {
+  var t = el("toast");
+  t.textContent = msg;
+  t.className = good ? "good" : "bad";
+  t.style.opacity = "1";
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.style.opacity = "0"; }, 2600);
+  if (good) sndGood(); else sndBad();
+}
+function flash(cssColor) {
+  var f = el("flash");
+  f.style.transition = "none";
+  f.style.background = cssColor;
+  f.style.opacity = "1";
+  void f.offsetWidth;
+  f.style.transition = "opacity .55s";
+  f.style.opacity = "0";
+}
+
+var tipSeen = {}, tipTimer = null;
+function showTip(txt) {
+  el("tipTxt").textContent = txt;
+  el("tip").style.display = "block";
+  if (tipTimer) clearTimeout(tipTimer);
+  tipTimer = setTimeout(function () { el("tip").style.display = "none"; }, 14000);
+}
+function academy(key) {
+  if (tipSeen[key]) return;
+  tipSeen[key] = true;
+  showTip(TIPS[key]);
+}
+
+var teachOpen = false;
+function showTeach(title, body, cost) {
+  teachOpen = true;
+  el("teachTitle").textContent = title;
+  el("teachBody").textContent = body;
+  el("teachCost").textContent = cost || "";
+  el("teach").style.display = "block";
+}
+function hideTeach() {
+  teachOpen = false;
+  el("teach").style.display = "none";
+}
+
+/* ---------------- textures ---------------- */
+function loadTex(url, rx, ry, srgb, cb) {
+  if (!ASSETS_OK) return;
+  try {
+    new THREE.TextureLoader().load(url, function (tex) {
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(rx, ry);
+      tex.anisotropy = maxAniso;
+      if (srgb) tex.encoding = THREE.sRGBEncoding;
+      cb(tex);
+    }, undefined, function () { /* onError: keep the procedural material */ });
+  } catch (e) {}
+}
+/* maps: which channels exist on disk for this texture set.
+   "d" = diffuse only, "dnr" = diffuse+normal+rough, "dnra" adds AO.
+   Requesting a channel that was never shipped just 404s, so we ask for
+   exactly what is there. */
+function pbrMat(color, dir, rx, ry, maps) {
+  maps = maps || "dnr";
+  var mat = new THREE.MeshStandardMaterial({ color: col(color), roughness: 0.92, metalness: 0.02 });
+  mat.envMapIntensity = 0.5;
+  loadTex(dir + "/diff.jpg", rx, ry, true, function (tex) {
+    mat.map = tex; mat.color.set(0xffffff); mat.needsUpdate = true;
+  });
+  if (maps.indexOf("n") >= 0) {
+    loadTex(dir + "/nor.jpg", rx, ry, false, function (tex) {
+      mat.normalMap = tex; mat.needsUpdate = true;
+    });
+  }
+  if (maps.indexOf("r") >= 0) {
+    loadTex(dir + "/rough.jpg", rx, ry, false, function (tex) {
+      mat.roughnessMap = tex; mat.roughness = 1.0; mat.needsUpdate = true;
+    });
+  }
+  if (maps.indexOf("a") >= 0) {
+    loadTex(dir + "/ao.jpg", rx, ry, false, function (tex) {
+      mat.aoMap = tex; mat.needsUpdate = true;
+    });
+  }
+  return mat;
+}
+
+/* ---------------- sky / environment ---------------- */
+function setupSky() {
+  /* procedural warm-gradient sky installed first = guaranteed fallback */
+  var c = document.createElement("canvas");
+  c.width = 4; c.height = 256;
+  var g = c.getContext("2d");
+  var gr = g.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0.0, "#8fb8e8");
+  gr.addColorStop(0.5, "#cfd6c2");
+  gr.addColorStop(0.72, "#f0dfba");
+  gr.addColorStop(1.0, "#ecd9b2");
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 4, 256);
+  var grad = new THREE.CanvasTexture(c);
+  grad.encoding = THREE.sRGBEncoding;
+  scene.background = grad;
+  scene.fog = new THREE.Fog(col(0x6a6152), 90, 220);
+
+  if (!ASSETS_OK) return;
+  if (typeof THREE.RGBELoader === "undefined") return;
+  try {
+    new THREE.RGBELoader().load("assets/hdri/sky.hdr", function (hdr) {
+      try {
+        var pm = new THREE.PMREMGenerator(renderer);
+        pm.compileEquirectangularShader();
+        var env = pm.fromEquirectangular(hdr).texture;
+        hdr.mapping = THREE.EquirectangularReflectionMapping;
+        scene.environment = env;
+        scene.background = hdr;
+        pm.dispose();
+      } catch (e) { /* keep procedural sky */ }
+    }, undefined, function () { /* keep procedural sky */ });
+  } catch (e) { /* keep procedural sky */ }
+}
+
+/* ---------------- pallet label sprites ----------------
+   One canvas per pallet, repainted in place when the batch ages. A shared
+   cache keyed by code+age would grow without bound over a long shift. */
+function paintLabel(rec) {
+  var x = rec.labelCtx;
+  var pctLeft = 1 - clamp(rec.age / SHELF_DAYS, 0, 1);
+  var band = pctLeft > 0.5 ? "#2f7d4f" : (pctLeft > 0.22 ? "#b5771f" : "#a6301f");
+  x.fillStyle = "#f4ecd8";
+  x.fillRect(0, 0, 256, 128);
+  x.fillStyle = band;
+  x.fillRect(0, 92, 256, 36);
+  x.strokeStyle = "#2e2a24"; x.lineWidth = 6;
+  x.strokeRect(3, 3, 250, 122);
+  x.fillStyle = "#2e2a24";
+  x.textAlign = "center"; x.textBaseline = "middle";
+  x.font = "bold 62px 'Courier New', monospace";
+  x.fillText(rec.code, 128, 48);
+  x.fillStyle = "#fff6e2";
+  x.font = "bold 26px Arial";
+  x.fillText(rec.age + " DAYS", 128, 110);
+  rec.labelTex.needsUpdate = true;
+  rec.labelAge = rec.age;
+}
+function makeLabelSprite(rec) {
+  var cv = document.createElement("canvas");
+  cv.width = 256; cv.height = 128;
+  rec.labelCtx = cv.getContext("2d");
+  rec.labelTex = new THREE.CanvasTexture(cv);
+  rec.labelTex.encoding = THREE.sRGBEncoding;
+  paintLabel(rec);
+  var spr = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: rec.labelTex, depthTest: true, transparent: true
+  }));
+  spr.scale.set(1.12, 0.56, 1);
+  spr.position.y = 1.42;
+  return spr;
+}
+function makeTextPlane(w, h, draw) {
+  var cv = document.createElement("canvas");
+  cv.width = 1024; cv.height = Math.round(1024 * h / w);
+  draw(cv.getContext("2d"), cv.width, cv.height);
+  var tex = new THREE.CanvasTexture(cv);
+  tex.encoding = THREE.sRGBEncoding;
+  tex.anisotropy = maxAniso;
+  return new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+}
+
+/* ================= WORLD ================= */
+var W2 = 42, D2 = 32;
+var ROWZ = [-22, -13.5, -5, 3.5, 12];
+var ROWX0 = -30, ROWX1 = 30;
+var UNITW = 3.0;
+var BEAM_Y = 1.5;
+var WALK_Z = 18.6;                 /* pedestrian walkway centre line */
+var dockZone = { minX: -6.5, maxX: 6.5, minZ: 24.5, maxZ: 31.4 };
+var dockGlowMat = null;
+var truckGroup = null, truckX = 0, truckState = "at";  /* at | leaving | arriving */
+var truckT = 0;
+
+function buildWorld() {
+  /* ---- floor ---- */
+  var floorMat = pbrMat(0xbfb49c, "assets/tex/concrete", 22, 17, "dnra");
+  var floorGeo = new THREE.PlaneGeometry(W2 * 2, D2 * 2);
+  floorGeo.setAttribute("uv2", new THREE.BufferAttribute(floorGeo.attributes.uv.array, 2));
+  var floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  /* asphalt apron outside the dock door */
+  var apron = new THREE.Mesh(new THREE.PlaneGeometry(46, 26),
+    pbrMat(0x8a8478, "assets/tex/asphalt", 4, 3, "dnr"));
+  apron.rotation.x = -Math.PI / 2;
+  apron.position.set(0, -0.02, D2 + 13);
+  apron.receiveShadow = true;
+  scene.add(apron);
+
+  /* ---- painted aisle lines ---- */
+  var lineMat = new THREE.MeshBasicMaterial({ color: col(0xc9a84c), transparent: true, opacity: 0.5 });
+  function strip(x, z, w, d, mat) {
+    var m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat || lineMat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(x, 0.02, z);
+    scene.add(m);
+    return m;
+  }
+  var i;
+  for (i = 0; i < ROWZ.length; i++) {
+    strip(0, ROWZ[i] - 2.6, 62, 0.18);
+    strip(0, ROWZ[i] + 2.6, 62, 0.18);
+  }
+
+  /* ---- pedestrian walkway (hatched) ---- */
+  var walkMat = new THREE.MeshBasicMaterial({ color: col(0xe0b544), transparent: true, opacity: 0.34 });
+  strip(0, WALK_Z, W2 * 2 - 4, 2.6, walkMat);
+  var hatchMat = new THREE.MeshBasicMaterial({ color: col(0xfff0c0), transparent: true, opacity: 0.5 });
+  for (i = -26; i <= 26; i += 2.2) {
+    var h = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 2.4), hatchMat);
+    h.rotation.x = -Math.PI / 2;
+    h.rotation.z = 0.5;
+    h.position.set(i, 0.025, WALK_Z);
+    scene.add(h);
+  }
+  var walkSign = makeTextPlane(7, 1.0, function (x, w, hh) {
+    x.fillStyle = "#3a2f18"; x.fillRect(0, 0, w, hh);
+    x.strokeStyle = "#f0c060"; x.lineWidth = 7; x.strokeRect(6, 6, w - 12, hh - 12);
+    x.fillStyle = "#ffd98a"; x.textAlign = "center"; x.textBaseline = "middle";
+    x.font = "bold 60px Arial";
+    x.fillText("PEDESTRIAN WALKWAY - HORN", w / 2, hh / 2);
+  });
+  walkSign.position.set(-24, 3.2, WALK_Z - 1.6);
+  scene.add(walkSign);
+
+  /* ---- walls ---- */
+  var wallMat = pbrMat(0xb0a58e, "assets/tex/concrete", 14, 2, "dnr");
+  function wall(x, z, w, d) {
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w, 9, d), wallMat);
+    m.position.set(x, 4.5, z);
+    m.receiveShadow = true; m.castShadow = true;
+    scene.add(m);
+  }
+  wall(0, -D2 - 0.25, W2 * 2 + 1, 0.5);
+  wall(-W2 - 0.25, 0, 0.5, D2 * 2 + 1);
+  wall(W2 + 0.25, 0, 0.5, D2 * 2 + 1);
+  /* south wall in two pieces, leaving a 14 m dock opening in the middle */
+  var segW = W2 + 0.5 - 7;                  /* from the corner in to x = -7 / +7 */
+  wall(-(7 + segW / 2), D2 + 0.25, segW, 0.5);
+  wall(7 + segW / 2, D2 + 0.25, segW, 0.5);
+
+  /* ---- roof beams (depth without cost) ---- */
+  var beamSteel = pbrMat(0x9aa2ab, "assets/tex/steel", 8, 1, "dnr");
+  for (i = -36; i <= 36; i += 12) {
+    var rb = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, D2 * 2), beamSteel);
+    rb.position.set(i, 8.6, 0);
+    scene.add(rb);
+  }
+
+  /* ---- OFM wall sign ---- */
+  var sign = makeTextPlane(26, 4.2, function (x, w, h) {
+    x.fillStyle = "#2f3d52"; x.fillRect(0, 0, w, h);
+    x.strokeStyle = "#c8a86a"; x.lineWidth = 8; x.strokeRect(10, 10, w - 20, h - 20);
+    x.fillStyle = "#f2ede2"; x.textAlign = "center"; x.textBaseline = "middle";
+    x.font = "bold 92px Arial";
+    x.fillText("OMAN FLOUR MILLS", w / 2, h * 0.34);
+    x.fillStyle = "#f0c060"; x.font = "bold 54px Arial";
+    x.fillText("FEED MILLS  ·  WAREHOUSE  ·  FIFO STOCK", w / 2, h * 0.72);
+  });
+  sign.position.set(0, 5.8, -D2 + 0.06);
+  scene.add(sign);
+
+  /* ---- dispatch dock ---- */
+  dockGlowMat = new THREE.MeshStandardMaterial({
+    color: col(0x2f7d4f), emissive: col(0x2fae5f), emissiveIntensity: 0.5, roughness: 0.75
+  });
+  var zone = new THREE.Mesh(new THREE.PlaneGeometry(13, 6.8), dockGlowMat);
+  zone.rotation.x = -Math.PI / 2;
+  zone.position.set(0, 0.028, 28);
+  scene.add(zone);
+  strip(0, 24.55, 13.4, 0.25);
+  strip(-6.6, 28, 0.25, 6.9);
+  strip(6.6, 28, 0.25, 6.9);
+
+  var dockSign = makeTextPlane(9, 1.3, function (x, w, h) {
+    x.fillStyle = "#1e3327"; x.fillRect(0, 0, w, h);
+    x.strokeStyle = "#7fc46a"; x.lineWidth = 6; x.strokeRect(6, 6, w - 12, h - 12);
+    x.fillStyle = "#8fe08f"; x.textAlign = "center"; x.textBaseline = "middle";
+    x.font = "bold 72px Arial";
+    x.fillText("DISPATCH DOCK", w / 2, h / 2);
+  });
+  dockSign.position.set(0, 6.1, D2 - 0.08);
+  dockSign.rotation.y = Math.PI;
+  scene.add(dockSign);
+
+  var bolGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.9, 10);
+  var bolMat = new THREE.MeshStandardMaterial({ color: col(0xd9a441), roughness: 0.6 });
+  var bolls = [[-6.9, 24.3], [6.9, 24.3], [-6.9, 31.2], [6.9, 31.2]];
+  for (i = 0; i < bolls.length; i++) {
+    var b = new THREE.Mesh(bolGeo, bolMat);
+    b.position.set(bolls[i][0], 0.45, bolls[i][1]);
+    b.castShadow = true;
+    scene.add(b);
+  }
+
+  buildTruck();
+  buildRacks();
+}
+
+/* ---- the flat bed at the dock, with an Omani yellow plate ---- */
+function buildTruck() {
+  truckGroup = new THREE.Group();
+  var steel = pbrMat(0x8d99a4, "assets/tex/steel", 3, 1, "dnr");
+  var deck = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.5, 12.4), steel);
+  deck.position.set(0, 1.35, 0);
+  deck.castShadow = true;
+  truckGroup.add(deck);
+  var headboard = new THREE.Mesh(new THREE.BoxGeometry(3.0, 1.6, 0.16), steel);
+  headboard.position.set(0, 2.4, -6.1);
+  truckGroup.add(headboard);
+
+  var cabMat = new THREE.MeshStandardMaterial({ color: col(0xc9d2d8), roughness: 0.42, metalness: 0.25 });
+  var cab = new THREE.Mesh(new THREE.BoxGeometry(2.7, 2.5, 2.6), cabMat);
+  cab.position.set(0, 2.1, 7.6);
+  cab.castShadow = true;
+  truckGroup.add(cab);
+  var glass = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.0, 0.1),
+    new THREE.MeshStandardMaterial({ color: col(0x1d2a33), roughness: 0.15, metalness: 0.5 }));
+  glass.position.set(0, 2.7, 8.92);
+  truckGroup.add(glass);
+
+  var wGeo = new THREE.CylinderGeometry(0.62, 0.62, 0.38, 16);
+  var wMat = new THREE.MeshStandardMaterial({ color: col(0x1e2126), roughness: 0.9 });
+  var wp = [[-1.45, -4.4], [1.45, -4.4], [-1.45, -2.9], [1.45, -2.9],
+            [-1.45, 1.6], [1.45, 1.6], [-1.45, 7.2], [1.45, 7.2]];
+  for (var i = 0; i < wp.length; i++) {
+    var w = new THREE.Mesh(wGeo, wMat);
+    w.rotation.z = Math.PI / 2;
+    w.position.set(wp[i][0], 0.62, wp[i][1]);
+    w.castShadow = true;
+    truckGroup.add(w);
+  }
+
+  /* Omani yellow plate */
+  var plate = makeTextPlane(1.5, 0.5, function (x, w, h) {
+    x.fillStyle = "#f2c400"; x.fillRect(0, 0, w, h);
+    x.strokeStyle = "#2b2b2b"; x.lineWidth = 10; x.strokeRect(5, 5, w - 10, h - 10);
+    x.fillStyle = "#1a1a1a"; x.textAlign = "center"; x.textBaseline = "middle";
+    x.font = "bold 150px Arial";
+    x.fillText("4 7 2 8 1", w / 2, h / 2);
+  });
+  plate.position.set(0, 1.0, 8.98);
+  truckGroup.add(plate);
+
+  truckGroup.position.set(0, 0, D2 + 6.5);
+  scene.add(truckGroup);
+}
+
+/* ---- racking ---- */
+function buildRacks() {
+  var upGeo = new THREE.BoxGeometry(0.16, 3.6, 0.16);
+  var beamGeo = new THREE.BoxGeometry(UNITW, 0.14, 0.12);
+  steelRackMat = pbrMat(0x7e8894, "assets/tex/steel", 1, 3, "dnr");
+  var beamMat = new THREE.MeshStandardMaterial({ color: col(0xc07a3a), roughness: 0.65, metalness: 0.3 });
+  beamMat.envMapIntensity = 0.5;
+
+  var nUnits = Math.round((ROWX1 - ROWX0) / UNITW);
+  var nRows = ROWZ.length;
+  var ups = new THREE.InstancedMesh(upGeo, steelRackMat, nRows * (nUnits + 1) * 2);
+  var beams = new THREE.InstancedMesh(beamGeo, beamMat, nRows * nUnits * 2 * 2);
+  ups.castShadow = true; beams.castShadow = true;
+
+  var d = new THREE.Object3D();
+  var ui = 0, bi = 0, r, iu, side, lvl;
+  for (r = 0; r < nRows; r++) {
+    var rz = ROWZ[r];
+    for (iu = 0; iu <= nUnits; iu++) {
+      for (side = -1; side <= 1; side += 2) {
+        d.position.set(ROWX0 + iu * UNITW, 1.8, rz + side * 1.15);
+        d.rotation.set(0, 0, 0); d.updateMatrix();
+        ups.setMatrixAt(ui++, d.matrix);
+      }
+    }
+    for (iu = 0; iu < nUnits; iu++) {
+      var cx = ROWX0 + (iu + 0.5) * UNITW;
+      for (side = -1; side <= 1; side += 2) {
+        for (lvl = 0; lvl < 2; lvl++) {
+          d.position.set(cx, lvl === 0 ? BEAM_Y : 3.4, rz + side * 1.15);
+          d.rotation.set(0, 0, 0); d.updateMatrix();
+          beams.setMatrixAt(bi++, d.matrix);
+        }
+      }
+    }
+    colliders.push({ minX: ROWX0 - 0.15, maxX: ROWX1 + 0.15, minZ: rz - 1.25, maxZ: rz + 1.25 });
+  }
+  ups.instanceMatrix.needsUpdate = true;
+  beams.instanceMatrix.needsUpdate = true;
+  scene.add(ups); scene.add(beams);
+
+  /* ---- slots. "depth" = how far from the aisle mouth (x = 0 side) ----
+     Depth drives the FIFO trap: old stock is racked deep, new stock lands
+     near the mouth, so the convenient pallet is the wrong one. */
+  for (r = 0; r < nRows; r++) {
+    for (iu = 0; iu < nUnits; iu++) {
+      var sx = ROWX0 + (iu + 0.5) * UNITW;
+      var depth = Math.abs(sx) / ROWX1;   /* 0 = near the centre aisle, 1 = deep end */
+      addSlot(sx, 0, ROWZ[r], depth);
+      addSlot(sx, 1.62, ROWZ[r], depth);
+    }
+  }
+  /* floor staging near the dock: always shallow */
+  var k, a, b2;
+  for (k = 0; k < 2; k++) {
+    var sgn = k === 0 ? -1 : 1;
+    for (a = 0; a < 3; a++) {
+      for (b2 = 0; b2 < 2; b2++) {
+        addSlot(sgn * (16 + a * 3.2), 0, 21.5 + b2 * 2.4, 0);
+      }
+    }
+  }
+}
+function addSlot(x, y, z, depth) {
+  slots.push({ x: x, y: y, z: z, pallet: null, depth: depth });
+}
+
+/* ================= PALLETS ================= */
+var palBaseGeo = new THREE.BoxGeometry(1.15, 0.13, 1.15);
+var palBagGeo = new THREE.BoxGeometry(1.02, 0.92, 1.02);
+var strapGeo = new THREE.BoxGeometry(1.06, 0.09, 1.06);
+var strapMat = tame(new THREE.MeshStandardMaterial({ color: col(0x2e2a24), roughness: 0.85 }));
+
+function makePalletMesh(rec) {
+  var g = new THREE.Group();
+  var base = new THREE.Mesh(palBaseGeo, palletMat);
+  base.position.y = 0.065;
+  base.castShadow = true;
+  g.add(base);
+  var bags = new THREE.Mesh(palBagGeo, bagMat);
+  bags.position.y = 0.59;
+  bags.castShadow = true;
+  g.add(bags);
+  var strap = new THREE.Mesh(strapGeo, strapMat);
+  strap.position.y = 0.62;
+  g.add(strap);
+
+  var spr = makeLabelSprite(rec);
+  g.add(spr);
+  rec.sprite = spr;
+  return g;
+}
+function relabel(rec) {
+  if (!rec.labelCtx) return;
+  if (rec.labelAge === rec.age) return;
+  paintLabel(rec);
+}
+function spawnPallet(code, age, slot) {
+  var rec = { code: code, age: age, labelAge: -1, state: "rack", slot: slot, baseY: slot.y, mesh: null };
+  rec.mesh = makePalletMesh(rec);
+  rec.mesh.position.set(slot.x, slot.y, slot.z);
+  scene.add(rec.mesh);
+  slot.pallet = rec;
+  pallets.push(rec);
+  return rec;
+}
+function freeSlots(maxDepth, minDepth) {
+  var out = [];
+  for (var i = 0; i < slots.length; i++) {
+    var s = slots[i];
+    if (s.pallet) continue;
+    if (maxDepth !== undefined && s.depth > maxDepth) continue;
+    if (minDepth !== undefined && s.depth < minDepth) continue;
+    out.push(s);
+  }
+  return out;
+}
+function spawnInDepthBand(code, age, minDepth, maxDepth) {
+  var fs = freeSlots(maxDepth, minDepth);
+  if (!fs.length) fs = freeSlots();
+  if (!fs.length) return null;
+  return spawnPallet(code, age, fs[randi(0, fs.length - 1)]);
+}
+function disposePallet(rec) {
+  if (rec.labelTex) { rec.labelTex.dispose(); rec.labelTex = null; rec.labelCtx = null; }
+  if (rec.sprite && rec.sprite.material) rec.sprite.material.dispose();
+}
+function removePallet(rec) {
+  if (rec.slot) { rec.slot.pallet = null; rec.slot = null; }
+  if (rec.mesh.parent) rec.mesh.parent.remove(rec.mesh);
+  disposePallet(rec);
+  var ix = pallets.indexOf(rec);
+  if (ix >= 0) pallets.splice(ix, 1);
+}
+
+/* the oldest available pallet of a code, ignoring what is on the forks */
+function oldestAge(code) {
+  var best = -1;
+  for (var i = 0; i < pallets.length; i++) {
+    var p = pallets[i];
+    if (p.code !== code) continue;
+    if (p.state === "carried") continue;
+    if (p.age > best) best = p.age;
+  }
+  return best;
+}
+
+function seedStock() {
+  /* a spread of codes, ages biased so the deep slots hold the old stock */
+  var codes = CORE_CODES.slice(0);
+  var i, s;
+  for (i = 0; i < slots.length; i++) {
+    s = slots[i];
+    var chance = s.y > 0.5 ? 0.4 : 0.5;
+    if (Math.random() > chance) continue;
+    /* deep slots skew old, shallow slots skew new */
+    var base = s.depth * 0.75 + Math.random() * 0.35;
+    var age = Math.round(clamp(base, 0, 1) * (SHELF_DAYS - 6)) + randi(0, 4);
+    spawnPallet(pick(codes), age, s);
+  }
+}
+
+/* ================= FORKLIFT ================= */
+var lift = new THREE.Group();
+var carriage = new THREE.Group();
+var wheels = [], steerWheels = [];
+var LIFT_R = 1.05;
+var FORK_TRAVEL = 0.12, FORK_MAX = 2.15, FORK_SAFE = 0.55;
+var forkY = FORK_TRAVEL, forkTarget = FORK_TRAVEL;
+var liftX = 0, liftZ = 22.0, heading = Math.PI;
+var speed = 0, velX = 0, velZ = 0, steerVis = 0, shake = 0;
+var beaconMesh = null;
+var PAL_LOCAL = new THREE.Vector3(0, 0.10, 1.72);
+
+function buildForklift() {
+  scene.add(lift);
+  var bodyMat = new THREE.MeshStandardMaterial({ color: col(0xd9a441), roughness: 0.5, metalness: 0.2 });
+  var darkMat = new THREE.MeshStandardMaterial({ color: col(0x33383f), roughness: 0.7 });
+  var steelMat = pbrMat(0x9aa2ab, "assets/tex/steel", 1, 2, "dnr");
+
+  var body = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.7, 1.9), bodyMat);
+  body.position.set(0, 0.62, -0.05); body.castShadow = true; lift.add(body);
+  var counter = new THREE.Mesh(new THREE.BoxGeometry(1.24, 0.62, 0.5), bodyMat);
+  counter.position.set(0, 0.55, -1.05); counter.castShadow = true; lift.add(counter);
+  var dash = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.3, 0.35), darkMat);
+  dash.position.set(0, 1.05, 0.55); lift.add(dash);
+  var seat = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.45, 0.5), darkMat);
+  seat.position.set(0, 1.1, -0.35); lift.add(seat);
+
+  var postGeo = new THREE.BoxGeometry(0.08, 1.15, 0.08);
+  var posts = [[-0.55, 0.6], [0.55, 0.6], [-0.55, -0.75], [0.55, -0.75]];
+  for (var i = 0; i < posts.length; i++) {
+    var post = new THREE.Mesh(postGeo, darkMat);
+    post.position.set(posts[i][0], 1.55, posts[i][1]);
+    lift.add(post);
+  }
+  var roof = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.08, 1.55), darkMat);
+  roof.position.set(0, 2.14, -0.05); roof.castShadow = true; lift.add(roof);
+
+  /* amber safety beacon */
+  beaconMesh = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8),
+    new THREE.MeshBasicMaterial({ color: col(0xffb020) }));
+  beaconMesh.position.set(0, 2.26, -0.05);
+  lift.add(beaconMesh);
+
+  var railGeo = new THREE.BoxGeometry(0.11, 2.6, 0.14);
+  var railL = new THREE.Mesh(railGeo, steelMat); railL.position.set(-0.45, 1.4, 0.95); railL.castShadow = true; lift.add(railL);
+  var railR = new THREE.Mesh(railGeo, steelMat); railR.position.set(0.45, 1.4, 0.95); railR.castShadow = true; lift.add(railR);
+  var mastTop = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.12, 0.14), steelMat);
+  mastTop.position.set(0, 2.72, 0.95); lift.add(mastTop);
+
+  lift.add(carriage);
+  carriage.position.set(0, FORK_TRAVEL, 0);
+  var plate = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.55, 0.08), steelMat);
+  plate.position.set(0, 0.3, 0.98); plate.castShadow = true; carriage.add(plate);
+  var forkGeo = new THREE.BoxGeometry(0.13, 0.06, 1.5);
+  var forkL = new THREE.Mesh(forkGeo, steelMat); forkL.position.set(-0.3, 0.05, 1.72); forkL.castShadow = true; carriage.add(forkL);
+  var forkR = new THREE.Mesh(forkGeo, steelMat); forkR.position.set(0.3, 0.05, 1.72); forkR.castShadow = true; carriage.add(forkR);
+
+  var wheelGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.26, 16);
+  var wheelMat = new THREE.MeshStandardMaterial({ color: col(0x1e2126), roughness: 0.9 });
+  function addWheel(x, z, steerable) {
+    var g = new THREE.Group(); g.position.set(x, 0.34, z);
+    var w = new THREE.Mesh(wheelGeo, wheelMat);
+    w.rotation.z = Math.PI / 2; w.castShadow = true; g.add(w);
+    lift.add(g); wheels.push(w);
+    if (steerable) steerWheels.push(g);
+  }
+  addWheel(-0.62, 0.68, true); addWheel(0.62, 0.68, true);
+  addWheel(-0.62, -0.72, false); addWheel(0.62, -0.72, false);
+
+  /* driver, in a hi-viz vest and a helmet */
+  var torso = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.5, 0.3),
+    new THREE.MeshStandardMaterial({ color: col(0xe8862a), roughness: 0.8 }));
+  torso.position.set(0, 1.5, -0.35); lift.add(torso);
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 10),
+    new THREE.MeshStandardMaterial({ color: col(0xc9a184), roughness: 0.85 }));
+  head.position.set(0, 1.88, -0.35); lift.add(head);
+  var helmet = new THREE.Mesh(new THREE.SphereGeometry(0.175, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: col(0xf0f0e6), roughness: 0.55 }));
+  helmet.position.set(0, 1.9, -0.35); lift.add(helmet);
+}
+
+function liftPoint(lx, ly, lz) {
+  var s = Math.sin(heading), c = Math.cos(heading);
+  return { x: liftX + c * lx + s * lz, y: ly, z: liftZ - s * lx + c * lz };
+}
+function resetLift() {
+  liftX = 0; liftZ = 22.0; heading = Math.PI;
+  speed = 0; velX = 0; velZ = 0;
+  showToast("Forklift reset", true);
+}
+
+/* ================= PEDESTRIANS ================= */
+function makePed(x, dir) {
+  var g = new THREE.Group();
+  var legs = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.72, 0.26),
+    tame(new THREE.MeshStandardMaterial({ color: col(0x2f3a4a), roughness: 0.9 })));
+  legs.position.y = 0.36; g.add(legs);
+  var vest = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.6, 0.3),
+    tame(new THREE.MeshStandardMaterial({ color: col(0xe8d43a), emissive: col(0x4a4408), roughness: 0.75 })));
+  vest.position.y = 1.02; vest.castShadow = true; g.add(vest);
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 10),
+    tame(new THREE.MeshStandardMaterial({ color: col(0xc9a184), roughness: 0.85 })));
+  head.position.y = 1.47; g.add(head);
+  var helmet = new THREE.Mesh(new THREE.SphereGeometry(0.165, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+    tame(new THREE.MeshStandardMaterial({ color: col(0xdd4b32), roughness: 0.55 })));
+  helmet.position.y = 1.49; g.add(helmet);
+  g.position.set(x, 0, WALK_Z);
+  scene.add(g);
+  return { mesh: g, x: x, dir: dir, wait: 0, speed: rnd(2.0, 2.9) };
+}
+function updatePeds(dt) {
+  for (var i = 0; i < peds.length; i++) {
+    var p = peds[i];
+    if (p.wait > 0) {
+      p.wait -= dt;
+    } else {
+      p.x += p.dir * p.speed * dt;
+      if (p.x > 30) { p.x = 30; p.dir = -1; }
+      if (p.x < -30) { p.x = -30; p.dir = 1; }
+      p.mesh.position.x = p.x;
+      p.mesh.rotation.y = p.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+      /* bob so they read as walking */
+      p.mesh.position.y = Math.abs(Math.sin(p.x * 2.6)) * 0.05;
+    }
+    var dx = liftX - p.x, dz = liftZ - WALK_Z;
+    var d = Math.sqrt(dx * dx + dz * dz);
+    if (d < 5.5) academy("ped");
+    if (d < 1.55 && Math.abs(speed) > 0.7) { pedestrianStrike(); return; }
+  }
+}
+function hornBlast() {
+  if (G.state !== "play") return;
+  ensureAudio();
+  sndHorn();
+  G.hornT = 1.0;
+  var used = false;
+  for (var i = 0; i < peds.length; i++) {
+    var p = peds[i];
+    var dx = liftX - p.x, dz = liftZ - WALK_Z;
+    if (Math.sqrt(dx * dx + dz * dz) < 9) { p.wait = 2.4; used = true; }
+  }
+  if (used) {
+    G.score += 15;
+    updateHud();
+    showToast("Horn sounded - pedestrian waved through  +15", true);
+  }
+}
+function pedestrianStrike() {
+  G.safetyClean = false;
+  flash("rgba(220,40,30,0.65)");
+  sndAlarm();
+  gameOver("SAFETY FAILURE",
+    "You struck a pedestrian on the marked walkway. Unsafe act - the shift ends here.");
+}
+
+/* ================= SPILL HAZARDS ================= */
+var spillGeo = new THREE.CircleGeometry(1.35, 20);
+var spillMat = tame(new THREE.MeshStandardMaterial({
+  color: col(0xd8cba0), roughness: 0.35, metalness: 0.05,
+  transparent: true, opacity: 0.9
+}));
+function spawnSpill() {
+  var lane = pick(ROWZ);
+  var m = new THREE.Mesh(spillGeo, spillMat);
+  m.rotation.x = -Math.PI / 2;
+  var x = rnd(-26, 26);
+  var z = lane + (Math.random() < 0.5 ? -2.9 : 2.9);
+  m.position.set(x, 0.035, z);
+  scene.add(m);
+  var cone = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.8, 10),
+    tame(new THREE.MeshStandardMaterial({ color: col(0xe8621f), roughness: 0.7 })));
+  cone.position.set(x, 0.4, z);
+  scene.add(cone);
+  spills.push({ x: x, z: z, mesh: m, cone: cone });
+  academy("spill");
+}
+function updateSpills(dt) {
+  for (var i = spills.length - 1; i >= 0; i--) {
+    var s = spills[i];
+    var dx = liftX - s.x, dz = liftZ - s.z;
+    var d = Math.sqrt(dx * dx + dz * dz);
+    if (d < 1.6) {
+      if (Math.abs(speed) > 3.2) {
+        /* driving through it at speed = skid, and a dropped load */
+        speed *= 0.35;
+        shake = Math.max(shake, 0.8);
+        if (G.carried) {
+          dropAccident();
+          showToast("Skid on the spill - load down", false);
+          G.omr -= 12;
+          updateHud();
+        }
+      }
+    }
+  }
+}
+function clearNearestSpill() {
+  for (var i = 0; i < spills.length; i++) {
+    var s = spills[i];
+    var dx = liftX - s.x, dz = liftZ - s.z;
+    if (Math.sqrt(dx * dx + dz * dz) < 2.4) {
+      scene.remove(s.mesh); scene.remove(s.cone);
+      spills.splice(i, 1);
+      G.score += 60; G.omr += 6;
+      updateHud();
+      showToast("Hazard cleared  +60  +6 OMR", true);
+      return true;
+    }
+  }
+  return false;
+}
+
+/* ================= INPUT ================= */
+var keys = {};
+window.addEventListener("keydown", function (e) {
+  if (e.code === "Space" || e.code.indexOf("Arrow") === 0) e.preventDefault();
+  if (keys[e.code]) return;
+  keys[e.code] = true;
+  if (e.code === "Space") onAction();
+  if (e.code === "KeyH") hornBlast();
+  if (e.code === "KeyR" && G.state === "play") resetLift();
+  if (e.code === "KeyQ") forkTarget = clamp(forkTarget + 0.75, FORK_TRAVEL, FORK_MAX);
+  if (e.code === "KeyE") forkTarget = clamp(forkTarget - 0.75, FORK_TRAVEL, FORK_MAX);
+});
+window.addEventListener("keyup", function (e) { keys[e.code] = false; });
+
+var joyId = null, joyActive = false, joyVec = { x: 0, y: 0 };
+function initJoystick() {
+  var joyEl = el("joy"), knob = el("joyKnob");
+  if ("ontouchstart" in window) joyEl.style.display = "block";
+  function handle(e) {
+    var t = null, i;
+    for (i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === joyId) { t = e.changedTouches[i]; break; }
+    }
+    if (!t) return;
+    var r = joyEl.getBoundingClientRect();
+    var dx = t.clientX - (r.left + r.width / 2);
+    var dy = t.clientY - (r.top + r.height / 2);
+    var len = Math.sqrt(dx * dx + dy * dy), max = 44;
+    if (len > max) { dx = dx / len * max; dy = dy / len * max; }
+    knob.style.left = (40 + dx) + "px";
+    knob.style.top = (40 + dy) + "px";
+    joyVec.x = dx / max; joyVec.y = dy / max;
+  }
+  joyEl.addEventListener("touchstart", function (e) {
+    e.preventDefault(); ensureAudio();
+    if (joyId === null) { joyId = e.changedTouches[0].identifier; joyActive = true; handle(e); }
+  }, { passive: false });
+  joyEl.addEventListener("touchmove", function (e) { e.preventDefault(); handle(e); }, { passive: false });
+  function end(e) {
+    for (var i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === joyId) {
+        joyId = null; joyActive = false; joyVec.x = 0; joyVec.y = 0;
+        knob.style.left = "40px"; knob.style.top = "40px";
+      }
+    }
+  }
+  joyEl.addEventListener("touchend", end);
+  joyEl.addEventListener("touchcancel", end);
+  document.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
+}
+
+var input = { throttle: 0, steer: 0 };
+function readInput() {
+  var th = 0, st = 0;
+  if (keys.KeyW || keys.ArrowUp) th += 1;
+  if (keys.KeyS || keys.ArrowDown) th -= 1;
+  if (keys.KeyA || keys.ArrowLeft) st += 1;
+  if (keys.KeyD || keys.ArrowRight) st -= 1;
+  if (joyActive) { th += -joyVec.y; st += joyVec.x; }
+  input.throttle = clamp(th, -1, 1);
+  input.steer = clamp(st, -1, 1);
+}
+
+/* ================= DRIVING ================= */
+function hardHit() {
+  shake = 1; sndCrash();
+  speed *= 0.15; velX *= 0.2; velZ *= 0.2;
+  G.omr -= 15;
+  updateHud();
+  if (G.carried) {
+    dropAccident();
+    showToast("Rack strike - load down, -15 OMR", false);
+  } else {
+    showToast("Rack strike - damage -15 OMR", false);
+  }
+}
+function collide() {
+  var i, b, cx, cz, dx, dz, d2, d, nx, nz, vdot;
+  var R = LIFT_R;
+  for (i = 0; i < colliders.length; i++) {
+    b = colliders[i];
+    cx = clamp(liftX, b.minX, b.maxX);
+    cz = clamp(liftZ, b.minZ, b.maxZ);
+    dx = liftX - cx; dz = liftZ - cz;
+    d2 = dx * dx + dz * dz;
+    if (d2 < R * R) {
+      if (d2 < 0.0001) {
+        var pl = liftX - b.minX, pr = b.maxX - liftX, pn = liftZ - b.minZ, pf = b.maxZ - liftZ;
+        var m = Math.min(pl, pr, pn, pf);
+        if (m === pl) { liftX = b.minX - R; nx = -1; nz = 0; }
+        else if (m === pr) { liftX = b.maxX + R; nx = 1; nz = 0; }
+        else if (m === pn) { liftZ = b.minZ - R; nx = 0; nz = -1; }
+        else { liftZ = b.maxZ + R; nx = 0; nz = 1; }
+      } else {
+        d = Math.sqrt(d2); nx = dx / d; nz = dz / d;
+        liftX = cx + nx * R; liftZ = cz + nz * R;
+      }
+      vdot = velX * nx + velZ * nz;
+      if (vdot < 0) {
+        if (-vdot > 4.2) hardHit();
+        else { shake = Math.max(shake, -vdot / 8); speed *= 0.55; }
+        velX -= nx * vdot * 1.3; velZ -= nz * vdot * 1.3;
+      }
+    }
+  }
+  var WX = W2 - 0.6 - R, WZ = D2 - 0.6 - R;
+  /* the dock doorway is open, so the south wall only stops you outside it */
+  if (liftX < -WX) { wallHit(-1, 0); liftX = -WX; }
+  if (liftX > WX) { wallHit(1, 0); liftX = WX; }
+  if (liftZ < -WZ) { wallHit(0, -1); liftZ = -WZ; }
+  if (liftZ > WZ) { wallHit(0, 1); liftZ = WZ; }
+}
+function wallHit(nx, nz) {
+  var vdot = velX * nx + velZ * nz;
+  if (vdot < 0) {
+    if (-vdot > 4.2) hardHit();
+    else { shake = Math.max(shake, -vdot / 9); speed *= 0.6; }
+    velX -= nx * vdot * 1.3; velZ -= nz * vdot * 1.3;
+  }
+}
+function updateDrive(dt) {
+  readInput();
+  var th = input.throttle, st = input.steer;
+  /* a raised load slows the truck down, exactly like the real thing */
+  var loadFactor = (forkY > FORK_SAFE) ? 0.55 : 1.0;
+  if (th > 0) speed += 9.5 * th * dt * loadFactor;
+  else if (th < 0) {
+    if (speed > 0.4) speed += 15 * th * dt;
+    else speed += 5.5 * th * dt * loadFactor;
+  } else {
+    speed -= speed * 1.7 * dt;
+    if (Math.abs(speed) < 0.06) speed = 0;
+  }
+  speed -= speed * 0.3 * dt;
+  speed = clamp(speed, -4.5, 9 * loadFactor);
+  var sf = clamp(speed / 9, -1, 1);
+  heading += st * 2.35 * sf * dt;
+  var dvx = Math.sin(heading) * speed, dvz = Math.cos(heading) * speed;
+  var k = 1 - Math.exp(-5.5 * dt);
+  velX += (dvx - velX) * k; velZ += (dvz - velZ) * k;
+  liftX += velX * dt; liftZ += velZ * dt;
+  collide();
+  lift.position.set(liftX, 0, liftZ);
+  lift.rotation.y = heading;
+
+  steerVis = lerp(steerVis, st * 0.45, 1 - Math.exp(-8 * dt));
+  var i;
+  for (i = 0; i < steerWheels.length; i++) steerWheels[i].rotation.y = steerVis;
+  for (i = 0; i < wheels.length; i++) wheels[i].rotation.x += speed * dt / 0.34;
+}
+
+/* ---- fork height + the unsafe-travel rule ---- */
+function updateForks(dt) {
+  if (Math.abs(forkTarget - forkY) > 0.001) {
+    var dir = forkTarget > forkY ? 1 : -1;
+    forkY += dir * 1.45 * dt;
+    if ((dir > 0 && forkY > forkTarget) || (dir < 0 && forkY < forkTarget)) forkY = forkTarget;
+  }
+  carriage.position.y = forkY;
+
+  var unsafe = (forkY > FORK_SAFE) && (Math.abs(speed) > 2.0);
+  var sEl = el("safety");
+  if (unsafe) {
+    G.unsafeT += dt;
+    academy("forks");
+    sEl.style.display = "block";
+    sEl.innerHTML = "&#9888; LOAD RAISED WHILE TRAVELLING" +
+      '<div class="sub">Lower the forks (E / LOWER) &mdash; ' +
+      (3.5 - G.unsafeT).toFixed(1) + "s to an unsafe act</div>";
+    if (G.unsafeT > 3.5) {
+      G.safetyClean = false;
+      flash("rgba(220,40,30,0.65)");
+      sndAlarm();
+      gameOver("SAFETY FAILURE",
+        "You drove at speed with the load raised. Unsafe act - the shift ends here.");
+    }
+  } else {
+    G.unsafeT = Math.max(0, G.unsafeT - dt * 1.6);
+    if (sEl.style.display !== "none" && G.unsafeT <= 0.02) sEl.style.display = "none";
+  }
+}
+
+/* ================= PICK / DROP ================= */
+var forkAnim = null;
+
+function inDock() {
+  return liftX > dockZone.minX && liftX < dockZone.maxX &&
+         liftZ > dockZone.minZ && liftZ < dockZone.maxZ;
+}
+function nearestPickable() {
+  var tip = liftPoint(0, 0, 1.7);
+  var fx = Math.sin(heading), fz = Math.cos(heading);
+  var best = null, bestD = 2.2;
+  for (var i = 0; i < pallets.length; i++) {
+    var p = pallets[i];
+    if (p.state === "carried") continue;
+    var dx = p.mesh.position.x - tip.x, dz = p.mesh.position.z - tip.z;
+    var d = Math.sqrt(dx * dx + dz * dz);
+    if (d >= bestD) continue;
+    /* the forks have to actually be at the pallet's height */
+    if (Math.abs(forkY - p.baseY) > 0.42) continue;
+    var dot = (dx * fx + dz * fz) / (d + 0.0001);
+    if (dot > 0.35) { best = p; bestD = d; }
+  }
+  return best;
+}
+/* a pallet in reach but at the wrong fork height - drives the hint text */
+function heightBlocked() {
+  var tip = liftPoint(0, 0, 1.7);
+  var fx = Math.sin(heading), fz = Math.cos(heading);
+  for (var i = 0; i < pallets.length; i++) {
+    var p = pallets[i];
+    if (p.state === "carried") continue;
+    var dx = p.mesh.position.x - tip.x, dz = p.mesh.position.z - tip.z;
+    var d = Math.sqrt(dx * dx + dz * dz);
+    if (d >= 2.2) continue;
+    var dot = (dx * fx + dz * fz) / (d + 0.0001);
+    if (dot > 0.35 && Math.abs(forkY - p.baseY) > 0.42) return p;
+  }
+  return null;
+}
+
+function startPick(rec) {
+  /* FIFO check happens at the fork, where the lesson lands hardest */
+  var oldest = oldestAge(rec.code);
+  G.picks++;
+  if (oldest > rec.age) {
+    G.fifoBad++;
+    G.score -= 150;
+    G.omr -= 25;
+    flash("rgba(220,60,40,0.35)");
+    academy("fifo");
+    showTeach("FIFO BREACH",
+      "There is a " + oldest + "-day batch of " + rec.code + " still in the racking and you took the " +
+      rec.age + "-day pallet. The old stock now ages another day closer to a write-off.",
+      "-25 OMR   -150 pts");
+    sndBad();
+    updateHud();
+  }
+  if (rec.slot) { rec.slot.pallet = null; rec.slot = null; }
+  rec.state = "carried";
+  forkAnim = { mode: "pick", pallet: rec, phase: 0, t: 0, fromPos: rec.mesh.position.clone() };
+  sndPick();
+}
+function attachCarried(rec) {
+  carriage.add(rec.mesh);
+  rec.mesh.position.copy(PAL_LOCAL);
+  rec.mesh.rotation.set(0, 0, 0);
+  G.carried = rec;
+}
+function detachTo(parent, rec, x, y, z) {
+  if (rec.mesh.parent) rec.mesh.parent.remove(rec.mesh);
+  parent.add(rec.mesh);
+  rec.mesh.position.set(x, y, z);
+  rec.mesh.rotation.set(0, 0, 0);
+}
+function detachToScene(rec, x, y, z) { detachTo(scene, rec, x, y, z); }
+function dropAccident() {
+  var rec = G.carried;
+  if (!rec) return;
+  var wp = liftPoint(0, 0, 2.3);
+  wp.x = clamp(wp.x, -W2 + 1.6, W2 - 1.6);
+  wp.z = clamp(wp.z, -D2 + 1.6, D2 - 1.6);
+  detachToScene(rec, wp.x, 0, wp.z);
+  rec.state = "floor"; rec.baseY = 0;
+  G.carried = null;
+  forkAnim = null;
+  forkTarget = FORK_TRAVEL;
+}
+function finishFloorDrop(rec) {
+  var wp = liftPoint(0, 0, 2.4);
+  wp.x = clamp(wp.x, -W2 + 1.6, W2 - 1.6);
+  wp.z = clamp(wp.z, -D2 + 1.6, D2 - 1.6);
+  detachToScene(rec, wp.x, 0, wp.z);
+  rec.state = "floor"; rec.baseY = 0;
+  G.carried = null;
+  showToast("Pallet set down", true);
+}
+
+/* ---- loading the truck ----
+   Spots are in truckGroup-local space so the load drives off with the truck.
+   Deck top sits at local y = 1.6; the bed spans local z -6.2 .. +6.2. */
+function truckSpot(n) {
+  var row = Math.floor(n / 2);
+  var col = n % 2;
+  return { x: (col === 0 ? -0.66 : 0.66), y: 1.6, z: -5.2 + row * 1.35 };
+}
+function finishTruckDrop(rec) {
+  var so = G.so;
+  if (rec.code !== so.code) {
+    /* wrong code = a rejected load; the pallet goes back on the floor */
+    var wp = liftPoint(0, 0, 2.4);
+    detachToScene(rec, clamp(wp.x, -6, 6), 0, 23.0);
+    rec.state = "floor"; rec.baseY = 0;
+    G.carried = null;
+    G.score -= 200; G.omr -= 45;
+    flash("rgba(220,60,40,0.4)");
+    academy("code");
+    showTeach("WRONG PRODUCT",
+      "SO-" + so.num + " is for code " + so.code + " and you loaded " + rec.code +
+      ". That truck comes back from " + so.cust + " at your cost.",
+      "-45 OMR   -200 pts");
+    sndBad();
+    updateHud();
+    return;
+  }
+  var spot = truckSpot(so.got);
+  detachTo(truckGroup, rec, spot.x, spot.y, spot.z);
+  rec.state = "loaded";
+  loaded.push(rec);
+  var ix = pallets.indexOf(rec);
+  if (ix >= 0) pallets.splice(ix, 1);
+  G.carried = null;
+
+  so.got++;
+  G.moved++;
+  G.score += 120;
+  G.omr += 3;
+  flash("rgba(60,220,120,0.3)");
+  sndCoin();
+  showToast("Loaded " + rec.code + " batch " + rec.age + "d  +120", true);
+  updateHud();
+  renderSO();
+  if (so.got >= so.need) loadComplete();
+}
+function loadComplete() {
+  G.so.loadDone = true;
+  academy("docs");
+  showToast("Load complete - issue the DN, then the GATE PASS", true);
+  renderSO();
+  updateButtons();
+}
+
+function updateForkAnim(dt) {
+  if (!forkAnim) return;
+  var a = forkAnim;
+  a.t += dt * 2.4;
+  var p = a.pallet;
+  if (a.mode === "pick") {
+    if (a.phase === 0) {
+      var t1 = ease(clamp(a.t, 0, 1));
+      var anchor = liftPoint(PAL_LOCAL.x, forkY + PAL_LOCAL.y, PAL_LOCAL.z);
+      p.mesh.position.set(
+        lerp(a.fromPos.x, anchor.x, t1),
+        lerp(a.fromPos.y, anchor.y, t1),
+        lerp(a.fromPos.z, anchor.z, t1));
+      if (a.t >= 1) { attachCarried(p); forkAnim = null; }
+    }
+  } else if (a.t * 1.4 >= 1) {
+    var mode = a.mode;
+    forkAnim = null;
+    if (mode === "truck") finishTruckDrop(p);
+    else finishFloorDrop(p);
+  }
+}
+
+function onAction() {
+  if (G.state !== "play") return;
+  ensureAudio();
+  if (teachOpen) { hideTeach(); return; }
+  if (forkAnim) return;
+  if (G.carried) {
+    if (inDock()) {
+      if (G.so.loadDone) {
+        showToast("Truck is full - finish the paperwork", false);
+        return;
+      }
+      forkAnim = { mode: "truck", pallet: G.carried, t: 0, fromY: forkY, toY: forkY };
+      sndDrop();
+    } else {
+      forkAnim = { mode: "floor", pallet: G.carried, t: 0, fromY: forkY, toY: FORK_TRAVEL };
+      forkTarget = FORK_TRAVEL;
+      sndDrop();
+    }
+  } else {
+    var p = nearestPickable();
+    if (p) { startPick(p); return; }
+    if (clearNearestSpill()) return;
+  }
+}
+
+/* ================= SALES ORDERS ================= */
+function newSO() {
+  var need = clamp(2 + Math.floor((G.level - 1) * 0.7), 2, 6);
+  var code = pick(CORE_CODES);
+  G.seenCodes[code] = true;   /* from now on this code's ageing is on your ledger */
+  G.so = {
+    num: randi(1000, 9999),
+    cust: pick(CUSTOMERS),
+    code: code,
+    need: need,
+    got: 0,
+    loadDone: false,
+    dn: false,
+    pass: false,
+    timeTotal: Math.max(40, 34 + 21 * need - 4 * (G.level - 1)),
+    timeLeft: 0
+  };
+  G.so.timeLeft = G.so.timeTotal;
+  G.demurrageT = 0;
+  ensureSupply(code, need);
+  renderSO();
+  updateButtons();
+  academy("mt");
+  showToast("New order: SO-" + G.so.num + "  " + code + "  " + need + " MT", true);
+}
+/* make sure the ordered code is actually pickable, and that at least one
+   genuinely older batch of it sits deep in the racking (the FIFO trap) */
+function ensureSupply(code, need) {
+  var have = 0, oldest = -1, i;
+  for (i = 0; i < pallets.length; i++) {
+    if (pallets[i].code === code && pallets[i].state !== "carried") {
+      have++;
+      if (pallets[i].age > oldest) oldest = pallets[i].age;
+    }
+  }
+  var want = need + 2;
+  while (have < want) {
+    /* new stock lands shallow - right where it is most tempting */
+    var age = randi(1, Math.round(SHELF_DAYS * 0.35));
+    if (!spawnInDepthBand(code, age, 0, 0.45)) break;
+    have++;
+  }
+  /* guarantee an old batch deep in the aisle */
+  if (oldest < SHELF_DAYS * 0.55) {
+    spawnInDepthBand(code, randi(Math.round(SHELF_DAYS * 0.6), SHELF_DAYS - 5), 0.6, 1.0);
+  }
+}
+function soExpired() {
+  G.strikes++;
+  G.omr -= 30;
+  flash("rgba(230,60,50,0.45)");
+  updateHud();
+  if (G.strikes >= 5) {
+    gameOver("SHIFT OVER", "Five strikes - the supervisor called it.");
+    return;
+  }
+  showToast("SO-" + G.so.num + " EXPIRED - strike " + G.strikes + "/5", false);
+  clearTruck();
+  newSO();
+}
+function clearTruck() {
+  for (var i = 0; i < loaded.length; i++) {
+    if (loaded[i].mesh.parent) loaded[i].mesh.parent.remove(loaded[i].mesh);
+    disposePallet(loaded[i]);
+  }
+  loaded.length = 0;
+}
+
+/* ---- document chain ---- */
+function issueDN() {
+  if (G.state !== "play" || !G.so) return;
+  ensureAudio();
+  if (!G.so.loadDone) {
+    showToast("The truck is not loaded yet", false);
+    return;
+  }
+  if (G.so.dn) return;
+  G.so.dn = true;
+  G.score += 40;
+  showToast("Delivery Note issued", true);
+  renderSO(); updateHud(); updateButtons();
+}
+function issuePass() {
+  if (G.state !== "play" || !G.so) return;
+  ensureAudio();
+  if (!G.so.loadDone) {
+    showToast("The truck is not loaded yet", false);
+    return;
+  }
+  if (!G.so.dn) {
+    academy("docs");
+    showTeach("OUT OF ORDER",
+      "A gate pass without a Delivery Note is a truck leaving the site with no record of what is on it. " +
+      "DN first, then the gate pass.",
+      "-10 OMR");
+    G.omr -= 10;
+    sndBad();
+    updateHud();
+    return;
+  }
+  if (G.so.pass) return;
+  G.so.pass = true;
+  dispatchTruck();
+}
+function dispatchTruck() {
+  var so = G.so;
+  var timeBonus = Math.round(so.timeLeft) * 6;
+  var omrGain = so.need * 4 + Math.round(so.timeLeft / 8);
+  G.score += 300 + timeBonus;
+  G.omr += omrGain;
+  G.sosDone++;
+  G.level++;
+  flash("rgba(60,220,120,0.45)");
+  showToast("SO-" + so.num + " DISPATCHED  +" + (300 + timeBonus) + " pts  +" + omrGain + " OMR", true);
+  updateHud();
+  truckState = "leaving";
+  truckT = 0;
+  so.timeLeft = 999;   /* stop the deadline while the truck pulls out */
+  if (G.level === 3) spawnSpill();
+  if (G.level === 4 && peds.length < 2) peds.push(makePed(-18, 1));
+  if (G.level >= 5 && Math.random() < 0.6) spawnSpill();
+}
+function updateTruck(dt) {
+  if (truckState === "leaving") {
+    truckT += dt;
+    /* the load is parented to the truck, so it rides out with it */
+    truckGroup.position.z = D2 + 6.5 + truckT * truckT * 9;
+    if (truckT > 1.9) {
+      clearTruck();
+      truckState = "arriving";
+      truckT = 0;
+      truckGroup.position.z = D2 + 46;
+    }
+  } else if (truckState === "arriving") {
+    truckT += dt;
+    truckGroup.position.z = lerp(D2 + 46, D2 + 6.5, clamp(truckT / 1.8, 0, 1));
+    if (truckT >= 1.8) {
+      truckGroup.position.z = D2 + 6.5;
+      truckState = "at";
+      newSO();
+    }
+  }
+}
+
+/* ================= STOCK AGEING ================= */
+var ageAcc = 0;
+var MAX_PALLETS = 150;
+function ageStock(dt) {
+  ageAcc += dt;
+  if (ageAcc < DAY_SECONDS) return;
+  ageAcc -= DAY_SECONDS;
+  for (var i = pallets.length - 1; i >= 0; i--) {
+    var p = pallets[i];
+    p.age++;
+    relabel(p);
+    if (p.age > SHELF_DAYS) {
+      if (p.state === "carried") continue;   /* never yank it off the forks */
+      /* Only stock you were actually asked to move is on your ledger. A code
+         that never reached your SO board leaves on another shift's truck -
+         you cannot dispatch what nobody ordered. */
+      var mine = !!G.seenCodes[p.code];
+      removePallet(p);
+      if (!mine) continue;
+      G.writeOffs++;
+      G.omr -= WRITEOFF_OMR;
+      academy("age");
+      showToast("Batch " + p.code + " written off - " + WRITEOFF_OMR + " OMR", false);
+      updateHud();
+    }
+  }
+  /* keep the object count inside the phone budget: retire the oldest stock
+     for codes that are not on your board */
+  while (pallets.length > MAX_PALLETS) {
+    var victim = null;
+    for (var j = 0; j < pallets.length; j++) {
+      var q = pallets[j];
+      if (q.state === "carried" || G.seenCodes[q.code]) continue;
+      if (!victim || q.age > victim.age) victim = q;
+    }
+    if (!victim) break;
+    removePallet(victim);
+  }
+}
+
+/* ================= HUD ================= */
+function renderSO() {
+  var so = G.so;
+  if (!so) return;
+  el("soNum").textContent = "SO-" + so.num;
+  el("soCust").textContent = so.cust;
+  el("soCode").textContent = so.code;
+  el("soQty").textContent = so.need + " MT  ·  " + (so.need * BAGS_PER_PALLET) +
+    " bags × " + KG_PER_BAG + " kg";
+  el("soProg").innerHTML = '<span class="got">' + so.got + "</span> / " + so.need + " PALLETS";
+  var dn = so.dn ? '<span class="ok">DN &#10004;</span>' : '<span class="no">DN &#10006;</span>';
+  var gp = so.pass ? '<span class="ok">GATE PASS &#10004;</span>' : '<span class="no">GATE PASS &#10006;</span>';
+  el("docs").innerHTML = dn + " &nbsp; " + gp;
+}
+function updateHud() {
+  el("omr").textContent = G.omr + " OMR";
+  el("omr").className = G.omr < 0 ? "big neg" : "big";
+  el("score").textContent = G.score;
+  el("level").textContent = G.level;
+  var acc = G.picks > 0 ? Math.round((G.picks - G.fifoBad) / G.picks * 100) : 100;
+  el("fifoHud").textContent = "FIFO " + acc + "%";
+  var s = "", i;
+  for (i = 0; i < 5; i++) {
+    s += i < G.strikes ? '<span class="on">&#10006;</span>' : '<span class="off">&#10006;</span>';
+  }
+  el("strikes").innerHTML = s;
+  el("hudHigh").textContent = "BEST: " + G.high + " OMR";
+}
+function updateButtons() {
+  var so = G.so;
+  var dnOn = so && so.loadDone && !so.dn;
+  var gpOn = so && so.loadDone && so.dn && !so.pass;
+  el("btnDN").className = dnOn ? "abtn go" : "abtn off";
+  el("btnPass").className = gpOn ? "abtn go" : "abtn off";
+}
+
+var lastLabel = "";
+function updatePrompt() {
+  var label = "PICK", off = true, hint = "";
+  if (forkAnim) { label = "..."; off = true; }
+  else if (G.carried) {
+    label = "DROP"; off = false;
+    if (inDock()) {
+      if (G.so.loadDone) { label = "FULL"; off = true; hint = "Truck loaded - issue the DN, then the GATE PASS"; }
+      else if (G.carried.code === G.so.code) hint = "In the dock - drop to load " + G.carried.code;
+      else { hint = "This is " + G.carried.code + ", the order is " + G.so.code; }
+    } else {
+      hint = "Carrying " + G.carried.code + " (" + G.carried.age + "d) - take it to the DISPATCH DOCK";
+      if (forkY > FORK_SAFE) hint = "LOWER THE FORKS before you drive";
+    }
+  } else {
+    var p = nearestPickable();
+    if (p) {
+      label = "PICK"; off = false;
+      var oldest = oldestAge(p.code);
+      hint = "Pick " + p.code + " batch " + p.age + "d" +
+        (oldest > p.age ? "  —  a " + oldest + "d batch of " + p.code + " is still racked" : "");
+    } else {
+      var hb = heightBlocked();
+      if (hb) {
+        hint = "Forks at " + forkY.toFixed(1) + "m, pallet at " + hb.baseY.toFixed(1) +
+          "m - " + (hb.baseY > forkY ? "RAISE" : "LOWER");
+      } else if (G.so) {
+        hint = "Find " + G.so.need + " pallets of " + G.so.code + " - oldest batch first";
+      }
+      var near = false;
+      for (var i = 0; i < spills.length; i++) {
+        var dx = liftX - spills[i].x, dz = liftZ - spills[i].z;
+        if (Math.sqrt(dx * dx + dz * dz) < 2.4) near = true;
+      }
+      if (near) { label = "CLEAR"; off = false; hint = "Spill hazard - clear it"; }
+    }
+  }
+  if (label !== lastLabel) {
+    lastLabel = label;
+    el("action").textContent = label;
+  }
+  el("action").className = off ? "off" : "";
+  if (hint) el("hint").textContent = hint;
+}
+
+/* ================= CAMERA ================= */
+function updateCamera(dt, t) {
+  if (G.state !== "play") {
+    camera.position.set(Math.sin(t * 0.11) * 30, 15, Math.cos(t * 0.11) * 30);
+    camera.lookAt(0, 1.5, 4);
+    return;
+  }
+  var fx = Math.sin(heading), fz = Math.cos(heading);
+  var dx = liftX - fx * 7.2, dz = liftZ - fz * 7.2;
+  var k = 1 - Math.exp(-4.5 * dt);
+  camera.position.x += (dx - camera.position.x) * k;
+  camera.position.y += (4.0 - camera.position.y) * k;
+  camera.position.z += (dz - camera.position.z) * k;
+  if (shake > 0.003) {
+    camera.position.x += (Math.random() - 0.5) * shake * 0.5;
+    camera.position.y += (Math.random() - 0.5) * shake * 0.35;
+    camera.position.z += (Math.random() - 0.5) * shake * 0.5;
+    shake *= Math.exp(-4.5 * dt);
+  }
+  camera.lookAt(liftX + fx * 2.4, 1.3, liftZ + fz * 2.4);
+}
+
+/* ================= GAME FLOW ================= */
+var HS_KEY = "ofm_fork_v2_best";
+function getHigh() { try { return parseInt(localStorage.getItem(HS_KEY), 10) || 0; } catch (e) { return 0; } }
+function setHigh(v) { try { localStorage.setItem(HS_KEY, String(v)); } catch (e) {} }
+
+function startGame() {
+  ensureAudio();
+  /* clear anything from the previous shift */
+  var i;
+  for (i = pallets.length - 1; i >= 0; i--) removePallet(pallets[i]);
+  clearTruck();
+  for (i = 0; i < spills.length; i++) { scene.remove(spills[i].mesh); scene.remove(spills[i].cone); }
+  spills.length = 0;
+  for (i = 0; i < peds.length; i++) scene.remove(peds[i].mesh);
+  peds.length = 0;
+  peds.push(makePed(6, 1));
+
+  G.state = "play";
+  G.score = 0; G.omr = 0; G.strikes = 0; G.level = 1;
+  G.carried = null; G.so = null;
+  G.picks = 0; G.fifoBad = 0; G.writeOffs = 0; G.moved = 0; G.sosDone = 0;
+  G.unsafeT = 0; G.safetyClean = true;
+  G.demurrageT = 0; G.demurragePaid = 0;
+  G.seenCodes = {};
+  G.tipT = 26; G.tipIdx = 0;
+  forkAnim = null;
+  forkY = FORK_TRAVEL; forkTarget = FORK_TRAVEL;
+  carriage.position.y = forkY;
+  liftX = 0; liftZ = 22.0; heading = Math.PI; speed = 0; velX = 0; velZ = 0;
+  lift.position.set(liftX, 0, liftZ); lift.rotation.y = heading;
+  truckState = "at"; truckGroup.position.z = D2 + 6.5;
+  ageAcc = 0;
+  tipSeen = {};
+
+  seedStock();
+  el("startOv").style.display = "none";
+  el("overOv").style.display = "none";
+  el("safety").style.display = "none";
+  hideTeach();
+  updateHud();
+  newSO();
+  lastLabel = "";
+}
+
+function gameOver(title, sub) {
+  if (G.state !== "play") return;
+  G.state = "over";
+  el("safety").style.display = "none";
+  hideTeach();
+  if (G.omr > G.high) { G.high = G.omr; setHigh(G.high); }
+  el("overTitle").textContent = title;
+  el("overSub").textContent = sub;
+  el("finalScore").textContent = G.omr + " OMR  ·  " + G.score + " pts";
+  el("finalHigh").textContent = "BEST: " + G.high + " OMR";
+
+  var acc = G.picks > 0 ? Math.round((G.picks - G.fifoBad) / G.picks * 100) : 100;
+  var rows = "";
+  function row(k, v, cls) {
+    rows += "<tr" + (cls ? ' class="' + cls + '"' : "") + "><td>" + k + "</td><td>" + v + "</td></tr>";
+  }
+  row("Orders dispatched", G.sosDone, G.sosDone > 0 ? "good" : "");
+  row("Pallets moved", G.moved + "  (" + (G.moved * BAGS_PER_PALLET) + " bags)");
+  row("FIFO accuracy", acc + "%", acc >= 90 ? "good" : "bad");
+  row("FIFO breaches", G.fifoBad, G.fifoBad === 0 ? "good" : "bad");
+  row('Batches written off<span class="todo">TODO_CONFIRM</span>',
+      G.writeOffs + "  (" + (G.writeOffs * WRITEOFF_OMR) + " OMR)",
+      G.writeOffs === 0 ? "good" : "bad");
+  row('Demurrage paid<span class="todo">TODO_CONFIRM</span>', G.demurragePaid + " OMR",
+      G.demurragePaid === 0 ? "good" : "bad");
+  row("Strikes", G.strikes + " / 5", G.strikes === 0 ? "good" : "bad");
+  row("Safety", G.safetyClean ? "CLEAN" : "UNSAFE ACT", G.safetyClean ? "good" : "bad");
+  el("report").innerHTML = rows;
+  el("overOv").style.display = "flex";
+}
+
+/* ================= LOOP ================= */
+var clock;
+function animate() {
+  requestAnimationFrame(animate);
+  var dt = Math.min(clock.getDelta(), 0.05);
+  var t = clock.elapsedTime;
+
+  if (G.state === "play") {
+    updateDrive(dt);
+    updateForks(dt);
+    updateForkAnim(dt);
+    updatePeds(dt);
+    updateSpills(dt);
+    updateTruck(dt);
+    ageStock(dt);
+
+    if (G.so && truckState === "at") {
+      if (G.so.loadDone) {
+        /* the deadline stops, demurrage starts */
+        G.demurrageT += dt;
+        while (G.demurrageT >= 10) {
+          G.demurrageT -= 10;
+          var cost = Math.max(1, Math.round(DEMURRAGE_OMR_PER_MIN / 6));
+          G.omr -= cost;
+          G.demurragePaid += cost;
+          updateHud();
+        }
+      } else {
+        G.so.timeLeft -= dt;
+        if (G.so.timeLeft <= 0) soExpired();
+      }
+    }
+    if (G.so) {
+      var pct = clamp(G.so.loadDone ? 1 : G.so.timeLeft / G.so.timeTotal, 0, 1);
+      var bar = el("bar");
+      bar.style.width = (pct * 100) + "%";
+      bar.style.background = G.so.loadDone ? "#8cc8ff" : (pct > 0.4 ? "#7fc46a" : (pct > 0.15 ? "#e0a53f" : "#e0563f"));
+    }
+
+    /* ambient academy tips */
+    G.tipT -= dt;
+    if (G.tipT <= 0) {
+      G.tipT = 34;
+      showTip(TIPS[AMBIENT_TIPS[G.tipIdx % AMBIENT_TIPS.length]]);
+      G.tipIdx++;
+    }
+    updatePrompt();
+  }
+
+  if (dockGlowMat) dockGlowMat.emissiveIntensity = 0.42 + 0.3 * Math.sin(t * 3.5);
+  if (beaconMesh) beaconMesh.visible = (Math.sin(t * 9) > -0.2);
+  if (G.hornT > 0) G.hornT -= dt;
+  updateCamera(dt, t);
+  renderer.render(scene, camera);
+}
+
+/* ================= BOOT ================= */
+function init() {
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 400);
+  camera.position.set(0, 15, 40);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  maxAniso = renderer.capabilities.getMaxAnisotropy();
+  el("scene").appendChild(renderer.domElement);
+
+  setupSky();
+
+  scene.add(new THREE.HemisphereLight(col(0xbcd6ff), col(0xb9a68a), 0.42));
+  var sun = new THREE.DirectionalLight(col(0xfff2e0), 1.6);
+  sun.position.set(34, 62, 40);
+  sun.castShadow = true;
+  sun.shadow.mapSize.width = 2048;
+  sun.shadow.mapSize.height = 2048;
+  sun.shadow.camera.left = -60; sun.shadow.camera.right = 60;
+  sun.shadow.camera.top = 60; sun.shadow.camera.bottom = -60;
+  sun.shadow.camera.far = 170;
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.02;
+  scene.add(sun);
+  /* warm interior fill so the aisles never go black */
+  var p1 = new THREE.PointLight(col(0xffd9a0), 0.5, 80); p1.position.set(-18, 7.5, -10); scene.add(p1);
+  var p2 = new THREE.PointLight(col(0xffd9a0), 0.5, 80); p2.position.set(18, 7.5, 6); scene.add(p2);
+
+  /* shared pallet materials */
+  palletMat = pbrMat(0x9c7a4e, "assets/tex/pallet", 1, 1, "d");
+  bagMat = pbrMat(0xd6c08a, "assets/tex/bag", 2, 1, "d");
+
+  buildWorld();
+  buildForklift();
+
+  /* The HDR environment is bright; materials built outside pbrMat default to
+     envMapIntensity 1 and blow out to white under ACES. Tame them all once. */
+  scene.traverse(function (o) {
+    if (!o.material) return;
+    var mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (var i = 0; i < mats.length; i++) {
+      if (mats[i] && mats[i].isMeshStandardMaterial && mats[i].envMapIntensity > 0.5) {
+        mats[i].envMapIntensity = 0.5;
+      }
+    }
+  });
+
+  initJoystick();
+
+  G.high = getHigh();
+  updateHud();
+
+  clock = new THREE.Clock();
+  animate();
+}
+
+window.addEventListener("resize", function () {
+  if (!camera || !renderer) return;
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+el("btnStart").addEventListener("click", startGame);
+el("btnRestart").addEventListener("click", startGame);
+el("teachBtn").addEventListener("click", hideTeach);
+el("tipX").addEventListener("click", function () { el("tip").style.display = "none"; });
+el("btnDN").addEventListener("click", issueDN);
+el("btnPass").addEventListener("click", issuePass);
+el("hornBtn").addEventListener("click", hornBlast);
+el("btnRaise").addEventListener("click", function () {
+  forkTarget = clamp(forkTarget + 0.75, FORK_TRAVEL, FORK_MAX);
+});
+el("btnLower").addEventListener("click", function () {
+  forkTarget = clamp(forkTarget - 0.75, FORK_TRAVEL, FORK_MAX);
+});
+el("action").addEventListener("click", function () { ensureAudio(); onAction(); });
+el("action").addEventListener("touchstart", function (e) {
+  e.preventDefault(); ensureAudio(); onAction();
+}, { passive: false });
+
+init();
+</script>
+</body>
+</html>

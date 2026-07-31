@@ -1,0 +1,9 @@
+{
+  "_source": "PRD 4.10. Contact PHONE NUMBERS are deliberately absent - contacts stay admin-only in Firestore and never ship in client JSON.",
+  "transporters": [
+    { "id": "gwc",     "name": "GWC / Flag Logistics", "contactRole": "Account manager" },
+    { "id": "kunooz",  "name": "Kunooz",               "contactRole": "Dispatch contact" },
+    { "id": "blue",    "name": "Blue Anchor",          "contactRole": "Dispatch contact" },
+    { "id": "sahab",   "name": "Al Sahab",             "contactRole": "Dispatch contact" }
+  ]
+}

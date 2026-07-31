@@ -49,7 +49,26 @@ These drive ALL of:
 ## Language
 - `toggleLang()` updates `[data-i18n]`, re-renders public services/estimator, recurring note, chatbot. Admin Quote Builder renders in the load-time language (not re-rendered on toggle, to avoid wiping selections).
 
+## OFM Logistics Arcade (`public/games/`)
+Four self-contained 3D training games (three.js r128, vendored in `public/games/vendor/` —
+**no CDN, no internet needed**). Served at `/games/`, linked from the Portfolio page
+(`portfolio-arcade.jpg` card → opens `games/` in a new tab). Full detail in
+`public/games/README.md`.
+
+- `game1` Loading Line Rush · `game2` Weighbridge Master · `game3` Forklift Warehouse ·
+  `game4` Fleet Management.
+- `game3` is the FIFO/safety/documents game: batch ageing, the 16 core Bühler codes,
+  pedestrian + raised-fork safety fails, spill hazards, DN → gate pass chain, shift report.
+- Shared assets in `public/games/assets/` (~3.3 MB total): 1024px PBR textures + a
+  1024x512 HDR sky. **Already downscaled** from 28 MB of 2048px sources — don't upscale.
+- Tuning values that still need Sam's confirmation (`SHELF_DAYS`, `WRITEOFF_OMR`,
+  `DEMURRAGE_OMR_PER_MIN`) sit at the top of `game3.html` and render a `TODO_CONFIRM`
+  badge in the shift report.
+
 ## Changelog
+- Added the OFM Logistics Arcade at `/games/`: completed game 3 (Forklift Warehouse — FIFO,
+  safety, document chain), vendored three.js so the games run offline, cut the shared asset
+  set from 28 MB to 3.3 MB, and linked the arcade from the Portfolio page.
 - Quotation PDF redesigned (branded invoice) + native-print fix (no more blank PDFs).
 - Added Add-ons + Recurring (weekly/monthly) to Quote Builder; recurring counts in Total.
 - Built the Services Assistant chatbot (bilingual, WhatsApp quote links).
