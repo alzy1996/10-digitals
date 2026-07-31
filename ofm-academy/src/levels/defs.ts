@@ -11,6 +11,7 @@ import type { Rng } from "../sim/rng";
 import { BAGS_PER_MT, mtToBags } from "../sim/entities";
 import { coreCodes, customers, glossary, rules } from "../content";
 import * as D2 from "./defs2";
+import * as D3 from "./defs3";
 
 const MIN = 60_000;
 
@@ -496,4 +497,12 @@ export const LEVEL_DEFS: Record<string, LevelDefinition<any>> = {
   "8.2": D2.L8_2_LabourForecast,
   "8.5": D2.L8_5_LeaveChain,
   "8.6": D2.L8_6_GhostHour,
+  "2.1": D3.L2_1_RawMaterial,
+  "2.5": D3.L2_5_Handshake,
+  "4.2": D3.L4_2_Fifo,
+  "5.5": D3.L5_5_GrossNet,
+  "5.6": D3.L5_6_PaperChain,
+  "6.5": D3.L6_5_NotMyLane,
+  "7.2": D3.L7_2_Inbound,
+  "9.1": D3.L9_1_FullShift,
 };

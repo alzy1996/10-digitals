@@ -333,3 +333,248 @@ test("every built level runs to completion without throwing", async () => {
     assert.ok(res.score >= 0 && res.score <= 1000, `${id} scored out of range: ${res.score}`);
   }
 });
+
+/* ---------------------------------------------------------------- Ch2/4/5/7/9 */
+
+test("2.1 Raw Material: promising a date you cannot hit is the expensive direction", async () => {
+  const { Simulation } = await load("sim/engine.ts");
+  const { L2_1_RawMaterial } = await load("levels/defs3.ts");
+
+  // find a seed where something is genuinely short
+  let sim = null;
+  for (let seed = 1; seed < 60; seed++) {
+    const s = new Simulation(L2_1_RawMaterial, seed, 0);
+    if (s.state.lines.some((l) => l.available < l.required)) { sim = s; break; }
+  }
+  assert.ok(sim, "expected at least one short-stock scenario");
+
+  sim.submit("answer", { ready: true });
+  assert.ok(sim.ledger.total() <= -180, "declaring ready when it is not must cost the most");
+  assert.equal(sim.result().parts.accuracy, 0);
+});
+
+test("2.1 Raw Material: honest 'not ready' on short stock is the correct call", async () => {
+  const { Simulation } = await load("sim/engine.ts");
+  const { L2_1_RawMaterial } = await load("levels/defs3.ts");
+
+  let sim = null;
+  for (let seed = 1; seed < 60; seed++) {
+    const s = new Simulation(L2_1_RawMaterial, seed, 0);
+    if (s.state.lines.some((l) => l.available < l.required)) { sim = s; break; }
+  }
+  sim.submit("answer", { ready: false });
+  assert.equal(sim.ledger.total(), 0);
+  assert.equal(sim.result().parts.accuracy, 1);
+});
+
+test("2.5 Handshake: the locked trigger phrase is present verbatim", async () => {
+  const { strings } = await load("content/index.ts");
+  assert.equal(strings.en.l2_5.trigger, "@Delivery AFM — Please dispatch");
+  assert.equal(strings.ar.l2_5.trigger, "@Delivery AFM — Please dispatch",
+    "the trigger phrase is a core beat and stays verbatim in both languages");
+});
+
+test("2.5 Handshake: a vague message costs per missing field", async () => {
+  const { Simulation } = await load("sim/engine.ts");
+  const { L2_5_Handshake, HANDSHAKE_FIELDS } = await load("levels/defs3.ts");
+
+  const sim = new Simulation(L2_5_Handshake, 21, 0);
+  sim.submit("toggle", { field: HANDSHAKE_FIELDS[0] });
+  sim.submit("send");
+
+  const missing = HANDSHAKE_FIELDS.length - 1;
+  assert.equal(sim.ledger.total(), -40 * missing);
+});
+
+test("4.2 FIFO: the oldest batch is deliberately the furthest away", async () => {
+  const { Simulation } = await load("sim/engine.ts");
+  const { L4_2_Fifo } = await load("levels/defs3.ts");
+
+  const sim = new Simulation(L4_2_Fifo, 22, 0);
+  const oldest = sim.state.batches.find((b) => b.id === sim.state.oldestId);
+  const nearest = [...sim.state.batches].sort((a, b) => a.distance - b.distance)[0];
+
+  assert.notEqual(oldest.id, nearest.id, "picking by proximity must be the wrong answer");
+  assert.ok(oldest.distance > nearest.distance);
+
+  sim.submit("pick", { id: nearest.id });
+  assert.ok(sim.ledger.total() < 0, "taking the nearest breaches FIFO");
+});
+
+test("5.5 Gross and Net: net is gross minus tare, and out of tolerance means STOP", async () => {
+  const { Simulation } = await load("sim/engine.ts");
+  const { L5_5_GrossNet } = await load("levels/defs3.ts");
+
+  // a seed where the load is genuinely out of tolerance
+  let sim = null;
+  for (let seed = 1; seed < 80; seed++) {
+    const s = new Simulation(L5_5_GrossNet, seed, 0);
+    if (!s.state.withinTolerance) { sim = s; break; }
+  }
+  assert.ok(sim, "expected an out-of-tolerance load");
+
+  const actual = sim.state.grossKg - sim.state.tareKg;
+  sim.submit("net", { value: actual });
+  assert.equal(sim.ledger.total(), 0, "correct arithmetic costs nothing");
+
+  sim.submit("decide", { action: "dispatch" });
+  assert.ok(sim.ledger.total() <= -250, "dispatching an out-of-tolerance load is the big failure");
+});
+
+test("5.5 Gross and Net: stopping an out-of-tolerance load is a clean pass", async () => {
+  const { Simulation } = await load("sim/engine.ts");
+  const { L5_5_GrossNet } = await load("levels/defs3.ts");
+
+  let sim = null;
+  for (let seed = 1; seed < 80; seed++) {
+    const s = new Simulation(L5_5_GrossNet, seed, 0);
+    if (!s.state.withinTolerance) { sim = s; break; }
+  }
+  sim.submit("net", { value: sim.state.grossKg - sim.state.tareKg });
+  sim.submit("decide", { action: "stop" });
+
+  assert.equal(sim.ledger.total(), 0);
+  assert.equal(sim.result().parts.accuracy, 1);
+});
+
+test("5.6 Paper Chain: the order cannot be skipped", async () => {
+  const { Simulation } = await load("sim/engine.ts");
+  const { L5_6_PaperChain } = await load("levels/defs3.ts");
+
+  const sim = new Simulation(L5_6_PaperChain, 23, 0);
+
+  // production cannot sign first
+  sim.submit("sign", { role: "production" });
+  assert.deepEqual(sim.state.signed, [], "an out-of-order signature must be refused");
+  assert.ok(sim.ledger.total() < 0);
+
+  sim.submit("sign", { role: "delivery" });
+  sim.submit("sign", { role: "packing" });
+  sim.submit("sign", { role: "production" });
+
+  assert.deepEqual(sim.state.signed, ["delivery", "packing", "production"]);
+  assert.equal(sim.state.remark, "checked", "the Production Clerk adds a remark");
+  assert.equal(sim.isEnded(), true);
+});
+
+test("6.5 Not My Lane: refusing a tipper route is the scored answer", async () => {
+  const { Simulation } = await load("sim/engine.ts");
+  const { L6_5_NotMyLane } = await load("levels/defs3.ts");
+
+  const good = new Simulation(L6_5_NotMyLane, 24, 0);
+  good.submit("decide", { action: "refuse" });
+  assert.ok(good.ledger.total() > 0);
+  assert.equal(good.result().parts.accuracy, 1);
+
+  const bad = new Simulation(L6_5_NotMyLane, 24, 0);
+  const violations = bad.submit("decide", { action: "book" });
+  assert.ok(violations.some((v) => v.ruleId === "R-SCOPE-01"), "booking must break the scope rule");
+});
+
+test("7.2 Inbound: receiving reverses the arithmetic", async () => {
+  const { Simulation } = await load("sim/engine.ts");
+  const { L7_2_Inbound } = await load("levels/defs3.ts");
+
+  const sim = new Simulation(L7_2_Inbound, 25, 0);
+  const received = sim.state.loadedKg - sim.state.emptyKg;
+  assert.ok(received > 0, "the truck arrives full and leaves empty");
+
+  sim.submit("enter", { value: received });
+  assert.equal(sim.ledger.total(), 0);
+  assert.equal(sim.result().parts.accuracy, 1);
+});
+
+test("9.1 Full Shift: a perfect run certifies, a poor one does not", async () => {
+  const { Simulation } = await load("sim/engine.ts");
+  const { L9_1_FullShift } = await load("levels/defs3.ts");
+
+  const perfect = new Simulation(L9_1_FullShift, 26, 0);
+  while (!perfect.isEnded()) {
+    const item = perfect.state.items[perfect.state.index];
+    if (!item) break;
+    perfect.submit("answer", { value: item.correct });
+  }
+  const res = perfect.result();
+  assert.equal(res.parts.accuracy, 1);
+  assert.equal(res.omr, 0);
+  assert.ok(res.score >= 900, `certification run should be strong, got ${res.score}`);
+
+  const sloppy = new Simulation(L9_1_FullShift, 26, 0);
+  while (!sloppy.isEnded()) {
+    const item = sloppy.state.items[sloppy.state.index];
+    if (!item) break;
+    const wrong = item.options.find((o) => o !== item.correct) ?? item.correct;
+    sloppy.submit("answer", { value: wrong });
+  }
+  assert.ok(sloppy.ledger.total() < 0);
+  assert.ok(sloppy.result().score < 500, "an unsafe/sloppy exam must not pass");
+});
+
+test("the campaign covers every persona in the PRD", async () => {
+  const { CHAPTERS } = await load("levels/registry.ts");
+  const withLevels = CHAPTERS.filter((c) => c.levels.some((l) => l.built));
+  const roles = new Set(withLevels.flatMap((c) => c.roles));
+
+  for (const persona of [
+    "Delivery Clerk",
+    "Forklift Operator",
+    "Packing Supervisor",
+    "Production Clerk",
+    "Shift Supervisor",
+    "All",
+  ]) {
+    assert.ok(roles.has(persona), `no built level serves the ${persona} persona`);
+  }
+});
+
+/* ---------------------------------------------------------------- progress */
+
+test("ranks: a rank is earned only when every built level in its chapters passes", async () => {
+  const { rankFor, chapterPassed } = await load("data/progress.ts");
+  const { CHAPTERS } = await load("levels/registry.ts");
+
+  assert.equal(rankFor({}), "trainee", "no attempts means no rank beyond trainee");
+
+  // pass every built level in chapters 1 and 2 -> Clerk
+  const attempts = {};
+  for (const ch of CHAPTERS.filter((c) => ["0", "1", "2"].includes(c.id))) {
+    for (const l of ch.levels.filter((x) => x.built)) {
+      attempts[l.id] = { levelId: l.id, score: 800, stars: 2, omr: 0, at: 0 };
+    }
+  }
+  assert.equal(chapterPassed(attempts, "1"), true);
+  assert.equal(rankFor(attempts), "clerk");
+
+  // one level dropped back to zero stars loses the rank again
+  const firstCh1 = CHAPTERS.find((c) => c.id === "1").levels[0].id;
+  attempts[firstCh1] = { levelId: firstCh1, score: 100, stars: 0, omr: -50, at: 0 };
+  assert.equal(chapterPassed(attempts, "1"), false);
+  assert.notEqual(rankFor(attempts), "clerk");
+});
+
+test("badges: awarded only for a 3-star run that did not lose money", async () => {
+  const { badgesFor } = await load("data/progress.ts");
+
+  assert.deepEqual(badgesFor({}), []);
+
+  const threeStarClean = { "6.6": { levelId: "6.6", score: 950, stars: 3, omr: 60, at: 0 } };
+  assert.ok(badgesFor(threeStarClean).includes("escalatedCorrectly"));
+
+  const threeStarButCostly = { "6.6": { levelId: "6.6", score: 950, stars: 3, omr: -10, at: 0 } };
+  assert.deepEqual(badgesFor(threeStarButCostly), [], "a costly run earns no badge");
+
+  const twoStar = { "6.6": { levelId: "6.6", score: 800, stars: 2, omr: 60, at: 0 } };
+  assert.deepEqual(badgesFor(twoStar), []);
+});
+
+test("certificate: the verification code is deterministic and short enough to read out", async () => {
+  const { verifyCode } = await load("data/progress.ts");
+
+  const a = verifyCode("Sam", "dispatcher", 4200);
+  const b = verifyCode("Sam", "dispatcher", 4200);
+  assert.equal(a, b, "the printed code and the stored record must always agree");
+  assert.notEqual(a, verifyCode("Sam", "dispatcher", 4201));
+  assert.notEqual(a, verifyCode("Sameer", "dispatcher", 4200));
+  assert.equal(a.length, 7);
+  assert.match(a, /^[0-9A-Z]+$/);
+});

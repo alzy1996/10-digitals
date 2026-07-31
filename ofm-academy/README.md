@@ -10,27 +10,43 @@ into a game each.
 ```bash
 npm install
 npm run dev        # local dev server
-npm test           # 26 tests: determinism, clock, rules, replay, content
+npm test           # 61 tests: determinism, clock, rules, replay, levels, content, ranks
 npm run typecheck
 npm run build      # production build -> dist/
 ```
 
 ## What works today
 
-Chapter 0 and Chapter 1 are playable end to end, in English and Arabic:
+**24 levels across all 10 chapters**, every one playable in English and Arabic.
+Every persona in PRD §2.1 now has levels, and every learning objective L01–L18
+that does not require a 3D zone is covered.
 
-| Level | Title | Teaches |
+| Ch | Levels | Persona |
 |---|---|---|
-| 0.2 | The Language of the Mill | 30 core terms, EN ↔ AR |
-| 1.1 | Read the SO | Customer, code, MT, bags, deadline |
-| 1.2 | Code Breaker | The 16 core Bühler codes — 716 is not 715 |
-| 1.3 | MT to Bags | ×40 until it is reflex |
-| 1.4 | The Deadline | Sequence by slack, not arrival — includes the ferry leg |
-| 1.5 | The Ghost SO | Cross-check the system against reality, and report the bug |
+| 0 | 0.2 The Language of the Mill | All |
+| 1 | 1.1 Read the SO · 1.2 Code Breaker · 1.3 MT to Bags · 1.4 The Deadline · 1.5 The Ghost SO | Delivery Clerk |
+| 2 | 2.1 Raw Material Check · 2.5 The Dispatch Handshake | Production Clerk |
+| 3 | 3.2 The Scale · 3.3 400 Free Kilos | Packing Supervisor |
+| 4 | 4.2 FIFO | Forklift Operator |
+| 5 | 5.5 Gross and Net · 5.6 The Paper Chain | Delivery Clerk |
+| 6 | 6.1 Bagged or Bulk · 6.3 Contract Board · 6.4 Sohar Poultry · 6.5 Not My Lane · 6.6 No Contract · 6.7 The Ferry | Delivery Clerk |
+| 7 | 7.2 Inbound Weighbridge | Receiving |
+| 8 | 8.2 Labour Forecast · 8.5 Leave Chain · 8.6 Ghost Hour | Shift Supervisor |
+| 9 | 9.1 The Full Shift | All (exam) |
 
-The other eight chapters appear on the map marked "not built yet". That is
-deliberate: the map shows the whole chain so every role can see where their work
-sits, and unbuilt levels say so instead of implying the product is finished.
+The two levels the PRD rates highest are both built:
+
+- **3.3 "400 Free Kilos"** — running the line at 25.4 kg over 1,000 bags gives
+  away exactly 400 kg, which a test asserts, against the confirmed
+  ~OMR 18,000/yr per line.
+- **6.4 Sohar Poultry** — both carriers genuinely hold a contract and the tipper
+  is the *dearer* one, so price is not the tell. Premix is bagged, so only the
+  flat bed can carry it. The level then asks **why**, and only "cargo form"
+  scores: the right carrier for the wrong reason still fails, because that
+  reason breaks on the next order.
+
+Progress, ranks and badges persist locally, and a chapter pass produces a
+printable certificate with a deterministic verification code.
 
 ## Architecture
 
@@ -107,14 +123,20 @@ one-line change.
 
 Honest list, so nobody plans against a promise:
 
-- Chapters 2–9 (Mill Floor, The Bag, Warehouse, Yard, The Road, Receiving, The
-  Shift, Final Exam) — including the two the PRD rates highest: the overfill
-  reveal (~OMR 18,000/yr per line) and the Sohar Poultry routing trap.
-- Firebase: auth, Firestore progress/attempts, offline persistence,
-  certification and QR verification. Progress is currently session-local.
-- 3D zones (R3F + Rapier), audio, Arabic voice-over.
-- Scenario Studio, Digital Twin import, trainer dashboards.
+- **Firebase**: auth, Firestore progress/attempts, offline persistence and QR
+  certificate verification. `src/data/progress.ts` defines the repository seam
+  and ships a local implementation behind it, so swapping in Firestore means
+  implementing one interface — but there is no Firebase project or credentials
+  yet, so none of it is wired or tested against a live backend.
+- **3D zones** (R3F + Rapier) and the levels that need them: forklift driving
+  (4.1), feed-the-line (4.6), the yard boss level (5.8). The arcade's
+  `game3.html` covers the forklift/HSE ground in the meantime.
+- **Audio and Arabic voice-over.** Critical for low-literacy learners per the
+  PRD, and not startable without recordings or a TTS budget.
+- **The remaining 29 levels** of the 53-level target — mostly depth within
+  chapters that already have levels, not new mechanics.
+- **Scenario Studio, Digital Twin import, trainer dashboards** (PRD Phase 6).
 
-The sim, content, rules, replay and bilingual shell are all in place, so the
-remaining chapters are content and views on top of a working engine rather than
-new architecture.
+The engine, content layer, rules, replay, bilingual shell and progression are
+all in place, so the rest is content and integration on a working base rather
+than new architecture.

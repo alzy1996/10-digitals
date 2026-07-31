@@ -18,6 +18,7 @@ import type {
 } from "./defs";
 import { SO_FIELDS } from "./defs";
 import * as V2 from "./views2";
+import * as V3 from "./views3";
 
 /** Shows whatever the last command broke, in the learner's language. */
 function Violations({ api }: { api: LevelApi<unknown> }) {
@@ -382,4 +383,12 @@ export const LEVEL_VIEWS: Record<string, (p: { api: LevelApi<any> }) => JSX.Elem
   "8.2": V2.LabourForecastView,
   "8.5": V2.LeaveChainView,
   "8.6": V2.GhostHourView,
+  "2.1": V3.RawMaterialView,
+  "2.5": V3.HandshakeView,
+  "4.2": V3.FifoView,
+  "5.5": V3.GrossNetView,
+  "5.6": V3.PaperChainView,
+  "6.5": V3.NotMyLaneView,
+  "7.2": V3.InboundView,
+  "9.1": V3.FullShiftView,
 };

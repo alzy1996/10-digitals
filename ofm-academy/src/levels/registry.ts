@@ -46,7 +46,16 @@ export const CHAPTERS: ChapterEntry[] = [
       { id: "1.5", titleKey: "l1_5", built: true },
     ],
   },
-  { id: "2", key: "ch2", roles: ["Production Clerk"], plannedLevels: 5, levels: [] },
+  {
+    id: "2",
+    key: "ch2",
+    roles: ["Production Clerk"],
+    plannedLevels: 5,
+    levels: [
+      { id: "2.1", titleKey: "l2_1", built: true },
+      { id: "2.5", titleKey: "l2_5", built: true },
+    ],
+  },
   {
     id: "3",
     key: "ch3",
@@ -57,8 +66,23 @@ export const CHAPTERS: ChapterEntry[] = [
       { id: "3.3", titleKey: "l3_3", built: true },
     ],
   },
-  { id: "4", key: "ch4", roles: ["Forklift Operator"], plannedLevels: 6, levels: [] },
-  { id: "5", key: "ch5", roles: ["Delivery Clerk"], plannedLevels: 8, levels: [] },
+  {
+    id: "4",
+    key: "ch4",
+    roles: ["Forklift Operator"],
+    plannedLevels: 6,
+    levels: [{ id: "4.2", titleKey: "l4_2", built: true }],
+  },
+  {
+    id: "5",
+    key: "ch5",
+    roles: ["Delivery Clerk"],
+    plannedLevels: 8,
+    levels: [
+      { id: "5.5", titleKey: "l5_5", built: true },
+      { id: "5.6", titleKey: "l5_6", built: true },
+    ],
+  },
   {
     id: "6",
     key: "ch6",
@@ -67,12 +91,19 @@ export const CHAPTERS: ChapterEntry[] = [
     levels: [
       { id: "6.1", titleKey: "l6_1", built: true },
       { id: "6.3", titleKey: "l6_3", built: true },
+      { id: "6.5", titleKey: "l6_5", built: true },
       { id: "6.4", titleKey: "l6_4", built: true },
       { id: "6.6", titleKey: "l6_6", built: true },
       { id: "6.7", titleKey: "l6_7", built: true },
     ],
   },
-  { id: "7", key: "ch7", roles: ["Delivery Clerk", "Production Clerk"], plannedLevels: 4, levels: [] },
+  {
+    id: "7",
+    key: "ch7",
+    roles: ["Delivery Clerk", "Production Clerk"],
+    plannedLevels: 4,
+    levels: [{ id: "7.2", titleKey: "l7_2", built: true }],
+  },
   {
     id: "8",
     key: "ch8",
@@ -84,7 +115,13 @@ export const CHAPTERS: ChapterEntry[] = [
       { id: "8.6", titleKey: "l8_6", built: true },
     ],
   },
-  { id: "9", key: "ch9", roles: ["All"], plannedLevels: 3, levels: [] },
+  {
+    id: "9",
+    key: "ch9",
+    roles: ["All"],
+    plannedLevels: 3,
+    levels: [{ id: "9.1", titleKey: "l9_1", built: true }],
+  },
 ];
 
 export const BUILT_LEVELS = CHAPTERS.flatMap((c) => c.levels.filter((l) => l.built));

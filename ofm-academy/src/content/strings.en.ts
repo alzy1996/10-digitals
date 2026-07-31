@@ -240,6 +240,92 @@ export const en = {
     rollover: "Production day rolls over at",
   },
 
+  l2_1: {
+    title: "Raw Material Check",
+    objective: "Before you promise a date, check the materials are actually there.",
+    prompt: "Can this batch run today?",
+    stock: "Stock board",
+    required: "Required",
+    available: "Available",
+    short: "Short",
+    canRun: "Materials are ready",
+    cannotRun: "Not ready — push the date",
+    rmNote: "The full raw-material master is not yet exported; this board uses the categories confirmed in the production check.",
+  },
+
+  l2_5: {
+    title: "The Dispatch Handshake",
+    objective: "Send the message that starts the delivery loop. Vague costs a truck.",
+    trigger: "@Delivery AFM — Please dispatch",
+    prompt: "Attach the fields the clerk needs",
+    include: "Include",
+    omit: "Leave out",
+    send: "Send the message",
+    missing: "Missing fields",
+  },
+
+  l4_2: {
+    title: "FIFO",
+    objective: "Oldest batch first. The newest pallet is always the closest one.",
+    prompt: "Which batch do you pick?",
+    produced: "Produced",
+    daysOld: "days old",
+    nearest: "Nearest the aisle",
+  },
+
+  l5_5: {
+    title: "Gross and Net",
+    objective: "Net is gross minus tare. Out of tolerance, the truck does not leave.",
+    tare: "Tare",
+    gross: "Gross",
+    net: "Net",
+    soQty: "SO quantity",
+    computeNet: "Enter the net weight",
+    dispatch: "Dispatch",
+    stop: "STOP — do not dispatch",
+    tolerance: "Tolerance",
+    toleranceNote: "The real accepted variance is not yet confirmed; this level uses ±2%.",
+  },
+
+  l5_6: {
+    title: "The Paper Chain",
+    objective: "Delivery signs, then Packing, then Production. The order cannot be skipped.",
+    delivery: "Delivery",
+    packing: "Packing",
+    production: "Production",
+    sign: "Sign",
+    signed: "Signed",
+    remark: "Production remark",
+    outOfOrder: "That signature cannot come yet",
+    complete: "Chain complete",
+  },
+
+  l6_5: {
+    title: "Not My Lane",
+    objective: "A tipper route lands in your inbox. Your scope is bags and flat bed.",
+    prompt: "What do you do with it?",
+    book: "Book the tipper",
+    refuse: "Out of scope — pass it on",
+  },
+
+  l7_2: {
+    title: "Inbound Weighbridge",
+    objective: "Receiving reverses the arithmetic: the truck arrives full and leaves empty.",
+    firstWeigh: "First weigh (loaded)",
+    secondWeigh: "Second weigh (empty)",
+    received: "Quantity received",
+    enterReceived: "Enter the quantity received",
+    item: "Bran Barley",
+  },
+
+  l9_1: {
+    title: "The Full Shift",
+    objective: "No hints, no pause. Everything you have learned, in one run.",
+    incoming: "Incoming",
+    decide: "Decide",
+    remaining: "Remaining",
+  },
+
   result: {
     title: "Shift report",
     omrNet: "Net OMR",
@@ -249,6 +335,36 @@ export const en = {
     noCost: "Nothing lost — clean run",
     replaySaved: "Replay saved",
     replaySize: "{bytes} bytes",
+  },
+
+  progress: {
+    rank: "Rank",
+    badges: "Badges",
+    certificate: "Certificate",
+    print: "Print / Save as PDF",
+    learnerName: "Learner name",
+    issued: "Issued",
+    verify: "Verification code",
+    notYet: "Pass a chapter to earn a certificate",
+    reset: "Reset progress",
+  },
+
+  rank: {
+    trainee: "Trainee",
+    clerk: "Clerk",
+    operator: "Operator",
+    dispatcher: "Dispatcher",
+    supervisor: "Supervisor",
+    millMaster: "Mill Master",
+  },
+
+  badge: {
+    zeroOverfill: "Zero-Overfill Shift",
+    fifoPerfect: "FIFO Perfect",
+    escalatedCorrectly: "Escalated Correctly",
+    ghostSoHunter: "Ghost SO Hunter",
+    ferryCaught: "Ferry Caught",
+    underBudget: "Under Budget",
   },
 
   reason: {

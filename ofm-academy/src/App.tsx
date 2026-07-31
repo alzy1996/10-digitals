@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Shell } from "./ui/Shell";
 import { Card, OmrMeter, ProgressBar, SectionTitle, Stars, useT } from "./ui/bits";
 import { ResultScreen } from "./ui/ResultScreen";
@@ -6,6 +6,8 @@ import { CHAPTERS, BUILT_LEVELS, TOTAL_PLANNED, levelEntry } from "./levels/regi
 import { useLevel } from "./levels/LevelHost";
 import { LEVEL_VIEWS } from "./levels/views";
 import { useUi } from "./state/ui";
+import { Certificate } from "./ui/Certificate";
+import { RANKS } from "./data/progress";
 import type { Strings } from "./content/strings.en";
 
 /** Level title and objective, both from content. */
@@ -14,6 +16,59 @@ function levelCopy(t: Strings, levelId: string) {
   if (!entry) return { title: levelId, objective: "" };
   const block = t[entry.titleKey] as { title: string; objective: string };
   return { title: block.title, objective: block.objective };
+}
+
+function RankCard() {
+  const { t, lang } = useT();
+  const rank = useUi((s) => s.rank);
+  const badges = useUi((s) => s.badges);
+  const go = useUi((s) => s.go);
+  const def = RANKS.find((r) => r.id === rank)!;
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-xs uppercase tracking-widest text-slate-500">
+            {t.progress.rank}
+          </div>
+          <div className="text-lg font-extrabold text-sls-ink">
+            {lang === "ar" ? def.ar : def.en}
+          </div>
+        </div>
+        <button className="btn-ghost !px-4 !py-2 text-sm" onClick={() => go({ name: "certificate" })}>
+          {t.progress.certificate}
+        </button>
+      </div>
+      {badges.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {badges.map((b) => (
+            <span key={b} className="badge bg-ofm-orange/15 text-ofm-orange">
+              {t.badge[b]}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+function CertificateScreen() {
+  const best = useUi((s) => s.best);
+  const rank = useUi((s) => s.rank);
+  const badges = useUi((s) => s.badges);
+  const attempts = Object.values(best);
+  const totalScore = attempts.reduce((n, a) => n + a.score, 0);
+  const levelsPassed = attempts.filter((a) => a.stars >= 1).length;
+
+  return (
+    <Certificate
+      rank={rank}
+      badges={badges}
+      totalScore={totalScore}
+      levelsPassed={levelsPassed}
+    />
+  );
 }
 
 function Home() {
@@ -33,6 +88,8 @@ function Home() {
           </div>
         </div>
       </Card>
+
+      <RankCard />
 
       <div className="grid gap-3">
         {CHAPTERS.map((c) => {
@@ -112,7 +169,7 @@ function LevelRunner({
   attempt: number;
   onRetry(): void;
   onHome(): void;
-  onRecord(levelId: string, score: number, stars: number): void;
+  onRecord(levelId: string, score: number, stars: 0 | 1 | 2 | 3, omr: number): void;
   t: Strings;
 }) {
   const { api, finished } = useLevel<unknown>(levelId, `attempt-${attempt}`);
@@ -120,7 +177,7 @@ function LevelRunner({
   const View = LEVEL_VIEWS[levelId];
 
   if (finished) {
-    onRecord(levelId, finished.result.score, finished.result.stars);
+    onRecord(levelId, finished.result.score, finished.result.stars, finished.result.omr);
     return <ResultScreen run={finished} onRetry={onRetry} onHome={onHome} />;
   }
 
@@ -147,9 +204,22 @@ function LevelRunner({
 
 export default function App() {
   const route = useUi((s) => s.route);
+  const hydrate = useUi((s) => s.hydrate);
+
+  // pull saved progress once; the repository is offline-first
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+
   return (
     <Shell>
-      {route.name === "level" ? <LevelScreen levelId={route.levelId} /> : <Home />}
+      {route.name === "level" ? (
+        <LevelScreen levelId={route.levelId} />
+      ) : route.name === "certificate" ? (
+        <CertificateScreen />
+      ) : (
+        <Home />
+      )}
     </Shell>
   );
 }
