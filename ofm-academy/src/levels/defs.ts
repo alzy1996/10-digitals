@@ -10,6 +10,7 @@ import type { Command, LevelDefinition, ScoreParts, SimContext } from "../sim/en
 import type { Rng } from "../sim/rng";
 import { BAGS_PER_MT, mtToBags } from "../sim/entities";
 import { coreCodes, customers, glossary, rules } from "../content";
+import * as D2 from "./defs2";
 
 const MIN = 60_000;
 
@@ -485,4 +486,14 @@ export const LEVEL_DEFS: Record<string, LevelDefinition<any>> = {
   "1.3": L1_3_MtToBags,
   "1.4": L1_4_Deadline,
   "1.5": L1_5_GhostSo,
+  "3.2": D2.L3_2_Scale,
+  "3.3": D2.L3_3_FreeKilos,
+  "6.1": D2.L6_1_BaggedOrBulk,
+  "6.3": D2.L6_3_ContractBoard,
+  "6.4": D2.L6_4_SoharPoultry,
+  "6.6": D2.L6_6_NoContract,
+  "6.7": D2.L6_7_Ferry,
+  "8.2": D2.L8_2_LabourForecast,
+  "8.5": D2.L8_5_LeaveChain,
+  "8.6": D2.L8_6_GhostHour,
 };

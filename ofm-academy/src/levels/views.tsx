@@ -17,6 +17,7 @@ import type {
   SoField,
 } from "./defs";
 import { SO_FIELDS } from "./defs";
+import * as V2 from "./views2";
 
 /** Shows whatever the last command broke, in the learner's language. */
 function Violations({ api }: { api: LevelApi<unknown> }) {
@@ -371,4 +372,14 @@ export const LEVEL_VIEWS: Record<string, (p: { api: LevelApi<any> }) => JSX.Elem
   "1.3": MtBagsView,
   "1.4": DeadlineView,
   "1.5": GhostSoView,
+  "3.2": V2.ScaleView,
+  "3.3": V2.FreeKilosView,
+  "6.1": V2.BaggedOrBulkView,
+  "6.3": V2.ContractBoardView,
+  "6.4": V2.SoharPoultryView,
+  "6.6": V2.NoContractView,
+  "6.7": V2.FerryView,
+  "8.2": V2.LabourForecastView,
+  "8.5": V2.LeaveChainView,
+  "8.6": V2.GhostHourView,
 };

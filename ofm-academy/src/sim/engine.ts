@@ -159,8 +159,12 @@ export class Simulation<S> {
 
     const ctx = this.ctx();
     const facts = this.level.apply(this.state, cmd, ctx);
+
+    // A command with no facts to check still counts as progress, so the
+    // completion check below must run on this path too.
     if (!facts) {
       this.lastViolations = [];
+      if (this.level.isComplete(this.state)) this.ended = true;
       return [];
     }
 

@@ -47,12 +47,43 @@ export const CHAPTERS: ChapterEntry[] = [
     ],
   },
   { id: "2", key: "ch2", roles: ["Production Clerk"], plannedLevels: 5, levels: [] },
-  { id: "3", key: "ch3", roles: ["Packing Supervisor"], plannedLevels: 6, levels: [] },
+  {
+    id: "3",
+    key: "ch3",
+    roles: ["Packing Supervisor"],
+    plannedLevels: 6,
+    levels: [
+      { id: "3.2", titleKey: "l3_2", built: true },
+      { id: "3.3", titleKey: "l3_3", built: true },
+    ],
+  },
   { id: "4", key: "ch4", roles: ["Forklift Operator"], plannedLevels: 6, levels: [] },
   { id: "5", key: "ch5", roles: ["Delivery Clerk"], plannedLevels: 8, levels: [] },
-  { id: "6", key: "ch6", roles: ["Delivery Clerk"], plannedLevels: 7, levels: [] },
+  {
+    id: "6",
+    key: "ch6",
+    roles: ["Delivery Clerk"],
+    plannedLevels: 7,
+    levels: [
+      { id: "6.1", titleKey: "l6_1", built: true },
+      { id: "6.3", titleKey: "l6_3", built: true },
+      { id: "6.4", titleKey: "l6_4", built: true },
+      { id: "6.6", titleKey: "l6_6", built: true },
+      { id: "6.7", titleKey: "l6_7", built: true },
+    ],
+  },
   { id: "7", key: "ch7", roles: ["Delivery Clerk", "Production Clerk"], plannedLevels: 4, levels: [] },
-  { id: "8", key: "ch8", roles: ["Shift Supervisor"], plannedLevels: 6, levels: [] },
+  {
+    id: "8",
+    key: "ch8",
+    roles: ["Shift Supervisor"],
+    plannedLevels: 6,
+    levels: [
+      { id: "8.2", titleKey: "l8_2", built: true },
+      { id: "8.5", titleKey: "l8_5", built: true },
+      { id: "8.6", titleKey: "l8_6", built: true },
+    ],
+  },
   { id: "9", key: "ch9", roles: ["All"], plannedLevels: 3, levels: [] },
 ];
 
