@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+/* Self-hosted fonts (no Google Fonts CDN at runtime). */
+@font-face { font-family: "Readex Pro"; font-weight: 600; font-display: swap; src: url("./assets/fonts/readex-latin-600.woff") format("woff"); unicode-range: U+0000-00FF, U+2000-206F; }
+@font-face { font-family: "Readex Pro"; font-weight: 600; font-display: swap; src: url("./assets/fonts/readex-arabic-600.woff") format("woff"); unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF; }
+
+/* Design tokens from PLAN.md §9 / §19.2. Sunlight = light, Basement = dark (parking). */
+@theme {
+  --font-sans: "Readex Pro", system-ui, -apple-system, "Segoe UI", "Noto Sans Arabic", sans-serif;
+  --color-bg: #FFFFFF;
+  --color-surface: #F1F4F8;
+  --color-ink: #0B0F14;
+  --color-ink-2: #3B4452;
+  --color-route: #0B57D0;
+  --color-car: #F5B700;
+  --color-ok: #067647;
+  --color-danger: #B42318;
+  --color-warn: #FFB020;
+}
+
+:root[data-theme="basement"] {
+  --color-bg: #0B0F14;
+  --color-surface: #161B22;
+  --color-ink: #F5F7FA;
+  --color-ink-2: #AEB8C6;
+  --color-route: #7AB0FF;
+  --color-ok: #4ADE9B;
+  --color-danger: #FF8A80;
+}
+
+html, body, #root { height: 100%; margin: 0; }
+body { background: var(--color-bg); color: var(--color-ink); font-family: var(--font-sans); -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
