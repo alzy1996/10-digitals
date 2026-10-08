@@ -1401,7 +1401,7 @@ Nothing here is confirmed by Sam yet.
 
 These are asked **one at a time**, in order of how much each answer changes the build. Each has a suggested default.
 
-1. **Which mall first, and who do you know there (name and role)?** **ANSWERED (mall only) on 2026-10-08: Mall of Oman** (§19.1). Still open and asked next: who do you know there, then Option A or B (§19.1).
+1. **Which mall first, and who do you know there (name and role)?** **ANSWERED (mall only) on 2026-10-08: Mall of Oman** (§19.1). **Q1b ANSWERED: nobody yet** (cold start, §19.1). Next: Q1c, Option A or B (§19.1).
 2. **Hosting for the live pilot:**
    - (A) shopper app on Cloudflare Workers Static Assets, $0;
    - (B) Firebase Hosting on Blaze, about $14–44/month, passed on to the mall;
@@ -1580,7 +1580,7 @@ After the last answer: a one-paragraph summary, then **"CONFIRMED?"**
 1. **First mall: Mall of Oman (MoO)**, "the biggest parking mall".
 2. **The future key feature:** every detail of the mall on the map. Not a flat Google-Maps-style map and not just arrows: a **game-like 3D view with the correct colours and the real shop sign names** (§19.2).
 3. **Walk near a shop → see its offers and prices, and compare** (§19.3).
-- **NOT YET ANSWERED:** "who do you know there (name and role)". It is the next question.
+- **Q1b ANSWERED (2026-10-08): nobody yet** at Mall of Oman or MAF. → Cold start: warm intro through 10 Digital's own network to the MoO General Manager or Oman marketing manager; first approach Q1 2027, armed with the 3D Demo Mall (and the MGM Proof Report under Option A).
 
 **MALL OF OMAN: WHAT WE KNOW**
 
@@ -2376,8 +2376,4 @@ Add these rows to §15.1. Only Q1 (the mall) is answered; everything else is sti
 
 ---
 
-**SAM, NEXT QUESTION** (the only one for now; it replaces the Q1 prompt at the end of §18): Who do you know at Mall of Oman or MAF (name and role)? And has 10 Digital ever done work for MAF Oman?
-
----
-
-**SAM, NEXT QUESTION (Q1b):** Who do you personally know at Mall of Oman or Majid Al Futtaim (name + role)? *Default: nobody yet; warm intro through 10 Digital's network, first approach Q1 2027.*
+**SAM, NEXT QUESTION (Q1c):** Mall of Oman's role: **Option A** (showcase + long-term target; Muscat Grand Mall = paid pilot; 15 Dec LOI and Ramadan 2027 proof hold) or **Option B** (Mall of Oman = paid pilot; LOI Q2 2027 at best, 600–1,200+ h mapping, proof realistically Ramadan 2028)? *Default: A.*
