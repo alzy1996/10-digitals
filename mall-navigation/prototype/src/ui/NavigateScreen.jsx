@@ -10,15 +10,13 @@ const WALK_MPS = 1.2
 
 /**
  * Navigate (S07): step card (large instruction, distance + time, Step n of N), Next (primary) and Back,
- * plus the SIMULATION controls (play / pause, 1x / 2x / 4x). The sheet stays under 47% of the screen (Arabic 49%,
- * more on short screens: app.css --nav-sheet-max) so the 3D map is always visible. Turn icons follow the walking
- * direction and are never mirrored. Next / Back and the simulator block ("Simulate walk", which opens the Walk view,
- * and the speed) are the sheet's pinned footer: they never scroll away and their rounded buttons are never cut by the
- * sheet's edge; a long step text scrolls above them on a short screen (a soft edge shows there is more). The
- * SIMULATION tag and its "not your live position" note share the first line of the simulator block, so the trust
- * message is never below the fold. Under 380 px wide the speed is one 56 px button that cycles 1x / 2x / 4x. On short
- * screens (a phone browser tab, under 700 px tall) the tag sits on the divider line and the status line folds into
- * the play button's label, so the simulator row stays inside the sheet.
+ * plus the SIMULATION controls (play / pause, 1x / 2x / 4x). Turn icons follow the walking direction and are never
+ * mirrored. In the foldable sheet the step card is the head and Next / Back the pinned footer right under it, so the
+ * folded sheet still shows the step and Next; the simulator block ("Simulate walk", which opens the Walk view, and the
+ * speed) is the body below them, shown from the default half height up when it fits (and always at full). The
+ * SIMULATION tag and its "not your live position" note share the first line of the simulator block. Under 380 px wide
+ * the speed is one 56 px button that cycles 1x / 2x / 4x. On short screens (a phone browser tab, under 700 px tall)
+ * the tag sits on the divider line and the status line folds into the play button's label.
  */
 export const NavigateScreen = forwardRef(function NavigateScreen(
   { lang, route, stepIndex, sim, onNext, onPrev, onEnd, onPlay, onPause, onSpeed },
@@ -114,29 +112,26 @@ export const NavigateScreen = forwardRef(function NavigateScreen(
   )
 
   const footer = (
-    <>
-      <div className="nav-actions">
-        <button
-          type="button"
-          className="btn btn-secondary nav-back"
-          onClick={onPrev}
-          disabled={i === 0}
-          aria-label={t('nav.prev', lang)}
-          style={i === 0 ? { opacity: 0.4 } : undefined}
-        >
-          <Icon name="back" size={24} className="flip-rtl" />
-        </button>
-        <button type="button" className="btn btn-primary flex-1" onClick={onNext}>
-          {isLast ? t('arrived.title', lang) : t('nav.next', lang)}
-          <Icon name={isLast ? 'check' : 'chevron'} size={22} className={isLast ? undefined : 'flip-rtl'} />
-        </button>
-      </div>
-      {simBlock}
-    </>
+    <div className="nav-actions">
+      <button
+        type="button"
+        className="btn btn-secondary nav-back"
+        onClick={onPrev}
+        disabled={i === 0}
+        aria-label={t('nav.prev', lang)}
+        style={i === 0 ? { opacity: 0.4 } : undefined}
+      >
+        <Icon name="back" size={24} className="flip-rtl" />
+      </button>
+      <button type="button" className="btn btn-primary flex-1" onClick={onNext}>
+        {isLast ? t('arrived.title', lang) : t('nav.next', lang)}
+        <Icon name={isLast ? 'check' : 'chevron'} size={22} className={isLast ? undefined : 'flip-rtl'} />
+      </button>
+    </div>
   )
 
-  return (
-    <Sheet ref={ref} maxHeight="var(--nav-sheet-max, 45%)" label={t('nav.stepCard', lang)} className="nav-sheet" scroll footer={footer}>
+  const head = (
+    <>
       <div className="nav-top">
         {route.stepFree ? (
           <span className="nav-stepfree" title={t('place.stepFreeOn', lang)} aria-label={t('place.stepFreeOn', lang)}>
@@ -180,7 +175,12 @@ export const NavigateScreen = forwardRef(function NavigateScreen(
           ) : null}
         </div>
       </div>
+    </>
+  )
 
+  return (
+    <Sheet ref={ref} label={t('nav.stepCard', lang)} className="nav-sheet" head={head} footer={footer} bodyAfterFooter>
+      {simBlock}
     </Sheet>
   )
 })

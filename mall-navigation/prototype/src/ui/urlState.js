@@ -14,11 +14,13 @@
  *   &q=<query>  &tile=food|restrooms|prayer|pharmacy|kids|exit   search screen
  *   &car=<bayId>                           a saved car
  *   &play=1                                navigate: start the simulated walk
+ *   &sheet=peek|half|full                  the first screen's bottom sheet snap (default: half; search: full)
  */
 
 const SCREENS = ['home', 'search', 'place', 'navigate', 'arrived', 'car', 'scan']
 const VIEWS = ['stack', 'floor', 'top', 'fpv']
 const STYLES = ['storm', 'classic']
+const SHEET_SNAPS = ['peek', 'half', 'full']
 
 /**
  * @param {string} [search] location.search
@@ -51,6 +53,7 @@ export function readUrlParams(search = typeof location !== 'undefined' ? locatio
     car: str('car'),
     play: str('play') === '1',
     style: STYLES.includes(str('style')) ? str('style') : null,
+    sheet: SHEET_SNAPS.includes(str('sheet')) ? str('sheet') : null,
   }
 }
 

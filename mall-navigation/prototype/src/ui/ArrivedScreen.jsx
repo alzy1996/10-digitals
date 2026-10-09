@@ -11,45 +11,45 @@ function foundItLabel(lang) {
 
 /**
  * Arrived (S13): green confirmation, one primary action (Found it), and two quiet follow-ups.
- * The map behind keeps the destination sign in view.
+ * The map behind keeps the destination sign in view. The confirmation is the sheet's head and Found it the footer right
+ * under it (what stays when the sheet is folded); the follow-ups and the simulated-arrival note follow.
  */
 export const ArrivedScreen = forwardRef(function ArrivedScreen({ index, lang, info, simulated, hasCar, onFound, onBackToCar, onAnother }, ref) {
   return (
     <Sheet
       ref={ref}
-      maxHeight="55%"
       label={t('arrived.title', lang)}
-      scroll
-      footer={
-        <>
-          <button type="button" className="btn btn-ok btn-block btn-go" onClick={onFound}>
-            {foundItLabel(lang)}
-            <Icon name="check" size={26} />
-          </button>
-          <div className="mt-3 flex flex-wrap gap-2 justify-center">
-            {hasCar ? (
-              <button type="button" className="chip" onClick={onBackToCar}>
-                <Icon name="car" size={20} />
-                {t('arrived.backToCar', lang)}
-              </button>
-            ) : null}
-            <button type="button" className="chip" onClick={onAnother}>
-              <Icon name="search" size={20} />
-              {t('arrived.anotherShop', lang)}
-            </button>
+      head={
+        <div className="arrived-hero">
+          <span className="arrived-check" aria-hidden="true">
+            <Icon name="check" size={38} />
+          </span>
+          <div className="min-w-0">
+            <p className="arrived-label">{t('arrived.title', lang)}</p>
+            <h2 className="title-l">{info ? pick(info.name, lang) : ''}</h2>
+            {info?.levelId ? <p className="arrived-level">{levelName(index, info.levelId, lang)}</p> : null}
           </div>
-        </>
-      }
-    >
-      <div className="arrived-hero">
-        <span className="arrived-check" aria-hidden="true">
-          <Icon name="check" size={38} />
-        </span>
-        <div className="min-w-0">
-          <p className="arrived-label">{t('arrived.title', lang)}</p>
-          <h2 className="title-l">{info ? pick(info.name, lang) : ''}</h2>
-          {info?.levelId ? <p className="arrived-level">{levelName(index, info.levelId, lang)}</p> : null}
         </div>
+      }
+      footer={
+        <button type="button" className="btn btn-ok btn-block btn-go" onClick={onFound}>
+          {foundItLabel(lang)}
+          <Icon name="check" size={26} />
+        </button>
+      }
+      bodyAfterFooter
+    >
+      <div className="arrived-more flex flex-wrap gap-2 justify-center">
+        {hasCar ? (
+          <button type="button" className="chip" onClick={onBackToCar}>
+            <Icon name="car" size={20} />
+            {t('arrived.backToCar', lang)}
+          </button>
+        ) : null}
+        <button type="button" className="chip" onClick={onAnother}>
+          <Icon name="search" size={20} />
+          {t('arrived.anotherShop', lang)}
+        </button>
       </div>
       {simulated ? <p className="caption mt-2 text-center">{t('sim.arrivedNote', lang)}</p> : null}
     </Sheet>

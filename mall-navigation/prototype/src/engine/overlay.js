@@ -5,10 +5,11 @@
  * labels never pile up. Label text keeps a constant on-screen size (>= 14 px Latin, >= 16 px Arabic).
  *
  * - Screen areas covered by UI (header, map controls, the bottom sheet) are "obstacles": nothing is
- *   drawn under them, so no label is ever half hidden by a button.
+ *   drawn under them, so no label is ever half hidden by a button. The bottom sheet's rect (`kind: 'sheet'`) also
+ *   ends the map: nothing whose anchor is below its top edge is drawn, and nothing slides below it.
  * - Level labels in stack view get their own pass: one column at the slab edges (the start side in the
  *   reading direction), pushed apart instead of dropped, with the short level code as a fallback. They are
- *   never dropped.
+ *   dropped only when they would sit under or below the bottom sheet.
  * - Neighbouring labels keep a clear gap, and nothing crowds the destination's label.
  * - The destination and the landmark / connector named in the current step always show (PLAN.md 19.2): when
  *   their spot is taken by a control or the screen edge they move to the nearest free spot instead of
@@ -347,6 +348,10 @@ export class OverlayLayer {
     _right.set(1, 0, 0).applyQuaternion(camera.quaternion)
 
     const toRect = (r) => [r.x, r.y, r.w, r.h]
+    // the visible map ends at the bottom sheet's top edge
+    let visH = height
+    for (const r of ctx.obstacles ?? []) if (r.kind === 'sheet') visH = Math.min(visH, r.y)
+    visH = Math.max(0, visH)
     const obstacles = (ctx.obstacles ?? []).map(toRect)
     const markerRects = (ctx.reserved ?? []).map(toRect)
     const keyRects = (ctx.keyRects ?? []).map(toRect)
@@ -357,7 +362,7 @@ export class OverlayLayer {
       return null
     }
     const underUi = (r) => hits(r, obstacles) != null
-    const onScreen = (r, m = 4) => r[0] >= m && r[1] >= m && r[0] + r[2] <= width - m && r[1] + r[3] <= height - m
+    const onScreen = (r, m = 4) => r[0] >= m && r[1] >= m && r[0] + r[2] <= width - m && r[1] + r[3] <= visH - m
     const free = (r, avoid) => onScreen(r) && !underUi(r) && !(avoid && hits(r, avoid))
     const hitsRoute = (r) => segs.some((sg) => rectNearSegment(r, sg))
     const forcedOf = (...ids) => {
@@ -382,13 +387,13 @@ export class OverlayLayer {
         if (!overlap(rect, q)) continue
         moves.push([q[0] - (x + w) - 4, 0], [q[0] + q[2] - x + 4, 0], [0, q[1] - (y + h) - 4], [0, q[1] + q[3] - y + 4])
       }
-      const edge = [x < 4 ? 4 - x : x + w > width - 4 ? width - 4 - x - w : 0, y < 4 ? 4 - y : y + h > height - 4 ? height - 4 - y - h : 0]
+      const edge = [x < 4 ? 4 - x : x + w > width - 4 ? width - 4 - x - w : 0, y < 4 ? 4 - y : y + h > visH - 4 ? visH - 4 - y - h : 0]
       if (edge[0] || edge[1]) moves.push(edge)
       // a move away from one control can run into the screen edge: also try it with the edge correction
       for (const m of moves.slice()) {
         const r = [x + m[0], y + m[1], w, h]
         const ex = r[0] < 4 ? 4 - r[0] : r[0] + w > width - 4 ? width - 4 - r[0] - w : 0
-        const ey = r[1] < 4 ? 4 - r[1] : r[1] + h > height - 4 ? height - 4 - r[1] - h : 0
+        const ey = r[1] < 4 ? 4 - r[1] : r[1] + h > visH - 4 ? visH - 4 - r[1] - h : 0
         if (ex || ey) moves.push([m[0] + ex, m[1] + ey])
       }
       moves.sort((a, b) => Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]))
@@ -410,7 +415,8 @@ export class OverlayLayer {
       const sy = (1 - ((_v4.y / _v4.w) * 0.5 + 0.5)) * height
       return { sx, sy, depth }
     }
-    const inView = (sx, sy, m = 40) => sx > -m && sx < width + m && sy > -m && sy < height + m
+    // (an anchor under the sheet is not drawn: it would have to float away from what it names)
+    const inView = (sx, sy, m = 40) => sx > -m && sx < width + m && sy > -m && sy < Math.min(height + m, visH)
 
     // pins
     const size = this.pinSize
@@ -470,10 +476,10 @@ export class OverlayLayer {
       const anchor = this._levelAnchor(it, ctx, project)
       if (anchor) levelItems.push({ it, anchor })
     }
-    if (levelItems.length) this._layoutLevelLabels(levelItems, ctx, obstacles.concat(markerRects), hits, levelPlaced)
+    if (levelItems.length) this._layoutLevelLabels(levelItems, { ...ctx, visH }, obstacles.concat(markerRects), hits, levelPlaced)
 
     // level badges under markers that are not on the top floor shown (stack view)
-    const badgeCands = this._placeBadges(ctx.markerBadges ?? [], ctx, slideFree, levelPlaced.concat(markerRects))
+    const badgeCands = this._placeBadges(ctx.markerBadges ?? [], ctx, slideFree, levelPlaced.concat(markerRects)).filter((b) => b.rect[1] + b.rect[3] <= visH)
     for (const b of badgeCands) levelPlaced.push(b.rect)
 
     // other labels
@@ -572,9 +578,12 @@ export class OverlayLayer {
     cands.sort((a, b) => b.pri - a.pri || a.depth - b.depth)
     const placed = markerRects.concat(levelPlaced)
     const accepted = levelItems.filter((x) => x.cand).map((x) => x.cand).concat(badgeCands)
+    // nothing under or below the sheet (a forced name whose free spot ran out stays where it was)
+    const aboveSheet = (c) => c.rect[1] + c.rect[3] <= visH + 0.5
     const cells = new Set()
     const forcedPlaced = []
     for (const c of cands) {
+      if (!aboveSheet(c)) continue
       if (!c.forced && hits(c.rect, placed)) continue
       if (c.forced && c.kind === 'label') {
         // two always-shown names (the destination and the step's landmark) never sit on each other: the later one
@@ -711,7 +720,8 @@ export class OverlayLayer {
       return { w: (bb[2] - bb[0]) * px, h: (bb[3] - bb[1]) * px * 0.82 }
     }
     // the band between the top controls and the sheet
-    let bottom = height - 4
+    const visH = ctx.visH ?? height
+    let bottom = visH - 4
     for (const q of obstacles) if (q[1] > height * 0.35 && q[0] < width / 2 + 40 && q[0] + q[2] > width / 2 - 40) bottom = Math.min(bottom, q[1] - 4)
     items.sort((a, b) => a.anchor.sy - b.anchor.sy)
     const layout = (useShort) => {
@@ -746,6 +756,8 @@ export class OverlayLayer {
     if (!pick) return
     for (const r of pick) {
       const { it, anchor } = r.entry
+      // a slab whose corner is under the sheet, or a name pushed below its top edge: not drawn
+      if (anchor.sy > visH || r.rect[1] + r.rect[3] > visH) continue
       out.push(r.rect)
       r.entry.cand = {
         kind: 'label',

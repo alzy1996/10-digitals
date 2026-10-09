@@ -6,7 +6,7 @@ import { hoursLine, levelName, pick, viaLine } from './model.js'
 
 /**
  * Place (S05): name, level, minutes, hours, step-free toggle and one primary action: GO.
- * The 3D map behind shows the route preview.
+ * The 3D map behind shows the route preview. Folded, the sheet keeps the name row (its head) and GO (its footer).
  */
 export const PlaceScreen = forwardRef(function PlaceScreen({ index, lang, info, route, you, stepFree, onToggleStepFree, onGo, onBack }, ref) {
   if (!info) return null
@@ -18,9 +18,26 @@ export const PlaceScreen = forwardRef(function PlaceScreen({ index, lang, info, 
   return (
     <Sheet
       ref={ref}
-      maxHeight="60%"
       label={pick(info.name, lang)}
-      scroll
+      head={
+        <div className="flex items-start gap-3">
+          <button type="button" className="icon-btn" onClick={onBack} aria-label={t('common.back', lang)}>
+            <Icon name="back" size={24} className="flip-rtl" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <h2 className="title">{pick(info.name, lang)}</h2>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {info.categoryLabelKey ? (
+                <span className="cat-chip" style={{ background: info.color, '--cat-c': info.color }}>
+                  <Icon name={info.icon} size={18} />
+                  {t(info.categoryLabelKey, lang)}
+                </span>
+              ) : null}
+              {levelId ? <span className="subtitle">{levelName(index, levelId, lang)}</span> : null}
+            </div>
+          </div>
+        </div>
+      }
       footer={
         <button type="button" className="btn btn-primary btn-go btn-block" onClick={onGo} disabled={!route} style={route ? undefined : { opacity: 0.45 }}>
           {t('place.go', lang)}
@@ -28,27 +45,9 @@ export const PlaceScreen = forwardRef(function PlaceScreen({ index, lang, info, 
         </button>
       }
     >
-      <div className="flex items-start gap-3">
-        <button type="button" className="icon-btn" onClick={onBack} aria-label={t('common.back', lang)}>
-          <Icon name="back" size={24} className="flip-rtl" />
-        </button>
-        <div className="flex-1 min-w-0">
-          <h2 className="title">{pick(info.name, lang)}</h2>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            {info.categoryLabelKey ? (
-              <span className="cat-chip" style={{ background: info.color, '--cat-c': info.color }}>
-                <Icon name={info.icon} size={18} />
-                {t(info.categoryLabelKey, lang)}
-              </span>
-            ) : null}
-            {levelId ? <span className="subtitle">{levelName(index, levelId, lang)}</span> : null}
-          </div>
-        </div>
-      </div>
-
       {route ? (
         // light hero numerals ("2" + "min walk"); the accessible name keeps the spoken form ("about 2 min")
-        <p className="place-eta mt-4" aria-label={`${formatDuration(route.etaS, lang)} · ${formatDistance(route.lengthM, lang)}`}>
+        <p className="place-eta mt-2" aria-label={`${formatDuration(route.etaS, lang)} · ${formatDistance(route.lengthM, lang)}`}>
           <span className="nowrap" aria-hidden="true">
             <span className="num-hero">{eta.value}</span> <span className="eta-unit">{t('hud.minWalk', lang)}</span>
           </span>

@@ -386,6 +386,9 @@ export const STRINGS = Object.freeze({
   'hud.where.out': { en: '{turn} as you step out', ar: '{turn} عند الخروج' },
   'hud.pressThen': { en: '{press}, {then}', ar: '{press}، {then}' },
   'hud.arrived': { en: 'Arrived', ar: 'وصلت' },
+  // foldable bottom sheet: the handle button says what a tap does (fold / expand the panel)
+  'sheet.fold': { en: 'Fold panel', ar: 'اطوِ اللوحة' },
+  'sheet.expand': { en: 'Expand panel', ar: 'وسّع اللوحة' },
 })
 
 /**

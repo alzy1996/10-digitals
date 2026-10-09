@@ -24,7 +24,8 @@ function useDebounced(value, ms) {
 
 /**
  * Search (S04): instant, debounced results in both languages; tiles and categories open filtered lists,
- * nearest first. Each row shows the level and the walking time from you-are-here.
+ * nearest first. Each row shows the level and the walking time from you-are-here. The search field (or the list's
+ * title) is the sheet's head; the sheet opens full while typing and half for a tile / category list.
  */
 export const SearchScreen = forwardRef(function SearchScreen(
   { index, lang, search, you, stepFree, query, tile, category, onQuery, onTile, onCategory, onPick, onCar, onBack, autoFocus = true },
@@ -73,39 +74,45 @@ export const SearchScreen = forwardRef(function SearchScreen(
   const filtered = Boolean(tile || category)
 
   return (
-    <Sheet ref={ref} maxHeight="66%" label={t('search.title', lang)} className="h-[66%]">
-      <div className="flex items-center gap-2">
-        <button type="button" className="icon-btn" onClick={onBack} aria-label={t('common.back', lang)}>
-          <Icon name="back" size={24} className="flip-rtl" />
-        </button>
-        {filtered ? (
-          <h2 className="list-title">{title}</h2>
-        ) : (
-          <label className="search-box flex-1 min-w-0">
-            <Icon name="search" size={22} />
-            <span className="sr-only">{t('home.searchLabel', lang)}</span>
-            <input
-              ref={inputRef}
-              type="search"
-              enterKeyHint="search"
-              autoComplete="off"
-              autoCorrect="off"
-              spellCheck={false}
-              dir="auto"
-              value={query}
-              placeholder={t('home.searchPlaceholder', lang)}
-              onChange={(e) => onQuery(e.target.value)}
-            />
-            {query ? (
-              <button type="button" className="grid place-items-center w-11 h-11 -me-2" onClick={() => onQuery('')} aria-label={t('search.clear', lang)}>
-                <Icon name="close" size={20} />
-              </button>
-            ) : null}
-          </label>
-        )}
-      </div>
-
-      <div className="sheet-scroll mt-2" aria-live="polite">
+    <Sheet
+      ref={ref}
+      label={t('search.title', lang)}
+      className="search-sheet"
+      stretch
+      head={
+        <div className="flex items-center gap-2">
+          <button type="button" className="icon-btn" onClick={onBack} aria-label={t('common.back', lang)}>
+            <Icon name="back" size={24} className="flip-rtl" />
+          </button>
+          {filtered ? (
+            <h2 className="list-title">{title}</h2>
+          ) : (
+            <label className="search-box flex-1 min-w-0">
+              <Icon name="search" size={22} />
+              <span className="sr-only">{t('home.searchLabel', lang)}</span>
+              <input
+                ref={inputRef}
+                type="search"
+                enterKeyHint="search"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                dir="auto"
+                value={query}
+                placeholder={t('home.searchPlaceholder', lang)}
+                onChange={(e) => onQuery(e.target.value)}
+              />
+              {query ? (
+                <button type="button" className="grid place-items-center w-11 h-11 -me-2" onClick={() => onQuery('')} aria-label={t('search.clear', lang)}>
+                  <Icon name="close" size={20} />
+                </button>
+              ) : null}
+            </label>
+          )}
+        </div>
+      }
+    >
+      <div aria-live="polite" data-sheet-rows="">
         {results === null ? (
           <Suggestions lang={lang} onTile={onTile} label={t('search.tryInstead', lang)} />
         ) : results.length === 0 ? (
@@ -114,7 +121,7 @@ export const SearchScreen = forwardRef(function SearchScreen(
             <Suggestions lang={lang} onTile={onTile} label={t('search.tryInstead', lang)} />
           </div>
         ) : (
-          <div className="list">
+          <div className="list" data-sheet-rows="">
             {!filtered && title ? <div className="list-head caption">{title}</div> : null}
             {results.map((r) => (
               <ResultRow

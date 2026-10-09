@@ -14,6 +14,10 @@
  * the default view while "Simulate walk" plays; the Map button in its bottom bar goes back to the overhead map (the
  * walk keeps playing there). In the Walk view the navigate sheet and the header give way to the HUD (src/ui/WalkHud.jsx,
  * a lazy chunk), the engine follows the walker by itself, and the HUD measures the free area for the engine.
+ *
+ * Bottom sheets fold (src/ui/Sheet.jsx, src/ui/sheetModel.js): peek / half / full, half by default (search: full while
+ * typing). The snap is UI state here (`state.sheet`, per sheet: it resets when the screen's sheet changes; never
+ * stored); each sheet reports its settled rect and the App frames the map in the free area above it.
  */
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from 'react'
 import { engine, loadEngine } from './engineHost.js'
@@ -36,6 +40,8 @@ import { bayForPlate, entityInfo, isParkingLevel, levelButtonLabel, levelName, p
 import { plateLabel } from './routing/names.js'
 import { initialLang, readUrlParams, rememberLang } from './ui/urlState.js'
 import { nextTurnFor } from './ui/hudModel.js'
+import { SheetContext } from './ui/Sheet.jsx'
+import { defaultSnap } from './ui/sheetModel.js'
 
 /** The Walk view HUD loads on demand (it is not part of the first screen: PLAN.md 19.2 load budget). */
 const loadWalkHud = () => import('./ui/WalkHud.jsx')
@@ -73,6 +79,8 @@ const INITIAL = {
   sim: { active: false, playing: false, done: false, speed: 1, distanceDoneM: 0, phase: 'walk', connectorType: null, onConnector: false, rideProgress: 0 },
   toast: null,
   undo: null,
+  /** bottom sheet snap: `snap` applies while the sheet is `key` (sheetKeyOf); otherwise the screen's default */
+  sheet: { key: null, snap: null },
 }
 
 function reducer(state, action) {
@@ -86,6 +94,13 @@ function reducer(state, action) {
     default:
       return state
   }
+}
+
+/** Which sheet is up: the snap resets to its default when this changes (another screen, car stage, search mode). */
+function sheetKeyOf(s) {
+  if (s.screen === 'car') return `car:${s.car && s.carStage === 'card' ? 'card' : s.carStage}`
+  if (s.screen === 'search') return `search:${s.tile || s.category ? 'list' : 'type'}`
+  return s.screen
 }
 
 /** You-are-here from a QR plate (exact). Bay codes in the label read as painted (names.plateLabel). */
@@ -201,6 +216,8 @@ export default function App() {
         // the Walk view needs a route (navigate / arrived); elsewhere view=fpv opens the Floor view
         const urlView = p.view === 'fpv' && scr !== 'navigate' && scr !== 'arrived' ? 'floor' : p.view
         pendingRef.current = { step: p.step, simT: p.simT, play: p.play, style: p.style }
+        const tileNow = p.tile && ['food', 'restrooms', 'prayer', 'pharmacy', 'kids', 'exit'].includes(p.tile) ? p.tile : null
+        const carStage = carNow ? 'card' : 'scan'
         dispatch({
           type: 'patch',
           patch: {
@@ -212,10 +229,12 @@ export default function App() {
             targetId: target ? p.to : null,
             stepFree: p.stepFree,
             query: p.q ?? '',
-            tile: p.tile && ['food', 'restrooms', 'prayer', 'pharmacy', 'kids', 'exit'].includes(p.tile) ? p.tile : null,
+            tile: tileNow,
             view: { mode: urlView ?? defaultMode, levelId },
             userView: Boolean(urlView),
-            carStage: carNow ? 'card' : 'scan',
+            carStage,
+            // ?sheet=peek|half|full: the first screen's sheet snap (test hook)
+            sheet: p.sheet ? { key: sheetKeyOf({ screen: scr, car: carNow, carStage, tile: tileNow, category: null }), snap: p.sheet } : { key: null, snap: null },
           },
         })
       })
@@ -634,11 +653,53 @@ export default function App() {
   }, [route, stopSim])
   useEffect(() => () => simRef.current?.dispose(), [])
 
+  // ------------------------------------------------------------------ bottom sheet snap (UI state, per sheet)
+  const sheetKey = sheetKeyOf(state)
+  const sheetKeyRef = useRef(sheetKey)
+  sheetKeyRef.current = sheetKey
+  const sheetSnap = state.sheet.key === sheetKey && state.sheet.snap ? state.sheet.snap : defaultSnap(screen, { filtered: Boolean(state.tile || state.category) })
+  const setSheetSnap = useCallback((snap) => {
+    dispatch({ type: 'patch', patch: { sheet: { key: sheetKeyRef.current, snap } } })
+  }, [])
+  /** The settled sheet's visible rect ({ top, height, snap, heights, ... }, app px), reported by Sheet.jsx. */
+  const sheetLayoutRef = useRef(null)
+  const onSheetLayout = useCallback((layout) => {
+    sheetLayoutRef.current = layout
+    layoutRef.current?.()
+  }, [])
+  /** Highest top edge of a sheet at full: under the header (in the Walk view: under the HUD's top row). */
+  const sheetTopLimit = useCallback(() => {
+    const header = topRef.current?.querySelector('.header')
+    const r = header?.getBoundingClientRect()
+    if (r && r.height > 0) return Math.round(r.bottom + 8)
+    return Math.round(walkLayoutRef.current?.padding?.top ?? 88)
+  }, [])
+  const sheetCtx = useMemo(
+    () => ({ snap: sheetSnap, setSnap: setSheetSnap, lang, topLimit: sheetTopLimit, onLayout: onSheetLayout }),
+    [sheetSnap, setSheetSnap, lang, sheetTopLimit, onSheetLayout],
+  )
+
   // ------------------------------------------------------------------ viewport padding (free map area) + UI obstacles
   // the floating "Walk view" pill (navigate, map views): DESIGN-GLASS 7.5
   const walkPill = Boolean(index && route && screen === 'navigate' && view.mode !== 'fpv' && !state.no3d)
+  /** last values sent to the engine: it renders a frame on every call, so only real changes are sent (idle = 0 frames) */
+  const sentRef = useRef({ padding: '', obstacles: '' })
   useLayoutEffect(() => {
     if (!index) return undefined
+    const sendPadding = (p) => {
+      const v = { top: Math.round(p.top), right: Math.round(p.right), bottom: Math.round(p.bottom), left: Math.round(p.left) }
+      const key = JSON.stringify(v)
+      if (key === sentRef.current.padding) return
+      sentRef.current.padding = key
+      engine.setViewportPadding(v)
+    }
+    const sendObstacles = (rects) => {
+      const v = rects.map((r) => ({ ...r, x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h) }))
+      const key = JSON.stringify(v)
+      if (key === sentRef.current.obstacles) return
+      sentRef.current.obstacles = key
+      engine.setScreenObstacles(v)
+    }
     const update = () => {
       const s = stateRef.current
       const fpv = s.view.mode === 'fpv'
@@ -647,44 +708,55 @@ export default function App() {
       if (fpv && !sheet) {
         // Walk view: the HUD measures the free area between its top column and the dome (WalkHud onLayout)
         if (wl) {
-          engine.setViewportPadding(wl.padding)
-          engine.setScreenObstacles(wl.obstacles)
+          sendPadding(wl.padding)
+          sendObstacles(wl.obstacles)
         }
         return
       }
       const top = topRef.current
       const header = top?.querySelector('.header')
-      // Arrived on a map: the shop's sign must read whole, so the free area starts under the View control too (on a
-      // 360 px phone the wide sign otherwise frames behind it; the level picker is an obstacle below)
-      const vc = !fpv && s.screen === 'arrived' ? top?.querySelector('.view-ctrl')?.getBoundingClientRect() : null
-      // (Arrived in the Walk view: the HUD's SIMULATION row on top, the Arrived sheet at the bottom)
-      const topPx = fpv ? (wl?.padding.top ?? 0) : header ? Math.max(header.getBoundingClientRect().bottom, vc && vc.height > 0 ? vc.bottom : 0) + 8 : 0
-      // layout box of the sheet (offset*, not getBoundingClientRect: the sheet slides in with a transform)
-      const sheetRect = sheet ? { left: sheet.offsetLeft, top: sheet.offsetTop, width: sheet.offsetWidth, height: sheet.offsetHeight } : null
       const appEl = document.querySelector('.app')
-      // sheets float 12 px above the bottom edge: everything below the sheet's top is taken
-      const bottomPx = sheetRect ? (appEl?.clientHeight ?? window.innerHeight) - sheetRect.top + 8 : 0
-      document.documentElement.style.setProperty('--sheet-top', `${Math.round(sheetRect ? sheetRect.top : window.innerHeight * 0.7)}px`)
+      const appH = appEl?.clientHeight ?? window.innerHeight
+      // the sheet's settled visible rect (Sheet.jsx onLayout; while it moves its box is taller and slid down)
+      const sl = sheet ? sheetLayoutRef.current : null
+      const sheetRect = sheet ? { left: sheet.offsetLeft, top: sl ? sl.top : sheet.offsetTop, width: sheet.offsetWidth, height: sl ? sl.height : sheet.offsetHeight } : null
+      document.documentElement.style.setProperty('--sheet-top', `${Math.round(sheetRect ? sheetRect.top : appH * 0.7)}px`)
       const levels = top?.querySelector('.levels')
+      const ctrls = top?.querySelector('.map-ctrls')
       const pill = document.querySelector('.walk-pill')
       const pillRect = pill?.getBoundingClientRect()
-      // the level picker never runs under the sheet (nor the Walk view pill below it): compact buttons, then scrolling
+      // a sheet pulled up over the map controls (full) hides them: they never draw on the sheet
+      if (ctrls) {
+        const vc = ctrls.querySelector('.view-ctrl')?.getBoundingClientRect()
+        ctrls.classList.toggle('ctrls-covered', Boolean(sheetRect && vc && vc.height > 0 && sheetRect.top < vc.bottom + 8))
+      }
+      // Arrived on a map: the shop's sign must read whole, so the free area starts under the View control too (on a
+      // 360 px phone the wide sign otherwise frames behind it; the level picker is an obstacle below)
+      const vcR = !fpv && s.screen === 'arrived' && !ctrls?.classList.contains('ctrls-covered') ? top?.querySelector('.view-ctrl')?.getBoundingClientRect() : null
+      // (Arrived in the Walk view: the HUD's SIMULATION row on top, the Arrived sheet at the bottom)
+      const topPx = fpv ? (wl?.padding.top ?? 0) : header ? Math.max(header.getBoundingClientRect().bottom, vcR && vcR.height > 0 ? vcR.bottom : 0) + 8 : 0
+      // sheets float 12 px above the bottom edge: everything below the sheet's top is taken
+      const bottomPx = sheetRect ? appH - sheetRect.top + 8 : 0
+      // the level picker never runs under the sheet (nor the Walk view pill below it): compact buttons, then scrolling,
+      // and none at all when not even one level fits (the sheet is at full)
       if (levels) {
         // (viewport coordinates: the app is fixed to the viewport; 16 px left for the "more levels" chevron)
         const floor = Math.min(sheetRect ? sheetRect.top : window.innerHeight, pillRect && pillRect.height > 0 ? pillRect.top - 4 : Infinity)
         const room = Math.floor(floor - levels.getBoundingClientRect().top - 16)
         levels.classList.toggle('levels-compact', room < 226)
-        levels.style.maxHeight = `${Math.max(104, room)}px`
+        levels.parentElement?.classList.toggle('levels-hidden', room < 48)
+        levels.style.maxHeight = `${Math.max(48, room)}px`
       }
       const rtl = document.documentElement.dir === 'rtl'
       const host = document.querySelector('.map-layer')?.getBoundingClientRect() ?? { left: 0, top: 0, right: window.innerWidth }
       // the level picker's column at the end edge (measured: wider screens centre the controls)
-      const lr = levels?.getBoundingClientRect()
+      const lr = levels && !levels.parentElement?.classList.contains('levels-hidden') ? levels.getBoundingClientRect() : null
       const side = lr && lr.width > 0 ? Math.round(rtl ? lr.right - host.left + 8 : host.right - lr.left + 8) : 0
       // fits frame the area between the header, the picker and the sheet; key points inside it are also kept
       // clear of the View control and the picker by the engine (clearOfUi), using the obstacles below
-      engine.setViewportPadding({ top: topPx, bottom: bottomPx, left: rtl ? Math.max(side, 0) : 0, right: rtl ? 0 : Math.max(side, 0) })
-      // screen areas covered by UI: labels and pins on the map keep out of them
+      sendPadding({ top: topPx, bottom: bottomPx, left: rtl ? Math.max(side, 0) : 0, right: rtl ? 0 : Math.max(side, 0) })
+      // screen areas covered by UI: labels and pins on the map keep out of them; the sheet's rect is tagged so the
+      // engine also culls everything below its top edge (nothing draws under or below the sheet)
       const appRect = appEl?.getBoundingClientRect() ?? { left: 0, top: 0 }
       const rects = wl ? [...wl.obstacles] : []
       const add = (el) => {
@@ -693,11 +765,13 @@ export default function App() {
         if (r.width > 0 && r.height > 0) rects.push({ x: r.left - host.left - 4, y: r.top - host.top - 4, w: r.width + 8, h: r.height + 8 })
       }
       add(header)
-      add(top?.querySelector('.view-ctrl'))
-      add(levels)
+      if (!ctrls?.classList.contains('ctrls-covered')) {
+        add(top?.querySelector('.view-ctrl'))
+        if (lr) add(levels)
+      }
       add(pill)
-      if (sheetRect) rects.push({ x: appRect.left + sheetRect.left - host.left, y: appRect.top + sheetRect.top - host.top - 6, w: sheetRect.width, h: sheetRect.height + 6 })
-      engine.setScreenObstacles(rects)
+      if (sheetRect) rects.push({ x: appRect.left + sheetRect.left - host.left, y: appRect.top + sheetRect.top - host.top - 6, w: sheetRect.width, h: sheetRect.height + 6, kind: 'sheet' })
+      sendObstacles(rects)
     }
     layoutRef.current = update
     update()
@@ -987,6 +1061,11 @@ export default function App() {
       get sim() {
         return simRef.current
       },
+      /** Bottom sheet: snap the current sheet ('peek' | 'half' | 'full'); read its settled rect and snap heights. */
+      setSheet: (snap) => {
+        if (snap === 'peek' || snap === 'half' || snap === 'full') dispatch({ type: 'patch', patch: { sheet: { key: sheetKeyRef.current, snap } } })
+      },
+      getSheet: () => (sheetLayoutRef.current && sheetRef.current ? { ...sheetLayoutRef.current } : null),
     }
   }, [])
 
@@ -1089,6 +1168,7 @@ export default function App() {
         </div>
       ) : null}
 
+      <SheetContext.Provider value={sheetCtx}>
       {!index ? (
         <section className="sheet" aria-busy="true">
           <div className="sheet-handle" />
@@ -1213,6 +1293,7 @@ export default function App() {
           onBack={() => patch({ screen: state.returnTo === 'scan' ? 'home' : state.returnTo })}
         />
       ) : null}
+      </SheetContext.Provider>
 
       <span className="sr-only" aria-live="polite">
         {index && you ? t('home.youAreHere', lang, { place: pick(you.label, lang) }) : ''}

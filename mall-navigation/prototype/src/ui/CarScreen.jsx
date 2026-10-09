@@ -4,14 +4,13 @@ import { Icon } from './icons.jsx'
 import { Sheet } from './Sheet.jsx'
 import { bayForPlate, levelButtonLabel, levelName, paintedBayCode, pick, plateLabelInLevel, platesByLevel, shortDuration, zoneOfBay, zoneOfPlate } from './model.js'
 
-/** Car sheets leave at least 30% of the screen to the map (header ~84 px above the free band). */
-const CAR_SHEET_MAX = 'min(64%, calc(70% - 84px))'
-
 /**
  * Car flow (S01 / S02 / S14), simulated: scan the parking plate -> Save my car -> Car Card -> Take me there.
  * Stages: 'scan' (choose the plate from a list or tap it on the map), 'confirm', 'card'.
  * The car is kept in memory for this visit only (no localStorage).
  * Bay codes are shown exactly as painted ("B1-43") in both languages, left-to-right (PLAN.md section 9).
+ * Sheets: the car summary (title + car card) is the head and the primary action the footer, so the folded sheet still
+ * says where the car is, with Take me there / Save my car.
  */
 export const CarScreen = forwardRef(function CarScreen(
   { index, lang, car, stage, plateId, you, etaToCarS, stepFree, onPickPlate, onSave, onRescan, onTakeMeThere, onForget, onToggleStepFree, onBack },
@@ -42,9 +41,37 @@ export const CarScreen = forwardRef(function CarScreen(
     return (
       <Sheet
         ref={ref}
-        maxHeight={CAR_SHEET_MAX}
         label={t('car.confirm', lang)}
-        scroll
+        head={
+          <>
+            <div className="flex items-start gap-3">
+              <button type="button" className="icon-btn" onClick={onRescan} aria-label={t('common.back', lang)}>
+                <Icon name="back" size={24} className="flip-rtl" />
+              </button>
+              <h2 className="title flex-1">{t('car.confirm', lang)}</h2>
+            </div>
+            {zone && bay ? (
+              <div className="car-card mt-3">
+                <ZoneBlock lang={lang} zone={zone} />
+                <div className="car-card-body">
+                  <div className="min-w-0">
+                    <p className="caption">{t('car.bay', lang, { bay: '' }).trim()}</p>
+                    <p className="bay-code">
+                      <bdi dir="ltr">{paintedBayCode(index, bay.id)}</bdi>
+                    </p>
+                  </div>
+                  <LevelBox index={index} lang={lang} levelId={bay.levelId} />
+                </div>
+                <p className="caption px-4 pb-3 flex items-center gap-2">
+                  <span className="plate-code">
+                    <bdi dir="ltr">{plate?.code}</bdi>
+                  </span>
+                  <span className="truncate">{plate ? plateLabelInLevel(index, plate, lang) : ''}</span>
+                </p>
+              </div>
+            ) : null}
+          </>
+        }
         footer={
           <button type="button" className="btn btn-primary btn-block btn-go" onClick={() => onSave(plateId)}>
             <Icon name="car" size={26} />
@@ -52,33 +79,7 @@ export const CarScreen = forwardRef(function CarScreen(
           </button>
         }
       >
-        <div className="flex items-start gap-3">
-          <button type="button" className="icon-btn" onClick={onRescan} aria-label={t('common.back', lang)}>
-            <Icon name="back" size={24} className="flip-rtl" />
-          </button>
-          <h2 className="title flex-1">{t('car.confirm', lang)}</h2>
-        </div>
-        {zone && bay ? (
-          <div className="car-card mt-3">
-            <ZoneBlock lang={lang} zone={zone} />
-            <div className="car-card-body">
-              <div className="min-w-0">
-                <p className="caption">{t('car.bay', lang, { bay: '' }).trim()}</p>
-                <p className="bay-code">
-                  <bdi dir="ltr">{paintedBayCode(index, bay.id)}</bdi>
-                </p>
-              </div>
-              <LevelBox index={index} lang={lang} levelId={bay.levelId} />
-            </div>
-            <p className="caption px-4 pb-3 flex items-center gap-2">
-              <span className="plate-code">
-                <bdi dir="ltr">{plate?.code}</bdi>
-              </span>
-              <span className="truncate">{plate ? plateLabelInLevel(index, plate, lang) : ''}</span>
-            </p>
-          </div>
-        ) : null}
-        <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2">
           <p className="caption">{t('car.savedNote', lang)}</p>
           <button type="button" className="chip flex-none" onClick={onRescan}>
             {t('car.otherPlate', lang)}
@@ -90,28 +91,33 @@ export const CarScreen = forwardRef(function CarScreen(
   // stage 'scan'
   const groups = platesByLevel(index, { kinds: ['parking_pillar'] })
   return (
-    <Sheet ref={ref} maxHeight={CAR_SHEET_MAX} label={t('car.scanPlate', lang)} className="h-[60%]">
-      <div className="flex items-start gap-3">
-        <button type="button" className="icon-btn" onClick={onBack} aria-label={t('common.back', lang)}>
-          <Icon name="back" size={24} className="flip-rtl" />
-        </button>
-        <div className="flex-1 min-w-0">
-          <h2 className="title flex items-center gap-2">
-            <span className="title-icon" aria-hidden="true">
-              <Icon name="scan" size={26} />
-            </span>
-            {t('car.scanPlate', lang)}
-          </h2>
-          <p className="caption">{t('car.scanSimulated', lang)}</p>
+    <Sheet
+      ref={ref}
+      label={t('car.scanPlate', lang)}
+      head={
+        <div className="flex items-start gap-3">
+          <button type="button" className="icon-btn" onClick={onBack} aria-label={t('common.back', lang)}>
+            <Icon name="back" size={24} className="flip-rtl" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <h2 className="title flex items-center gap-2">
+              <span className="title-icon" aria-hidden="true">
+                <Icon name="scan" size={26} />
+              </span>
+              {t('car.scanPlate', lang)}
+            </h2>
+            <p className="caption">{t('car.scanSimulated', lang)}</p>
+          </div>
         </div>
-      </div>
-      <p className="caption mt-2 flex items-center gap-2">
+      }
+    >
+      <p className="caption flex items-center gap-2 mb-1">
         <Icon name="pin" size={18} />
         {t('scan.tapOnMap', lang)}
       </p>
-      <div className="sheet-scroll mt-1">
+      <div data-sheet-rows="">
         {groups.map(({ level, plates }) => (
-          <div key={level.id} className="list">
+          <div key={level.id} className="list" data-sheet-rows="">
             <div className="list-head section-label">{levelName(index, level.id, lang)}</div>
             {plates.map((plate) => {
               const zone = zoneOfPlate(index, plate.id)
@@ -176,9 +182,33 @@ const CarCard = forwardRef(function CarCard({ index, lang, car, you, etaToCarS, 
   return (
     <Sheet
       ref={ref}
-      maxHeight={CAR_SHEET_MAX}
       label={t('car.title', lang)}
-      scroll
+      head={
+        <>
+          <div className="flex items-center gap-3">
+            <button type="button" className="icon-btn" onClick={onBack} aria-label={t('common.back', lang)}>
+              <Icon name="back" size={24} className="flip-rtl" />
+            </button>
+            <h2 className="title flex-1">{t('car.title', lang)}</h2>
+            <span className="saved-at">
+              <Icon name="check" size={20} />
+              {t('car.savedAt', lang, { time: clockOf(car.savedAt, lang) })}
+            </span>
+          </div>
+          <div className="car-card mt-3">
+            {zone ? <ZoneBlock lang={lang} zone={zone} /> : null}
+            <div className="car-card-body">
+              <div className="min-w-0">
+                <p className="caption">{t('car.bay', lang, { bay: '' }).trim()}</p>
+                <p className="bay-code">
+                  <bdi dir="ltr">{paintedBayCode(index, car.bayId)}</bdi>
+                </p>
+              </div>
+              {bay ? <LevelBox index={index} lang={lang} levelId={bay.levelId} /> : null}
+            </div>
+          </div>
+        </>
+      }
       footer={
         <button type="button" className="btn btn-primary btn-block btn-go" onClick={onTakeMeThere}>
           <Icon name="car" size={26} />
@@ -186,34 +216,12 @@ const CarCard = forwardRef(function CarCard({ index, lang, car, you, etaToCarS, 
         </button>
       }
     >
-      <div className="flex items-center gap-3">
-        <button type="button" className="icon-btn" onClick={onBack} aria-label={t('common.back', lang)}>
-          <Icon name="back" size={24} className="flip-rtl" />
-        </button>
-        <h2 className="title flex-1">{t('car.title', lang)}</h2>
-        <span className="saved-at">
-          <Icon name="check" size={20} />
-          {t('car.savedAt', lang, { time: clockOf(car.savedAt, lang) })}
-        </span>
-      </div>
-      <div className="car-card mt-3">
-        {zone ? <ZoneBlock lang={lang} zone={zone} /> : null}
-        <div className="car-card-body">
-          <div className="min-w-0">
-            <p className="caption">{t('car.bay', lang, { bay: '' }).trim()}</p>
-            <p className="bay-code">
-              <bdi dir="ltr">{paintedBayCode(index, car.bayId)}</bdi>
-            </p>
-          </div>
-          {bay ? <LevelBox index={index} lang={lang} levelId={bay.levelId} /> : null}
-        </div>
-      </div>
       <button
         type="button"
         role="switch"
         aria-checked={stepFree}
         aria-label={t('place.stepFreeToggle', lang)}
-        className="switch-row mt-3"
+        className="switch-row"
         onClick={onToggleStepFree}
       >
         <Icon name="accessible" size={24} />

@@ -92,8 +92,6 @@
   --gutter: 12px;
   --pad-sheet: 16px;
   --header-h: 64px;
-  /* step card: under 47% of the screen (Arabic 49%; 52-57% on short phones, see the media queries below) */
-  --nav-sheet-max: 47%;
 
   /* ---- motion ---- */
   --ease: cubic-bezier(0.2, 0, 0, 1);
@@ -541,6 +539,11 @@ button:disabled {
   color: var(--frost-ink);
   box-shadow: inset 0 0 0 4px transparent;
 }
+/* the sheet pulled up over the map controls (full): they step aside; a picker with no room for one level hides */
+.map-ctrls.ctrls-covered > *,
+.levels-wrap.levels-hidden {
+  visibility: hidden;
+}
 .levels-compact .level-btn {
   height: 48px;
   padding-block: 2px;
@@ -668,7 +671,8 @@ button:disabled {
 
 /* ---------- bottom sheet ---------- */
 
-/* floating dark glass: 12 px from the sides and the bottom (plus safe area), radius 28 on every corner */
+/* floating dark glass: 12 px from the sides and the bottom (plus safe area), radius 28 on every corner. A foldable
+   sheet (Sheet.jsx) sets its own height (its snap: peek / half / full, src/ui/sheetModel.js); it moves by transform only */
 .sheet {
   position: absolute;
   left: calc(var(--gutter) + env(safe-area-inset-left, 0px));
@@ -681,7 +685,7 @@ button:disabled {
   flex-direction: column;
   border-radius: var(--r-sheet);
   padding: 8px var(--pad-sheet) var(--pad-sheet);
-  overflow-y: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
   scrollbar-width: none;
   /* translate only (never opacity on a blurred element: Safari drops the blur while it animates) */
@@ -693,6 +697,72 @@ button:disabled {
 .sheet > * {
   flex-shrink: 0;
   animation: sheet-content-in 320ms var(--ease-emph);
+}
+/* foldable sheet: no top padding (the 44 px handle button is the top band), the body takes what is left */
+.sheet.sheet-snap {
+  padding-top: 0;
+}
+.sheet.is-moving {
+  animation: none;
+  will-change: transform;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.sheet.is-moving > * {
+  animation: none;
+}
+/* the handle: a real button, 44 px tall across the sheet (tap: fold / expand; drag: move the sheet) */
+.sheet-grip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  height: 44px;
+  margin-inline: calc(-1 * var(--pad-sheet));
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  background: transparent;
+  touch-action: none;
+  cursor: grab;
+}
+.sheet.is-moving .sheet-grip {
+  cursor: grabbing;
+}
+.sheet-grip .sheet-handle {
+  margin: 0;
+  transition: background-color 150ms var(--ease);
+}
+.sheet-grip:hover .sheet-handle,
+.sheet-grip:focus-visible .sheet-handle {
+  background: rgba(255, 255, 255, 0.55);
+}
+.sheet-grip:focus-visible {
+  outline-offset: -6px;
+}
+/* the row that stays when the sheet is folded; a drag on it moves the sheet */
+.sheet-head {
+  flex: none;
+  padding-bottom: 8px;
+  touch-action: none;
+}
+/* the body: scrolls only at the top snap (Sheet.jsx takes vertical drags elsewhere); a fade cues more below */
+.sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  margin-inline: calc(-1 * var(--pad-sheet));
+  padding-inline: var(--pad-sheet);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+.sheet > .sheet-body {
+  flex-shrink: 1;
+}
+.sheet-body.has-more {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
 }
 .sheet > .sheet-scroll {
   flex-shrink: 1;
@@ -712,16 +782,7 @@ button:disabled {
   flex: none;
   position: relative;
   padding-top: 12px;
-}
-/* more content above: a 16 px fade of the glass colour over the bottom of the scroll area, never a band */
-.sheet-footer.has-more::before {
-  content: "";
-  position: absolute;
-  inset-inline: calc(-1 * var(--pad-sheet));
-  top: -16px;
-  height: 16px;
-  background: linear-gradient(to top, rgba(14, 20, 25, 0.84), rgba(14, 20, 25, 0));
-  pointer-events: none;
+  touch-action: none;
 }
 .sheet-handle {
   flex: none;
@@ -730,6 +791,10 @@ button:disabled {
   border-radius: 3px;
   margin: 0 auto 8px;
   background: rgba(255, 255, 255, 0.28);
+}
+/* while a sheet moves, the floating Walk view pill (placed from the settled sheet top) steps aside */
+:root[data-sheet-moving] .walk-pill {
+  visibility: hidden;
 }
 @keyframes sheet-in {
   from {
@@ -907,9 +972,9 @@ button:disabled {
   flex-direction: column;
   gap: 8px;
 }
-/* the fictional-venue disclaimer is pinned under the scroll area: always on screen, never sliced by the sheet edge */
-.home-sheet .sheet-footer {
-  padding-top: 10px;
+/* the fictional-venue disclaimer closes the body (the header's PROTOTYPE badge is always on screen) */
+.home-note {
+  padding-block: 2px 4px;
 }
 .here-chip {
   display: flex;
@@ -1116,16 +1181,9 @@ button:disabled {
 }
 
 @media (max-height: 760px) {
-  /* short phones: a tighter home sheet keeps 30% of the screen for the map and the level picker; everything fits at
-     360 x 740 in both languages (Arabic lines are taller), nothing scrolls */
+  /* short phones: tighter tiles, so the half-height home sheet (at most half the screen) holds search + all six tiles */
   .home-stack {
     gap: 6px;
-  }
-  .home-sheet .sheet-handle {
-    margin-bottom: 6px;
-  }
-  .home-sheet .sheet-footer {
-    padding-top: 8px;
   }
   .home-sheet .tile {
     min-height: 68px;
@@ -1150,10 +1208,8 @@ button:disabled {
 }
 @media (max-height: 700px) {
   /* a phone browser tab (the address bar takes ~180 px): smaller tile icons, a one-line here-chip (icon-only Change)
-     and a slimmer search box so "Save my car" stays in view; what still does not fit scrolls above the pinned
-     disclaimer, with the soft edge as the cue */
+     and a slimmer search box */
   .home-sheet {
-    max-height: calc(72% - 72px) !important;
     padding-bottom: 12px;
   }
   .home-sheet .tile {
@@ -1176,9 +1232,6 @@ button:disabled {
   }
   .home-stack {
     gap: 4px;
-  }
-  .home-sheet .sheet-footer {
-    padding-top: 6px;
   }
 }
 
@@ -1414,13 +1467,15 @@ button:disabled {
 
 /* ---------- navigate (map views) ---------- */
 
-/* Next / Back and the simulator block are the pinned footer; a long step scrolls above them on a short screen. The
-   scroll area keeps room for the step tile's glow (a scroll container clips it into a hard-edged box otherwise) */
-.nav-sheet .sheet-scroll {
-  padding-bottom: 8px;
+/* the step card is the sheet's head, Next / Back the pinned footer right under it, the simulator block the body */
+.nav-sheet .sheet-head {
+  padding-bottom: 0;
 }
 .nav-sheet .sheet-footer {
   padding-top: 2px;
+}
+.nav-sheet .sheet-body-inner {
+  padding-bottom: 2px;
 }
 .nav-sheet .turn-icon {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 16px -6px rgba(38, 217, 199, 0.85);
@@ -1435,13 +1490,6 @@ button:disabled {
   min-width: 32px;
   height: 32px;
   font-size: 15px;
-}
-.nav-sheet .sheet-handle {
-  margin-bottom: 2px;
-}
-/* Arabic runs taller (1.6x line height): a little more sheet on phones taller than 760 px, so nothing scrolls */
-:root[dir="rtl"] {
-  --nav-sheet-max: 49%;
 }
 
 .nav-top {
@@ -1669,12 +1717,6 @@ button:disabled {
   display: none;
 }
 @media (max-height: 760px) {
-  :root {
-    --nav-sheet-max: 52%;
-  }
-  :root[dir="rtl"] {
-    --nav-sheet-max: 53%;
-  }
   /* short phones: tighter step card so the simulator row stays in view */
   .nav-sheet .step-top {
     margin-top: 8px;
@@ -1692,13 +1734,7 @@ button:disabled {
 }
 @media (max-height: 700px) {
   /* a phone browser tab: the SIMULATION tag sits on the divider (status folds into the play button's label),
-     tighter step text, a little more sheet: the simulator row stays inside the sheet */
-  :root {
-    --nav-sheet-max: 54%;
-  }
-  :root[dir="rtl"] {
-    --nav-sheet-max: 57%;
-  }
+     tighter step text */
   .nav-sheet .sim-head {
     display: none;
   }
@@ -1841,6 +1877,65 @@ button:disabled {
 .car-card .caption,
 .car-card .car-sub {
   color: var(--ink-2-raised);
+}
+/* short phones: the car summary is the sheet's head (it stays when the sheet folds), so it is compact there and the
+   folded / half sheet keeps the map's top half (the zone's colour, icon and name and the painted code stay) */
+@media (max-height: 760px) {
+  .sheet-head .car-card {
+    margin-top: 8px;
+  }
+  .sheet-head .zone-block {
+    gap: 12px;
+    padding: 6px 12px;
+  }
+  .sheet-head .zone-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+  .sheet-head .zone-icon svg {
+    width: 26px;
+    height: 26px;
+  }
+  .sheet-head .zone-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .sheet-head .zone-name {
+    font-size: 20px;
+    line-height: 26px;
+  }
+  :root[dir="rtl"] .sheet-head .zone-name {
+    line-height: 30px;
+  }
+  .sheet-head .car-card-body {
+    padding: 2px 16px 8px;
+  }
+  .sheet-head .bay-code {
+    font-size: 36px;
+    line-height: 40px;
+  }
+  .sheet-head .num-card {
+    font-size: 24px;
+    line-height: 28px;
+  }
+  :root[dir="rtl"] .sheet-head .num-card {
+    line-height: 32px;
+  }
+  /* the pinned primary action keeps 56 px (the minimum) and a tighter bottom edge */
+  .sheet-snap .sheet-footer .btn-go {
+    min-height: 56px;
+  }
+  .sheet.sheet-snap {
+    padding-bottom: 16px;
+  }
+}
+.arrived-more {
+  padding-top: 12px;
 }
 .saved-at {
   display: inline-flex;

@@ -6,8 +6,9 @@ import { Sheet } from './Sheet.jsx'
 import { TILE_STYLE, levelButtonLabel, paintedBayCode, pick, zoneOfBay } from './model.js'
 
 /**
- * Home (S03): you-are-here chip, search, the six tiles, My car, and the fictional-venue disclaimer (pinned under
- * the rest, so it is always fully on screen). One task: pick where to go.
+ * Home (S03): one task: pick where to go. The search bar is the sheet's head (it stays when the sheet is folded); the
+ * body holds the six tiles, the you-are-here chip, My car and the fictional-venue disclaimer, in that order, so the
+ * default (half) sheet shows search and all six tiles even on a short phone.
  */
 export const HomeScreen = forwardRef(function HomeScreen({ index, lang, you, car, onScan, onSearchFocus, onTile, onCar }, ref) {
   const zone = car ? zoneOfBay(index, car.bayId) : null
@@ -15,13 +16,30 @@ export const HomeScreen = forwardRef(function HomeScreen({ index, lang, you, car
   return (
     <Sheet
       ref={ref}
-      maxHeight="min(62%, calc(70% - 84px))"
       label={t('home.title', lang)}
       className="home-sheet"
-      scroll
-      footer={<p className="caption text-center">{pick(index.venue.meta.disclaimer, lang)}</p>}
+      head={
+        <button type="button" className="search-box w-full text-start" onClick={onSearchFocus} aria-label={t('home.searchLabel', lang)}>
+          <Icon name="search" size={24} />
+          <span className="search-ph">{t('home.searchPlaceholder', lang)}</span>
+        </button>
+      }
     >
-      <div className="home-stack">
+      <div className="home-stack" data-sheet-rows="">
+        <div className="tiles" role="group" aria-label={t('home.tiles', lang)} data-sheet-rows="">
+          {TILE_IDS.map((id) => {
+            const style = TILE_STYLE[id]
+            return (
+              <button key={id} type="button" className="tile" onClick={() => onTile(id)}>
+                <span className="tile-icon" style={{ '--tile-c': style.color }}>
+                  <Icon name={style.icon} size={24} />
+                </span>
+                <span>{t(`tile.${id}`, lang)}</span>
+              </button>
+            )
+          })}
+        </div>
+
         <button type="button" className="here-chip" onClick={onScan}>
           <span className="here-dot" aria-hidden="true" />
           <span className="here-text">
@@ -47,25 +65,6 @@ export const HomeScreen = forwardRef(function HomeScreen({ index, lang, you, car
             <span className="wide-only">{t('home.change', lang)}</span>
           </span>
         </button>
-
-        <button type="button" className="search-box w-full text-start" onClick={onSearchFocus} aria-label={t('home.searchLabel', lang)}>
-          <Icon name="search" size={24} />
-          <span className="search-ph">{t('home.searchPlaceholder', lang)}</span>
-        </button>
-
-        <div className="tiles" role="group" aria-label={t('home.tiles', lang)}>
-          {TILE_IDS.map((id) => {
-            const style = TILE_STYLE[id]
-            return (
-              <button key={id} type="button" className="tile" onClick={() => onTile(id)}>
-                <span className="tile-icon" style={{ '--tile-c': style.color }}>
-                  <Icon name={style.icon} size={24} />
-                </span>
-                <span>{t(`tile.${id}`, lang)}</span>
-              </button>
-            )
-          })}
-        </div>
 
         <button
           type="button"
@@ -95,6 +94,7 @@ export const HomeScreen = forwardRef(function HomeScreen({ index, lang, you, car
           <Icon name="chevron" size={22} className="flip-rtl" style={{ color: 'var(--ink-2-raised)' }} />
         </button>
 
+        <p className="caption text-center home-note">{pick(index.venue.meta.disclaimer, lang)}</p>
       </div>
     </Sheet>
   )
