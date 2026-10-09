@@ -25,7 +25,8 @@ function useDebounced(value, ms) {
 /**
  * Search (S04): instant, debounced results in both languages; tiles and categories open filtered lists,
  * nearest first. Each row shows the level and the walking time from you-are-here. The search field (or the list's
- * title) is the sheet's head; the sheet opens full while typing and half for a tile / category list.
+ * title) is the sheet's head; the sheet opens full while typing and half for a tile / category list. Typing into (or
+ * focusing) the field of a folded search sheet brings it back to full, where the results show.
  */
 export const SearchScreen = forwardRef(function SearchScreen(
   { index, lang, search, you, stepFree, query, tile, category, onQuery, onTile, onCategory, onPick, onCar, onBack, autoFocus = true },
@@ -79,6 +80,7 @@ export const SearchScreen = forwardRef(function SearchScreen(
       label={t('search.title', lang)}
       className="search-sheet"
       stretch
+      expandOnType={!filtered}
       head={
         <div className="flex items-center gap-2">
           <button type="button" className="icon-btn" onClick={onBack} aria-label={t('common.back', lang)}>

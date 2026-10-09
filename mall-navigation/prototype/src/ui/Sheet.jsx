@@ -22,13 +22,26 @@ export const SheetContext = createContext(null)
 
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
-/** Row bottoms (px from the body's content top): the body's children, and the children of `[data-sheet-rows]`. */
+/** The text field an event comes from (input, textarea, contenteditable), or null. */
+function editableOf(target) {
+  const el = target instanceof Element ? target.closest('input, textarea, [contenteditable=""], [contenteditable="true"]') : null
+  if (!el) return null
+  if (el.tagName === 'INPUT' && /^(button|checkbox|radio|range|submit|reset|color|file|image)$/i.test(el.type)) return null
+  return el
+}
+const fieldHasText = (el) => ('value' in el ? String(el.value).length > 0 : (el.textContent ?? '').length > 0)
+
+/**
+ * Row bottoms (px from the body's content top): the body's children, and the children of `[data-sheet-rows]`. A list's
+ * section heading is not a place to cut (a cut there would show a heading with nothing under it).
+ */
 function collectRows(body, inner) {
   const origin = body.getBoundingClientRect().top - body.scrollTop
   const out = new Set()
   const walk = (el) => {
     for (const c of el.children) {
       if (c.hasAttribute('data-sheet-rows')) walk(c)
+      else if (c.classList.contains('list-head')) continue
       else {
         const r = c.getBoundingClientRect()
         if (r.height > 0) out.add(Math.ceil(r.bottom - origin))
@@ -54,7 +67,7 @@ function collectRows(body, inner) {
  * After each settle the sheet reports its visible rect (`onLayout`) so the App frames the map in the free area.
  */
 export const Sheet = forwardRef(function Sheet(
-  { children, head = null, footer = null, label, className = '', bodyAfterFooter = false, stretch = false, lang: langProp },
+  { children, head = null, footer = null, label, className = '', bodyAfterFooter = false, stretch = false, expandOnType = false, lang: langProp },
   ref,
 ) {
   const ctx = useContext(SheetContext)
@@ -86,6 +99,7 @@ export const Sheet = forwardRef(function Sheet(
   const dragRef = useRef(null)
   const suppressUntil = useRef(0)
   const lastLayout = useRef('')
+  /** more content below what shows: false | 'fade' (top snap, or scrolled) | 'cue' (a lower snap) */
   const [more, setMore] = useState(false)
   const bodyId = useId()
   const stretchRef = useRef(stretch)
@@ -102,12 +116,18 @@ export const Sheet = forwardRef(function Sheet(
     [ref],
   )
 
+  /**
+   * More content below what shows: at the top snap (or once scrolled) the body's bottom fades; at a lower snap, where
+   * the body is cut at a row boundary, a hairline and a small chevron under the last whole row say "pull up for more"
+   * (no fade there: it would cut into that row).
+   */
   const checkMore = useCallback(() => {
     const body = bodyRef.current
     const h = heightsRef.current
     if (!body || !h) return
     const top = isTopSnap(h, snapRef.current)
-    const m = (top || body.scrollTop > 0) && body.scrollHeight - body.clientHeight - body.scrollTop > 2
+    const below = body.scrollHeight - body.clientHeight - body.scrollTop > 2
+    const m = !below ? false : top || body.scrollTop > 0 ? 'fade' : body.clientHeight > 0 ? 'cue' : false
     setMore((x) => (x === m ? x : m))
   }, [])
 
@@ -141,7 +161,10 @@ export const Sheet = forwardRef(function Sheet(
       const foot = footRef.current
       if (!sec || !body) return
       sec.classList.remove('is-moving')
-      sec.style.transition = ''
+      // after the first settle the content never re-plays its entry fade (no dim flash after a snap or a drag)
+      sec.classList.add('sheet-settled')
+      // (none at rest: a height change is never a transition, also not under the reduced-motion rule's 1 ms)
+      sec.style.transition = 'none'
       sec.style.transform = ''
       sec.style.clipPath = ''
       sec.style.height = `${v}px`
@@ -170,8 +193,10 @@ export const Sheet = forwardRef(function Sheet(
     if (!sec || !body) return
     const off = Math.max(0, H - v)
     const tr = (prop) => (ms ? `${prop} ${ms}ms var(--ease)` : 'none')
-    if (!sec.classList.contains('is-moving')) sec.classList.add('is-moving')
-    document.documentElement.setAttribute('data-sheet-moving', '')
+    if (!sec.classList.contains('is-moving')) {
+      sec.classList.add('is-moving')
+      document.documentElement.setAttribute('data-sheet-moving', '')
+    }
     if (sec.style.height !== `${H}px`) sec.style.height = `${H}px`
     sec.style.transition = ms ? `${tr('transform')}, ${tr('clip-path')}` : 'none'
     sec.style.transform = `translateY(${off}px)`
@@ -273,13 +298,23 @@ export const Sheet = forwardRef(function Sheet(
   })
   useEffect(() => {
     const els = [innerRef.current, headRef.current, footRef.current].filter(Boolean)
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => measure()) : null
+    // re-measure on the next frame, outside the ResizeObserver delivery (resizing the sheet from inside it would
+    // leave the App's observer of the sheet with an undelivered notification)
+    let raf = 0
+    const later = () => {
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        measure()
+      })
+    }
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(later) : null
     for (const el of els) ro?.observe(el)
-    const onResize = () => measure()
-    window.addEventListener('resize', onResize)
+    window.addEventListener('resize', later)
     return () => {
       ro?.disconnect()
-      window.removeEventListener('resize', onResize)
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', later)
     }
   }, [measure, head == null, footer == null])
   useEffect(
@@ -370,7 +405,6 @@ export const Sheet = forwardRef(function Sheet(
         if (ev.pointerId !== d.id) return
         if (!d.started) {
           if (Math.abs(ev.clientY - d.y0) < DRAG_SLOP_PX) return
-          d.y0 = ev.clientY
           try {
             d.el.setPointerCapture(d.id)
           } catch {
@@ -379,6 +413,9 @@ export const Sheet = forwardRef(function Sheet(
           if (!beginDrag(d)) return
         }
         if (ev.cancelable) ev.preventDefault()
+        // every finger position since the last frame counts for the velocity (moves are coalesced per frame)
+        const all = typeof ev.getCoalescedEvents === 'function' ? ev.getCoalescedEvents() : []
+        for (const c of all.slice(0, -1)) d.samples.push({ t: c.timeStamp, y: c.clientY })
         moveDrag(d, ev.clientY, ev.timeStamp)
       }
       const up = (ev) => {
@@ -387,6 +424,8 @@ export const Sheet = forwardRef(function Sheet(
         window.removeEventListener('pointerup', up)
         window.removeEventListener('pointercancel', up)
         dragRef.current = null
+        // the release counts for the velocity: a finger that stopped before lifting is not a flick
+        if (d.started) d.samples.push({ t: ev.timeStamp, y: ev.clientY })
         endDrag(d, ev.type === 'pointercancel')
       }
       window.addEventListener('pointermove', move, { passive: false })
@@ -396,30 +435,56 @@ export const Sheet = forwardRef(function Sheet(
     [beginDrag, moveDrag, endDrag],
   )
 
-  // body: touch events, so a drag can take over from native scrolling (iOS has no pan-up / pan-down)
+  // body: touch events, so a drag can take over from native scrolling (iOS has no pan-up / pan-down). The gesture
+  // follows its first finger only (by identifier): a second finger neither ends nor restarts it, and a gesture whose
+  // finger is gone (no touchend came) is ended by the next touch, so the sheet can never stay stuck mid-drag.
   useEffect(() => {
     const body = bodyRef.current
     if (!body) return undefined
     let bt = null
+    const find = (list, id) => {
+      for (let i = 0; i < (list?.length ?? 0); i++) if (list[i].identifier === id) return list[i]
+      return null
+    }
+    const finish = (e, cancelled) => {
+      const b = bt
+      bt = null
+      if (b?.mode !== 'sheet') return
+      if (dragRef.current === b.d) dragRef.current = null
+      const tch = find(e?.changedTouches, b.id)
+      if (tch && !cancelled) b.d.samples.push({ t: e.timeStamp, y: tch.clientY })
+      endDrag(b.d, cancelled)
+    }
     const start = (e) => {
-      if (e.touches.length !== 1 || dragRef.current) {
-        bt = null
-        return
+      if (bt) {
+        // another finger while the first is down: ignored (the first finger keeps the gesture)
+        if (find(e.touches, bt.id)) return
+        // the first finger is gone without a touchend: end its gesture where it is
+        finish(null, true)
       }
-      const y = e.touches[0].clientY
-      bt = { y0: y, mode: null, d: null }
+      const d0 = dragRef.current
+      if (d0?.id === 'touch') {
+        // safety net: a body drag left over with no live touch
+        dragRef.current = null
+        endDrag(d0, true)
+      } else if (d0) return
+      if (e.touches.length !== 1) return
+      const t0 = e.touches[0]
+      bt = { id: t0.identifier, y0: t0.clientY, t0: e.timeStamp, mode: null, d: null }
     }
     const move = (e) => {
       if (!bt) return
-      const y = e.touches[0]?.clientY ?? bt.y0
+      const tch = find(e.touches, bt.id)
+      if (!tch) return
+      const y = tch.clientY
       if (bt.mode === null) {
         const dy = y - bt.y0
         if (Math.abs(dy) < 3) return
         const h = heightsRef.current
         const top = h ? isTopSnap(h, snapRef.current) : true
         // down at the top of the content folds the sheet; up expands it until it is at its top snap; else scroll
-        if (h && ((dy > 0 && body.scrollTop <= 0) || (dy < 0 && !top))) {
-          const d = { id: 'touch', y0: y, started: false, samples: [{ t: e.timeStamp, y }] }
+        if (h && !dragRef.current && ((dy > 0 && body.scrollTop <= 0) || (dy < 0 && !top))) {
+          const d = { id: 'touch', y0: bt.y0, started: false, samples: [{ t: bt.t0, y: bt.y0 }] }
           if (!e.cancelable || !beginDrag(d)) {
             bt.mode = 'scroll'
             return
@@ -435,11 +500,10 @@ export const Sheet = forwardRef(function Sheet(
       }
     }
     const end = (e) => {
-      if (bt?.mode === 'sheet') {
-        dragRef.current = null
-        endDrag(bt.d, e.type === 'touchcancel')
-      }
-      bt = null
+      if (!bt) return
+      // only the gesture's own finger ends it (a second finger lifting does not); touchcancel ends it anyway
+      if (e.type !== 'touchcancel' && !find(e.changedTouches, bt.id)) return
+      finish(e, e.type === 'touchcancel')
     }
     body.addEventListener('touchstart', start, { passive: true })
     body.addEventListener('touchmove', move, { passive: false })
@@ -453,6 +517,8 @@ export const Sheet = forwardRef(function Sheet(
       body.removeEventListener('touchend', end)
       body.removeEventListener('touchcancel', end)
       body.removeEventListener('scroll', onScroll)
+      if (bt?.mode === 'sheet' && dragRef.current === bt.d) dragRef.current = null
+      bt = null
     }
   }, [beginDrag, moveDrag, endDrag, checkMore])
 
@@ -467,6 +533,9 @@ export const Sheet = forwardRef(function Sheet(
 
   const onKeyDown = (e) => {
     if (e.key !== 'Escape' || e.defaultPrevented) return
+    // Escape in a text field that has text is the field's own (a search box clears it): the sheet stays
+    const field = editableOf(e.target)
+    if (field && fieldHasText(field)) return
     const h = heightsRef.current
     if (!h) return
     const low = distinctSnaps(h)[0].snap
@@ -474,6 +543,28 @@ export const Sheet = forwardRef(function Sheet(
     e.stopPropagation()
     setSnap('peek')
     gripRef.current?.focus({ preventScroll: true })
+  }
+  // Escape also folds when nothing has focus (after a tap on the map or a drag of the handle, focus is on <body>);
+  // a focused control elsewhere keeps Escape for itself
+  const onKeyDownRef = useRef(onKeyDown)
+  onKeyDownRef.current = onKeyDown
+  useEffect(() => {
+    const onDocKey = (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      const ae = document.activeElement
+      if (ae && ae !== document.body && ae !== document.documentElement) return
+      onKeyDownRef.current(e)
+    }
+    document.addEventListener('keydown', onDocKey)
+    return () => document.removeEventListener('keydown', onDocKey)
+  }, [])
+
+  // search: typing (or focusing the field) in a folded sheet brings it up to full, where the results show
+  const expandForTyping = (e) => {
+    if (!expandOnType || !editableOf(e.target)) return
+    const h = heightsRef.current
+    if (!h || isTopSnap(h, snapRef.current)) return
+    setSnap('full')
   }
 
   // a drag that started on a button inside the head does not also press it
@@ -485,10 +576,13 @@ export const Sheet = forwardRef(function Sheet(
   }
 
   const canon = heights ? canonicalSnap(heights, snap) : snap
-  const folded = heights ? canon === distinctSnaps(heights)[0].snap : snap === 'peek'
+  // a sheet too short to fold has one snap: its handle does nothing, so it is not offered to assistive tech or Tab
+  const single = Boolean(heights) && distinctSnaps(heights).length === 1
   const action = heights ? handleAction(heights, snap) : 'fold'
+  const gripLabel = t(action === 'expand' ? 'sheet.expand' : 'sheet.fold', lang)
   const foot = footer ? (
-    <div ref={footRef} className="sheet-footer">
+    // a drag that starts on the footer moves the sheet too (a press without movement is a tap on its button)
+    <div ref={footRef} className="sheet-footer" onPointerDown={onGrabDown}>
       {footer}
     </div>
   ) : null
@@ -501,16 +595,23 @@ export const Sheet = forwardRef(function Sheet(
       data-snap={canon}
       onKeyDown={onKeyDown}
       onClickCapture={onClickCapture}
+      onFocus={expandOnType ? expandForTyping : undefined}
+      onInput={expandOnType ? expandForTyping : undefined}
     >
       <button
         ref={gripRef}
         type="button"
         className="sheet-grip"
-        aria-expanded={!folded}
-        aria-controls={bodyId}
-        aria-label={t(action === 'expand' ? 'sheet.expand' : 'sheet.fold', lang)}
-        title={t(action === 'expand' ? 'sheet.expand' : 'sheet.fold', lang)}
+        // the state matches the label: "Expand panel" = collapsed (more to show), "Fold panel" = expanded
+        aria-expanded={single ? undefined : action === 'fold'}
+        aria-controls={single ? undefined : bodyId}
+        aria-label={single ? undefined : gripLabel}
+        aria-hidden={single || undefined}
+        tabIndex={single ? -1 : undefined}
+        title={single ? undefined : gripLabel}
         onPointerDown={onGrabDown}
+        // (a one-snap handle never takes focus on a mouse press either: it is hidden from assistive tech)
+        onMouseDown={single ? (e) => e.preventDefault() : undefined}
         onClick={onGripClick}
       >
         <span className="sheet-handle" aria-hidden="true" />
@@ -521,11 +622,12 @@ export const Sheet = forwardRef(function Sheet(
         </div>
       ) : null}
       {bodyAfterFooter ? foot : null}
-      <div ref={bodyRef} id={bodyId} className={`sheet-body${more ? ' has-more' : ''}`}>
+      <div ref={bodyRef} id={bodyId} className={`sheet-body${more === 'fade' ? ' has-more' : ''}`}>
         <div ref={innerRef} className="sheet-body-inner">
           {children}
         </div>
       </div>
+      {more === 'cue' ? <div className="sheet-more-cue" aria-hidden="true" /> : null}
       {bodyAfterFooter ? null : foot}
     </section>
   )

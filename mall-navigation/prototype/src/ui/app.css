@@ -475,6 +475,8 @@ button:disabled {
   border-radius: 28px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* a capped picker shows whole buttons: scrolling stops on a button, never half-way */
+  scroll-snap-type: y mandatory;
   scrollbar-width: none;
 }
 .levels::-webkit-scrollbar {
@@ -485,16 +487,20 @@ button:disabled {
   position: relative;
 }
 .levels.has-more-below {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
 }
 .levels.has-more-above {
-  -webkit-mask-image: linear-gradient(to top, #000 calc(100% - 22px), transparent);
-  mask-image: linear-gradient(to top, #000 calc(100% - 22px), transparent);
+  -webkit-mask-image: linear-gradient(to top, #000 calc(100% - 16px), transparent);
+  mask-image: linear-gradient(to top, #000 calc(100% - 16px), transparent);
 }
 .levels.has-more-above.has-more-below {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 22px, #000 calc(100% - 22px), transparent);
-  mask-image: linear-gradient(to bottom, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+}
+.levels-wrap.levels-few .levels {
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 .levels-more {
   position: absolute;
@@ -506,11 +512,12 @@ button:disabled {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
   pointer-events: none;
 }
+/* (inside the picker, over its own fade: never on the header above it or the sheet below it) */
 .levels-more.is-below {
-  bottom: -14px;
+  bottom: 1px;
 }
 .levels-more.is-above {
-  top: -14px;
+  top: 1px;
 }
 .levels-more .rot-down {
   transform: rotate(90deg);
@@ -522,6 +529,7 @@ button:disabled {
 .level-btn {
   position: relative;
   flex: none;
+  scroll-snap-align: start;
   display: grid;
   place-items: center;
   width: 56px;
@@ -544,7 +552,7 @@ button:disabled {
 .levels-wrap.levels-hidden {
   visibility: hidden;
 }
-.levels-compact .level-btn {
+.levels-wrap.levels-compact .level-btn {
   height: 48px;
   padding-block: 2px;
 }
@@ -696,6 +704,9 @@ button:disabled {
 }
 .sheet > * {
   flex-shrink: 0;
+}
+/* the content fade plays once, when a sheet first appears: never again after a snap or a released drag */
+.sheet:not(.sheet-settled) > * {
   animation: sheet-content-in 320ms var(--ease-emph);
 }
 /* foldable sheet: no top padding (the 44 px handle button is the top band), the body takes what is left */
@@ -763,6 +774,36 @@ button:disabled {
 .sheet-body.has-more {
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
+}
+/* a lower snap cuts the body at a row boundary: a hairline and a small chevron under the last whole row say there is
+   more (pull up); nothing covers the row itself */
+.sheet-more-cue {
+  flex: none;
+  position: relative;
+  height: 0;
+  pointer-events: none;
+}
+.sheet-more-cue::before {
+  content: "";
+  position: absolute;
+  inset-inline: 8px;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+}
+.sheet-more-cue::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid rgba(255, 255, 255, 0.6);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.6);
+  transform: translateX(-50%) rotate(45deg);
+}
+.sheet.is-moving .sheet-more-cue {
+  visibility: hidden;
 }
 .sheet > .sheet-scroll {
   flex-shrink: 1;
@@ -1467,9 +1508,42 @@ button:disabled {
 
 /* ---------- navigate (map views) ---------- */
 
-/* the step card is the sheet's head, Next / Back the pinned footer right under it, the simulator block the body */
+/* the step row (turn icon + instruction) is the sheet's head, Next / Back the pinned footer right under it, the trip
+   line and the simulator block the body */
 .nav-sheet .sheet-head {
-  padding-bottom: 0;
+  padding-bottom: 6px;
+}
+.nav-sheet .step-top {
+  margin-top: 0;
+}
+/* End route: the X at the inline end of the handle row (the handle stays a full-width button under it) */
+.nav-sheet .nav-end {
+  position: absolute;
+  top: 0;
+  inset-inline-end: 6px;
+  z-index: 1;
+  margin: 0;
+  color: var(--ink-2);
+}
+.nav-sheet .nav-end:hover,
+.nav-sheet .nav-end:focus-visible {
+  color: var(--ink);
+}
+/* the trip line under Next: Step n of N and what is left, the progress bar, this step's distance / time */
+.nav-info {
+  padding-top: 12px;
+}
+.nav-sheet .nav-info .nav-top {
+  min-height: 24px;
+}
+.nav-sheet .nav-info .progress {
+  margin-top: 8px;
+}
+.nav-sheet .nav-info .step-meta {
+  margin-top: 8px;
+}
+.nav-sheet .sim-bar {
+  margin-top: 6px;
 }
 .nav-sheet .sheet-footer {
   padding-top: 2px;
@@ -1718,9 +1792,6 @@ button:disabled {
 }
 @media (max-height: 760px) {
   /* short phones: tighter step card so the simulator row stays in view */
-  .nav-sheet .step-top {
-    margin-top: 8px;
-  }
   .nav-sheet .sheet-footer {
     padding-top: 0;
   }
@@ -1757,10 +1828,14 @@ button:disabled {
     line-height: 25px;
   }
   :root[dir="rtl"] .nav-sheet .step-text {
-    line-height: 30px;
+    font-size: 18px;
+    line-height: 27px;
   }
-  .nav-sheet .step-meta {
-    margin-top: 2px;
+  .nav-sheet .sheet-head {
+    padding-bottom: 4px;
+  }
+  .nav-sheet .nav-info {
+    padding-top: 10px;
   }
 }
 .nav-stepfree {
@@ -1775,41 +1850,57 @@ button:disabled {
 
 /* ---------- arrived ---------- */
 
-/* mint-tinted hero (10 %: --mint-text stays >= 4.5:1 over a white scene) */
+/* mint-tinted hero (10 %: --mint-text stays >= 4.5:1 over a white scene): one compact row, the sheet's head (it stays
+   when the sheet folds, so the map keeps the destination's sign in view) */
 .arrived-hero {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
+  gap: 12px;
+  padding: 6px 12px 6px 6px;
   border-radius: var(--r-card);
   background: rgba(91, 229, 132, 0.10);
   border: 1px solid rgba(91, 229, 132, 0.28);
+}
+:root[dir="rtl"] .arrived-hero {
+  padding: 6px 6px 6px 12px;
 }
 .arrived-check {
   flex: none;
   display: grid;
   place-items: center;
-  width: 72px;
-  height: 72px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: radial-gradient(circle at 40% 35%, #8BF5A8, #2FB866);
   color: var(--on-ok);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 0 24px -4px rgba(91, 229, 132, 0.8);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 0 18px -4px rgba(91, 229, 132, 0.8);
   animation: pop 600ms var(--ease);
 }
 .arrived-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 15px;
   line-height: 20px;
   font-weight: 600;
   color: var(--mint-text);
 }
 :root[dir="rtl"] .arrived-label {
-  line-height: 24px;
+  line-height: 22px;
 }
 .arrived-level {
-  font-size: 14px;
-  line-height: 20px;
+  font-weight: 500;
   color: var(--ink-2-raised);
+}
+.arrived-name {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+:root[dir="rtl"] .arrived-name {
+  line-height: 30px;
+  letter-spacing: 0;
 }
 @keyframes pop {
   0% {
@@ -1878,54 +1969,68 @@ button:disabled {
 .car-card .car-sub {
   color: var(--ink-2-raised);
 }
-/* short phones: the car summary is the sheet's head (it stays when the sheet folds), so it is compact there and the
-   folded / half sheet keeps the map's top half (the zone's colour, icon and name and the painted code stay) */
+/* the Car Card sheet's head: the car in one row, on the zone's colour exactly (it must match the paint) */
+.car-sum {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding-block: 5px;
+  padding-inline: 6px 14px;
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.car-sum-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+}
+.car-sum-zone {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  line-height: 18px;
+  font-weight: 600;
+}
+:root[dir="rtl"] .car-sum-zone {
+  line-height: 22px;
+}
+.car-sum-bay {
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.car-sum-level {
+  flex: none;
+  text-align: end;
+}
+.car-sum-level small {
+  display: block;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.car-sum-level b {
+  display: block;
+  font-size: 22px;
+  line-height: 26px;
+  font-weight: 600;
+}
+.car-title-row {
+  padding-top: 4px;
+}
 @media (max-height: 760px) {
-  .sheet-head .car-card {
-    margin-top: 8px;
-  }
-  .sheet-head .zone-block {
-    gap: 12px;
-    padding: 6px 12px;
-  }
-  .sheet-head .zone-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-  }
-  .sheet-head .zone-icon svg {
-    width: 26px;
-    height: 26px;
-  }
-  .sheet-head .zone-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-  .sheet-head .zone-name {
-    font-size: 20px;
-    line-height: 26px;
-  }
-  :root[dir="rtl"] .sheet-head .zone-name {
-    line-height: 30px;
-  }
-  .sheet-head .car-card-body {
-    padding: 2px 16px 8px;
-  }
-  .sheet-head .bay-code {
-    font-size: 36px;
-    line-height: 40px;
-  }
-  .sheet-head .num-card {
-    font-size: 24px;
-    line-height: 28px;
-  }
-  :root[dir="rtl"] .sheet-head .num-card {
-    line-height: 32px;
-  }
   /* the pinned primary action keeps 56 px (the minimum) and a tighter bottom edge */
   .sheet-snap .sheet-footer .btn-go {
     min-height: 56px;

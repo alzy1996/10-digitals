@@ -11,23 +11,27 @@ function foundItLabel(lang) {
 
 /**
  * Arrived (S13): green confirmation, one primary action (Found it), and two quiet follow-ups.
- * The map behind keeps the destination sign in view. The confirmation is the sheet's head and Found it the footer right
- * under it (what stays when the sheet is folded); the follow-ups and the simulated-arrival note follow.
+ * The map behind keeps the destination sign in view. The confirmation is the sheet's head, one compact row (the tick,
+ * "You've arrived · level" and the place's name), and Found it the footer right under it (what stays when the sheet
+ * is folded); the follow-ups and the simulated-arrival note follow.
  */
 export const ArrivedScreen = forwardRef(function ArrivedScreen({ index, lang, info, simulated, hasCar, onFound, onBackToCar, onAnother }, ref) {
   return (
     <Sheet
       ref={ref}
       label={t('arrived.title', lang)}
+      className="arrived-sheet"
       head={
         <div className="arrived-hero">
           <span className="arrived-check" aria-hidden="true">
-            <Icon name="check" size={38} />
+            <Icon name="check" size={28} />
           </span>
-          <div className="min-w-0">
-            <p className="arrived-label">{t('arrived.title', lang)}</p>
-            <h2 className="title-l">{info ? pick(info.name, lang) : ''}</h2>
-            {info?.levelId ? <p className="arrived-level">{levelName(index, info.levelId, lang)}</p> : null}
+          <div className="min-w-0 flex-1">
+            <p className="arrived-label">
+              {t('arrived.title', lang)}
+              {info?.levelId ? <span className="arrived-level">{` · ${levelName(index, info.levelId, lang)}`}</span> : null}
+            </p>
+            <h2 className="arrived-name">{info ? pick(info.name, lang) : ''}</h2>
           </div>
         </div>
       }

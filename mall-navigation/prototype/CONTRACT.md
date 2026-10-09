@@ -205,8 +205,10 @@ Singleton, render-on-demand (no continuous loop when idle).
     between the View control and the level picker), with the arrival ring above the sheet when it fits. Called before
     the sign's text is typeset (a deep link), it frames again once the text is measured, unless the camera has moved.
   - `setViewportPadding({ top, right, bottom, left })`: screen space taken by UI, so fits frame the free area.
-  - `setScreenObstacles([{ x, y, w, h }])`: screen rectangles covered by UI (header, map controls, sheet);
-    labels and pins never draw under them (camera moves also keep key points clear of them, see above). Level
+  - `setScreenObstacles([{ x, y, w, h, kind? }])`: screen rectangles covered by UI (header, map controls, sheet);
+    labels and pins never draw under them (camera moves also keep key points clear of them, see above). The bottom
+    sheet's rect carries `kind: 'sheet'`: the map ends at its top edge, so nothing whose anchor is below it is drawn
+    and nothing slides below it (level labels included). Level
     labels in stack view are laid out as one column growing outward from the slab corners (reading-start side,
     which the stack fit keeps free), never dropped (short codes for the whole column when the names do not fit
     outside the slabs). The destination's name (placed by its marker) and the step's landmark / connector are
@@ -260,9 +262,23 @@ SIMULATE controls: play/pause, speed 1×/2×/4×) → `arrived` (Found it ✓, B
 bilingual) → "Take me there".
 `scan` sheet: choose a QR plate (anchor) from a list or tap one on the map → sets you-are-here (exact).
 Views: one 56 px View control (menu: Overview (stack) / Floor / 2D top) at the start edge, the level picker at
-the end edge (capped to the space above the sheet; when it scrolls, a fade and a chevron show the hidden levels
-and the active level is scrolled into view). Primary buttons of the place, arrived and car sheets are pinned in
-the sheet footer (always fully visible); the rest scrolls above them on short screens.
+the end edge (capped to the space above the sheet in whole buttons, compact 48 px ones when the 56 px ones do not all
+fit, and it scroll-snaps to whole buttons; when it scrolls, a fade and a chevron inside the picker show the hidden
+levels, and the active level is kept whole in view, clear of the fades, also when the cap changes; hidden when not
+one level fits, e.g. under a full sheet).
+Bottom sheets fold (src/ui/Sheet.jsx, src/ui/sheetModel.js): peek (handle + the screen's one head row + its pinned
+primary action: home = search bar; place = name + GO; navigate = turn icon + instruction + Next, End route the X in
+the handle row; car = one zone / bay / level row + Take me there; arrived = tick + place + Found it), half (default;
+its top edge never above the middle of the screen, cut at a row boundary; a hairline and chevron under the last row
+when more is hidden) and full (under the header); drag the handle, head or footer (touch and mouse; a body drag
+follows its first finger only), flick, tap / Enter on the handle (a 44 px button whose `aria-expanded` matches its
+"Expand panel" / "Fold panel" label; a sheet with one snap hides it), Escape folds (not from a text field that has
+text); the search sheet goes to full when the shopper types or focuses its field; the body scrolls only at the top
+snap. The snap is UI state in the App (reset per
+sheet, never stored); `?sheet=peek|half|full` and `window.__dallni.setSheet(snap)` set it. After each snap the App
+sends the engine the free area above the sheet (`setViewportPadding`, `setScreenObstacles`), only when it changed:
+the engine renders one frame per snap and stays at 0 frames while idle. Primary buttons of the place, arrived and
+car sheets are pinned in the sheet footer (always fully visible, >= 56 px, at every snap).
 No 3D (`MapView` `onError({ kind: 'webgl' | 'load' })`): the map controls are hidden, a notice sits above the
 sheet ("can't run on this phone", or "Couldn't load the 3D map" + Try again) and every sheet keeps working. Theme switches to `basement` automatically when the
 focused level is a parking level. Ending a route offers Undo for 5 s instead of a confirmation.

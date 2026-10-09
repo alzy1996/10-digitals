@@ -96,6 +96,10 @@ function reducer(state, action) {
   }
 }
 
+/** Level picker buttons (app.css .level-btn, .levels-compact .level-btn): full and compact height, CSS px. */
+const LEVEL_BTN_PX = 56
+const LEVEL_BTN_COMPACT_PX = 48
+
 /** Which sheet is up: the snap resets to its default when this changes (another screen, car stage, search mode). */
 function sheetKeyOf(s) {
   if (s.screen === 'car') return `car:${s.car && s.carStage === 'card' ? 'card' : s.carStage}`
@@ -663,9 +667,19 @@ export default function App() {
   }, [])
   /** The settled sheet's visible rect ({ top, height, snap, heights, ... }, app px), reported by Sheet.jsx. */
   const sheetLayoutRef = useRef(null)
+  /** Last settled snap per sheet: a fold / unfold of the same sheet re-frames the map in the new free area. */
+  const lastSnapRef = useRef({ key: null, snap: null })
+  const refitAfterSnapRef = useRef(null)
   const onSheetLayout = useCallback((layout) => {
     sheetLayoutRef.current = layout
     layoutRef.current?.()
+    const key = sheetKeyRef.current
+    const prev = lastSnapRef.current
+    const snap = layout?.snap ?? null
+    lastSnapRef.current = { key, snap }
+    // only a snap change of the sheet already up (the screen's own framing handles a new sheet), after the new
+    // padding has reached the engine above: shifting the view alone would leave the step / model under the sheet
+    if (prev.key === key && prev.snap != null && snap != null && prev.snap !== snap) refitAfterSnapRef.current?.()
   }, [])
   /** Highest top edge of a sheet at full: under the header (in the Walk view: under the HUD's top row). */
   const sheetTopLimit = useCallback(() => {
@@ -731,21 +745,37 @@ export default function App() {
         ctrls.classList.toggle('ctrls-covered', Boolean(sheetRect && vc && vc.height > 0 && sheetRect.top < vc.bottom + 8))
       }
       // Arrived on a map: the shop's sign must read whole, so the free area starts under the View control too (on a
-      // 360 px phone the wide sign otherwise frames behind it; the level picker is an obstacle below)
-      const vcR = !fpv && s.screen === 'arrived' && !ctrls?.classList.contains('ctrls-covered') ? top?.querySelector('.view-ctrl')?.getBoundingClientRect() : null
+      // 360 px phone the wide sign otherwise frames behind it; the level picker is an obstacle below). The same when
+      // the strip between the header and a pulled-up sheet is short: the model is framed under the View control, not
+      // behind it
+      const headerBottom = header ? header.getBoundingClientRect().bottom : 0
+      const shortStrip = Boolean(sheetRect) && sheetRect.top - headerBottom < 300
+      const vcR = !fpv && (s.screen === 'arrived' || shortStrip) && !ctrls?.classList.contains('ctrls-covered') ? top?.querySelector('.view-ctrl')?.getBoundingClientRect() : null
       // (Arrived in the Walk view: the HUD's SIMULATION row on top, the Arrived sheet at the bottom)
-      const topPx = fpv ? (wl?.padding.top ?? 0) : header ? Math.max(header.getBoundingClientRect().bottom, vcR && vcR.height > 0 ? vcR.bottom : 0) + 8 : 0
+      const topPx = fpv ? (wl?.padding.top ?? 0) : header ? Math.max(headerBottom, vcR && vcR.height > 0 ? vcR.bottom : 0) + 8 : 0
       // sheets float 12 px above the bottom edge: everything below the sheet's top is taken
       const bottomPx = sheetRect ? appH - sheetRect.top + 8 : 0
       // the level picker never runs under the sheet (nor the Walk view pill below it): compact buttons, then scrolling,
-      // and none at all when not even one level fits (the sheet is at full)
+      // and none at all when not even one level fits (the sheet is at full). The cap is a whole number of buttons (no
+      // half-cut level); MapControls keeps the active level in view (and scrolls snap to whole buttons). The classes go
+      // on the wrapper: React owns the picker's own className (its "more above / below" state)
       if (levels) {
-        // (viewport coordinates: the app is fixed to the viewport; 16 px left for the "more levels" chevron)
+        const wrap = levels.parentElement
+        // (viewport coordinates: the app is fixed to the viewport; 8 px clear of the sheet)
         const floor = Math.min(sheetRect ? sheetRect.top : window.innerHeight, pillRect && pillRect.height > 0 ? pillRect.top - 4 : Infinity)
-        const room = Math.floor(floor - levels.getBoundingClientRect().top - 16)
-        levels.classList.toggle('levels-compact', room < 226)
-        levels.parentElement?.classList.toggle('levels-hidden', room < 48)
-        levels.style.maxHeight = `${Math.max(48, room)}px`
+        const lt = levels.getBoundingClientRect().top
+        const frame = levels.offsetHeight - levels.clientHeight
+        const room = Math.floor(floor - lt - 8 - frame)
+        const count = levels.querySelectorAll('.level-btn').length
+        const compact = count * LEVEL_BTN_PX > room
+        const bh = compact ? LEVEL_BTN_COMPACT_PX : LEVEL_BTN_PX
+        const n = Math.floor(room / bh)
+        wrap?.classList.toggle('levels-compact', compact)
+        wrap?.classList.toggle('levels-hidden', n < 1)
+        // one or two levels show: no edge fades (the active level would sit in one), the chevrons alone say "more"
+        wrap?.classList.toggle('levels-few', n <= 2 && n < count)
+        const cap = `${Math.max(1, Math.min(n, count)) * bh + frame}px`
+        if (levels.style.maxHeight !== cap) levels.style.maxHeight = cap
       }
       const rtl = document.documentElement.dir === 'rtl'
       const host = document.querySelector('.map-layer')?.getBoundingClientRect() ?? { left: 0, top: 0, right: window.innerWidth }
@@ -906,6 +936,28 @@ export default function App() {
     if (typeof window !== 'undefined' && window.__dallni) window.__dallni.ready = true
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, screen, route, state.carStage, state.plateId])
+
+  // ------------------------------------------------------------------ re-fit after a sheet snap
+  refitAfterSnapRef.current = () => {
+    const s = stateRef.current
+    const r = routeRef.current
+    // the shopper's own map choice, the Walk view and a playing walk (camera follows the walker) keep their camera
+    if (!index || s.no3d || s.userView || s.view.mode === 'fpv' || s.sim.playing) return
+    if (s.screen === 'arrived') {
+      frameArrival(600)
+      return
+    }
+    if (s.screen === 'navigate' && r) {
+      if (s.view.mode === 'stack') engine.setView({ mode: 'stack', levelId: s.view.levelId, fit: 'route' })
+      else engine.setActiveStep(s.stepIndex)
+      return
+    }
+    if (ROUTE_SCREENS.has(s.screen) && r) {
+      engine.setView({ mode: s.view.mode, levelId: s.view.levelId, fit: 'route' })
+      return
+    }
+    if (s.screen === 'home') engine.setView({ mode: s.view.mode, levelId: s.view.levelId, fit: 'level' })
+  }
 
   // ------------------------------------------------------------------ actions
   const toggleLang = () => patch({ lang: lang === 'ar' ? 'en' : 'ar' })

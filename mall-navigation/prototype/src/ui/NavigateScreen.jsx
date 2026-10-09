@@ -11,9 +11,11 @@ const WALK_MPS = 1.2
 /**
  * Navigate (S07): step card (large instruction, distance + time, Step n of N), Next (primary) and Back,
  * plus the SIMULATION controls (play / pause, 1x / 2x / 4x). Turn icons follow the walking direction and are never
- * mirrored. In the foldable sheet the step card is the head and Next / Back the pinned footer right under it, so the
- * folded sheet still shows the step and Next; the simulator block ("Simulate walk", which opens the Walk view, and the
- * speed) is the body below them, shown from the default half height up when it fits (and always at full). The
+ * mirrored. In the foldable sheet the head is the one step row (turn icon + instruction; End route is the X in the
+ * handle row) and Next / Back the pinned footer right under it, so the folded sheet shows the step and Next and leaves
+ * the map almost whole. The body below them: the trip line (Step n of N, distance / time left, progress) with this
+ * step's distance / time (and the lift button to press), shown from the default half height up, then the simulator
+ * block ("Simulate walk", which opens the Walk view, and the speed) at full (or at half when it fits). The
  * SIMULATION tag and its "not your live position" note share the first line of the simulator block. Under 380 px wide
  * the speed is one 56 px button that cycles 1x / 2x / 4x. On short screens (a phone browser tab, under 700 px tall)
  * the tag sits on the divider line and the status line folds into the play button's label.
@@ -130,8 +132,27 @@ export const NavigateScreen = forwardRef(function NavigateScreen(
     </div>
   )
 
+  // the one row that stays when the sheet is folded: the turn and the instruction (End route sits in the handle row)
   const head = (
     <>
+      <button type="button" className="nav-end" onClick={onEnd} aria-label={t('nav.end', lang)} title={t('nav.end', lang)}>
+        <Icon name="close" size={20} />
+      </button>
+      <div className="step-top">
+        <span className={`turn-icon ${kindClass}`} aria-hidden="true">
+          <Icon name={icon} size={34} />
+        </span>
+        <p className="step-text flex-1 min-w-0" aria-live="polite" aria-atomic="true">
+          {pick(step.text, lang)}
+        </p>
+      </div>
+    </>
+  )
+
+  // under Next (shown from half up): where the trip stands (step n of N, what is left, progress) and this step's
+  // distance / time (and the lift button to press)
+  const tripInfo = (
+    <div className="nav-info">
       <div className="nav-top">
         {route.stepFree ? (
           <span className="nav-stepfree" title={t('place.stepFreeOn', lang)} aria-label={t('place.stepFreeOn', lang)}>
@@ -139,47 +160,33 @@ export const NavigateScreen = forwardRef(function NavigateScreen(
           </span>
         ) : null}
         <span className="nav-count nowrap">{t('nav.step', lang, { n: i + 1, total })}</span>
-        <span className="nav-left nowrap">
-          <span className="wide-only">{t('nav.remaining', lang, { distance: formatDistance(remainM, lang), duration: formatDuration(remainS, lang) })}</span>
-          <span className="narrow-only">{`${formatDistance(remainM, lang)} · ${formatDuration(remainS, lang)}`}</span>
-        </span>
-        <button type="button" className="nav-end" onClick={onEnd} aria-label={t('nav.end', lang)} title={t('nav.end', lang)}>
-          <Icon name="close" size={20} />
-        </button>
+        <span className="nav-left nowrap">{t('nav.remaining', lang, { distance: formatDistance(remainM, lang), duration: formatDuration(remainS, lang) })}</span>
       </div>
       <div className="progress" aria-hidden="true">
         {steps.map((s) => (
           <span key={s.index} className={s.index < i ? 'is-done' : s.index === i ? 'is-current' : ''} />
         ))}
       </div>
-
-      <div className="step-top">
-        <span className={`turn-icon ${kindClass}`} aria-hidden="true">
-          <Icon name={icon} size={34} />
-        </span>
-        <div className="flex-1 min-w-0" aria-live="polite" aria-atomic="true">
-          <p className="step-text">{pick(step.text, lang)}</p>
-          {meta || (step.kind === 'connector' && step.connector?.type === 'lift') ? (
-            <div className="step-meta">
-              {meta ? <span className="nowrap">{meta}</span> : null}
-              {step.kind === 'connector' && step.connector?.type === 'lift' && step.connector.buttonLabel ? (
-                <span className="inline-flex items-center gap-2 nowrap">
-                  {t('nav.press', lang)}
-                  {/* the code as printed on the lift panel, in both languages (ui/model.levelButtonLabel) */}
-                  <span className="press-label">
-                    <bdi dir="ltr">{pick(step.connector.buttonLabel, 'en')}</bdi>
-                  </span>
-                </span>
-              ) : null}
-            </div>
+      {meta || (step.kind === 'connector' && step.connector?.type === 'lift') ? (
+        <div className="step-meta" aria-live="polite" aria-atomic="true">
+          {meta ? <span className="nowrap">{meta}</span> : null}
+          {step.kind === 'connector' && step.connector?.type === 'lift' && step.connector.buttonLabel ? (
+            <span className="inline-flex items-center gap-2 nowrap">
+              {t('nav.press', lang)}
+              {/* the code as printed on the lift panel, in both languages (ui/model.levelButtonLabel) */}
+              <span className="press-label">
+                <bdi dir="ltr">{pick(step.connector.buttonLabel, 'en')}</bdi>
+              </span>
+            </span>
           ) : null}
         </div>
-      </div>
-    </>
+      ) : null}
+    </div>
   )
 
   return (
     <Sheet ref={ref} label={t('nav.stepCard', lang)} className="nav-sheet" head={head} footer={footer} bodyAfterFooter>
+      {tripInfo}
       {simBlock}
     </Sheet>
   )

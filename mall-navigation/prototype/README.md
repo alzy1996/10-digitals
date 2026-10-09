@@ -68,6 +68,13 @@ The header always shows **PROTOTYPE · SIMULATION**, and the home screen shows t
    upper floor see-through, so the route, the car and the destination below stay visible. Drag to pan,
    pinch to zoom, tap a shop to open it.
 9. **ع / EN** switches the whole app between English and Arabic (right-to-left, Arabic-Indic digits).
+10. **Fold the panel**: every bottom sheet folds. Drag its handle (or the row under it, or its main button) down to
+    fold it to one row (home: the search bar; a shop: its name and GO; a step: the instruction and Next; My car: the
+    zone, bay and level in one row and Take me there; arrived: the tick and the place, and Found it), tap the handle
+    to open it halfway again (and full when there is more), flick it up for full. It opens halfway by default and
+    never covers more than the bottom half of the screen there, so the map stays in view; the map re-centres in the
+    space above it. Escape folds it too (in the search field, Escape clears the text first), and typing into a
+    folded search panel opens it full again. A small chevron under the last row says there is more above the fold.
 
 Nothing is stored on a server or in localStorage. The saved car lives in memory for this visit only; the
 language choice is kept in sessionStorage. The app makes no network calls except loading its own files.
@@ -123,11 +130,14 @@ Add these to the address (they are also used by the screenshot script):
 | `?screen=navigate&to=occ-muttrah-kitchen&view=fpv&step=6` | Walk view on the last step (the bar's Arrived) |
 | `?screen=arrived&to=occ-abaya-atelier&view=fpv` | Walk view arrival at a shop facing the atrium void |
 | `?style=classic` | The v0.1 look (light classic scene, blue ribbon) |
+| `?sheet=peek` / `?sheet=full` | The first screen's bottom sheet folded / full (default: half) |
 
 Full list: `screen=home|search|place|navigate|arrived|car|scan`, `from=<plate id>`,
 `to=<shop | amenity | bay | plate id>`, `view` (`stack|floor|top|fpv`), `style` (`storm|classic`), `level`, `simT=<seconds>`, `step=<n>|connector`,
-`stepFree=1`, `q=<search text>`, `tile=food|restrooms|prayer|pharmacy|kids|exit`, `car=<bay id>`, `play=1`.
-In the browser console, `window.__dallni` gives `{ engine, getState(), setState(partial), index, route, sim }`.
+`stepFree=1`, `q=<search text>`, `tile=food|restrooms|prayer|pharmacy|kids|exit`, `car=<bay id>`, `play=1`,
+`sheet=peek|half|full`.
+In the browser console, `window.__dallni` gives `{ engine, getState(), setState(partial), index, route, sim,
+setSheet(snap), getSheet() }` (`getSheet()`: the bottom sheet's settled rect, snap and its peek / half / full heights).
 
 ## Build
 
@@ -246,6 +256,15 @@ The script also fails (exit code 1) if the page logs an error or requests anythi
 localhost. Most shots are 390 × 844 (a modern phone); the `-360` ones are 360 × 740 (a budget Android); the
 `-390x664` and `-360x640` ones are what a phone browser tab really gets once the address bar is shown.
 `SHOTS_ONLY=home-en,arrived-en npm run shots` takes only the named shots.
+The `sheet-*` scenarios (`.shots/sheet-after-*.png`) show the foldable bottom sheet at peek / half / full at
+393 × 728 (a phone in the Claude app's artifact viewer, also with the iPhone's 34 px home-indicator inset), 390 × 844,
+390 × 664 and 360 × 640, in both languages; each also checks that half keeps the map's top half, the primary button is
+on screen, no map label sits under the sheet, the level picker shows whole buttons with the active level whole and
+its "more" chevrons inside it, and the handle's `aria-expanded` matches its label. A gesture test then drives the
+sheet with touch, mouse and keyboard, and a per-screen one folds the navigate and car sheets by their head row, drags
+the place sheet by its GO footer, lands a second finger during a body drag and types into a folded search sheet.
+`npm run shots -- --sheet` runs only those, `--gesture` only the gesture test, and `--measure` re-measures every sheet
+into `tests/fixtures/sheet-measures.js` (the unit tests check the snap rules on the real layouts).
 
 What the shots cover (`.shots/app-<name>.png`):
 
@@ -313,6 +332,7 @@ What the shots cover (`.shots/app-<name>.png`):
   reference AR apps. Its narrow phone field of view (about 36° across at 390 × 844) means a short jog out of a doorway
   turns the view: the demo route's first frame faces up the corridor toward the fountain (as the step says), and
   when Play is pressed the view glances about 35° toward the corner 3 m out of the south entrance and back.
-- On a 360 px wide phone, the longest English lift step can need a little scroll in the step card (above the pinned
-  Next / Simulate walk buttons, with a soft edge as the cue); at browser-tab heights the home sheet can too (the
-  disclaimer stays pinned and visible).
+- Bottom sheets open at half height, at most the bottom half of the screen: on short screens (a phone browser tab,
+  the Claude app's viewer) the rest is one drag or tap away. There the navigate sheet shows the step, Next and the
+  trip line (step n of N, what is left) at half, and "Simulate walk" one pull further up (the **Walk view** pill on
+  the map is always there); folded, it keeps only the step and Next.

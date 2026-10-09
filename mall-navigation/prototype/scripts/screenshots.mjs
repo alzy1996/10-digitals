@@ -82,6 +82,19 @@ const SHEET_SCENARIOS = [
   { name: 'arrived-half-en-393x728', viewport: CLAUDE_VIEWER, query: { lang: 'en', screen: 'arrived', to: 'occ-muttrah-kitchen' } },
   { name: 'scan-half-en-393x728', viewport: CLAUDE_VIEWER, query: { lang: 'en', screen: 'scan' } },
   { name: 'car-scan-half-ar-360x640', viewport: VIEWPORTS['360x640'], query: { lang: 'ar', screen: 'car' } },
+  // QA round 1: navigate / car / arrived fold to one row (the map almost whole), the level picker at full
+  { name: 'navigate-half-ar-360x640', viewport: VIEWPORTS['360x640'], query: { lang: 'ar', ...KITCHEN, step: '1', view: 'floor' } },
+  { name: 'navigate-peek-ar-360x640', viewport: VIEWPORTS['360x640'], query: { lang: 'ar', ...KITCHEN, step: '1', view: 'floor', sheet: 'peek' } },
+  { name: 'navigate-full-en-360x640', viewport: VIEWPORTS['360x640'], query: { lang: 'en', ...KITCHEN, step: '1', view: 'floor', sheet: 'full' } },
+  { name: 'navigate-lift-half-en-393x728', viewport: CLAUDE_VIEWER, dpr: 3, query: { lang: 'en', ...TO_CAR, step: 'connector' } },
+  { name: 'car-peek-en-393x728', viewport: CLAUDE_VIEWER, dpr: 3, query: { lang: 'en', screen: 'car', car: 'bay-B1-043', sheet: 'peek' } },
+  { name: 'car-half-ar-360x640', viewport: VIEWPORTS['360x640'], query: { lang: 'ar', screen: 'car', car: 'bay-B1-043' } },
+  { name: 'car-full-ar-390x664', viewport: VIEWPORTS['390x664'], query: { lang: 'ar', screen: 'car', car: 'bay-B1-043', sheet: 'full' } },
+  { name: 'arrived-peek-en-360x640', viewport: VIEWPORTS['360x640'], query: { lang: 'en', screen: 'arrived', to: 'occ-muttrah-kitchen', sheet: 'peek' } },
+  { name: 'arrived-half-ar-393x728', viewport: CLAUDE_VIEWER, dpr: 3, query: { lang: 'ar', screen: 'arrived', to: 'occ-muttrah-kitchen' } },
+  { name: 'home-full-ar-393x728-safe34', viewport: CLAUDE_VIEWER, dpr: 3, safeBottom: 34, query: { lang: 'ar', screen: 'home', sheet: 'full' } },
+  { name: 'home-full-en-360x640-car', viewport: VIEWPORTS['360x640'], query: { lang: 'en', screen: 'home', sheet: 'full', car: 'bay-B1-043' } },
+  { name: 'search-tile-half-en-393x728', viewport: CLAUDE_VIEWER, dpr: 3, query: { lang: 'en', screen: 'search', tile: 'food' } },
 ].map((sc) => ({ ...sc, file: `sheet-after-${sc.name}.png` }))
 
 /** The demo scenarios (URL test hooks: see src/ui/urlState.js). */
@@ -229,9 +242,10 @@ function watch(page, name, problems) {
   })
 }
 
-async function load(page, query) {
-  // A fixed afternoon in Muscat so opening hours read "Open until 22:00" in every run (timers keep running).
-  await page.clock.setFixedTime(new Date('2026-10-09T13:30:00Z'))
+async function load(page, query, { fixedClock = true } = {}) {
+  // A fixed afternoon in Muscat so opening hours read "Open until 22:00" in every run (timers keep running). Not for
+  // the gesture test: the emulated clock also stamps the input events, and the sheet's velocity reads their timestamps.
+  if (fixedClock) await page.clock.setFixedTime(new Date('2026-10-09T13:30:00Z'))
   await page.goto(`${BASE}?${new URLSearchParams(query).toString()}`, { waitUntil: 'load' })
   await page.waitForFunction(() => window.__dallni && window.__dallni.ready === true, null, { timeout: 30000 })
   await page.evaluate(() => document.fonts.ready.then(() => true))
@@ -271,19 +285,52 @@ async function sheetProblems(page) {
     if (lv && wrap && getComputedStyle(wrap).visibility !== 'hidden' && getComputedStyle(lv).visibility !== 'hidden') {
       const l = lv.getBoundingClientRect()
       if (l.height > 0 && l.bottom > sh.top) out.push(`level picker bottom ${l.bottom} under the sheet (${sh.top})`)
+      // whole buttons only (compact ones when the full size does not fit), the active level whole inside the picker,
+      // the "more" chevrons inside the picker (never on the header)
+      const btns = [...lv.querySelectorAll('.level-btn')]
+      const bh = btns[0]?.offsetHeight ?? 0
+      if (bh > 0) {
+        const shown = lv.clientHeight / bh
+        if (Math.abs(shown - Math.round(shown)) > 0.03) out.push(`level picker shows a cut button (${lv.clientHeight}px of ${bh}px buttons)`)
+        const off = lv.scrollTop % bh
+        if (off > 1 && bh - off > 1) out.push(`level picker scrolled to part of a button (scrollTop ${lv.scrollTop})`)
+        if (bh > 50 && btns.length * bh > lv.clientHeight + 1) out.push('level picker scrolls but its buttons are not compact')
+        const act = btns.find((b) => b.getAttribute('aria-pressed') === 'true')
+        if (act) {
+          const a = act.getBoundingClientRect()
+          if (a.top < l.top - 0.5 || a.bottom > l.bottom + 0.5) out.push(`active level ${act.textContent} not whole in the picker (${Math.round(a.top)}-${Math.round(a.bottom)} in ${Math.round(l.top)}-${Math.round(l.bottom)})`)
+        }
+      }
+      const hb = document.querySelector('.header')?.getBoundingClientRect().bottom ?? 0
+      for (const c of wrap.querySelectorAll('.levels-more')) {
+        const r = c.getBoundingClientRect()
+        if (r.top < hb - 0.5 || r.top < l.top - 0.5 || r.bottom > l.bottom + 0.5) out.push(`"more levels" chevron outside the picker (${Math.round(r.top)}-${Math.round(r.bottom)}; header bottom ${Math.round(hb)})`)
+      }
+    }
+    // the handle says what a tap does, and its state matches ("Expand panel" = collapsed)
+    const grip = sec.querySelector('.sheet-grip')
+    if (grip && grip.getAttribute('aria-hidden') !== 'true') {
+      const exp = grip.getAttribute('aria-expanded')
+      const lab = grip.getAttribute('aria-label') ?? ''
+      const fold = /Fold|اطو/.test(lab)
+      if ((exp === 'true') !== fold) out.push(`handle aria-expanded=${exp} with label "${lab}"`)
     }
     return out
   })
 }
 
-/** Touch drag with real touch events (CDP): from (x, y0) to (x, y1) in `steps` moves over `ms`. */
+/**
+ * Touch drag with real touch events (CDP): from (x, y0) to (x, y1) in `steps` moves over `ms`. The events carry their
+ * own timestamps (a software-rendered headless page can take a second per frame while the blurred sheet moves, which
+ * would make every drag look slow), so the sheet's velocity sees the gesture as a finger would make it.
+ */
 async function touchDrag(page, cdp, x, y0, y1, { steps = 12, ms = 240 } = {}) {
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: y0 }] })
+  const t0 = Date.now() / 1000
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: y0 }], timestamp: t0 })
   for (let i = 1; i <= steps; i++) {
-    await page.waitForTimeout(ms / steps)
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y0 + ((y1 - y0) * i) / steps }] })
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y0 + ((y1 - y0) * i) / steps }], timestamp: t0 + (ms * i) / steps / 1000 })
   }
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [], timestamp: t0 + (ms + 8) / 1000 })
 }
 
 const sheetNow = (page) => page.evaluate(() => ({ ...window.__dallni.getSheet(), dom: document.querySelector('.sheet-snap').getBoundingClientRect().toJSON() }))
@@ -311,7 +358,7 @@ async function gestureTest(browser, problems) {
   watch(page, 'gesture', problems)
   const cdp = await context.newCDPSession(page)
   try {
-    await load(page, sc.query)
+    await load(page, sc.query, { fixedClock: false })
     let sh = await expectSnap(page, 'half', 'home opens at half')
     if (sh.top < 728 / 2) fail(`home half top ${sh.top} above the middle`)
     const h = sh.heights
@@ -354,8 +401,8 @@ async function gestureTest(browser, problems) {
     await expectSnap(page, 'half', 'tap handle at peek')
     // 3. flick the head (search bar) up -> full; the search screen must NOT open (a drag is not a tap)
     const head = await page.evaluate(() => document.querySelector('.sheet-head').getBoundingClientRect().toJSON())
-    await touchDrag(page, cdp, head.x + head.width / 2, head.y + head.height / 2, head.y + head.height / 2 - 90, { steps: 4, ms: 60 })
-    await expectSnap(page, 'full', 'flick search bar up 90 px in 60 ms')
+    await touchDrag(page, cdp, head.x + head.width / 2, head.y + head.height / 2, head.y + head.height / 2 - 90, { steps: 4, ms: 64 })
+    await expectSnap(page, 'full', 'flick search bar up 90 px in 64 ms')
     const scr = await page.evaluate(() => window.__dallni.getState().screen)
     if (scr !== 'home') fail(`the drag on the search bar opened ${scr}`)
     // 4. drag the body down from its top (scrollTop 0) -> folds
@@ -421,18 +468,157 @@ async function gestureTest(browser, problems) {
   const rm = await openPage(browser, { ...sc, reducedMotion: true })
   watch(rm.page, 'gesture-reduced-motion', problems)
   try {
-    await load(rm.page, sc.query)
+    await load(rm.page, sc.query, { fixedClock: false })
     await rm.page.evaluate(() => document.querySelector('.sheet-grip').click())
     await rm.page.waitForTimeout(60)
+    // no snap animation: no transform at any time, the box set straight to the new height
+    const st = await rm.page.evaluate(() => {
+      const sec = document.querySelector('.sheet-snap')
+      return { moving: sec.classList.contains('is-moving'), transform: sec.style.transform, height: sec.style.height }
+    })
+    await rm.page.waitForTimeout(250)
     const sh = await sheetNow(rm.page)
-    const moving = await rm.page.evaluate(() => document.querySelector('.sheet-snap').classList.contains('is-moving'))
-    const ok = sh.snap === 'full' && !moving && Math.abs(sh.dom.height - sh.heights.full) < 1.5
-    log.push(`${ok ? 'ok  ' : 'FAIL'} reduced motion: tap at half -> ${sh.snap}, no animation (no transform, settled at once)`)
-    if (!ok) fail(`reduced motion: ${sh.snap}, moving ${moving}, dom ${sh.dom.height} / full ${sh.heights.full}, reported ${sh.height}`)
+    const ok = sh.snap === 'full' && !st.moving && !st.transform && st.height === `${sh.heights.full}px` && Math.abs(sh.dom.height - sh.heights.full) < 1.5
+    log.push(`${ok ? 'ok  ' : 'FAIL'} reduced motion: tap at half -> ${sh.snap} ${sh.height}px, no animation (no transform; height set at once)`)
+    if (!ok) fail(`reduced motion: ${sh.snap}, ${JSON.stringify(st)}, dom ${sh.dom.height} / full ${sh.heights.full}`)
   } finally {
     await rm.context.close()
   }
   console.log(`\nGesture test (393 x 728, touch / mouse / keyboard):\n${log.map((l) => `  ${l}`).join('\n')}`)
+}
+
+/**
+ * Gesture test, per screen (393 x 728, Arabic and English, real touch): the navigate and car heads fold their sheets
+ * (a drag down of 150 px lowers them), a drag on the pinned footer moves the sheet (and does not press GO), a second
+ * finger landing during a body drag never leaves the sheet stuck mid-drag, and the search sheet comes up to full when
+ * the shopper types into it folded (Escape in the field clears it and keeps the sheet).
+ */
+async function gestureScreens(browser, problems) {
+  const log = []
+  const fail = (m) => problems.push(`[gesture-screens] ${m}`)
+  const settle = (page) => page.waitForTimeout(450)
+  const check = (ok, what) => {
+    log.push(`${ok ? 'ok  ' : 'FAIL'} ${what}`)
+    if (!ok) fail(what)
+  }
+  const open = async (query) => {
+    const sc = { viewport: CLAUDE_VIEWER, dpr: 2, query }
+    const p = await openPage(browser, sc)
+    watch(p.page, `gesture ${query.screen}`, problems)
+    await load(p.page, query, { fixedClock: false })
+    return { ...p, cdp: await p.context.newCDPSession(p.page) }
+  }
+  const rect = (page, sel) => page.evaluate((q) => document.querySelector(q)?.getBoundingClientRect().toJSON() ?? null, sel)
+  // 1-2. navigate and car: a drag down on the head lowers the sheet (it folds to its one row)
+  for (const [name, query, sel] of [
+    ['navigate (ar)', { lang: 'ar', ...KITCHEN, step: '1', view: 'floor' }, '.sheet-head .step-text'],
+    ['car card (ar)', { lang: 'ar', screen: 'car', car: 'bay-B1-043' }, '.sheet-head .car-sum'],
+    ['navigate (en)', { lang: 'en', ...KITCHEN, step: '1', view: 'floor' }, '.sheet-head .step-text'],
+    ['car card (en)', { lang: 'en', screen: 'car', car: 'bay-B1-043' }, '.sheet-head .car-sum'],
+  ]) {
+    const { context, page, cdp } = await open(query)
+    try {
+      const a = await sheetNow(page)
+      const r = await rect(page, sel)
+      await touchDrag(page, cdp, r.x + r.width / 2, r.y + r.height / 2, r.y + r.height / 2 + 150)
+      await settle(page)
+      const b = await sheetNow(page)
+      const lowered = b.height < a.height - 20 && b.snap === 'peek' && Math.abs(b.dom.height - b.height) < 1.5
+      check(lowered, `${name}: opens ${a.snap} ${a.height}px (peek ${a.heights.peek} = ${Math.round((a.heights.peek / 728) * 100)}% of the screen), drag head down 150 px -> ${b.snap} ${b.height}px`)
+      const scr = await page.evaluate(() => window.__dallni.getState().screen)
+      check(scr === query.screen, `${name}: the drag pressed nothing (screen ${scr})`)
+    } finally {
+      await context.close()
+    }
+  }
+  // 3. place: a drag down that starts on the GO footer folds the sheet (and does not start the route)
+  {
+    const { context, page, cdp } = await open({ lang: 'ar', screen: 'place', to: 'occ-muttrah-kitchen' })
+    try {
+      const a = await sheetNow(page)
+      const r = await rect(page, '.sheet-footer .btn')
+      await touchDrag(page, cdp, r.x + r.width / 2, r.y + r.height / 2, r.y + r.height / 2 + 120)
+      await settle(page)
+      const b = await sheetNow(page)
+      const scr = await page.evaluate(() => window.__dallni.getState().screen)
+      check(b.snap === 'peek' && b.height < a.height && scr === 'place', `place (ar): drag on the GO footer down 120 px: ${a.snap} ${a.height}px -> ${b.snap} ${b.height}px, screen ${scr}`)
+      // a plain tap on GO still starts the route
+      const g = await rect(page, '.sheet-footer .btn')
+      await page.touchscreen.tap(g.x + g.width / 2, g.y + g.height / 2)
+      await settle(page)
+      const scr2 = await page.evaluate(() => window.__dallni.getState().screen)
+      check(scr2 === 'navigate', `place (ar): a tap on GO still opens ${scr2}`)
+    } finally {
+      await context.close()
+    }
+  }
+  // 4. home at full: a second finger lands during a body drag; the sheet settles and the handle still works
+  {
+    const { context, page, cdp } = await open({ lang: 'en', screen: 'home', sheet: 'full' })
+    try {
+      const b = await rect(page, '.sheet-body')
+      const x = b.x + b.width / 2
+      const y0 = b.y + 40
+      const t0 = Date.now() / 1000
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: y0, id: 1 }], timestamp: t0 })
+      for (let i = 1; i <= 6; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y0 + 12 * i, id: 1 }], timestamp: t0 + (i * 40) / 1000 })
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: y0 + 72, id: 1 }, { x: x + 60, y: y0 + 20, id: 2 }], timestamp: t0 + 0.3 })
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y0 + 90, id: 1 }, { x: x + 60, y: y0 + 30, id: 2 }], timestamp: t0 + 0.34 })
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [{ x, y: y0 + 90, id: 1 }], timestamp: t0 + 0.4 })
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [], timestamp: t0 + 0.45 })
+      await page.waitForTimeout(800)
+      const st = await page.evaluate(() => {
+        const sec = document.querySelector('.sheet-snap')
+        return { moving: sec.classList.contains('is-moving'), attr: document.documentElement.hasAttribute('data-sheet-moving'), transform: sec.style.transform }
+      })
+      const sh = await sheetNow(page)
+      const settled = !st.moving && !st.attr && !st.transform && Math.abs(sh.dom.height - sh.heights[sh.snap]) < 1.5
+      check(settled, `second finger during a body drag: settles at ${sh.snap} ${sh.height}px (moving ${st.moving}, data-sheet-moving ${st.attr}, transform "${st.transform}")`)
+      const before = sh.snap
+      const g = await rect(page, '.sheet-grip')
+      await page.touchscreen.tap(g.x + g.width / 2, g.y + g.height / 2)
+      await settle(page)
+      const after = await sheetNow(page)
+      check(after.snap !== before && Math.abs(after.dom.height - after.heights[after.snap]) < 1.5, `then a tap on the handle: ${before} -> ${after.snap} ${after.dom.height}px`)
+    } finally {
+      await context.close()
+    }
+  }
+  // 5. search: folded, then typing brings it to full (the results show); Escape in the field clears it only
+  {
+    const { context, page, cdp } = await open({ lang: 'en', screen: 'home' })
+    try {
+      const head = await rect(page, '.sheet-head .search-box, .sheet-head button')
+      await page.touchscreen.tap(head.x + head.width / 2, head.y + head.height / 2)
+      await settle(page)
+      let sh = await sheetNow(page)
+      const focus0 = await page.evaluate(() => document.activeElement?.tagName)
+      check(sh.snap === 'full' && focus0 === 'INPUT', `search opens ${sh.snap} with the field focused (${focus0})`)
+      const g = await rect(page, '.sheet-grip')
+      await touchDrag(page, cdp, g.x + g.width / 2, g.y + g.height / 2, g.y + g.height / 2 + 450)
+      await settle(page)
+      sh = await sheetNow(page)
+      check(sh.snap === 'peek', `search: drag the handle down 450 px -> ${sh.snap} ${sh.height}px`)
+      const inp = await rect(page, '.sheet-head input')
+      await page.touchscreen.tap(inp.x + inp.width / 2, inp.y + inp.height / 2)
+      await page.keyboard.type('burger', { delay: 30 })
+      await page.waitForTimeout(600)
+      sh = await sheetNow(page)
+      const res = await page.evaluate(() => {
+        const b = document.querySelector('.sheet-body')
+        return { rows: b.querySelectorAll('.row').length, clientH: b.clientHeight, inert: b.inert, q: window.__dallni.getState().query }
+      })
+      check(sh.snap === 'full' && res.rows > 0 && res.clientH > 100 && !res.inert, `search folded, then typing "${res.q}": ${sh.snap} ${sh.height}px, ${res.rows} result rows in a ${res.clientH}px body`)
+      await page.keyboard.press('Escape')
+      await settle(page)
+      sh = await sheetNow(page)
+      const esc = await page.evaluate(() => ({ q: window.__dallni.getState().query, v: document.querySelector('.sheet-head input')?.value, focus: document.activeElement?.tagName }))
+      check(sh.snap === 'full' && esc.focus === 'INPUT', `Escape in the field with text: query "${esc.q}" (field "${esc.v}"), sheet ${sh.snap}, focus ${esc.focus}`)
+    } finally {
+      await context.close()
+    }
+  }
+  console.log(`\nGesture test per screen (393 x 728, touch):\n${log.map((l) => `  ${l}`).join('\n')}`)
 }
 
 /** Measure every sheet (screen x viewport x language) for the unit tests' fixtures. */
@@ -446,6 +632,8 @@ async function measureSheets(browser, problems) {
     arrived: { screen: 'arrived', to: 'occ-muttrah-kitchen' },
     car: { screen: 'car', car: 'bay-B1-043' },
     'car-scan': { screen: 'car' },
+    // the confirm stage has no URL hook: the first parking plate on B1, picked through the state hook
+    'car-confirm': { screen: 'car', $confirm: true },
     scan: { screen: 'scan' },
   }
   const sizes = [...Object.entries(VIEWPORTS).map(([vp, v]) => ({ vp, v, safe: 0 })), { vp: '393x728', v: CLAUDE_VIEWER, safe: 34 }]
@@ -454,9 +642,17 @@ async function measureSheets(browser, problems) {
     for (const lang of ['en', 'ar']) {
       const { context, page } = await openPage(browser, { viewport: v, dpr: 1, safeBottom: safe, query: { lang } })
       watch(page, `measure ${v.width}x${v.height}`, problems)
-      for (const [key, q] of Object.entries(screens)) {
+      for (const [key, { $confirm, ...q }] of Object.entries(screens)) {
         await page.goto(`${BASE}?${new URLSearchParams({ lang, ...q }).toString()}`, { waitUntil: 'load' })
         await page.waitForFunction(() => window.__dallni && window.__dallni.ready === true && window.__dallni.getSheet?.(), null, { timeout: 30000 })
+        if ($confirm) {
+          await page.evaluate(() => {
+            const plate = [...window.__dallni.index.anchorById.values()].find((a) => a.kind === 'parking_pillar' && a.levelId === 'B1')
+            window.__dallni.setState({ carStage: 'confirm', plateId: plate.id })
+          })
+          await page.waitForFunction(() => document.querySelector('.sheet-snap')?.getAttribute('aria-label')?.length > 0 && window.__dallni.getState().carStage === 'confirm')
+          await page.waitForTimeout(200)
+        }
         await page.evaluate(() => document.fonts.ready.then(() => true))
         await page.waitForTimeout(150)
         const sh = await page.evaluate(() => window.__dallni.getSheet())
@@ -519,7 +715,10 @@ async function main() {
       }
       await context.close()
     }
-    if (!flags.has('--measure') && !only) await gestureTest(browser, problems)
+    if (!flags.has('--measure') && !only) {
+      await gestureTest(browser, problems)
+      await gestureScreens(browser, problems)
+    }
   } finally {
     await browser.close()
   }

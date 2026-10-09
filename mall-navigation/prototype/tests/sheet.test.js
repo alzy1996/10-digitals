@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  MIN_STEP_PX,
   RUBBER_PX,
   SNAP_MS,
   canonicalSnap,
@@ -208,6 +209,16 @@ describe('sheet handle', () => {
     const H = { peek: 240, half: 240, full: 240 }
     expect(tapNext(H, 'half')).toBe('peek')
     expect(handleAction(H, 'half')).toBe('fold')
+    // (Sheet.jsx hides such a handle from assistive tech and Tab: it does nothing)
+    expect(distinctSnaps(H)).toHaveLength(1)
+  })
+
+  it('the handle label says what a tap does: "Expand" below the top snap, "Fold" at it', () => {
+    // Sheet.jsx: aria-expanded = (action === 'fold'), so the state never contradicts the label
+    const H = { peek: 120, half: 334, full: 450 }
+    expect(['peek', 'half', 'full'].map((s) => handleAction(H, s))).toEqual(['expand', 'expand', 'fold'])
+    const merged = { peek: 200, half: 200, full: 400 }
+    expect(['peek', 'half', 'full'].map((s) => handleAction(merged, s))).toEqual(['expand', 'expand', 'fold'])
   })
 })
 
@@ -243,7 +254,7 @@ describe('sheet heights measured in the app, per screen and viewport', () => {
     for (const v of ['393x728', '390x844', '390x664', '360x640']) expect(sizes.has(v), v).toBe(true)
   })
   for (const f of SHEET_FIXTURES) {
-    it(`${f.screen} ${f.lang} ${f.width}x${f.height}${f.bottomGap > 12 ? ' (safe area)' : ''}`, () => {
+    it(`${f.variant ?? f.screen} ${f.lang} ${f.width}x${f.height}${f.bottomGap > 12 ? ' (safe area)' : ''}`, () => {
       const h = computeSnapHeights(f)
       // folded: the head row and the pinned primary action, nothing else (a sheet too short to fold: all of it)
       if (h.full - Math.ceil(f.chrome) >= 24) expect(h.peek).toBe(Math.ceil(f.chrome))
@@ -265,6 +276,17 @@ describe('sheet heights measured in the app, per screen and viewport', () => {
       }
       // full stays under the header
       expect(f.height - f.bottomGap - h.full).toBeGreaterThanOrEqual(f.topLimit - 1)
+      // navigate, the car card and arrived fold to their one row (the step + Next, the car + Take me there, the tick +
+      // Found it): the folded sheet leaves the map almost whole, and folding really lowers it (Sam: "can't fold it")
+      if (['navigate', 'car', 'arrived'].includes(f.variant)) {
+        expect(h.peek).toBeLessThanOrEqual(f.height * 0.32)
+        expect(h.half - h.peek).toBeGreaterThanOrEqual(MIN_STEP_PX)
+        expect(distinctSnaps(h).length).toBeGreaterThanOrEqual(2)
+      }
+      // every sheet that has more than its head row can fold: its lowest snap is under its default (half)
+      if (h.natural - Math.ceil(f.chrome) >= 24 && f.variant !== 'car-confirm') expect(h.half).toBeGreaterThan(h.peek)
+      // scanning a plate: at least the first plate row shows at half
+      if (f.variant === 'car-scan' || f.variant === 'scan') expect(h.half - Math.ceil(f.chrome)).toBeGreaterThanOrEqual(64)
     })
   }
 })

@@ -12,6 +12,30 @@ const MODES = [
 const WALK_MODE = { mode: 'fpv', key: 'view.fpv', icon: 'eye' }
 
 /**
+ * Scroll a capped level picker so the active level shows whole and, when the picker shows 3 or more levels, not at an
+ * edge that fades out (more levels beyond it): it moves to the middle of what shows. Scroll positions are whole
+ * buttons (the picker also scroll-snaps to them).
+ */
+function showActiveLevel(el) {
+  const btn = el.querySelector('[aria-pressed="true"]')
+  const bh = btn?.offsetHeight ?? 0
+  if (!btn || bh <= 0) return
+  const count = el.querySelectorAll('.level-btn').length
+  const n = Math.max(1, Math.floor((el.clientHeight + 1) / bh))
+  if (n >= count) {
+    if (el.scrollTop !== 0) el.scrollTop = 0
+    return
+  }
+  const i = Math.round(btn.offsetTop / bh)
+  let first = Math.round(el.scrollTop / bh)
+  const lo = first + (first > 0 && n >= 3 ? 1 : 0)
+  const hi = first + n - 1 - (first + n < count && n >= 3 ? 1 : 0)
+  if (i < lo || i > hi) first = Math.min(Math.max(0, i - Math.floor((n - 1) / 2)), count - n)
+  const top = first * bh
+  if (Math.abs(el.scrollTop - top) > 1) el.scrollTop = top
+}
+
+/**
  * Map controls, kept to the two top corners so the middle of the map stays free:
  * - one 56 px "View" control at the start edge (icon + name of the current view); it opens a short menu with
  *   Overview / Floor / 2D (56 px rows);
@@ -26,8 +50,9 @@ export function MapControls({ index, lang, view, onView, onLevel, routeLevelIds,
   const boxRef = useRef(null)
   const levelsRef = useRef(null)
 
-  // the picker is capped to the space above the sheet (App): when it scrolls, a fade and a chevron show the edge
-  // that has more levels, and the active level is always scrolled into view
+  // the picker is capped to the space above the sheet (App: a whole number of buttons): when it scrolls, a fade and a
+  // chevron show the edge that has more levels, and the active level is always in view, clear of the fades (also
+  // when the cap changes: a sheet snap, a resize)
   useEffect(() => {
     const el = levelsRef.current
     if (!el) return undefined
@@ -36,10 +61,16 @@ export function MapControls({ index, lang, view, onView, onLevel, routeLevelIds,
       const below = el.scrollTop + el.clientHeight < el.scrollHeight - 2
       setMore((m) => (m.above === above && m.below === below ? m : { above, below }))
     }
-    check()
+    const onResize = () => {
+      showActiveLevel(el)
+      check()
+    }
+    onResize()
     el.addEventListener('scroll', check, { passive: true })
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(check) : null
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onResize) : null
     ro?.observe(el)
+    // (a button too: compact buttons change the content, not always the capped box)
+    if (el.firstElementChild) ro?.observe(el.firstElementChild)
     return () => {
       el.removeEventListener('scroll', check)
       ro?.disconnect()
@@ -47,13 +78,7 @@ export function MapControls({ index, lang, view, onView, onLevel, routeLevelIds,
   }, [index])
 
   useEffect(() => {
-    const el = levelsRef.current
-    const btn = el?.querySelector('[aria-pressed="true"]')
-    if (!el || !btn) return
-    const top = btn.offsetTop
-    const bottom = top + btn.offsetHeight
-    if (top < el.scrollTop + 4) el.scrollTop = Math.max(0, top - 4)
-    else if (bottom > el.scrollTop + el.clientHeight - 4) el.scrollTop = bottom - el.clientHeight + 4
+    if (levelsRef.current) showActiveLevel(levelsRef.current)
   }, [view.levelId])
 
   useEffect(() => {
