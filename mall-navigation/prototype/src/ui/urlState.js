@@ -6,7 +6,8 @@
  *   &screen=home|search|place|navigate|arrived|car|scan
  *   &from=<anchorId>                       you-are-here (default: the venue's defaultStartAnchorId)
  *   &to=<occupantId|amenityId|bayId|anchorId>
- *   &view=stack|floor|top  &level=<levelId>
+ *   &view=stack|floor|top|fpv  &level=<levelId>   (fpv = the first-person Walk view, v0.2; navigate / arrived)
+ *   &style=storm|classic                   v0.2 scene style (engine.setSceneStyle; default storm)
  *   &simT=<seconds>                        navigate: simulated walk paused at that time
  *   &step=<n>|connector                    navigate: open on step n (or the first floor change)
  *   &stepFree=1
@@ -16,7 +17,8 @@
  */
 
 const SCREENS = ['home', 'search', 'place', 'navigate', 'arrived', 'car', 'scan']
-const VIEWS = ['stack', 'floor', 'top']
+const VIEWS = ['stack', 'floor', 'top', 'fpv']
+const STYLES = ['storm', 'classic']
 
 /**
  * @param {string} [search] location.search
@@ -48,6 +50,7 @@ export function readUrlParams(search = typeof location !== 'undefined' ? locatio
     tile: str('tile'),
     car: str('car'),
     play: str('play') === '1',
+    style: STYLES.includes(str('style')) ? str('style') : null,
   }
 }
 

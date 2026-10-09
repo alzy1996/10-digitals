@@ -9,13 +9,13 @@
  * Art direction: PLAN.md §19.2 "architect's model" - unlit, vertex-coloured, flat-shaded geometry,
  * real wall-top strips, no realtime shadows, no bloom.
  */
-import { DoubleSide, Group, MOUSE, MathUtils, Mesh, MeshBasicMaterial, PerspectiveCamera, Scene, TOUCH, Vector3, WebGLRenderer } from 'three'
+import { Color, DoubleSide, Fog, Group, MOUSE, MathUtils, Mesh, MeshBasicMaterial, PerspectiveCamera, Scene, TOUCH, Vector3, WebGLRenderer } from 'three'
 // OrbitControls set up exactly like three's MapControls (one-finger pan, two-finger pinch-zoom + rotate, panning on
 // the ground plane), without MapControls' mouse ray-casting: one class (and Raycaster) fewer in the engine chunk
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { configureFonts } from './fonts.js'
-import { ColorRegistry, THEMES } from './palette.js'
-import { applyTheme, pointInPolygon, setRise } from './geometry.js'
+import { ColorRegistry, THEMES, paletteName } from './palette.js'
+import { applyTheme, distToSegment, pointInPolygon, polygonCentroid, setRise } from './geometry.js'
 import { buildEscalator, buildLiftColumn, buildParkingLevel, buildRetailLevel } from './levels.js'
 import { buildBaysMesh } from './bays.js'
 import { createIconAtlas } from './icons.js'
@@ -24,6 +24,9 @@ import { MIN_TEXT_PX, SignLayer } from './signs.js'
 import { RouteLayer } from './route.js'
 import { MarkerLayer, disposeTree } from './markers.js'
 import { applyPose, boxCenter, easeStandard, fitDistance, lerpPose, readPose } from './camera.js'
+import { SkyLayer } from './sky.js'
+import { TargetRing } from './ring.js'
+import { arrivalStand, buildInterior, levelVoids } from './interior.js'
 
 /** Vertical distance between levels in stack view (metres). */
 export const STACK_GAP_M = 18
@@ -52,6 +55,14 @@ const PIN_BOX = [24, 50, 24, 12]
 /** ...of a key point without a pin (a turn corner, the walker). */
 const POINT_BOX = [18, 22, 18, 14]
 const DEFAULT_SIZE = { width: 390, height: 844 }
+/** Walk view defaults (CONTRACT 3b setFpvOptions) and their clamps. */
+const FPV_DEFAULTS = Object.freeze({ eyeHeightM: 1.6, fovDeg: 70, pitchDeg: -5 })
+const FPV_CLAMPS = { eyeHeightM: [1.2, 2.0], fovDeg: [50, 85], pitchDeg: [-25, 5] }
+/** The Walk view's eye pose written as an orbit pose: the target this far ahead of the eye (the dive lerps to it). */
+const EYE_TARGET_M = 6.1
+const bearingDeg = (ax, ay, bx, by) => MathUtils.radToDeg(Math.atan2(bx - ax, by - ay))
+const angDelta = (a, b) => ((((b - a) % 360) + 540) % 360) - 180
+const norm360 = (a) => ((a % 360) + 360) % 360
 
 /**
  * @typedef {object} EngineStats
@@ -81,8 +92,10 @@ export function createEngine() {
     registry: new ColorRegistry(),
     atlas: null,
     theme: /** @type {'sunlight'|'basement'} */ ('sunlight'),
+    /** scene style (CONTRACT 3b): 'storm' (v0.2 default) or 'classic' (v0.1) */
+    style: /** @type {'storm'|'classic'} */ ('storm'),
     lang: /** @type {'en'|'ar'} */ ('en'),
-    mode: /** @type {'stack'|'floor'|'top'} */ ('stack'),
+    mode: /** @type {'stack'|'floor'|'top'|'fpv'} */ ('stack'),
     focusId: null,
     /** 0 = true scale (floor / 2D), 1 = exploded stack; animated during camera flights */
     blend: 1,
@@ -130,21 +143,72 @@ export function createEngine() {
     /** route trimmed under the arrival ring (metres) */
     trimEnd: 0,
     mats: null,
+    sky: new SkyLayer(),
+    ring: new TargetRing(),
+    /** the target ring / nextTurn anchor (setNextTurn), with its distance along the shown route */
+    nextTurn: null,
+    /** chevron flow and ring ripple: only while on (setPathAnimating) */
+    anim: { on: false, flow: 1.8, pos: 0, t: 0 },
+    anchorCbs: new Set(),
+    /** inside onRender / onAnchors callbacks: commands are deferred, requestRender coalesced */
+    inCb: false,
+    fpvOpts: { ...FPV_DEFAULTS },
+    /** Walk view runtime (created on first entry) */
+    fpv: null,
+    /** levels drawn in the Walk view */
+    fpvShown: new Set(),
+    lastTap: null,
+    sheenColor: { value: new Color() },
+    sheenOn: { value: 1 },
+    /** 0 = map views, 1 = Walk view (floor tiles, wall gradient) */
+    walkU: { value: 0 },
+    /** floor-to-floor height (m): wall heights above their level floor in the Walk view (true scale) */
+    levelH: { value: 5.5 },
   }
 
   S.scene.add(S.venueRoot)
   S.scene.add(S.route.root)
   S.scene.add(S.overlay.batch)
+  S.scene.add(S.sky.mesh)
+  S.scene.add(S.ring.root)
+  // always present (so no material recompiles when the Walk view starts); far away outside the Walk view
+  S.scene.fog = new Fog(0x2a3036, 1e6, 2e6)
   S.scene.matrixWorldAutoUpdate = true
   // Markers (you, car, destination, walker) are drawn in a second pass after the depth buffer is cleared,
   // so walls, gates, glass or the floors stacked above can never hide or tint them.
   S.markerScene = new Scene()
   S.markerScene.add(S.markers.root)
 
+  /**
+   * Storm finishes on the shared materials (no extra draw calls): a glossy-floor sheen on up-facing surfaces that
+   * brightens toward grazing angles, and storefront glass whose opacity rises toward grazing angles (fresnel).
+   * Normals come from screen-space derivatives (the merged geometry carries none). Off in classic (uSheenOn = 0).
+   * Walk view only (uWalk): faint 1.2 m floor tiles (scale and perspective cues, faded out with distance) and a
+   * vertical gradient on walls (a dark skirting, darker low down, a little lighter under the ceiling lights).
+   */
+  const finish = (mat, glass) => {
+    mat.customProgramCacheKey = () => (glass ? 'dallni-glass' : 'dallni-sheen')
+    mat.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, { uSheen: S.sheenColor, uSheenOn: S.sheenOn, uWalk: S.walkU, uLevelH: S.levelH })
+      sh.vertexShader = 'varying vec3 vWP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;')
+      const code = glass
+        ? 'if (uSheenOn > 0.5) { vec3 gn = normalize(cross(dFdx(vWP), dFdy(vWP))); diffuseColor.a = 0.30 + 0.25 * pow(1.0 - abs(dot(gn, normalize(cameraPosition - vWP))), 2.0); }'
+        : `{ vec3 sn = normalize(cross(dFdx(vWP), dFdy(vWP))); vec3 sv = normalize(cameraPosition - vWP); vec2 tq = vWP.xz / 1.2; vec2 tw = fwidth(tq) + 1e-4; float w = uWalk * uSheenOn;
+if (abs(sn.y) > 0.9 && sv.y > 0.0) { outgoingLight += uSheen * pow(1.0 - sv.y, 3.0) * 0.16 * uSheenOn; vec2 gl = 1.0 - smoothstep(vec2(0.012), 0.012 + tw, abs(fract(tq + 0.5) - 0.5)); outgoingLight *= 1.0 - 0.07 * w * max(gl.x, gl.y) * (1.0 - smoothstep(8.0, 22.0, distance(vWP, cameraPosition))); }
+else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight *= 1.0 + w * (0.24 * smoothstep(0.1, 1.9, h) - 0.24 - 0.14 * step(h, 0.12) + 0.06 * smoothstep(2.3, 3.4, h)); } }`
+      sh.fragmentShader = 'uniform vec3 uSheen;\nuniform float uSheenOn, uWalk, uLevelH;\nvarying vec3 vWP;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', code + '\n#include <opaque_fragment>')
+    }
+    return mat
+  }
+
   const makeMaterials = () => ({
-    opaque: new MeshBasicMaterial({ vertexColors: true }),
+    opaque: finish(new MeshBasicMaterial({ vertexColors: true }), false),
     roofs: new MeshBasicMaterial({ vertexColors: true }),
-    glass: new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.38, depthWrite: false, side: DoubleSide }),
+    glass: finish(new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.38, depthWrite: false, side: DoubleSide }), true),
+    // escalator balustrade panels (storm): the same glass, one-sided (they carry a face per side)
+    escGlass: finish(new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.38, depthWrite: false }), true),
+    // Walk view: ceiling-light halos and floor reflection streaks
+    interiorGlow: new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.09, depthWrite: false }),
     decals: new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.3, depthWrite: false }),
     ghost: new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.28, depthWrite: false }),
     // stack view with a multi-floor route: the floors above the lowest one are see-through, so the route,
@@ -164,6 +228,15 @@ export function createEngine() {
     batch.addEventListener('synccomplete', () => {
       pendingSync.delete(batch)
       requestRender()
+      // (after the lines' own sync handlers, which measure them)
+      if (S.reframe && !pendingSync.size)
+        setTimeout(() => {
+          const rf = S.reframe
+          if (!rf || pendingSync.size) return
+          S.reframe = null
+          const cur = S.flight ? S.flight.to : currentPose()
+          if (cur.target.distanceTo(rf.to.target) < 0.01 && Math.abs(cur.distance - rf.to.distance) < 0.01) api.flyToShopFront(rf.p, 400)
+        })
     })
   }
   watchSync(S.overlay.batch)
@@ -230,7 +303,28 @@ export function createEngine() {
 
   function isVisible(id) {
     if (S.mode === 'stack') return S.stackLevels ? S.stackLevels.has(id) : S.levels.has(id)
+    if (S.mode === 'fpv') return S.fpvShown.has(id)
     return id === S.focusId
+  }
+
+  /** Palette of the current style and theme (classic: the v0.1 tables). */
+  function pal() {
+    return paletteName(S.style, S.theme)
+  }
+
+  let reducedMq = null
+  function prefersReducedMotion() {
+    try {
+      if (!reducedMq && typeof window !== 'undefined') reducedMq = window.matchMedia?.('(prefers-reduced-motion: reduce)') ?? null
+      return Boolean(reducedMq?.matches)
+    } catch {
+      return false
+    }
+  }
+
+  /** Chevron flow / ring ripple run only while asked to, mounted, with a route, on a visible page, motion allowed. */
+  function animActive() {
+    return S.anim.on && S.mounted && Boolean(S.route.route) && !prefersReducedMotion() && (typeof document === 'undefined' || document.visibilityState !== 'hidden')
   }
 
   function focusOrdinal() {
@@ -274,6 +368,8 @@ export function createEngine() {
   // ------------------------------------------------------------------------------------------
 
   function requestRender() {
+    // from inside a frame callback: no frame of its own (it joins whatever frame is scheduled next)
+    if (S.inCb) return
     S.needsRender = true
     schedule()
   }
@@ -292,11 +388,18 @@ export function createEngine() {
     const wasFlying = !!S.flight
     if (S.flight) {
       animating = stepFlight(now)
-    } else if (S.controls) {
+    } else if (S.controls && S.mode !== 'fpv') {
       if (S.controls.update()) animating = true
       if (clampTarget()) animating = true
     }
-    if (stepFollow(dt)) animating = true
+    if (S.mode === 'fpv') {
+      if (!S.flight && stepFpv(dt, now)) animating = true
+    } else if (stepFollow(dt)) animating = true
+    if (animActive()) {
+      S.anim.pos = (S.anim.pos + dt * S.anim.flow) % 2400
+      S.anim.t += dt
+      animating = true
+    }
     if (S.needsRender || animating || wasFlying) render()
     if (animating) schedule()
     else if (!S.rafId) S.lastTick = 0
@@ -306,8 +409,9 @@ export function createEngine() {
     const cam = S.camera
     const target = S.controls ? S.controls.target : S.flightTarget ?? new Vector3()
     const dist = cam.position.distanceTo(target)
-    const near = MathUtils.clamp(dist * 0.035, 0.2, 40)
-    const far = dist * 4 + 900
+    const eye = S.mode === 'fpv' && !S.fpv?.dive
+    const near = eye ? 0.05 : MathUtils.clamp(dist * 0.035, 0.2, 40)
+    const far = eye ? 300 : dist * 4 + 900
     if (Math.abs(cam.near - near) > 1e-3 || Math.abs(cam.far - far) > 1e-2) {
       cam.near = near
       cam.far = far
@@ -525,12 +629,41 @@ export function createEngine() {
     const target = S.controls ? S.controls.target : new Vector3()
     const ppm = pxPerMeterAt(target)
     const camDist = cam.position.distanceTo(target)
+    const eye = S.mode === 'fpv' && !S.fpv?.dive
+    const walk = walkMix()
+    const pose = readPose(cam, target)
 
-    // route width keeps >= ~11 px on screen (14 px in the stacked Overview, where it must read from afar)
-    S.route.setHalfWidth((S.mode === 'stack' ? 7 : 5.5) / ppm)
+    // route width keeps >= ~11 px on screen (14 px in the stacked Overview, where it must read from afar); the glowing
+    // path is measured rim to rim (0.67 of its half width); the Walk view draws it at true size (1.4 m)
+    const glow = S.route.style === 'glow'
+    S.route.setHalfWidth(eye ? 1.05 : (S.mode === 'stack' ? (glow ? 10.4 : 7) : glow ? 8.2 : 5.5) / ppm)
+    S.route.setFrame(eye, S.anim.pos)
+    S.walkU.value = walk
+    // the Walk view's fog (ramped in during the dive, out during the rise)
+    S.scene.fog.near = walk > 0 ? Math.exp(Math.log(3000) + (Math.log(30) - Math.log(3000)) * walk) : 1e6
+    S.scene.fog.far = walk > 0 ? Math.exp(Math.log(6000) + (Math.log(140) - Math.log(6000)) * walk) : 2e6
+    const nt = S.nextTurn
+    const dm = S.markers.get('dest')
+    // Walk view with a route and no next turn (Arrived, CONTRACT 3b setNextTurn): the whole route counts as walked,
+    // however the arrival happened (the Walk view does not draw walked parts, nor the connector poles); the target ring
+    // in mint stands at the doorstep (DESIGN-GLASS 5.8; the flat arrival ring is not drawn there, fpvHiddenMarkers)
+    const done = S.mode === 'fpv' && !nt && Boolean(S.route.route)
+    const rt = nt ?? (done && dm?.state === 'arrived' ? { levelId: dm.levelId, x: dm.x, y: dm.y, kind: 'arrive' } : null)
+    const rk = S.ring.target
+    if (rt?.x !== rk?.x || rt?.y !== rk?.y || rt?.kind !== rk?.kind) S.ring.set(rt)
+    S.route.uniforms.uWalked.value = done ? 1e9 : S.route.walked
+    const ntY = rt ? levelY(rt.levelId) : 0
+    S.ring.layout({
+      shown: Boolean(rt) && S.mode !== 'stack' && isVisible(rt.levelId),
+      y: ntY,
+      // map views: the ring keeps at least 14 px radius on screen
+      scale: eye || !rt ? 1 : Math.max(1, 14 / (1.1 * pxPerMeterAt(_dir.set(rt.x, ntY, -rt.y)))),
+      camera: cam,
+      ripple: animActive() ? (S.anim.t / 1.6) % 1 : null,
+    })
     const gap = S.stackLevels ? STACK_FOCUS_GAP_M : STACK_GAP_M
     const columnH = Math.max(5.5, 5.5 + (gap * 0.8 - 5.5) * S.blend)
-    const layoutCtx = { levelY: (id) => levelY(id), isVisible, mode: S.mode, columnH }
+    const layoutCtx = { levelY: (id) => levelY(id), isVisible, mode: S.mode, columnH, fpv: eye, ring: nt, done, rampY: eye ? (id, x, y) => markerWorldY('walker', { connectorId: id, x, y }) ?? 0 : null }
     S.route.layout(layoutCtx)
 
     S.markers.layout({
@@ -538,6 +671,8 @@ export function createEngine() {
       isVisible,
       elevationOverride: markerWorldY,
       pxPerMeter: (p) => pxPerMeterAt(p),
+      fpv: S.mode === 'fpv',
+      hidden: S.mode === 'fpv' ? fpvHiddenMarkers() : null,
     })
 
     cam.getWorldDirection(_dir)
@@ -574,6 +709,10 @@ export function createEngine() {
       return false
     }
     const reserved = S.markers.screenRects((p) => projectWorld(p))
+    // Walk view: names keep clear of the UI's turn bubble on top of the ring's beam (its icon, and its box above it
+    // toward the inline end)
+    const bs = eye && rt && isVisible(rt.levelId) ? projectWorld(new Vector3(rt.x, ntY + 2.2, -rt.y)) : null
+    if (bs) reserved.push({ x: bs.sx - 24, y: bs.sy - 24, w: 48, h: 48 }, { x: S.lang === 'ar' ? bs.sx - 230 : bs.sx - 8, y: bs.sy - 72, w: 238, h: 72 })
     S.overlay.update({
       camera: cam,
       width,
@@ -588,9 +727,11 @@ export function createEngine() {
       obstacles: S.obstacles,
       ...routeScreenInfo(),
       markerBadges: markerBadges(),
+      turnAt: S.nextTurn,
     })
 
     const r = S.renderer
+    if (S.sky.mesh.visible) S.sky.update(r, cam, MathUtils.degToRad(pose.headingDeg), width / height, walk)
     r.info.reset()
     r.render(S.scene, cam)
     // second pass: markers on top of everything (own depth buffer, so a marker still shades itself)
@@ -600,13 +741,36 @@ export function createEngine() {
     r.autoClear = true
     S.frames++
     S.frameMs = performance.now() - t0
-    for (const cb of S.renderCbs) {
-      try {
-        cb()
-      } catch (err) {
-        console.error(err)
+    // callbacks: commands they send run after the frame (DEFERRED), a requestRender is coalesced; anchors are pure
+    // projection and never request a frame (CONTRACT 3b onAnchors)
+    S.inCb = true
+    try {
+      for (const cb of S.renderCbs) {
+        try {
+          cb()
+        } catch (err) {
+          console.error(err)
+        }
       }
+      if (S.anchorCbs.size) {
+        const a = computeAnchors()
+        for (const cb of S.anchorCbs) {
+          try {
+            cb(a)
+          } catch (err) {
+            console.error(err)
+          }
+        }
+      }
+    } finally {
+      S.inCb = false
     }
+  }
+
+  /** 0 = map views, 1 = Walk view; in between during the dive into it and the rise out of it. */
+  function walkMix() {
+    if (S.mode === 'fpv') return S.fpv?.dive ? (S.fpv.diveE ?? 0) : 1
+    return S.flight?.fromFpv ? 1 - (S.flight.e ?? 0) : 0
   }
 
   /**
@@ -716,21 +880,14 @@ export function createEngine() {
     c.maxDistance = Math.max(200, diag * 12)
   }
 
-  function prefersReducedMotion() {
-    try {
-      return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    } catch {
-      return false
-    }
-  }
-
   /**
    * Start a camera flight to `to` (and the stack blend `toBlend`).
    */
   function startFlight(to, durationMs, toBlend = S.blend) {
     resetControlsMomentum()
     const from = currentPose()
-    const dur = prefersReducedMotion() ? Math.min(durationMs, 200) : durationMs
+    // prefers-reduced-motion: every camera move is a cut (CONTRACT 3b)
+    const dur = prefersReducedMotion() ? 0 : durationMs
     if (!S.mounted || dur <= 0) {
       S.blend = toBlend
       applyLayout()
@@ -747,6 +904,7 @@ export function createEngine() {
     const f = S.flight
     const t = Math.min(1, (now - f.start) / f.dur)
     const e = easeStandard(t)
+    f.e = e
     S.blend = f.fromBlend + (f.toBlend - f.fromBlend) * e
     applyLayout()
     setPoseNow(lerpPose(f.from, f.to, e))
@@ -852,6 +1010,398 @@ export function createEngine() {
   }
 
   // ------------------------------------------------------------------------------------------
+  // Walk view (fpv): the simulated walk at eye height inside the model (DESIGN-GLASS.md 6). A SIMULATION, not AR.
+  // ------------------------------------------------------------------------------------------
+
+  /** Vertical fov of the Walk view, reduced so the horizontal fov stays <= 80 deg on wide screens. */
+  function fpvFov() {
+    const { width, height } = viewSize()
+    const maxV = MathUtils.radToDeg(2 * Math.atan(Math.tan(MathUtils.degToRad(40)) / (width / height)))
+    return Math.min(S.fpvOpts.fovDeg, maxV)
+  }
+
+  /** The eye (world position, compass yaw, pitch) written as an orbit pose, so flights and dives lerp to it. */
+  function eyePose(pos, yaw, pitch) {
+    const t = MathUtils.degToRad(pitch)
+    const h = MathUtils.degToRad(yaw)
+    const c = Math.cos(t) * EYE_TARGET_M
+    return { target: new Vector3(pos.x + Math.sin(h) * c, pos.y + Math.sin(t) * EYE_TARGET_M, pos.z - Math.cos(h) * c), distance: EYE_TARGET_M, tiltDeg: -pitch, headingDeg: yaw, fov: fpvFov() }
+  }
+
+  function connOf(id) {
+    return id ? (S.connectors.find((c) => c.conn.id === id) ?? null) : null
+  }
+
+  /**
+   * Compass yaw toward the route point 5 m ahead of route distance d (anticipates corners): the walker's follow
+   * camera, and the fallback for a stand with no walker (the App sends its own stand heading, DESIGN-GLASS 6.1).
+   */
+  function routeYaw(d, levelId, x, y) {
+    const p = d == null ? null : S.route.pointAt(d + 5)
+    if (!p || p.levelId !== levelId || Math.hypot(p.x - x, p.y - y) < 0.5) return null
+    return bearingDeg(x, y, p.x, p.y)
+  }
+
+  /** Where the eye stands for a step with no walker: the step's start, facing along it. */
+  function stepStand(i) {
+    const r = S.route.route
+    let k = i
+    // a zero-length "Start at ..." step stands where the next one starts
+    while (r.steps[k + 1] && (r.steps[k].to ?? 0) <= (r.steps[k].from ?? 0)) k++
+    const pts = S.route.stepPoints(k)
+    const a = pts[0]
+    if (!a) return null
+    const d = S.route.stepStartDist(k)
+    let yaw = routeYaw(d, a.levelId, a.x, a.y)
+    if (yaw == null && pts[1]) {
+      const b = pts[1]
+      const c = connOf(r.steps[k].connector?.id)
+      const ctr = c?.conn.shaft ? polygonCentroid(c.conn.shaft) : null
+      if (Math.hypot(b.x - a.x, b.y - a.y) > 0.5) yaw = bearingDeg(a.x, a.y, b.x, b.y)
+      else if (ctr) yaw = bearingDeg(a.x, a.y, ctr[0], ctr[1])
+    }
+    return { levelId: a.levelId, x: a.x, y: a.y, yaw: yaw ?? S.fpv.yaw }
+  }
+
+  /** Nothing to follow: the you marker, else the chosen step's start, else the route start, else the default anchor. */
+  function restPose(levelId) {
+    const r = S.route.route
+    const you = S.markers.get('you')
+    const st = r && S.activeStep >= 1 ? stepStand(S.activeStep) : null
+    if (st) return st
+    if (you && S.levels.has(you.levelId)) {
+      const d = r ? S.route.locate(you.levelId, you.x, you.y) : null
+      return { levelId: you.levelId, x: you.x, y: you.y, yaw: routeYaw(d, you.levelId, you.x, you.y) ?? you.headingDeg ?? S.fpv.yaw }
+    }
+    const st0 = r ? stepStand(0) : null
+    if (st0) return st0
+    const an = S.index.anchorById.get(S.index.venue.meta?.defaultStartAnchorId)
+    if (an && S.levels.has(an.levelId)) return { levelId: an.levelId, x: an.point[0], y: an.point[1], yaw: an.facingDeg ?? 0 }
+    const n = [...S.index.nodeById.values()].find((nd) => nd.levelId === (levelId ?? S.focusId))
+    return { levelId: n?.levelId ?? S.focusId, x: n?.point[0] ?? 0, y: n?.point[1] ?? 0, yaw: 0 }
+  }
+
+  const walkerKey = (w) => (w ? `${w.levelId}|${w.x.toFixed(3)}|${w.y.toFixed(3)}` : '')
+
+  /** What the eye aims for this frame: { levelId, x, y, fy (floor world y), yaw, pitch, ride?, cutRide? }. */
+  function fpvGoal() {
+    const F = S.fpv
+    const o = S.fpvOpts
+    const w = S.markers.get('walker')
+    if (w && !F.hold && S.levels.has(w.levelId)) {
+      const c = connOf(w.connectorId)
+      if (c && c.kind === 'escalator' && c.inVoid) {
+        // ride the ramp; look up the escalator going up (about +5 deg), further down going down
+        const up = c.conn.direction !== 'down'
+        return { levelId: w.levelId, x: w.x, y: w.y, fy: markerWorldY('walker', w) ?? levelY(w.levelId), yaw: w.headingDeg ?? F.yaw, pitch: o.pitchDeg + (up ? 0.5 : -0.3) * c.slopeDeg, ride: c }
+      }
+      if (c) {
+        // lift / stairs: no vertical slide through floors; face the doors until the cut at the exit stop
+        if (!F.rideAt || F.cutRide !== c) F.rideAt = { levelId: w.levelId, x: w.x, y: w.y }
+        const at = F.rideAt
+        const ctr = c.conn.shaft ? polygonCentroid(c.conn.shaft) : null
+        let yaw = c.conn.doorFacingDeg != null ? c.conn.doorFacingDeg + 180 : F.yaw
+        if (ctr && Math.hypot(ctr[0] - at.x, ctr[1] - at.y) > 0.5) yaw = bearingDeg(at.x, at.y, ctr[0], ctr[1])
+        return { levelId: at.levelId, x: at.x, y: at.y, fy: levelY(at.levelId), yaw, pitch: o.pitchDeg, cutRide: c }
+      }
+      const yaw = routeYaw(S.walkerDist, w.levelId, w.x, w.y) ?? w.headingDeg ?? F.yaw
+      return { levelId: w.levelId, x: w.x, y: w.y, fy: levelY(w.levelId), yaw, pitch: o.pitchDeg }
+    }
+    const h = F.hold ?? (F.rest ??= restPose())
+    return { ...h, fy: levelY(h.levelId), pitch: h.pitch ?? o.pitchDeg }
+  }
+
+  /** Levels drawn in the Walk view: the eye's level, the adjacent retail levels (seen through voids), the ride's. */
+  function updateFpvLevels() {
+    const F = S.fpv
+    const L = levelOf(F.levelId)
+    const set = new Set()
+    if (L) {
+      set.add(L.id)
+      if (L.level.kind === 'retail') for (const M of S.levels.values()) if (M.level.kind === 'retail' && Math.abs(M.level.ordinal - L.level.ordinal) === 1) set.add(M.id)
+    }
+    if (F.rideConn) set.add(F.rideConn.lowStop.levelId).add(F.rideConn.highStop.levelId)
+    for (const id of set) ensureInterior(levelOf(id))
+    S.fpvShown = set
+    applyVisibility()
+  }
+
+  /** Walk-view-only geometry of a level (ceiling, bulkheads, light panels), built on first use. */
+  function ensureInterior(L) {
+    if (!L || L.interior) return
+    const lv = S.index.levels
+    const above = lv[lv.findIndex((l) => l.id === L.id) + 1]
+    // the floor below an atrium looks up through it; the top floor's own voids are a skylight
+    const b = buildInterior(S.index, L.level, S.registry, levelVoids(S.index, above ? above.id : L.id))
+    const grp = new Group()
+    grp.name = 'interior-' + L.id
+    addThemedMesh(b.solid, S.mats.opaque, grp, 'ceiling-' + L.id)
+    addThemedMesh(b.glow, S.mats.interiorGlow, grp, 'lights-' + L.id, 4)
+    grp.visible = S.mode === 'fpv'
+    L.content.add(grp)
+    L.interior = grp
+  }
+
+  function fpvHiddenMarkers() {
+    const F = S.fpv
+    const hide = new Set(['walker'])
+    // one marker per turn (DESIGN-GLASS 6.5): the target ring (and the bubble on its beam) marks the destination on the
+    // last step and on arrival, so the destination pin / flat ring is not drawn as well
+    const dm = S.markers.get('dest')
+    const nt = S.nextTurn
+    if (dm && (dm.state === 'arrived' || (nt?.kind === 'arrive' && nt.levelId === dm.levelId && Math.hypot(nt.x - dm.x, nt.y - dm.y) < 5))) hide.add('dest')
+    const you = S.markers.get('you')
+    if (you && F && you.levelId === F.levelId && Math.hypot(you.x - F.pos.x, you.y + F.pos.z) < 1.2) hide.add('you')
+    return hide
+  }
+
+  /** Stand somewhere (flyTo, arrival framing, a step with no walker): glide there, then hold until the walker moves. */
+  function fpvHoldAt(h, durationMs) {
+    const F = S.fpv
+    F.hold = h
+    F.holdWalker = walkerKey(S.markers.get('walker'))
+    const dur = prefersReducedMotion() ? 0 : durationMs
+    if (dur > 0 && S.mounted) F.glide = { pos: F.pos.clone(), yaw: F.yaw, pitch: F.pitch, start: performance.now(), dur }
+    else F.snap = true
+    requestRender()
+  }
+
+  /**
+   * Arrival in the Walk view (DESIGN-GLASS 6.3): on the sign's normal 8 m out (more for a sign wider than the view),
+   * facing it; when the corridor in front is narrower (a shop facing the atrium void), turned along the corridor to
+   * where the stand gets furthest (interior.arrivalStand); its centre at 25 % of the free area's height (the free area
+   * ends at the Arrived sheet), so the arrival ring at the doorstep shows above the sheet, 900 ms.
+   */
+  function fpvShopFront(p, sign, durationMs) {
+    const F = S.fpv
+    const dur = durationMs === 0 ? 0 : 900
+    if (!sign || levelOf(p.levelId)?.level.kind === 'parking') {
+      fpvHoldAt({ levelId: p.levelId, x: p.x, y: p.y, yaw: F.yaw }, dur)
+      return false
+    }
+    const fov = fpvFov()
+    const { width, height } = viewSize()
+    const tanV = Math.tan(MathUtils.degToRad(fov) / 2)
+    const st = arrivalStand(S.index, p.levelId, sign, Math.max(8, sign.width / (2 * tanV * (width / height)) + 0.5))
+    const freeH = Math.max(50, height - S.padding.top - S.padding.bottom)
+    const el = MathUtils.radToDeg(Math.atan2(sign.h - S.fpvOpts.eyeHeightM, st.d))
+    const pitch = MathUtils.clamp(el - MathUtils.radToDeg(Math.atan2(0.25 * freeH, height / 2 / tanV)), -25, 30)
+    fpvHoldAt({ levelId: p.levelId, x: st.x, y: st.y, yaw: bearingDeg(st.x, st.y, sign.x, sign.y), pitch }, dur)
+    return true
+  }
+
+  function enterFpv(view, opts) {
+    const from = currentPose()
+    const fromMap = S.mode !== 'fpv'
+    S.flight = null
+    resetControlsMomentum()
+    if (!S.fpv) S.fpv = { pos: new Vector3(), yaw: from.headingDeg, pitch: S.fpvOpts.pitchDeg, lookYaw: 0, lookPitch: 0, lookFrom: [0, 0], lookRelease: 0 }
+    const F = S.fpv
+    if (fromMap) {
+      F.mapPose = from
+      Object.assign(F, { hold: null, glide: null, rest: null, lookYaw: 0, lookPitch: 0, recenter: null, cutRide: null, rideAt: null })
+      if (!S.markers.get('walker')) F.rest = restPose(view?.levelId)
+    }
+    S.mode = 'fpv'
+    if (S.controls) S.controls.enabled = false
+    const g = fpvGoal()
+    F.levelId = g.levelId
+    F.rideConn = g.ride ?? null
+    S.focusId = g.levelId
+    S.lastView = { mode: 'fpv', levelId: g.levelId, fit: 'none' }
+    updateFpvLevels()
+    F.pos.set(g.x, g.fy + S.fpvOpts.eyeHeightM, -g.y)
+    F.yaw = g.yaw
+    F.pitch = g.pitch
+    const dur = prefersReducedMotion() ? 0 : (opts?.durationMs ?? 1100)
+    if (fromMap && dur > 0 && S.mounted) F.dive = { from, blend: S.blend, start: performance.now(), dur }
+    else {
+      F.dive = null
+      S.blend = 0
+      applyLayout()
+      F.snap = true
+    }
+    requestRender()
+  }
+
+  /** Leave the Walk view (the caller starts the rise to the map pose). */
+  function exitFpv() {
+    const F = S.fpv
+    F.dive = null
+    F.glide = null
+    if (S.controls) S.controls.enabled = true
+  }
+
+  /** Map pose to rise to when leaving the Walk view without a fit: over the walker, route-up, the last map distance. */
+  function risePose(mode, levelId) {
+    const F = S.fpv
+    const def = VIEW_DEFAULTS[mode]
+    const mp = F.mapPose
+    return {
+      target: new Vector3(F.pos.x, levelY(levelId, targetBlend(mode)), F.pos.z),
+      distance: MathUtils.clamp(mp?.distance ?? 115, 40, 140),
+      tiltDeg: mode === 'top' ? def.tiltDeg : MathUtils.clamp(mp?.tiltDeg ?? 52, TILT_MIN, TILT_MAX),
+      headingDeg: F.yaw + F.lookYaw,
+      fov: def.fov,
+    }
+  }
+
+  /**
+   * One Walk view frame: follow the walker (position tau 120 ms, heading tau 250 ms capped at 90 deg/s, aiming 5 m
+   * ahead), escalator pitch ease, lift / stairs cut, glides, the dive, and the look-around offsets.
+   * @returns {boolean} still moving
+   */
+  function stepFpv(dt, now) {
+    const F = S.fpv
+    if (!F) return false
+    const g = fpvGoal()
+    const wasCut = F.cutRide
+    F.cutRide = g.cutRide ?? null
+    if (!F.cutRide) F.rideAt = null
+    // never a camera slide through floors (DESIGN-GLASS 6.4): a jump to another level outside a ride (Next step,
+    // a step glide) or of more than 3 m (a walker seek) is a cut
+    const levelJump = F.levelId != null && g.levelId !== F.levelId && !g.ride && !F.rideConn
+    if (g.levelId !== F.levelId || (g.ride ?? null) !== F.rideConn) {
+      F.levelId = g.levelId
+      F.rideConn = g.ride ?? null
+      S.focusId = g.levelId
+      S.lastView = { mode: 'fpv', levelId: g.levelId, fit: 'none' }
+      updateFpvLevels()
+      S.route.setCurrentLevel(routeCurrentLevel())
+    }
+    const eye = new Vector3(g.x, g.fy + S.fpvOpts.eyeHeightM, -g.y)
+    const cut = (wasCut && !F.cutRide) || (!F.dive && (levelJump || (!F.glide && eye.distanceToSquared(F.pos) > 9)))
+    let moving = false
+    if (F.glide && !cut) {
+      const gl = F.glide
+      const t = Math.min(1, (now - gl.start) / gl.dur)
+      const e = easeStandard(t)
+      F.pos.lerpVectors(gl.pos, eye, e)
+      F.yaw = gl.yaw + angDelta(gl.yaw, g.yaw) * e
+      F.pitch = gl.pitch + (g.pitch - gl.pitch) * e
+      if (t >= 1) F.glide = null
+      moving = true
+    } else if (cut || F.dive || F.snap) {
+      F.glide = null
+      F.snap = false
+      F.pos.copy(eye)
+      F.yaw = g.yaw
+      F.pitch = g.pitch
+    } else {
+      const dp = eye.clone().sub(F.pos)
+      const dy = angDelta(F.yaw, g.yaw)
+      const dpi = g.pitch - F.pitch
+      if (dp.lengthSq() > 4e-6 || Math.abs(dy) > 0.02 || Math.abs(dpi) > 0.02) {
+        F.pos.addScaledVector(dp, 1 - Math.exp(-dt / 0.12))
+        F.yaw += MathUtils.clamp(dy * (1 - Math.exp(-dt / 0.25)), -90 * dt, 90 * dt)
+        F.pitch += dpi * (1 - Math.exp(-dt / 0.2))
+        moving = true
+      } else {
+        F.pos.copy(eye)
+        F.yaw = g.yaw
+        F.pitch = g.pitch
+      }
+    }
+    F.yaw = norm360(F.yaw)
+    // look-around: double-tap recentres; while the walk plays the offsets ease back 1.5 s after the finger lifts
+    if (F.recenter) {
+      const t = Math.min(1, (now - F.recenter.start) / 300)
+      const k = 1 - easeStandard(t)
+      F.lookYaw = F.recenter.from[0] * k
+      F.lookPitch = F.recenter.from[1] * k
+      if (t >= 1) F.recenter = null
+      moving = true
+    } else if (!F.drag && S.anim.on && (F.lookYaw || F.lookPitch)) {
+      const t = (now - F.lookRelease - 1500) / 600
+      const k = t >= 1 ? 0 : 1 - easeStandard(Math.max(0, t))
+      F.lookYaw = F.lookFrom[0] * k
+      F.lookPitch = F.lookFrom[1] * k
+      moving = true
+    }
+    const pose = eyePose(F.pos, F.yaw + F.lookYaw, MathUtils.clamp(F.pitch + F.lookPitch, -60, 60))
+    if (F.dive) {
+      const t = Math.min(1, (now - F.dive.start) / F.dive.dur)
+      const e = easeStandard(t)
+      F.diveE = e
+      S.blend = F.dive.blend * (1 - e)
+      applyLayout()
+      setPoseNow(lerpPose(F.dive.from, pose, e))
+      if (t >= 1) F.dive = null
+      moving = true
+    } else setPoseNow(pose)
+    return moving
+  }
+
+  // ------------------------------------------------------------------------------------------
+  // anchors (CONTRACT 3b): projection only, after a rendered frame, never a frame of their own
+  // ------------------------------------------------------------------------------------------
+
+  function computeAnchors() {
+    const cam = S.camera
+    const { width, height } = viewSize()
+    const fpv = S.mode === 'fpv'
+    // "inside the free viewport" = the canvas minus setViewportPadding (CONTRACT 3b)
+    const pad = S.padding
+    const pose = currentPose()
+    const heading = norm360(pose.headingDeg)
+    const camX = cam.position.x
+    const camY = -cam.position.z
+    const w = S.markers.get('walker')
+    const routeOn = Boolean(S.route.route)
+    // along the route from the walker; in the Walk view with no walker, from where the eye stands (stepping through)
+    const F = fpv && !w ? S.fpv : null
+    const wd = w ? S.walkerDist : routeOn && F ? (S.route.locate(F.levelId, F.pos.x, -F.pos.z, S.route.stepStartDist(S.activeStep)) ?? 0) : 0
+    const v = new Vector3()
+    const proj = (x, h, y) => {
+      v.set(x, h, -y).applyMatrix4(cam.matrixWorldInverse)
+      const depth = -v.z
+      v.applyMatrix4(cam.projectionMatrix)
+      return { sx: (v.x * 0.5 + 0.5) * width, sy: (1 - (v.y * 0.5 + 0.5)) * height, depth }
+    }
+    const point = (levelId, x, y, routeD) => {
+      if (!S.levels.has(levelId)) return { x: null, y: null, floorX: null, floorY: null, visible: false, behind: true, relBearingDeg: 0, distanceM: 0, levelId }
+      const ly = levelY(levelId)
+      const top = proj(x, ly + 2.2, y)
+      const fl = proj(x, ly + 0.05, y)
+      const behind = top.depth <= 0
+      let distanceM
+      if (routeOn && routeD != null) distanceM = Math.max(0, routeD - wd)
+      else {
+        const from = w ?? S.markers.get('you') ?? { x: pose.target.x, y: -pose.target.z }
+        distanceM = Math.hypot(x - from.x, y - from.y)
+      }
+      return {
+        x: top.sx,
+        y: top.sy,
+        floorX: fl.sx,
+        floorY: fl.sy,
+        visible: !behind && isVisible(levelId) && top.sx >= pad.left && top.sx <= width - pad.right && top.sy >= pad.top && top.sy <= height - pad.bottom,
+        behind,
+        relBearingDeg: angDelta(heading, bearingDeg(camX, camY, x, y)),
+        distanceM,
+        levelId,
+      }
+    }
+    const nt = S.nextTurn
+    const dm = S.markers.get('dest')
+    const last = S.route.route?.points.at(-1)
+    const total = S.route.totalDist()
+    let walker = null
+    if (w) {
+      const s = fpv ? null : proj(w.x, (markerWorldY('walker', w) ?? levelY(w.levelId)) + 0.3, w.y)
+      walker = { x: s ? s.sx : null, y: s ? s.sy : null, visible: Boolean(s && s.depth > 0 && isVisible(w.levelId)), headingDeg: w.headingDeg ?? 0, levelId: w.levelId, mapX: w.x, mapY: w.y }
+    }
+    return {
+      frame: S.frames,
+      mode: S.mode,
+      camera: { headingDeg: heading, pitchDeg: -pose.tiltDeg, fovDeg: cam.fov },
+      nextTurn: nt ? point(nt.levelId, nt.x, nt.y, nt.routeD) : null,
+      destination: dm ? point(dm.levelId, dm.x, dm.y, routeOn ? total : null) : last ? point(last.levelId, last.x, last.y, total) : null,
+      walker,
+    }
+  }
+
+  // ------------------------------------------------------------------------------------------
   // scene state
   // ------------------------------------------------------------------------------------------
 
@@ -874,7 +1424,7 @@ export function createEngine() {
       c.group.position.y = y0
       const rise = levelY(hi) - y0
       if (Math.abs(rise - c.rise) > 1e-4) {
-        setRise(c.mesh.geometry, rise)
+        for (const m of c.parts) setRise(m.geometry, rise)
         c.rise = rise
       }
     }
@@ -891,10 +1441,17 @@ export function createEngine() {
       const lowShown = isVisible(c.lowStop.levelId)
       const highShown = isVisible(c.highStop.levelId)
       if (c.kind === 'escalator') c.group.visible = S.mode === 'stack' ? lowShown && highShown : lowShown || highShown
+      if (c.arrows) c.arrows.visible = S.mode !== 'fpv'
       else c.group.visible = S.mode === 'stack' && c.stops.filter((st) => isVisible(st.levelId)).length >= 2
     }
-    // floor view cuts the roofs away so storefronts and interiors read; stack/top keep them
-    for (const L of S.levels.values()) if (L.roofs) L.roofs.visible = S.mode !== 'floor'
+    // floor view cuts the roofs away so storefronts and interiors read; stack/top keep them; the Walk view has its
+    // own ceilings instead
+    for (const L of S.levels.values()) {
+      if (L.roofs) L.roofs.visible = S.mode !== 'floor' && S.mode !== 'fpv'
+      if (L.interior) L.interior.visible = S.mode === 'fpv'
+      // QR floor tiles read as smears seen edge-on from eye height
+      if (L.plates) L.plates.visible = S.mode !== 'fpv'
+    }
     // stack view with a multi-floor route: every route floor above the lowest is see-through
     const fadeIds = S.mode === 'stack' && S.stackLevels ? new Set(S.stackOrder.slice(1)) : null
     for (const L of S.levels.values()) setFaded(L, Boolean(fadeIds?.has(L.id)))
@@ -907,6 +1464,7 @@ export function createEngine() {
     if (L.faded === faded) return
     L.faded = faded
     if (L.opaque) L.opaque.material = faded ? S.mats.fadeOpaque : S.mats.opaque
+    if (L.plates) L.plates.material = L.opaque?.material ?? S.mats.opaque
     if (L.roofs) L.roofs.material = faded ? S.mats.fadeOpaque : S.mats.roofs
     if (L.glass) L.glass.material = faded ? S.mats.fadeGlass : S.mats.glass
     if (L.decals) L.decals.material = faded ? S.mats.fadeDecals : S.mats.decals
@@ -922,20 +1480,31 @@ export function createEngine() {
   }
 
   function applyThemeAll() {
-    for (const g of S.themedGeometries) applyTheme(g, S.theme)
+    const P = pal()
+    const T = THEMES[P]
+    for (const g of S.themedGeometries) applyTheme(g, P)
     for (const L of S.levels.values()) {
-      if (L.bays) L.bays.userData.setTheme(S.theme)
-      if (L.floorTexts) L.floorTexts.setTextColor(THEMES[S.theme].floorPaint)
+      if (L.bays) L.bays.userData.setTheme(P)
+      if (L.floorTexts) L.floorTexts.setTextColor(T.floorPaint)
     }
-    S.route.setTheme(S.theme)
-    S.markers.setTheme(S.theme)
-    const T = THEMES[S.theme]
-    S.overlay.setColors({ text: T.labelText, halo: T.labelHalo, badgeText: T.badgeText, badgeHalo: T.badgeHalo })
+    S.route.setTheme(P)
+    S.markers.setTheme(P)
+    S.ring.setPalette(P)
+    S.sky.setPalette(P)
+    S.sky.mesh.visible = S.style === 'storm'
+    S.sheenColor.value.set(T.sheen)
+    S.sheenOn.value = S.style === 'storm' ? 1 : 0
+    for (const c of S.connectors) if (c.panels) c.panels.material = S.style === 'storm' ? S.mats.escGlass : S.mats.opaque
+    S.scene.fog.color.set(T.fog)
+    // zone colours stay the paint's; on the dark storm asphalt a lighter wash keeps them from flooding the floor
+    S.mats.decals.opacity = S.style === 'storm' ? 0.2 : 0.3
+    S.overlay.setColors({ text: T.labelText, halo: T.labelHalo, badgeText: T.badgeText, badgeHalo: T.badgeHalo, badgeW: T.badgeW })
     if (S.renderer) S.renderer.domElement.style.background = `linear-gradient(180deg, ${T.bgTop} 0%, ${T.bgBottom} 100%)`
   }
 
   function clearVenue() {
     S.flight = null
+    S.reframe = null
     S.route.clear()
     S.markers.dispose()
     S.overlay.dispose()
@@ -954,7 +1523,7 @@ export function createEngine() {
     }
     S.levels.clear()
     for (const c of S.connectors) {
-      c.mesh.geometry.dispose()
+      for (const m of c.parts) m.geometry.dispose()
       S.venueRoot.remove(c.group)
     }
     S.connectors = []
@@ -967,6 +1536,10 @@ export function createEngine() {
     S.stackLevels = null
     S.stackOrder = []
     S.destRefs = new Set()
+    S.nextTurn = null
+    S.ring.set(null)
+    S.fpvShown = new Set()
+    if (S.fpv) Object.assign(S.fpv, { hold: null, glide: null, dive: null, levelId: null, rideConn: null, cutRide: null, rideAt: null })
     pendingSync.clear()
   }
 
@@ -982,7 +1555,7 @@ export function createEngine() {
 
   function addThemedMesh(builder, material, parent, name, renderOrder = 0) {
     if (builder.isEmpty) return null
-    const g = builder.build(S.theme)
+    const g = builder.build(pal())
     S.themedGeometries.push(g)
     const mesh = new Mesh(g, material)
     mesh.name = name
@@ -1006,9 +1579,10 @@ export function createEngine() {
     L.roofs = addThemedMesh(build.roofs, S.mats.roofs, content, 'roofs-' + level.id, 0)
     L.decals = addThemedMesh(build.decals, S.mats.decals, content, 'zone-decals-' + level.id, 1)
     L.glass = addThemedMesh(build.glass, S.mats.glass, content, 'glass-' + level.id, 2)
+    L.plates = addThemedMesh(build.plates, S.mats.opaque, content, 'plates-' + level.id)
     addThemedMesh(build.ghost, S.mats.ghost, ghostGroup, 'ghost-' + level.id, 1)
     if (build.bays.length) {
-      L.bays = buildBaysMesh(build.bays, S.theme)
+      L.bays = buildBaysMesh(build.bays, pal())
       L.bays.name = 'bays-' + level.id
       content.add(L.bays)
     }
@@ -1024,7 +1598,7 @@ export function createEngine() {
     }
     L.signs = signLayer(build.signs, {}, 3)
     L.floorTexts = signLayer(build.floorTexts, {}, 3)
-    if (L.floorTexts) L.floorTexts.setTextColor(THEMES[S.theme].floorPaint)
+    if (L.floorTexts) L.floorTexts.setTextColor(THEMES[pal()].floorPaint)
     L.bayCodes = signLayer(build.bayTexts, {}, 3)
     const pins = buildPinMesh(build.pins, S.atlas)
     if (pins) {
@@ -1056,15 +1630,17 @@ export function createEngine() {
       const lowStop = sorted[0]
       const highStop = sorted[sorted.length - 1]
       let builder = null
+      let e = null
       let material = S.mats.opaque
       if (conn.type === 'escalator') {
-        builder = buildEscalator(conn, S.registry, { elevLow: elev(lowStop), elevHigh: elev(highStop), lowStop, highStop })
+        e = buildEscalator(conn, S.registry, { elevLow: elev(lowStop), elevHigh: elev(highStop), lowStop, highStop })
+        builder = e.deck
       } else if (conn.type === 'lift' && Array.isArray(conn.shaft)) {
         builder = buildLiftColumn(conn, S.registry)
         material = S.mats.glass
       }
       if (!builder || builder.isEmpty) continue
-      const g = builder.build(S.theme)
+      const g = builder.build(pal())
       S.themedGeometries.push(g)
       const mesh = new Mesh(g, material)
       mesh.name = 'connector-' + conn.id
@@ -1072,8 +1648,38 @@ export function createEngine() {
       const group = new Group()
       group.name = 'connector-' + conn.id
       group.add(mesh)
+      // escalators: balustrade panels (glass in storm, opaque in classic: applyThemeAll) and the painted arrows (map
+      // views only: applyVisibility)
+      const part = (b, order) => {
+        if (!b || b.isEmpty) return null
+        const m = new Mesh(b.build(pal()), S.mats.opaque)
+        S.themedGeometries.push(m.geometry)
+        m.renderOrder = order
+        group.add(m)
+        return m
+      }
+      const panels = part(e?.panels, 2)
+      const arrows = part(e?.arrows, 0)
       S.venueRoot.add(group)
-      S.connectors.push({ conn, kind: conn.type, group, mesh, stops, lowStop, highStop, elevLow: elev(lowStop), elevHigh: elev(highStop), rise: -1 })
+      const entry = { conn, kind: conn.type, group, mesh, panels, arrows, parts: [mesh, panels, arrows].filter(Boolean), stops, lowStop, highStop, elevLow: elev(lowStop), elevHigh: elev(highStop), rise: -1, inVoid: false, slopeDeg: 0 }
+      if (conn.type === 'escalator') {
+        // the Walk view rides an escalator only when its ramp runs inside the upper floor's void (no slab or ceiling
+        // can cut through the camera); otherwise it is treated like the stairs (a cut under the UI's card)
+        const a = lowStop.point
+        const b = highStop.point
+        const len = Math.hypot(b[0] - a[0], b[1] - a[1])
+        const landing = Math.min(1.4, len * 0.15)
+        const voids = levelVoids(S.index, highStop.levelId)
+        const near = (p, v) => pointInPolygon(p, v) || v.some((q, i) => distToSegment(p, q, v[(i + 1) % v.length]) < 0.3)
+        entry.inVoid = voids.length > 0
+        for (let k = 0; k <= 4; k++) {
+          const f = (landing + ((len - 2 * landing) * k) / 4) / Math.max(1e-6, len)
+          const p = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]
+          if (!voids.some((v) => near(p, v))) entry.inVoid = false
+        }
+        entry.slopeDeg = MathUtils.radToDeg(Math.atan2(entry.elevHigh - entry.elevLow, Math.max(1, len - 2 * landing)))
+      }
+      S.connectors.push(entry)
     }
   }
 
@@ -1251,8 +1857,19 @@ export function createEngine() {
     const polys = levelScreenPolys()
     const ordinals = new Map([...S.levels.values()].map((L) => [L.id, L.level.ordinal]))
     const v = new Vector3()
+    const fpv = S.mode === 'fpv'
+    // Walk view: a shop's sign (and a lift's or entrance's) is what the finger lands on
+    if (fpv) {
+      const idx = S.index
+      for (const sg of levelOf(S.focusId)?.build.signs ?? []) {
+        const id = sg.refId
+        const s = id && !sg.flat ? projectWorld(v.set(sg.x, levelY(S.focusId) + sg.h, -sg.y)) : null
+        if (s) consider(idx.occupantById.has(id) ? 'occupant' : idx.amenityById.has(id) ? 'amenity' : idx.connectorById.has(id) ? 'connector' : 'anchor', id, s.sx, s.sy)
+      }
+    }
     for (const p of S.pickables) {
       if (!isVisible(p.levelId)) continue
+      if (fpv && (p.levelId !== S.focusId || Math.hypot(p.x - S.camera.position.x, p.y + S.camera.position.z) > 40)) continue
       if (p.nearOnly && !near) continue
       const s = projectWorld(v.set(p.x, levelY(p.levelId) + p.h, -p.y))
       if (!s) continue
@@ -1267,7 +1884,7 @@ export function createEngine() {
     if (best) return best
     // fallback: the unit under the finger on the top-most visible level
     S.camera.updateMatrixWorld()
-    const levels = [...S.levels.values()].filter((L) => isVisible(L.id)).sort((a, b) => b.level.ordinal - a.level.ordinal)
+    const levels = [...S.levels.values()].filter((L) => isVisible(L.id) && (!fpv || L.id === S.focusId)).sort((a, b) => b.level.ordinal - a.level.ordinal)
     for (const L of levels) {
       for (const pp of S.pickPolygons) {
         if (pp.levelId !== L.id) continue
@@ -1278,29 +1895,77 @@ export function createEngine() {
     return null
   }
 
+  /** A Walk view look-around drag ends (however the gesture ended): the offsets stay (paused) or ease back (playing). */
+  function endLook() {
+    const F = S.fpv
+    if (!F?.drag) return
+    F.drag = false
+    F.lookRelease = performance.now()
+    F.lookFrom = [F.lookYaw, F.lookPitch]
+    requestRender()
+  }
+
   function onPointerDown(e) {
     cancelFlight()
     S.userMoved = true
     if (!e.isPrimary) {
+      endLook()
       S.pointer = null
       return
     }
-    S.pointer = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), multi: false }
+    S.pointer = { id: e.pointerId, x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, t: performance.now(), multi: false, drag: false }
   }
 
   function onPointerUp(e) {
     const p = S.pointer
     S.pointer = null
-    if (!p || p.id !== e.pointerId || p.multi) return
-    if (performance.now() - p.t > 600) return
+    endLook()
+    if (!p || p.id !== e.pointerId || p.multi || p.drag) return
+    const now = performance.now()
+    const F = S.mode === 'fpv' ? S.fpv : null
+    if (now - p.t > 600) return
     if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) return
+    if (F) {
+      const lt = S.lastTap
+      if (lt && now - lt.t < 320 && Math.hypot(e.clientX - lt.x, e.clientY - lt.y) < 30) {
+        // double-tap recentres the view
+        S.lastTap = null
+        F.recenter = { start: now, from: [F.lookYaw, F.lookPitch] }
+        requestRender()
+        return
+      }
+      S.lastTap = { t: now, x: e.clientX, y: e.clientY }
+    }
     const rect = S.renderer.domElement.getBoundingClientRect()
     const hit = pickAt(e.clientX - rect.left, e.clientY - rect.top)
     if (hit) for (const cb of S.pickCbs) cb(hit)
   }
 
   function onPointerMoveOther(e) {
-    if (S.pointer && e.pointerId !== S.pointer.id) S.pointer.multi = true
+    const p = S.pointer
+    if (!p) return
+    if (e.pointerId !== p.id) {
+      p.multi = true
+      endLook()
+      return
+    }
+    const F = S.mode === 'fpv' ? S.fpv : null
+    if (!F || p.multi) return endLook()
+    // Walk view: one-finger drag looks around (0.25 deg/px yaw, 0.2 deg/px pitch); no pan, no zoom, no inertia
+    if (!p.drag && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8) p.drag = F.drag = true
+    if (p.drag) {
+      F.recenter = null
+      const yaw = F.lookYaw - (e.clientX - p.lx) * 0.25
+      F.lookYaw = S.anim.on ? MathUtils.clamp(yaw, -100, 100) : angDelta(0, yaw)
+      F.lookPitch = MathUtils.clamp(F.lookPitch + (e.clientY - p.ly) * 0.2, -25, 25)
+      requestRender()
+    }
+    p.lx = e.clientX
+    p.ly = e.clientY
+  }
+
+  function onVisibility() {
+    if (document.visibilityState === 'visible') requestRender()
   }
 
   function onWheel() {
@@ -1353,6 +2018,8 @@ export function createEngine() {
         S.controls.zoomSpeed = 1.1
         S.controls.rotateSpeed = 0.6
         if (S.flightTarget) S.controls.target.copy(S.flightTarget)
+        // a deep link can enter the Walk view before the canvas mounts: no orbit / pan / zoom there (CONTRACT 3b)
+        S.controls.enabled = S.mode !== 'fpv'
         S.controls.addEventListener('change', requestRender)
         S.controls.addEventListener('start', () => {
           cancelFlight()
@@ -1361,9 +2028,18 @@ export function createEngine() {
         el.addEventListener('pointerdown', onPointerDown)
         el.addEventListener('pointerup', onPointerUp)
         el.addEventListener('pointermove', onPointerMoveOther)
-        el.addEventListener('pointercancel', () => (S.pointer = null))
+        el.addEventListener('pointercancel', () => {
+          endLook()
+          S.pointer = null
+        })
         el.addEventListener('wheel', onWheel, { passive: true })
-        el.addEventListener('webglcontextrestored', () => requestRender())
+        // the cloud texture lives in a render target: after a context loss it comes back empty, draw it again
+        el.addEventListener('webglcontextrestored', () => {
+          S.sky.invalidate()
+          requestRender()
+        })
+        // the chevron flow pauses on a hidden page and resumes when it shows again
+        if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility)
         applyControlLimits()
         applyThemeAll()
       }
@@ -1380,7 +2056,7 @@ export function createEngine() {
         S.renderer.setSize(width, height, false)
         S.camera.aspect = width / height
         updateClip()
-        if (!S.userMoved && S.lastView && S.index) {
+        if (!S.userMoved && S.lastView && S.index && S.mode !== 'fpv') {
           const pose = viewPose(S.lastView.mode, S.lastView.levelId, S.lastView.fit)
           setPoseNow(pose)
         }
@@ -1424,6 +2100,7 @@ export function createEngine() {
       S.atlas = createIconAtlas((index.venue.parking?.zones ?? []).map((z) => ({ id: z.id, color: z.color, icon: z.icon })))
       const b = index.venue.meta?.bounds
       S.bounds = b ? { ...b } : { minX: 0, minY: 0, maxX: 128, maxY: 64 }
+      S.levelH.value = floorToFloor()
       for (const level of index.levels) buildLevel(level)
       buildConnectors()
       S.overlay.setLanguage(S.lang)
@@ -1472,6 +2149,12 @@ export function createEngine() {
      */
     setView(view, opts = {}) {
       if (S.failed || !S.index) return
+      if (view?.mode === 'fpv') {
+        enterFpv(view, opts)
+        return
+      }
+      const leaving = S.mode === 'fpv'
+      if (leaving) exitFpv()
       const mode = view?.mode === 'floor' || view?.mode === 'top' ? view.mode : 'stack'
       const levelId = view?.levelId && S.levels.has(view.levelId) ? view.levelId : S.focusId
       const fit = view?.fit ?? 'level'
@@ -1482,7 +2165,8 @@ export function createEngine() {
       applyControlLimits()
       const toBlend = targetBlend(mode)
       let pose
-      if (fit === 'none') {
+      if (fit === 'none' && leaving) pose = risePose(mode, levelId)
+      else if (fit === 'none') {
         const cur = currentPose()
         pose = { ...cur, target: new Vector3(cur.target.x, levelY(levelId, toBlend), cur.target.z), fov: VIEW_DEFAULTS[mode].fov }
         if (mode === 'top') pose.tiltDeg = VIEW_DEFAULTS.top.tiltDeg
@@ -1491,10 +2175,13 @@ export function createEngine() {
         pose = viewPose(mode, levelId, fit)
       }
       startFlight(pose, opts.durationMs ?? 1200, toBlend)
+      // the rise out of the Walk view: fog and the sky dome fade out with it
+      if (leaving && S.flight) S.flight.fromFpv = true
     },
 
     /** @returns {{ mode: string, levelId: string|null, blend: number, stackLevels: string[]|null }} */
     getView() {
+      if (S.mode === 'fpv') return { mode: 'fpv', levelId: S.focusId, blend: 0, stackLevels: null }
       return { mode: S.mode, levelId: S.focusId, blend: S.blend, stackLevels: S.stackLevels ? [...S.stackOrder] : null }
     },
 
@@ -1530,6 +2217,9 @@ export function createEngine() {
         S.stackLevels = null
         S.stackOrder = []
       }
+      if (!route) api.setNextTurn(null)
+      else if (S.nextTurn) S.nextTurn.routeD = S.route.locate(S.nextTurn.levelId, S.nextTurn.x, S.nextTurn.y)
+      if (S.fpv) S.fpv.rest = null
       applyVisibility()
       S.route.setProgress(-1, 0)
       S.route.setCurrentLevel(routeCurrentLevel())
@@ -1554,6 +2244,17 @@ export function createEngine() {
       // the landmark and the lift / escalator the step names always show (PLAN.md 19.2)
       const st = i >= 0 ? r.steps[i] : null
       S.overlay.stepForced = new Set([st?.landmark?.id, st?.connector?.id].filter(Boolean))
+      if (S.mode === 'fpv') {
+        // Walk view: no map flight; with no walker the eye glides to the step's start, facing along it
+        S.fpv.rest = null
+        S.route.setCurrentLevel(routeCurrentLevel())
+        if (i >= 0 && opts.fly !== false && !S.markers.get('walker')) {
+          const h = stepStand(i)
+          if (h) fpvHoldAt(h, opts.durationMs ?? 900)
+        }
+        requestRender()
+        return
+      }
       if (i < 0) {
         S.route.setCurrentLevel(routeCurrentLevel())
         requestRender()
@@ -1643,13 +2344,21 @@ export function createEngine() {
         S.trimEnd = trim
         S.route.setTrimEnd(trim)
       }
+      const F = S.mode === 'fpv' ? S.fpv : null
+      if (F && kind === 'walker') {
+        // a held pose (arrival framing, flyTo) lasts until the walker moves again; a walker that goes away leaves
+        // the eye where it stands
+        if (value && F.hold && walkerKey(value) !== F.holdWalker) F.hold = null
+        if (!value && S.markers.get('walker')) F.hold = { levelId: F.levelId, x: F.pos.x, y: -F.pos.z, yaw: F.yaw, pitch: F.pitch }
+      }
+      if (F && kind === 'you') F.rest = null
       S.markers.set(kind, value)
       if (kind === 'walker') {
         if (value && S.route.route) {
           // search from where the current step starts: after Next / Back the walker may be far from where it was
           const base = S.activeStep >= 0 ? S.route.stepStartDist(S.activeStep) : 0
           const hint = Math.max(base, S.walkerDist)
-          const d = S.route.project(value.levelId, value.x, value.y, hint)
+          const d = S.route.project(value.levelId, value.x, value.y, hint, value.connectorId)
           if (d != null && d >= hint - 0.5 && d - hint < 40) S.walkerDist = Math.max(hint, d)
           S.route.setProgress(S.activeStep, Math.max(base, S.walkerDist))
         } else if (!value) {
@@ -1657,7 +2366,7 @@ export function createEngine() {
           const base = S.activeStep >= 0 ? S.route.stepStartDist(S.activeStep) : 0
           S.route.setProgress(S.activeStep, base)
         }
-        if (value && S.follow && S.mode !== 'stack' && value.levelId !== S.focusId && S.levels.has(value.levelId)) {
+        if (value && S.follow && S.mode !== 'stack' && S.mode !== 'fpv' && value.levelId !== S.focusId && S.levels.has(value.levelId)) {
           S.focusId = value.levelId
           S.lastView = { mode: S.mode, levelId: value.levelId, fit: 'none' }
           applyVisibility()
@@ -1674,6 +2383,12 @@ export function createEngine() {
     flyTo(p, durationMs = 1200) {
       if (S.failed || !S.index || !p) return
       S.userMoved = true
+      if (S.mode === 'fpv') {
+        // Walk view: the eye moves to the point, facing headingDeg when given
+        const lid = p.levelId && S.levels.has(p.levelId) ? p.levelId : S.fpv.levelId
+        fpvHoldAt({ levelId: lid, x: p.x, y: p.y, yaw: p.headingDeg ?? S.fpv.yaw }, durationMs)
+        return
+      }
       if (S.mode !== 'stack' && p.levelId && p.levelId !== S.focusId && S.levels.has(p.levelId)) {
         S.focusId = p.levelId
         S.lastView = { mode: S.mode, levelId: p.levelId, fit: 'none' }
@@ -1705,6 +2420,7 @@ export function createEngine() {
       if (S.failed || !S.index || !p) return false
       const L = levelOf(p.levelId)
       const best = nearestShopSign(p.levelId, p.x, p.y, 9)
+      if (S.mode === 'fpv') return fpvShopFront(p, best, durationMs)
       if (S.mode === 'stack') return false
       if (!best || L.level.kind === 'parking') {
         api.flyTo({ levelId: p.levelId, x: p.x, y: p.y, distance: 45, tiltDeg: 50, clear: [{ x: p.x, y: p.y, pin: true }] }, durationMs)
@@ -1730,7 +2446,11 @@ export function createEngine() {
       // the arrival ring on the floor in front of the door stays above the sheet, the sign below the header
       const ring = S.markers.get('dest')
       const signPos = new Vector3(best.x, levelY(p.levelId, 0) + best.h, -best.y)
-      const half = () => Math.min(150, (best.width / 2) * (k / distance))
+      // the text is what must read (on a 360 px phone the whole sign box can be wider than the gap between the View
+      // control and the level picker)
+      const ink = L.signs?.inkWidth(best) ?? null
+      const textW = Math.min(best.width, ink ?? best.width)
+      const half = () => Math.min(150, (textW / 2) * (k / distance))
       // the sign is what must read; the ring in front of the door is shown when it fits (soft)
       const ringKey = ring && ring.levelId === p.levelId ? keyPoint(ring.levelId, ring.x, ring.y, { pin: ring.state !== 'arrived' }) : null
       const ringItem = ringKey ? { ...ringKey, soft: true } : null
@@ -1757,6 +2477,9 @@ export function createEngine() {
       }
       S.userMoved = true
       startFlight(pose, durationMs, targetBlend(S.mode))
+      // the sign's text is not typeset yet (a deep link right after loading): frame it again once it is measured,
+      // unless the camera has been moved since (watchSync)
+      S.reframe = ink == null ? { p, to: pose } : null
       return true
     },
 
@@ -1774,6 +2497,12 @@ export function createEngine() {
       const f = [Math.sin(h), Math.cos(h)]
       const w = bay.w ?? 2.5
       const l = bay.l ?? 5
+      if (S.mode === 'fpv') {
+        // Walk view: stand in the aisle 6 m from the bay mouth, facing into the bay (code and car in view)
+        const k = l / 2 + 6
+        fpvHoldAt({ levelId: bay.levelId, x: bay.x - f[0] * k, y: bay.y - f[1] * k, yaw: bay.angleDeg ?? 0, pitch: -14 }, durationMs)
+        return
+      }
       const code = [bay.x - f[0] * (l / 2 - 1.0), bay.y - f[1] * (l / 2 - 1.0)]
       const car = [bay.x + f[0] * CAR_BACK_M, bay.y + f[1] * CAR_BACK_M]
       const def = VIEW_DEFAULTS[S.mode === 'stack' ? 'floor' : S.mode]
@@ -1812,6 +2541,98 @@ export function createEngine() {
     },
 
     requestRender,
+
+    /**
+     * Scene style (CONTRACT 3b): 'storm' (v0.2 default: storm sky, cool architecture, floor sheen, fresnel glass,
+     * desaturated sign boxes) or 'classic' (the v0.1 look exactly). Recolours in place, no rebuild.
+     * @param {'storm'|'classic'} style
+     */
+    setSceneStyle(style) {
+      S.style = style === 'classic' ? 'classic' : 'storm'
+      if (S.failed) return
+      applyThemeAll()
+      requestRender()
+    },
+
+    /** @returns {'storm'|'classic'} */
+    getSceneStyle() {
+      return S.style
+    },
+
+    /** @param {'glow'|'ribbon'} style the v0.2 glowing path (default) or the v0.1 ribbon */
+    setPathStyle(style) {
+      S.route.setStyle(style)
+      requestRender()
+    },
+
+    /**
+     * Chevrons flow (flowMps m/s, default 1.8, 0.3..6) and the target ring ripples only while on; the engine then
+     * renders every frame (only while mounted, with a route, on a visible page; never under reduced motion). Off:
+     * static chevrons and render-on-demand again (idle = 0 frames).
+     * @param {boolean} on
+     * @param {{ flowMps?: number }} [opts]
+     */
+    setPathAnimating(on, opts = {}) {
+      S.anim.on = Boolean(on)
+      const f = Number(opts?.flowMps)
+      if (Number.isFinite(f)) S.anim.flow = MathUtils.clamp(f, 0.3, 6)
+      if (S.anim.on && S.fpv) {
+        S.fpv.lookRelease = performance.now()
+        S.fpv.lookFrom = [S.fpv.lookYaw, S.fpv.lookPitch]
+      }
+      requestRender()
+    },
+
+    /**
+     * Target ring + beam at the next turn (and the nextTurn anchor). kind 'arrive' = destination colour. The label is
+     * drawn beside the ring in Floor and 2D only. null removes it.
+     * @param {{ levelId: string, x: number, y: number, label?: {en: string, ar: string}, kind?: 'turn'|'connector'|'arrive' } | null} p
+     */
+    setNextTurn(p) {
+      if (S.failed) return
+      const t = p && S.levels.has(p.levelId) && Number.isFinite(p.x) && Number.isFinite(p.y) ? { levelId: p.levelId, x: p.x, y: p.y, kind: p.kind ?? 'turn' } : null
+      if (t) t.routeD = S.route.locate(t.levelId, t.x, t.y, S.walkerDist)
+      S.nextTurn = t
+      S.ring.set(t)
+      S.overlay.setTurnLabel(t && p.label ? { levelId: t.levelId, x: t.x, y: t.y, text: p.label } : null)
+      if (S.renderer) S.overlay.sync()
+      requestRender()
+    },
+
+    /**
+     * Walk view camera (partial update): eye height 1.2..2 m, vertical fov 50..85 deg (reduced so the horizontal fov
+     * stays <= 80 deg), pitch -25..5 deg.
+     * @param {{ eyeHeightM?: number, fovDeg?: number, pitchDeg?: number }} o
+     */
+    setFpvOptions(o = {}) {
+      for (const [k, [lo, hi]] of Object.entries(FPV_CLAMPS)) {
+        const v = Number(o?.[k])
+        if (Number.isFinite(v)) S.fpvOpts[k] = MathUtils.clamp(v, lo, hi)
+      }
+      if (S.fpv) S.fpv.rest = null
+      requestRender()
+    },
+
+    /** @returns {{ eyeHeightM: number, fovDeg: number, pitchDeg: number }} */
+    getFpvOptions() {
+      return { ...S.fpvOpts }
+    },
+
+    /**
+     * Screen anchors after every rendered frame (next turn, destination, walker, camera heading). Called only when a
+     * frame renders; never causes one. Returns an unsubscribe function.
+     * @param {(a: object) => void} cb
+     */
+    onAnchors(cb) {
+      S.anchorCbs.add(cb)
+      return () => S.anchorCbs.delete(cb)
+    },
+
+    /** Anchors for the current camera (those of the last rendered frame unless something moved since). No render. */
+    getAnchors() {
+      S.camera.updateMatrixWorld()
+      return computeAnchors()
+    },
 
     /** @returns {EngineStats} */
     getStats() {
@@ -1903,26 +2724,17 @@ export function createEngine() {
 
     /** Current camera pose (for tests and deep links). */
     getCameraPose() {
+      if (S.mode === 'fpv' && S.fpv) {
+        const F = S.fpv
+        return { x: F.pos.x, y: -F.pos.z, distance: 0, tiltDeg: F.pitch + F.lookPitch, headingDeg: norm360(F.yaw + F.lookYaw), levelId: F.levelId, eye: true }
+      }
       const p = currentPose()
       return { x: p.target.x, y: -p.target.z, distance: p.distance, tiltDeg: p.tiltDeg, headingDeg: p.headingDeg }
     },
 
-    /** Read-only handles for debugging and tests (not part of the app contract). */
+    /** The engine state, for debugging and tests only (not part of the app contract; do not write to it). */
     get debug() {
-      return {
-        scene: S.scene,
-        markerScene: S.markerScene,
-        camera: S.camera,
-        renderer: S.renderer,
-        materials: S.mats,
-        levels: S.levels,
-        overlay: S.overlay,
-        markers: S.markers,
-        route: S.route,
-        padding: padFor(S.blend),
-        obstacles: S.obstacles,
-        project: (levelId, x, y, h = 0) => projectWorld(new Vector3(x, levelY(levelId) + h, -y)),
-      }
+      return S
     },
 
     /** Free every GPU resource and the WebGL context. The instance cannot be used afterwards. */
@@ -1933,6 +2745,8 @@ export function createEngine() {
       S.overlay.dispose()
       S.route.dispose()
       S.markers.dispose()
+      S.sky.dispose()
+      S.ring.dispose()
       for (const m of Object.values(S.mats)) m.dispose()
       S.atlas?.dispose()
       S.atlas = null
@@ -1947,8 +2761,20 @@ export function createEngine() {
       disposeTree(S.markerScene)
       S.pickCbs.clear()
       S.renderCbs.clear()
+      S.anchorCbs.clear()
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility)
       S.disposed = true
     },
+  }
+  // commands (set*, show*, fly*) sent from inside a frame callback (onRender / onAnchors) run in a microtask after
+  // that frame
+  for (const k of Object.keys(api).filter((n) => /^(set|show|fly)/.test(n))) {
+    const f = api[k]
+    api[k] = (...args) => {
+      if (!S.inCb) return f(...args)
+      queueMicrotask(() => f(...args))
+      return undefined
+    }
   }
   return api
 }

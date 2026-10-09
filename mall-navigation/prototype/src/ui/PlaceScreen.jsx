@@ -1,5 +1,5 @@
 import { forwardRef } from 'react'
-import { formatDistance, formatDuration, t } from '../i18n/strings.js'
+import { formatDistance, formatDuration, formatMinutesParts, t } from '../i18n/strings.js'
 import { Icon } from './icons.jsx'
 import { Sheet } from './Sheet.jsx'
 import { hoursLine, levelName, pick, viaLine } from './model.js'
@@ -12,6 +12,7 @@ export const PlaceScreen = forwardRef(function PlaceScreen({ index, lang, info, 
   if (!info) return null
   const hours = info.hours ? hoursLine(index, info.hours, lang) : null
   const via = route ? viaLine(route, lang) : null
+  const eta = route ? formatMinutesParts(route.etaS, lang) : null
   // lifts and stairs serve several levels: name the level the route takes you to
   const levelId = info.levelId ?? route?.points[route.points.length - 1]?.levelId ?? null
   return (
@@ -35,7 +36,7 @@ export const PlaceScreen = forwardRef(function PlaceScreen({ index, lang, info, 
           <h2 className="title">{pick(info.name, lang)}</h2>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             {info.categoryLabelKey ? (
-              <span className="cat-chip" style={{ background: info.color }}>
+              <span className="cat-chip" style={{ background: info.color, '--cat-c': info.color }}>
                 <Icon name={info.icon} size={18} />
                 {t(info.categoryLabelKey, lang)}
               </span>
@@ -45,23 +46,23 @@ export const PlaceScreen = forwardRef(function PlaceScreen({ index, lang, info, 
         </div>
       </div>
 
-      <div className="facts mt-4">
-        {route ? (
-          <>
-            <span className="fact">
-              <Icon name="walk" size={22} />
-              <span className="nowrap font-semibold">{formatDuration(route.etaS, lang)}</span>
-            </span>
-            <span className="fact nowrap text-ink-2">{formatDistance(route.lengthM, lang)}</span>
-          </>
-        ) : null}
-        {hours ? (
-          <span className={`fact ${hours.ok ? 'open-ok' : 'open-closed'}`}>
-            <Icon name="clock" size={20} />
-            {hours.text}
+      {route ? (
+        // light hero numerals ("2" + "min walk"); the accessible name keeps the spoken form ("about 2 min")
+        <p className="place-eta mt-4" aria-label={`${formatDuration(route.etaS, lang)} · ${formatDistance(route.lengthM, lang)}`}>
+          <span className="nowrap" aria-hidden="true">
+            <span className="num-hero">{eta.value}</span> <span className="eta-unit">{t('hud.minWalk', lang)}</span>
           </span>
-        ) : null}
-      </div>
+          <span className="num-card eta-dist nowrap" aria-hidden="true">
+            {formatDistance(route.lengthM, lang)}
+          </span>
+        </p>
+      ) : null}
+      {hours ? (
+        <p className={`fact mt-2 ${hours.ok ? 'open-ok' : 'open-closed'}`}>
+          <Icon name="clock" size={20} />
+          {hours.text}
+        </p>
+      ) : null}
       {route && (via || you) ? (
         <p className="caption mt-1">
           {you ? t('place.from', lang, { place: pick(you.label, lang) }) : null}

@@ -35,22 +35,24 @@ import { drawableText } from './textGuard.js'
 import { iconUv } from './icons.js'
 import { pointInPolygon } from './geometry.js'
 
+// aShift: CSS px (x right, y down), a pin slid out from under a control; clip.z: always in front (occlusion is
+// decided on the CPU)
 const PIN_VERT = /* glsl */ `
 attribute vec2 aCorner;
 attribute vec2 aUv;
 attribute float aVis;
-attribute vec2 aShift; // CSS px (x right, y down): a pin slid out from under a control
+attribute vec2 aShift;
 uniform vec2 uViewport;
 uniform float uSize;
 varying vec2 vUv;
 varying float vVis;
-void main() {
-  vec4 clip = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  clip.xy += (aCorner * uSize + vec2(aShift.x, -aShift.y)) * 2.0 / uViewport * clip.w;
-  clip.z = -clip.w * 0.999; // always in front: occlusion is decided on the CPU
-  gl_Position = clip;
-  vUv = aUv;
-  vVis = aVis;
+void main(){
+vec4 clip=projectionMatrix*modelViewMatrix*vec4(position,1.0);
+clip.xy+=(aCorner*uSize+vec2(aShift.x,-aShift.y))*2.0/uViewport*clip.w;
+clip.z=-clip.w*0.999;
+gl_Position=clip;
+vUv=aUv;
+vVis=aVis;
 }
 `
 
@@ -59,12 +61,12 @@ uniform sampler2D uAtlas;
 uniform float uOpacity;
 varying vec2 vUv;
 varying float vVis;
-void main() {
-  if (vVis < 0.5) discard;
-  vec4 c = texture2D(uAtlas, vUv);
-  if (c.a < 0.03) discard;
-  gl_FragColor = vec4(c.rgb, c.a * uOpacity);
-  #include <colorspace_fragment>
+void main(){
+if(vVis<0.5)discard;
+vec4 c=texture2D(uAtlas,vUv);
+if(c.a<0.03)discard;
+gl_FragColor=vec4(c.rgb,c.a*uOpacity);
+#include <colorspace_fragment>
 }
 `
 
@@ -253,9 +255,7 @@ export class OverlayLayer {
       t.anchorY = 'middle'
       t.textAlign = 'center'
       t.direction = lang === 'ar' ? 'rtl' : 'ltr'
-      const badge = spec.type === 'level' || spec.type === 'mbadge'
-      t.outlineWidth = badge ? 0.26 : 0.17
-      t.outlineBlur = badge ? 0.02 : 0.0
+      t.outlineBlur = spec.type === 'level' || spec.type === 'mbadge' ? 0.02 : 0.0
       t.scale.setScalar(0)
       this.batch.addText(t)
       return t
@@ -269,6 +269,23 @@ export class OverlayLayer {
     this.labels.push(item)
     this._colorItem(item)
     return item
+  }
+
+  /**
+   * The next-turn label beside the target ring (engine setNextTurn): always shown in Floor and 2D, never in the
+   * stacked Overview or the Walk view (the UI's bubble names it there). null removes it.
+   * @param {{ levelId: string, x: number, y: number, text: {en: string, ar: string} } | null} spec
+   */
+  setTurnLabel(spec) {
+    const i = this.labels.findIndex((l) => l.type === 'turn')
+    if (i >= 0) {
+      for (const m of Object.values(this.labels[i].members)) {
+        this.batch.removeText(m)
+        m.dispose()
+      }
+      this.labels.splice(i, 1)
+    }
+    if (spec) this.addLabel({ id: 'lbl-turn', type: 'turn', h: 0, priority: 0, px: 14, offsetPx: 30, ...spec })
   }
 
   /** @param {Mesh} mesh @param {string} levelId */
@@ -290,6 +307,7 @@ export class OverlayLayer {
     for (const m of Object.values(it.members)) {
       m.color = badge ? this.colors.badgeText : this.colors.text
       m.outlineColor = badge ? this.colors.badgeHalo : this.colors.halo
+      m.outlineWidth = badge ? (this.colors.badgeW ?? 0.26) : 0.17
     }
   }
 
@@ -304,7 +322,7 @@ export class OverlayLayer {
    * @param {import('three').PerspectiveCamera} ctx.camera
    * @param {number} ctx.width   CSS px
    * @param {number} ctx.height  CSS px
-   * @param {'stack'|'floor'|'top'} ctx.mode
+   * @param {'stack'|'floor'|'top'|'fpv'} ctx.mode   in 'fpv' (Walk view) only the always-shown pins and names
    * @param {boolean} [ctx.rtl]  Arabic: level labels sit at the right-hand slab edges
    * @param {(levelId:string)=>number} ctx.levelY      world y of a level floor
    * @param {(levelId:string)=>boolean} ctx.isVisible   level content shown
@@ -321,6 +339,7 @@ export class OverlayLayer {
    */
   update(ctx) {
     const { camera, width, height, mode } = ctx
+    const fpv = mode === 'fpv'
     const lang = this.lang
     const tanHalf = Math.tan((camera.fov * Math.PI) / 360)
     const pxToWorld = (depth) => (2 * depth * tanHalf) / height
@@ -346,6 +365,11 @@ export class OverlayLayer {
       for (const id of ids) if (id && this.stepForced.has(id)) return 1
       return 0
     }
+    // Walk view: only the forced pins and names, and not the step's lift / escalator / landmark when it stands within
+    // 3 m of the next-turn ring, nor the destination's own name on the last step (the UI's turn bubble and turn card
+    // already name it, and so does its sign: one marker per turn)
+    const T = ctx.turnAt
+    const skip = (f, x, y) => fpv && (!f || (T && (f < 2 ? Math.hypot(x - T.x, y - T.y) < 3 : T.kind === 'arrive')))
     /**
      * The smallest move [dx, dy] (CSS px, at most maxPx) that takes a rect out from under the controls and in from
      * the screen edges (and off `avoid`), or null.
@@ -407,6 +431,7 @@ export class OverlayLayer {
         if (!s || !inView(s.sx, s.sy, size)) return
         if (ctx.isOccluded(pm.levelId, s.sx, s.sy)) return
         const f = forcedOf(p.id)
+        if (skip(f, p.x, p.y)) return
         const important = f > 0 || scanPin
         let rect = [s.sx - size * 0.42, s.sy - size, size * 0.84, size]
         let shift = [0, 0]
@@ -461,7 +486,10 @@ export class OverlayLayer {
       const modes = it.modes ?? 'all'
       if (modes === 'stack' && mode !== 'stack') continue
       if (modes === 'flat' && mode === 'stack') continue
-      const f = forcedOf(it.refOccupantId, it.pickId, it.id)
+      const turn = it.type === 'turn'
+      if (turn && mode !== 'floor' && mode !== 'top') continue
+      const f = turn ? 1 : forcedOf(it.refOccupantId, it.pickId, it.id)
+      if (skip(f, it.x, it.y)) continue
       if (mode === 'stack' && it.priority < 3 && !f) continue
       // arrival: the shop's own sign is in view and names it
       if (f === 2 && this.destAnchor?.noLabel) continue
@@ -550,13 +578,16 @@ export class OverlayLayer {
       if (!c.forced && hits(c.rect, placed)) continue
       if (c.forced && c.kind === 'label') {
         // two always-shown names (the destination and the step's landmark) never sit on each other: the later one
-        // moves just below or above the earlier one
+        // moves just below or above the earlier one (pulled in from the screen edge when it pokes out)
         const q = hits(c.rect, forcedPlaced)
         if (q) {
+          const dx = Math.min(Math.max(c.rect[0], 5), width - 5 - c.rect[2]) - c.rect[0]
           for (const dy of [q[1] + q[3] + 2 - c.rect[1], q[1] - 2 - (c.rect[1] + c.rect[3])]) {
-            const r = [c.rect[0], c.rect[1] + dy, c.rect[2], c.rect[3]]
+            const r = [c.rect[0] + dx, c.rect[1] + dy, c.rect[2], c.rect[3]]
             if (!free(r) || hits(r, forcedPlaced)) continue
             c.rect = r
+            c.sx += dx
+            c.shiftPx += dx
             c.sy += dy
             c.shiftYPx += dy
             break
@@ -618,7 +649,7 @@ export class OverlayLayer {
       it.activeMember = m
       it.sx = c.sx
       it.sy = c.sy
-      if (it.type !== 'level' && it.type !== 'mbadge') this.visibleTargets.push({ type: it.pickType ?? it.type, id: it.pickId ?? it.id, sx: c.sx, sy: c.sy })
+      if (it.type !== 'level' && it.type !== 'mbadge' && it.type !== 'turn') this.visibleTargets.push({ type: it.pickType ?? it.type, id: it.pickId ?? it.id, sx: c.sx, sy: c.sy })
     }
     // members changed transforms: the batch reads member matrices when it renders
     this.batch.updateMatrixWorld(true)

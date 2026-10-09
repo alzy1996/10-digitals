@@ -1,11 +1,11 @@
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
-import { t } from '../i18n/strings.js'
+import { formatDuration, formatMinutesParts, t } from '../i18n/strings.js'
 import { CATEGORY_COLORS, PIN_COLORS } from '../engine/tokens.js'
 import { resolveTarget, travelTimesFrom } from '../routing/route.js'
 import { TILE_IDS } from '../search/search.js'
 import { Icon } from './icons.jsx'
 import { Sheet } from './Sheet.jsx'
-import { TILE_STYLE, entityInfo, levelButtonLabel, levelName, pick, shortDuration } from './model.js'
+import { TILE_STYLE, entityInfo, levelButtonLabel, levelName, pick } from './model.js'
 
 const CATEGORY_ICON = {
   fashion: 'fashion', food: 'food', cafe: 'cafe', electronics: 'electronics', beauty: 'beauty', kids: 'kids',
@@ -79,7 +79,7 @@ export const SearchScreen = forwardRef(function SearchScreen(
           <Icon name="back" size={24} className="flip-rtl" />
         </button>
         {filtered ? (
-          <h2 className="flex-1 min-w-0 truncate text-[20px] leading-7 font-bold">{title}</h2>
+          <h2 className="list-title">{title}</h2>
         ) : (
           <label className="search-box flex-1 min-w-0">
             <Icon name="search" size={22} />
@@ -144,7 +144,7 @@ function Suggestions({ lang, onTile, label }) {
       <div className="flex flex-wrap gap-2">
         {TILE_IDS.map((id) => (
           <button key={id} type="button" className="chip" onClick={() => onTile(id)}>
-            <span className="grid place-items-center w-7 h-7 rounded-lg text-white" style={{ background: TILE_STYLE[id].color }}>
+            <span className="grid place-items-center w-7 h-7 rounded-full text-white" style={{ background: TILE_STYLE[id].color }}>
               <Icon name={TILE_STYLE[id].icon} size={18} />
             </span>
             {t(`tile.${id}`, lang)}
@@ -152,6 +152,17 @@ function Suggestions({ lang, onTile, label }) {
         ))}
       </div>
     </div>
+  )
+}
+
+/** Walking minutes as light numerals ("3" + "min"); read out as "about 3 min". */
+function Minutes({ seconds, lang }) {
+  const m = formatMinutesParts(seconds, lang)
+  return (
+    <span className="row-mins nowrap" aria-label={formatDuration(seconds, lang)}>
+      <b aria-hidden="true">{m.value}</b>
+      <small aria-hidden="true">{m.unit}</small>
+    </span>
   )
 }
 
@@ -186,8 +197,12 @@ function ResultRow({ index, lang, result, onClick }) {
         <span className="row-sub block">{sub}</span>
       </span>
       <span className="row-end">
-        {info.levelId ? <span className="level-badge">{levelButtonLabel(index, info.levelId, lang)}</span> : null}
-        {result.etaS != null ? <span className="nowrap">{shortDuration(result.etaS, lang)}</span> : null}
+        {info.levelId ? (
+          <span className="level-badge" title={levelName(index, info.levelId, lang)}>
+            <bdi dir="ltr">{levelButtonLabel(index, info.levelId, lang)}</bdi>
+          </span>
+        ) : null}
+        {result.etaS != null ? <Minutes seconds={result.etaS} lang={lang} /> : null}
       </span>
     </button>
   )

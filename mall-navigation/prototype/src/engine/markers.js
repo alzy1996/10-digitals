@@ -70,8 +70,11 @@ function flatRing(r0, r1, color, opacity = 1, segs = 48) {
   return new Mesh(g, m)
 }
 
-/** A flat wedge (heading cone) pointing along -Z (north) in local space. */
-function headingWedge(len, halfAngleDeg, color, opacity) {
+/**
+ * A flat wedge (heading cone) pointing along -Z (north) in local space. `fade`: radial gradient from `opacity` at the
+ * tip to 0 at the rim (storm style, DESIGN-GLASS.md 5.9).
+ */
+function headingWedge(len, halfAngleDeg, color, opacity, fade = false) {
   const a = (halfAngleDeg * Math.PI) / 180
   const g = new BufferGeometry()
   const segs = 12
@@ -84,7 +87,12 @@ function headingWedge(len, halfAngleDeg, color, opacity) {
   for (let i = 1; i <= segs; i++) idx.push(0, i + 1, i)
   g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3))
   g.setIndex(idx)
-  const m = new MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: DoubleSide })
+  if (fade) {
+    const col = []
+    for (let i = 0; i <= segs + 1; i++) col.push(color.r, color.g, color.b, i ? 0 : opacity)
+    g.setAttribute('color', new BufferAttribute(new Float32Array(col), 4))
+  }
+  const m = new MeshBasicMaterial(fade ? { vertexColors: true, transparent: true, depthWrite: false, side: DoubleSide } : { color, transparent: true, opacity, depthWrite: false, side: DoubleSide })
   return new Mesh(g, m)
 }
 
@@ -144,9 +152,12 @@ function buildMarker(kind, state, theme) {
   const heading = new Group()
   g.add(heading)
   let radius = 1.2
-  if (kind === 'you') {
-    const you = themeColor(theme, 'you')
-    const ring = themeColor(theme, 'youRing')
+  // storm: the simulated walker looks like you (blue puck, white ring, gradient heading cone); the UI's
+  // SIMULATION tag says what it is (DESIGN-GLASS.md 5.9)
+  const storm = String(theme).startsWith('storm')
+  if (kind === 'you' || (kind === 'walker' && storm)) {
+    const you = themeColor(theme, kind === 'walker' ? 'walker' : 'you')
+    const ring = themeColor(theme, kind === 'walker' ? 'walkerOutline' : 'youRing')
     if (state === 'lastSeen') {
       const c = themeColor(theme, 'lastSeen')
       g.add(flatDisc(0.9, c, 0.35))
@@ -157,14 +168,14 @@ function buildMarker(kind, state, theme) {
       g.add(flatDisc(1.7, you, 0.18))
       radius = 2.2
     } else {
-      g.add(flatDisc(2.6, you, 0.16))
+      g.add(flatDisc(storm ? 2.4 : 2.6, you, storm ? 0.22 : 0.16))
       const base = new CylinderGeometry(1.2, 1.2, 0.28, 40)
       base.translate(0, 0.14, 0)
       g.add(new Mesh(bake(base, ring, 0.85), new MeshBasicMaterial({ vertexColors: true })))
       const puck = new CylinderGeometry(0.88, 0.88, 0.42, 40)
       puck.translate(0, 0.21, 0)
       g.add(new Mesh(bake(puck, you, 0.8), new MeshBasicMaterial({ vertexColors: true })))
-      const wedge = headingWedge(3.2, 32, you, 0.32)
+      const wedge = storm ? headingWedge(3.6, 30, you, 0.55, true) : headingWedge(3.2, 32, you, 0.32)
       wedge.position.y = 0.06
       heading.add(wedge)
       radius = 1.25
@@ -195,18 +206,26 @@ function buildMarker(kind, state, theme) {
     const cabin = new BoxGeometry(1.42, 0.56, 1.85)
     cabin.translate(0, 1.22, 0.2)
     const matV = new MeshBasicMaterial({ vertexColors: true })
-    heading.add(outlineOf(body, dark, 0.08))
-    heading.add(outlineOf(cabin, dark, 0.08))
+    heading.add(outlineOf(body, dark, 0.05))
+    heading.add(outlineOf(cabin, dark, 0.05))
     heading.add(new Mesh(bake(body, amber, 0.72), matV))
     heading.add(new Mesh(bake(cabin, amber.clone().multiplyScalar(0.92), 0.72), matV))
-    // windscreen + headlights (front = -Z)
+    // tinted windows all round the cabin (a band a little proud of it), windscreen, head and tail lights (front = -Z)
+    const win = new BoxGeometry(1.46, 0.3, 1.89)
+    win.translate(0, 1.27, 0.2)
+    heading.add(new Mesh(win, new MeshBasicMaterial({ color: 0x1b2733 })))
     const glass = new BoxGeometry(1.26, 0.38, 0.06)
     glass.translate(0, 1.24, -0.74)
     heading.add(new Mesh(glass, new MeshBasicMaterial({ color: dark })))
     for (const x of [-0.55, 0.55]) {
-      const hl = new BoxGeometry(0.38, 0.18, 0.06)
-      hl.translate(x, 0.7, -1.82)
-      heading.add(new Mesh(hl, new MeshBasicMaterial({ color: 0xffffff })))
+      for (const [z, c] of [
+        [-1.82, 0xffffff],
+        [1.82, 0xd7263d],
+      ]) {
+        const l = new BoxGeometry(0.38, 0.16, 0.06)
+        l.translate(x, 0.72, z)
+        heading.add(new Mesh(l, new MeshBasicMaterial({ color: c })))
+      }
     }
     for (const x of [-0.88, 0.88]) {
       for (const z of [-1.12, 1.12]) {
@@ -297,6 +316,8 @@ export class MarkerLayer {
    * @param {(levelId:string)=>boolean} ctx.isVisible
    * @param {(m:{levelId:string,x:number,y:number})=>number|null} ctx.elevationOverride world y or null
    * @param {(worldPos:Vector3)=>number} ctx.pxPerMeter
+   * @param {boolean} [ctx.fpv]          Walk view: markers keep their true size (only the minimum size applies)
+   * @param {Set<string>} [ctx.hidden]   kinds not drawn (the walker in the Walk view: the camera is the walker)
    */
   layout(ctx) {
     for (const [kind, it] of Object.entries(this.items)) {
@@ -304,7 +325,7 @@ export class MarkerLayer {
       const v = it.value
       const g = it.group
       const yOverride = ctx.elevationOverride(kind, v)
-      g.visible = ctx.isVisible(v.levelId) || yOverride != null
+      g.visible = (ctx.isVisible(v.levelId) || yOverride != null) && !ctx.hidden?.has(kind)
       const y = yOverride ?? ctx.levelY(v.levelId)
       g.position.set(v.x, y + 0.03, -v.y)
       const h = typeof v.headingDeg === 'number' ? v.headingDeg : 0
@@ -314,7 +335,7 @@ export class MarkerLayer {
       const rpx = Math.max(1e-6, g.userData.radius * ppm)
       const [minPx, maxPx] = MARKER_PX[kind] ?? [14, 30]
       // never smaller than true size until it would drop under minPx; never larger on screen than maxPx
-      const s = Math.min(8, Math.max(1, minPx / rpx), Math.max(0.05, maxPx / rpx))
+      const s = ctx.fpv ? Math.min(8, Math.max(1, minPx / rpx)) : Math.min(8, Math.max(1, minPx / rpx), Math.max(0.05, maxPx / rpx))
       g.scale.setScalar(s)
       it.screenRadius = rpx * s
     }

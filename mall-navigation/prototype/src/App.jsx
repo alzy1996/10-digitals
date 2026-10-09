@@ -8,8 +8,14 @@
  * Engine use: the singleton engine (src/engine/engine.js) is driven imperatively from effects and event
  * handlers; React never re-renders the 3D scene. The engine is a lazy chunk (src/engineHost.js): the sheet
  * renders at once and engine calls made before the chunk arrives are queued.
+ *
+ * v0.2 (DESIGN-GLASS.md, CONTRACT.md 3b): storm glass look, and the first-person **Walk view** (`view.mode === 'fpv'`):
+ * the simulated walk seen at eye height inside the 3D model (a SIMULATION, never camera AR or live positioning). It is
+ * the default view while "Simulate walk" plays; the Map button in its bottom bar goes back to the overhead map (the
+ * walk keeps playing there). In the Walk view the navigate sheet and the header give way to the HUD (src/ui/WalkHud.jsx,
+ * a lazy chunk), the engine follows the walker by itself, and the HUD measures the free area for the engine.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from 'react'
 import { engine, loadEngine } from './engineHost.js'
 import { loadVenue } from './data/venue.js'
 import { findRouteToTarget, resolveTarget, travelTimesFrom } from './routing/route.js'
@@ -17,7 +23,7 @@ import { createSearch } from './search/search.js'
 import { createSimulator } from './sim/simulator.js'
 import { dirFor, t } from './i18n/strings.js'
 import { Header } from './ui/Header.jsx'
-import { MapControls } from './ui/MapControls.jsx'
+import { MapControls, WalkViewButton } from './ui/MapControls.jsx'
 import { MapView } from './ui/MapView.jsx'
 import { HomeScreen } from './ui/HomeScreen.jsx'
 import { SearchScreen } from './ui/SearchScreen.jsx'
@@ -29,6 +35,11 @@ import { ScanSheet } from './ui/ScanSheet.jsx'
 import { bayForPlate, entityInfo, isParkingLevel, levelButtonLabel, levelName, pick } from './ui/model.js'
 import { plateLabel } from './routing/names.js'
 import { initialLang, readUrlParams, rememberLang } from './ui/urlState.js'
+import { nextTurnFor } from './ui/hudModel.js'
+
+/** The Walk view HUD loads on demand (it is not part of the first screen: PLAN.md 19.2 load budget). */
+const loadWalkHud = () => import('./ui/WalkHud.jsx')
+const WalkHud = lazy(loadWalkHud)
 
 const VENUE_URL = `${import.meta.env.BASE_URL}venues/demo-muscat/venue.json`
 /** Camera while following the simulated walker: about 35 m of route visible above the step card. */
@@ -37,6 +48,8 @@ const TOAST_MS = 3200
 /** How long "Route ended · Undo" stays (PLAN.md section 9: undo instead of "Are you sure?"). */
 const UNDO_MS = 5000
 const ROUTE_SCREENS = new Set(['place', 'navigate', 'arrived'])
+/** Browser theme colour per theme (DESIGN-GLASS.md 2.1): storm retail / parking. */
+const THEME_COLOR = { sunlight: '#0E1418', basement: '#070A0D' }
 
 const INITIAL = {
   ready: false,
@@ -94,6 +107,42 @@ function stepLevelOf(route, i) {
   return step ? route.points[Math.max(0, step.from)]?.levelId : null
 }
 
+/**
+ * Where the Walk view stands for a step before the walk plays: the step's start (a zero-length "Start at" step: the
+ * next step's), facing along the first leg of the route that is at least 4 m long. A short jog out of a doorway would
+ * otherwise turn the narrow first-person view away from where the walk really goes: on the demo route, the route point
+ * 5 m ahead (the follow camera's rule once the walk plays) is the corner 3 m out of the south entrance, and facing it
+ * shows the Lift A wall instead of the corridor, the escalator and the fountain the step says to face (QA round 1,
+ * compared at the -5° pitch). The cost is one short glance toward that corner when Play is pressed.
+ * @returns {{ levelId: string, x: number, y: number, headingDeg: number } | null}
+ */
+function walkStand(route, i) {
+  const steps = route?.steps ?? []
+  let k = Math.max(0, Math.min(steps.length - 1, i))
+  while (steps[k + 1] && steps[k].to <= steps[k].from) k++
+  const step = steps[k]
+  if (!step) return null
+  const pts = route.points
+  const a = pts[Math.max(0, step.from)]
+  let heading = null
+  let first = null
+  let run = 0
+  for (let j = Math.max(0, step.from); j < pts.length - 1 && run < 15; j++) {
+    const p = pts[j]
+    const q = pts[j + 1]
+    if (p.levelId !== a.levelId || q.levelId !== a.levelId) break
+    const len = Math.hypot(q.x - p.x, q.y - p.y)
+    const b = (Math.atan2(q.x - p.x, q.y - p.y) * 180) / Math.PI
+    if (len > 0.3 && first == null) first = b
+    if (len >= 4) {
+      heading = b
+      break
+    }
+    run += len
+  }
+  return { levelId: a.levelId, x: a.x, y: a.y, headingDeg: ((heading ?? first ?? 0) + 360) % 360 }
+}
+
 export default function App() {
   const [state, dispatch] = useReducer(reducer, INITIAL, (s) => ({ ...s, lang: initialLang(readUrlParams().lang) }))
   const stateRef = useRef(state)
@@ -103,14 +152,28 @@ export default function App() {
   const pendingRef = useRef({ step: null, simT: null, play: false })
   const simRef = useRef(null)
   const simMeta = useRef({ step: -1, level: null, lastUi: 0, doneTimer: 0, phase: null })
+  /** "Simulate walk" from a map view: the walk starts once the dive into the Walk view is over. */
+  const startTimer = useRef(0)
   const topRef = useRef(null)
   const sheetRef = useRef(null)
   const shownRouteRef = useRef(undefined)
   const toastTimer = useRef(0)
   const undoTimer = useRef(0)
   const undoRef = useRef(null)
+  /** The map view to go back to from the Walk view (DESIGN-GLASS 7.3 Map button: default Floor). */
+  const mapModeRef = useRef('floor')
+  /** "Simulate walk" opens the Walk view unless the shopper went back to the map during this trip. */
+  const walkPrefRef = useRef(true)
+  /** The Walk view HUD's measured layout (padding + obstacles), merged with the Arrived sheet on arrival. */
+  const walkLayoutRef = useRef(null)
+  const layoutRef = useRef(null)
 
   const patch = useCallback((p) => dispatch({ type: 'patch', patch: p }), [])
+  /** View state, also written to stateRef at once so simulator callbacks in the same tick see the new mode. */
+  const setViewState = useCallback((p) => {
+    stateRef.current = { ...stateRef.current, view: { ...stateRef.current.view, ...p } }
+    dispatch({ type: 'view', patch: p })
+  }, [])
   const index = state.ready ? indexRef.current : null
   const { lang, screen, you, car, view } = state
 
@@ -135,7 +198,9 @@ export default function App() {
         if (scr === 'car') levelId = carLevel ?? parkingTop ?? levelId
         if (p.level && idx.levelById.has(p.level)) levelId = p.level
         const defaultMode = scr === 'car' || scr === 'navigate' || scr === 'arrived' ? 'floor' : 'stack'
-        pendingRef.current = { step: p.step, simT: p.simT, play: p.play }
+        // the Walk view needs a route (navigate / arrived); elsewhere view=fpv opens the Floor view
+        const urlView = p.view === 'fpv' && scr !== 'navigate' && scr !== 'arrived' ? 'floor' : p.view
+        pendingRef.current = { step: p.step, simT: p.simT, play: p.play, style: p.style }
         dispatch({
           type: 'patch',
           patch: {
@@ -148,8 +213,8 @@ export default function App() {
             stepFree: p.stepFree,
             query: p.q ?? '',
             tile: p.tile && ['food', 'restrooms', 'prayer', 'pharmacy', 'kids', 'exit'].includes(p.tile) ? p.tile : null,
-            view: { mode: p.view ?? defaultMode, levelId },
-            userView: Boolean(p.view),
+            view: { mode: urlView ?? defaultMode, levelId },
+            userView: Boolean(urlView),
             carStage: carNow ? 'card' : 'scan',
           },
         })
@@ -195,6 +260,10 @@ export default function App() {
   useEffect(() => {
     if (!index) return
     engine.setVenue(index)
+    // v0.2 storm glass by default; ?style=classic is the v0.1 look exactly (classic scene + v0.1 ribbon)
+    const style = pendingRef.current.style === 'classic' ? 'classic' : 'storm'
+    engine.setSceneStyle(style)
+    engine.setPathStyle(style === 'classic' ? 'ribbon' : 'glow')
     shownRouteRef.current = undefined
     // the engine starts in its own default view: apply ours (from the URL or defaults) right away
     const v = stateRef.current.view
@@ -213,7 +282,7 @@ export default function App() {
   useEffect(() => {
     engine.setTheme(theme)
     document.documentElement.dataset.theme = theme
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'basement' ? '#0B0F14' : '#FFFFFF')
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[theme])
   }, [theme])
 
   useEffect(() => {
@@ -245,6 +314,30 @@ export default function App() {
     engine.setMarker('dest', last && !destIsCar ? { levelId: last.levelId, x: last.x, y: last.y, ...(screen === 'arrived' ? { state: 'arrived' } : {}) } : null)
   }, [index, shownRoute, destIsCar, screen])
 
+  // v0.2 target ring + beam at the next turn (CONTRACT 3b setNextTurn; DESIGN-GLASS 7.6): the end of the current step
+  // (a connector step: where you board it; while riding an escalator: where you step off), none on Arrived. A lift or
+  // the stairs keep it at the boarding stop on this floor until the step changes at the exit (the Walk view does not
+  // draw the other floor while you wait at the doors)
+  const stepIndex = state.stepIndex
+  const riding = Boolean(state.sim.active && state.sim.onConnector && state.sim.connectorType === 'escalator')
+  useEffect(() => {
+    if (!index) return
+    if (screen !== 'navigate' || !shownRoute) {
+      engine.setNextTurn(null)
+      return
+    }
+    const nt = nextTurnFor(index, shownRoute, stepIndex)
+    const st = shownRoute.steps[stepIndex]
+    const exit = riding && st?.kind === 'connector' ? shownRoute.points[st.connector?.exitIndex ?? st.to] : null
+    engine.setNextTurn(nt && exit ? { ...nt, levelId: exit.levelId, x: exit.x, y: exit.y } : nt)
+  }, [index, shownRoute, screen, stepIndex, riding])
+
+  // chevrons flow (and the engine renders frames) only while the simulated walk plays; idle = 0 frames otherwise
+  const animating = Boolean(screen === 'navigate' && state.sim.active && state.sim.playing && !state.sim.done)
+  useEffect(() => {
+    engine.setPathAnimating(animating, { flowMps: 1.2 * state.sim.speed + 0.6 })
+  }, [animating, state.sim.speed])
+
   // QR plate pins while a scan sheet asks the shopper to tap the plate in front of them
   const scanPins = screen === 'scan' ? true : screen === 'car' && state.carStage !== 'card' ? ['parking_pillar'] : null
   const scanKey = Array.isArray(scanPins) ? scanPins.join(',') : String(scanPins)
@@ -255,25 +348,47 @@ export default function App() {
   }, [index, scanKey])
 
   // ------------------------------------------------------------------ toasts ("Now on Level 1")
-  const showToast = useCallback((levelId) => {
+  const showToast = useCallback((levelId, ms = TOAST_MS) => {
     const idx = indexRef.current
     if (!idx) return
     clearTimeout(toastTimer.current)
     patch({ toast: { levelId, key: Date.now() } })
-    toastTimer.current = setTimeout(() => patch({ toast: null }), TOAST_MS)
+    toastTimer.current = setTimeout(() => patch({ toast: null }), ms)
   }, [patch])
   useEffect(
     () => () => {
       clearTimeout(toastTimer.current)
       clearTimeout(undoTimer.current)
+      clearTimeout(startTimer.current)
     },
     [],
   )
 
   // ------------------------------------------------------------------ camera helpers
   const goView = useCallback((mode, levelId, fit = 'level', opts) => {
-    dispatch({ type: 'view', patch: { mode, levelId } })
+    setViewState({ mode, levelId })
     engine.setView({ mode, levelId, fit }, opts)
+  }, [setViewState])
+
+  /**
+   * Arrival framing: face the shop's sign so both lines read (or look into the car's bay from the aisle). The engine
+   * does it the first-person way in the Walk view (DESIGN-GLASS 6.3) and the map way elsewhere.
+   */
+  const frameArrival = useCallback((durationMs = 1200) => {
+    const r = routeRef.current
+    const idx = indexRef.current
+    const s = stateRef.current
+    if (!r || !idx) return
+    const last = r.points[r.points.length - 1]
+    const target = s.targetId ? resolveTarget(idx, s.targetId) : null
+    if (target?.type === 'bay') {
+      // at the car: look into its bay from the aisle, the painted code upright and in front of the car
+      const bay = idx.bayById.get(s.targetId)
+      engine.flyToBay({ levelId: bay.levelId, x: bay.center[0], y: bay.center[1], angleDeg: bay.angleDeg, w: bay.w, l: bay.l }, durationMs)
+    } else {
+      // at a shop: face its front, close enough to read the sign (PLAN.md 19.2 arrival)
+      engine.flyToShopFront({ levelId: last.levelId, x: last.x, y: last.y }, durationMs)
+    }
   }, [])
 
   /** Show one navigation step: highlight it and fly the camera (route-up). */
@@ -284,6 +399,15 @@ export default function App() {
     const step = r.steps[i]
     if (!step) return
     const level = stepLevelOf(r, i)
+    if (s.view.mode === 'fpv') {
+      // Walk view: no map flight; the eye glides to the step's start, facing along it (while a walk is loaded the
+      // engine stands on the walker instead)
+      if (level !== s.view.levelId) setViewState({ levelId: level })
+      const stand = simRef.current ? null : walkStand(r, i)
+      engine.setActiveStep(i, stand ? { fly: false } : undefined)
+      if (stand) engine.flyTo(stand, 900)
+      return
+    }
     // Step view: the floor of the step (or 2D). The stacked Overview is one tap away and stays if picked.
     const mode = s.userView ? s.view.mode : s.view.mode === 'top' ? 'top' : 'floor'
     if (mode === 'stack') {
@@ -298,11 +422,11 @@ export default function App() {
       return
     }
     if (mode !== s.view.mode || level !== s.view.levelId) {
-      dispatch({ type: 'view', patch: { mode, levelId: level } })
+      setViewState({ mode, levelId: level })
       engine.setView({ mode, levelId: level, fit: 'none' })
     }
     engine.setActiveStep(i)
-  }, [goView])
+  }, [goView, setViewState])
 
   // ------------------------------------------------------------------ simulator
   // While riding, the walker carries the simulator's own height and connector: the engine never guesses
@@ -318,22 +442,27 @@ export default function App() {
   const handleSim = useCallback((s) => {
     const meta = simMeta.current
     const sim = simRef.current
-    engine.setMarker('walker', walkerValue(s))
     const playing = Boolean(sim?.isPlaying())
-    const stacked = stateRef.current.view.mode === 'stack'
-    if (s.stepIndex !== meta.step) {
+    const mode = stateRef.current.view.mode
+    const newStep = s.stepIndex !== meta.step
+    // the step first, then the walker: the engine measures the walked distance from where the step starts (the Walk
+    // view looks 5 m ahead of that distance)
+    if (newStep) {
       meta.step = s.stepIndex
       engine.setActiveStep(s.stepIndex, { fly: false })
-      // the follow camera re-frames on a new step; the Overview keeps its own framing
-      if (playing && !stacked) engine.flyTo({ levelId: s.levelId, x: s.x, y: s.y, headingDeg: s.headingDeg, ...FOLLOW }, 900)
+    }
+    engine.setMarker('walker', walkerValue(s))
+    if (newStep) {
+      // the map follow camera re-frames on a new step; the Overview keeps its own framing, the Walk view follows by itself
+      if (playing && mode !== 'stack' && mode !== 'fpv') engine.flyTo({ levelId: s.levelId, x: s.x, y: s.y, headingDeg: s.headingDeg, ...FOLLOW }, 900)
       dispatch({ type: 'patch', patch: { stepIndex: s.stepIndex } })
     }
     // a new floor is announced when the shopper steps off the lift / escalator / stairs, not while riding
     if (s.levelId !== meta.level && !s.onConnector) {
       const prev = meta.level
       meta.level = s.levelId
-      dispatch({ type: 'view', patch: { levelId: s.levelId } })
-      if (prev) showToast(s.levelId)
+      setViewState({ levelId: s.levelId })
+      if (prev && !meta.silent) showToast(s.levelId)
     }
     const now = performance.now()
     if (now - meta.lastUi > 150 || s.done || s.phase !== meta.phase) {
@@ -345,13 +474,15 @@ export default function App() {
       })
     }
     if (s.done && !playing && !meta.doneTimer && stateRef.current.screen === 'navigate' && stateRef.current.sim.playing) {
+      // Walk view: turn to face the shop's sign (or the car's bay) as the walk ends, then the Arrived sheet comes up
+      if (mode === 'fpv') frameArrival(900)
       meta.doneTimer = setTimeout(() => {
         meta.doneTimer = 0
         engine.setFollow(false)
         if (stateRef.current.screen === 'navigate') dispatch({ type: 'patch', patch: { screen: 'arrived' } })
       }, 900)
     }
-  }, [showToast])
+  }, [showToast, setViewState, frameArrival])
 
   const ensureSim = useCallback(() => {
     if (simRef.current) return simRef.current
@@ -366,6 +497,7 @@ export default function App() {
 
   const stopSim = useCallback(() => {
     const sim = simRef.current
+    clearTimeout(startTimer.current)
     clearTimeout(simMeta.current.doneTimer)
     simMeta.current.doneTimer = 0
     if (!sim) return
@@ -379,7 +511,25 @@ export default function App() {
   const playSim = useCallback(() => {
     const r = routeRef.current
     if (!r) return
+    clearTimeout(startTimer.current)
     const fresh = !simRef.current
+    const st0 = stateRef.current
+    if (fresh && st0.view.mode !== 'fpv' && walkPrefRef.current && !st0.no3d) {
+      // a walk that has not started yet opens the Walk view first: dive in at the step's start facing along the route,
+      // then start walking (diving straight onto a walker that is turning out of a doorway would face a wall)
+      const stand = walkStand(r, st0.stepIndex)
+      mapModeRef.current = st0.view.mode
+      engine.setFollow(false)
+      setViewState({ mode: 'fpv', levelId: stand?.levelId ?? stepLevelOf(r, st0.stepIndex) })
+      engine.setView({ mode: 'fpv', levelId: stand?.levelId })
+      if (stand) engine.flyTo(stand, 0)
+      const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+      startTimer.current = setTimeout(() => {
+        const s = stateRef.current
+        if (routeRef.current === r && !simRef.current && s.screen === 'navigate' && s.view.mode === 'fpv') playSimRef.current()
+      }, reduced ? 0 : 1150)
+      return
+    }
     const sim = ensureSim()
     if (fresh) sim.seekStep(stateRef.current.stepIndex)
     if (sim.getState().done) {
@@ -388,15 +538,79 @@ export default function App() {
       dispatch({ type: 'patch', patch: { stepIndex: 0 } })
     }
     const s = sim.getState()
-    const v = stateRef.current.view
-    const mode = v.mode === 'stack' ? 'floor' : v.mode
-    dispatch({ type: 'view', patch: { mode, levelId: s.levelId } })
-    engine.setView({ mode, levelId: s.levelId, fit: 'none' })
-    engine.flyTo({ levelId: s.levelId, x: s.x, y: s.y, headingDeg: s.headingDeg, ...FOLLOW }, 1000)
-    engine.setFollow(true)
+    const st = stateRef.current
+    const v = st.view
+    if (v.mode === 'fpv' || (walkPrefRef.current && !st.no3d)) {
+      // v0.2: the walk plays in the first-person Walk view (the engine follows the walker by itself)
+      if (v.mode !== 'fpv') {
+        mapModeRef.current = v.mode
+        engine.setFollow(false)
+        engine.setView({ mode: 'fpv', levelId: s.levelId })
+      }
+      setViewState({ mode: 'fpv', levelId: s.levelId })
+    } else {
+      // the overhead map follows the walker (v0.1)
+      const mode = v.mode === 'stack' ? 'floor' : v.mode
+      setViewState({ mode, levelId: s.levelId })
+      engine.setView({ mode, levelId: s.levelId, fit: 'none' })
+      engine.flyTo({ levelId: s.levelId, x: s.x, y: s.y, headingDeg: s.headingDeg, ...FOLLOW }, 1000)
+      engine.setFollow(true)
+    }
     dispatch({ type: 'sim', patch: { active: true, playing: true, done: false } })
     sim.play()
-  }, [ensureSim])
+  }, [ensureSim, setViewState])
+  const playSimRef = useRef(playSim)
+  playSimRef.current = playSim
+
+  /** Into the first-person Walk view (the "Walk view" pill, the View menu's 4th row). */
+  const enterWalk = useCallback(() => {
+    const s = stateRef.current
+    const r = routeRef.current
+    if (!r || s.no3d || s.view.mode === 'fpv') return
+    walkPrefRef.current = true
+    mapModeRef.current = s.view.mode
+    const sim = simRef.current
+    const level = sim ? sim.getState().levelId : s.screen === 'arrived' ? r.points[r.points.length - 1].levelId : stepLevelOf(r, s.stepIndex)
+    engine.setFollow(false)
+    setViewState({ mode: 'fpv', levelId: level })
+    patch({ userView: true })
+    engine.setView({ mode: 'fpv', levelId: level })
+    if (s.screen === 'arrived') frameArrival()
+    else if (!sim) {
+      const stand = walkStand(r, s.stepIndex)
+      if (stand) engine.flyTo(stand, 900)
+    }
+  }, [patch, setViewState, frameArrival])
+
+  /**
+   * Back from the Walk view to the overhead map (bottom bar Map, the mini-map, the Arrived Map button, the View menu).
+   * Only a chosen map (the Map buttons, the View menu) makes "Simulate walk" stay on the map for the rest of the trip;
+   * a tap on the mini-map (`{ via: 'dome' }`) only looks at it.
+   */
+  const leaveWalk = useCallback((opts) => {
+    const s = stateRef.current
+    const r = routeRef.current
+    if (s.view.mode !== 'fpv') return
+    if (opts?.via !== 'dome') walkPrefRef.current = false
+    clearTimeout(startTimer.current)
+    const sim = simRef.current
+    const playing = Boolean(sim?.isPlaying())
+    let mode = mapModeRef.current
+    if (mode === 'fpv' || (mode === 'stack' && (playing || s.screen === 'arrived'))) mode = 'floor'
+    patch({ userView: true })
+    if (s.screen === 'arrived' && r) {
+      const last = r.points[r.points.length - 1]
+      setViewState({ mode, levelId: last.levelId })
+      engine.setView({ mode, levelId: last.levelId, fit: 'none' })
+      frameArrival()
+      return
+    }
+    const level = sim ? sim.getState().levelId : s.view.levelId
+    setViewState({ mode, levelId: level })
+    // the rise out of the Walk view ends over the walker, route-up; while the walk plays the map follows it again
+    engine.setView({ mode, levelId: level, fit: mode === 'stack' ? 'route' : 'none' })
+    if (playing) engine.setFollow(true)
+  }, [patch, setViewState, frameArrival])
 
   const pauseSim = useCallback(() => {
     simRef.current?.pause()
@@ -415,29 +629,53 @@ export default function App() {
   }, [screen, stopSim])
   useEffect(() => {
     stopSim()
+    // a new trip: "Simulate walk" opens the Walk view again
+    walkPrefRef.current = true
   }, [route, stopSim])
   useEffect(() => () => simRef.current?.dispose(), [])
 
   // ------------------------------------------------------------------ viewport padding (free map area) + UI obstacles
+  // the floating "Walk view" pill (navigate, map views): DESIGN-GLASS 7.5
+  const walkPill = Boolean(index && route && screen === 'navigate' && view.mode !== 'fpv' && !state.no3d)
   useLayoutEffect(() => {
     if (!index) return undefined
     const update = () => {
+      const s = stateRef.current
+      const fpv = s.view.mode === 'fpv'
+      const wl = fpv ? walkLayoutRef.current : null
+      const sheet = sheetRef.current
+      if (fpv && !sheet) {
+        // Walk view: the HUD measures the free area between its top column and the dome (WalkHud onLayout)
+        if (wl) {
+          engine.setViewportPadding(wl.padding)
+          engine.setScreenObstacles(wl.obstacles)
+        }
+        return
+      }
       const top = topRef.current
       const header = top?.querySelector('.header')
-      const topPx = header ? header.getBoundingClientRect().bottom + 8 : 0
-      const sheet = sheetRef.current
+      // Arrived on a map: the shop's sign must read whole, so the free area starts under the View control too (on a
+      // 360 px phone the wide sign otherwise frames behind it; the level picker is an obstacle below)
+      const vc = !fpv && s.screen === 'arrived' ? top?.querySelector('.view-ctrl')?.getBoundingClientRect() : null
+      // (Arrived in the Walk view: the HUD's SIMULATION row on top, the Arrived sheet at the bottom)
+      const topPx = fpv ? (wl?.padding.top ?? 0) : header ? Math.max(header.getBoundingClientRect().bottom, vc && vc.height > 0 ? vc.bottom : 0) + 8 : 0
       // layout box of the sheet (offset*, not getBoundingClientRect: the sheet slides in with a transform)
       const sheetRect = sheet ? { left: sheet.offsetLeft, top: sheet.offsetTop, width: sheet.offsetWidth, height: sheet.offsetHeight } : null
-      const bottomPx = sheet ? sheet.offsetHeight + 8 : 0
+      const appEl = document.querySelector('.app')
+      // sheets float 12 px above the bottom edge: everything below the sheet's top is taken
+      const bottomPx = sheetRect ? (appEl?.clientHeight ?? window.innerHeight) - sheetRect.top + 8 : 0
+      document.documentElement.style.setProperty('--sheet-top', `${Math.round(sheetRect ? sheetRect.top : window.innerHeight * 0.7)}px`)
       const levels = top?.querySelector('.levels')
-      // the level picker never runs under the sheet: compact buttons, then scrolling inside the space above it
+      const pill = document.querySelector('.walk-pill')
+      const pillRect = pill?.getBoundingClientRect()
+      // the level picker never runs under the sheet (nor the Walk view pill below it): compact buttons, then scrolling
       if (levels) {
         // (viewport coordinates: the app is fixed to the viewport; 16 px left for the "more levels" chevron)
-        const room = Math.floor((sheetRect ? sheetRect.top : window.innerHeight) - levels.getBoundingClientRect().top - 16)
+        const floor = Math.min(sheetRect ? sheetRect.top : window.innerHeight, pillRect && pillRect.height > 0 ? pillRect.top - 4 : Infinity)
+        const room = Math.floor(floor - levels.getBoundingClientRect().top - 16)
         levels.classList.toggle('levels-compact', room < 226)
         levels.style.maxHeight = `${Math.max(104, room)}px`
       }
-      document.documentElement.style.setProperty('--sheet-top', `${Math.round(sheetRect ? sheetRect.top : window.innerHeight * 0.7)}px`)
       const rtl = document.documentElement.dir === 'rtl'
       const host = document.querySelector('.map-layer')?.getBoundingClientRect() ?? { left: 0, top: 0, right: window.innerWidth }
       // the level picker's column at the end edge (measured: wider screens centre the controls)
@@ -447,8 +685,8 @@ export default function App() {
       // clear of the View control and the picker by the engine (clearOfUi), using the obstacles below
       engine.setViewportPadding({ top: topPx, bottom: bottomPx, left: rtl ? Math.max(side, 0) : 0, right: rtl ? 0 : Math.max(side, 0) })
       // screen areas covered by UI: labels and pins on the map keep out of them
-      const appRect = document.querySelector('.app')?.getBoundingClientRect() ?? { left: 0, top: 0 }
-      const rects = []
+      const appRect = appEl?.getBoundingClientRect() ?? { left: 0, top: 0 }
+      const rects = wl ? [...wl.obstacles] : []
       const add = (el) => {
         if (!el) return
         const r = el.getBoundingClientRect()
@@ -457,9 +695,11 @@ export default function App() {
       add(header)
       add(top?.querySelector('.view-ctrl'))
       add(levels)
+      add(pill)
       if (sheetRect) rects.push({ x: appRect.left + sheetRect.left - host.left, y: appRect.top + sheetRect.top - host.top - 6, w: sheetRect.width, h: sheetRect.height + 6 })
       engine.setScreenObstacles(rects)
     }
+    layoutRef.current = update
     update()
     if (typeof ResizeObserver === 'undefined') return undefined
     const ro = new ResizeObserver(update)
@@ -470,13 +710,33 @@ export default function App() {
       ro.disconnect()
       window.removeEventListener('resize', update)
     }
-  }, [index, screen, state.carStage, state.plateId, lang, state.sim.active, state.no3d])
+  }, [index, screen, state.carStage, state.plateId, lang, state.sim.active, state.no3d, view.mode, walkPill])
+
+  /** The Walk view HUD reports its layout (free area + obstacles); the App forwards it to the engine. */
+  const onWalkLayout = useCallback((layout) => {
+    walkLayoutRef.current = layout
+    layoutRef.current?.()
+  }, [])
+  // the engine's anchors drive the turn bubble and the mini-map (stable functions: one subscription each)
+  const onAnchors = useCallback((cb) => engine.onAnchors(cb), [])
+  const getAnchors = useCallback(() => engine.getAnchors(), [])
+  // fetch the Walk view chunk while the shopper reads the first step, so the HUD is there when the walk starts
+  useEffect(() => {
+    if (screen === 'navigate' && !state.no3d) loadWalkHud().catch(() => {})
+  }, [screen, state.no3d])
 
   // ------------------------------------------------------------------ camera per screen
   useEffect(() => {
     if (!index) return
-    const s = stateRef.current
+    let s = stateRef.current
     const r = routeRef.current
+    if (s.view.mode === 'fpv' && screen !== 'navigate' && screen !== 'arrived') {
+      // the Walk view belongs to a trip: any other screen rises back to the map view it came from
+      const mode = mapModeRef.current === 'fpv' ? 'floor' : mapModeRef.current
+      setViewState({ mode })
+      engine.setView({ mode, levelId: s.view.levelId, fit: 'none' })
+      s = stateRef.current
+    }
     switch (screen) {
       case 'home': {
         if (s.you) goView(s.view.mode, s.you.levelId, 'level')
@@ -503,12 +763,32 @@ export default function App() {
         else if (pending.step != null) i = Math.min(pending.step, r.steps.length - 1)
         if (pending.simT != null) {
           const sim = ensureSim()
-          const st = sim.seekTime(pending.simT)
+          // walk up to that time in 1 s steps, as playback would, so the engine's walked distance follows the walker;
+          // "Now on Level 1" only when the deep link lands within the toast's time after stepping off
+          const T = Math.max(0, pending.simT)
+          let changedAt = -Infinity
+          let lvl = sim.getState().levelId
+          simMeta.current.silent = true
+          for (let k = 0; k <= T; k += 1) {
+            const sk = sim.seekTime(Math.min(k, T))
+            if (sk.levelId !== lvl && !sk.onConnector) {
+              lvl = sk.levelId
+              changedAt = Math.min(k, T)
+            }
+          }
+          simMeta.current.silent = false
+          const st = sim.seekTime(T)
+          // (a deep link keeps it a little longer: the 3D scene is still being built when the page opens)
+          if (T - changedAt <= TOAST_MS / 1000) showToast(st.levelId, TOAST_MS + 6000)
           const mode = s.view.mode === 'stack' ? 'floor' : s.view.mode
-          dispatch({ type: 'view', patch: { mode, levelId: st.levelId } })
-          dispatch({ type: 'sim', patch: { active: true, playing: false, done: st.done, distanceDoneM: st.distanceDoneM, phase: st.phase, connectorType: st.connectorType } })
+          setViewState({ mode, levelId: st.levelId })
+          dispatch({
+            type: 'sim',
+            patch: { active: true, playing: false, done: st.done, distanceDoneM: st.distanceDoneM, phase: st.phase, connectorType: st.connectorType, onConnector: st.onConnector, rideProgress: st.rideProgress ?? 0 },
+          })
           engine.setView({ mode, levelId: st.levelId, fit: 'none' }, { durationMs: 0 })
-          engine.flyTo({ levelId: st.levelId, x: st.x, y: st.y, headingDeg: st.headingDeg, ...FOLLOW }, 0)
+          // (the Walk view stands on the walker by itself)
+          if (mode !== 'fpv') engine.flyTo({ levelId: st.levelId, x: st.x, y: st.y, headingDeg: st.headingDeg, ...FOLLOW }, 0)
           break
         }
         if (i !== stateRef.current.stepIndex) dispatch({ type: 'patch', patch: { stepIndex: i } })
@@ -521,17 +801,10 @@ export default function App() {
         const last = r.points[r.points.length - 1]
         const mode = s.view.mode === 'stack' ? 'floor' : s.view.mode
         engine.setFollow(false)
-        dispatch({ type: 'view', patch: { mode, levelId: last.levelId } })
-        engine.setView({ mode, levelId: last.levelId, fit: 'none' })
-        const target = s.targetId ? resolveTarget(index, s.targetId) : null
-        if (target?.type === 'bay') {
-          // at the car: look into its bay from the aisle, the painted code upright and in front of the car
-          const bay = index.bayById.get(s.targetId)
-          engine.flyToBay({ levelId: bay.levelId, x: bay.center[0], y: bay.center[1], angleDeg: bay.angleDeg, w: bay.w, l: bay.l }, 1200)
-        } else {
-          // at a shop: face its front, close enough to read the sign (PLAN.md 19.2 arrival)
-          engine.flyToShopFront({ levelId: last.levelId, x: last.x, y: last.y }, 1200)
-        }
+        setViewState({ mode, levelId: last.levelId })
+        // the Walk view stays first-person: it faces the sign from the corridor (DESIGN-GLASS 6.3)
+        if (mode !== 'fpv') engine.setView({ mode, levelId: last.levelId, fit: 'none' })
+        frameArrival(1200)
         break
       }
       case 'car': {
@@ -566,10 +839,19 @@ export default function App() {
   const onViewMode = (mode) => {
     const s = stateRef.current
     const r = routeRef.current
+    if (mode === 'fpv') {
+      enterWalk()
+      return
+    }
+    if (s.view.mode === 'fpv') {
+      mapModeRef.current = mode
+      leaveWalk()
+      return
+    }
     patch({ userView: true })
     if (s.screen === 'navigate' && r) {
       const level = simRef.current ? simRef.current.getState().levelId : stepLevelOf(r, s.stepIndex)
-      dispatch({ type: 'view', patch: { mode, levelId: level } })
+      setViewState({ mode, levelId: level })
       if (simRef.current && s.sim.playing && mode !== 'stack') {
         // back to Floor / 2D during a walk: the camera follows the walker again
         const st = simRef.current.getState()
@@ -729,6 +1011,9 @@ export default function App() {
       : null
   const etaToCarS =
     index && you && car ? (travelTimesFrom(index, you.nodeId, { stepFree: state.stepFree }).get(index.bayById.get(car.bayId)?.nodeId)?.etaS ?? null) : null
+  // v0.2 first-person Walk view (a SIMULATION inside the 3D model): the HUD replaces the header and the navigate sheet
+  const walking = Boolean(index && route && view.mode === 'fpv' && (screen === 'navigate' || screen === 'arrived'))
+  const carBay = index && car ? index.bayById.get(car.bayId) : null
 
   return (
     <div className="app">
@@ -744,23 +1029,53 @@ export default function App() {
         </div>
       ) : null}
 
-      <div className="top" ref={topRef}>
-        <Header index={index} lang={lang} onToggleLang={toggleLang} />
-        {index && screen !== 'search' && !state.no3d ? (
-          <MapControls
+      {walking ? (
+        <Suspense fallback={null}>
+          <WalkHud
             index={index}
             lang={lang}
-            view={view}
-            onView={onViewMode}
-            onLevel={onLevel}
-            routeLevelIds={ROUTE_SCREENS.has(screen) ? route?.levelIds : null}
+            route={route}
+            stepIndex={state.stepIndex}
+            sim={state.sim}
+            levelId={view.levelId}
+            car={carBay ? { levelId: carBay.levelId, x: carBay.center[0], y: carBay.center[1] } : null}
+            arrived={screen === 'arrived'}
+            onAnchors={onAnchors}
+            getAnchors={getAnchors}
+            onEnd={endRoute}
+            onPlay={playSim}
+            onPause={pauseSim}
+            onSpeed={setSpeed}
+            onNext={() => goStep(state.stepIndex + 1)}
+            onOpenMap={leaveWalk}
+            onLayout={onWalkLayout}
+            bubbleTopInset={state.toast ? 64 : 0}
           />
-        ) : null}
-      </div>
+        </Suspense>
+      ) : (
+        <div className="top" ref={topRef}>
+          <Header index={index} lang={lang} onToggleLang={toggleLang} />
+          {index && screen !== 'search' && !state.no3d ? (
+            <MapControls
+              index={index}
+              lang={lang}
+              view={view}
+              onView={onViewMode}
+              onLevel={onLevel}
+              routeLevelIds={ROUTE_SCREENS.has(screen) ? route?.levelIds : null}
+              walkAvailable={Boolean(route && (screen === 'navigate' || screen === 'arrived'))}
+            />
+          ) : null}
+        </div>
+      )}
+
+      {walkPill ? <WalkViewButton lang={lang} onClick={enterWalk} hidden={Boolean(state.toast)} /> : null}
 
       {state.toast && index ? (
         <div className="toast" role="status" key={state.toast.key}>
-          <span className="level-chip">{levelButtonLabel(index, state.toast.levelId, lang)}</span>
+          <span className="level-chip" aria-hidden="true">
+            <bdi dir="ltr">{levelButtonLabel(index, state.toast.levelId, lang)}</bdi>
+          </span>
           <span>{t('nav.nowOn', lang, { level: levelName(index, state.toast.levelId, lang) })}</span>
         </div>
       ) : null}
@@ -834,7 +1149,7 @@ export default function App() {
         />
       ) : null}
 
-      {index && screen === 'navigate' && route ? (
+      {index && screen === 'navigate' && route && !walking ? (
         <NavigateScreen
           ref={sheetRef}
           lang={lang}

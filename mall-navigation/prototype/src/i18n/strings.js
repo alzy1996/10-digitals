@@ -1,5 +1,6 @@
 /**
  * UI strings and number formatting, English + Arabic (Gulf-friendly Modern Standard Arabic).
+ * Formatters: formatDistance, formatDuration, and (v0.2 Walk view) formatClock, formatSteps, formatMinutesParts.
  * Pure JS, no DOM.
  *
  * - `t(key, lang, params?)`: looks up the table below; `{name}` placeholders are filled from `params`.
@@ -82,6 +83,55 @@ export function formatDuration(s, lang) {
 }
 
 /**
+ * Wall-clock time "HH:MM" (24 h) in a time zone (the venue's, `Asia/Muscat`), Arabic-Indic digits in Arabic:
+ * "17:42" / «١٧:٤٢». An unknown time zone falls back to the phone's own clock.
+ * @param {number} epochMs
+ * @param {'en'|'ar'} lang
+ * @param {string} [timeZone]
+ */
+export function formatClock(epochMs, lang, timeZone = 'Asia/Muscat') {
+  const date = new Date(Number.isFinite(epochMs) ? epochMs : Date.now())
+  const pad = (n) => String(n).padStart(2, '0')
+  let hh = pad(date.getHours())
+  let mm = pad(date.getMinutes())
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date)
+    hh = parts.find((p) => p.type === 'hour')?.value ?? hh
+    mm = parts.find((p) => p.type === 'minute')?.value ?? mm
+    if (hh === '24') hh = '00'
+  } catch {
+    // unknown time zone: keep the phone's clock
+  }
+  const s = `${hh}:${mm}`
+  return isArabic(lang) ? toArabicDigits(s) : s
+}
+
+/**
+ * Footsteps left, as an estimate (0.75 m a step): rounded to 5 under 100 steps, to 10 from 100.
+ * Always shown with "≈" (it is an estimate): "≈ 130" / «≈ ١٣٠» (no-break space after the sign).
+ * @param {number} metres
+ * @param {'en'|'ar'} lang
+ */
+export function formatSteps(metres, lang) {
+  const steps = (Number.isFinite(metres) ? Math.max(0, metres) : 0) / 0.75
+  const rounded = steps < 100 ? Math.round(steps / 5) * 5 : Math.round(steps / 10) * 10
+  return `≈ ${isArabic(lang) ? toArabicDigits(rounded) : rounded}`
+}
+
+/**
+ * Walking minutes split for light numerals: { value: '2', unit: 'min' } / { value: '٢', unit: 'د' };
+ * under half a minute '<1' / '<١'.
+ * @param {number} seconds
+ * @param {'en'|'ar'} lang
+ */
+export function formatMinutesParts(seconds, lang) {
+  const minutes = Math.round((Number.isFinite(seconds) ? Math.max(0, seconds) : 0) / 60)
+  const ar = isArabic(lang)
+  const value = minutes < 1 ? '<1' : String(minutes)
+  return { value: ar ? toArabicDigits(value) : value, unit: ar ? 'د' : 'min' }
+}
+
+/**
  * The string table. Keep both languages side by side; Arabic is written for Gulf readers in plain MSA.
  * Placeholders: {place} {level} {bay} {zone} {n} {total} {q} {time} {distance} {duration} {name}.
  */
@@ -131,7 +181,7 @@ export const STRINGS = Object.freeze({
   'tile.prayer': { en: 'Prayer', ar: 'المصلى' },
   'tile.pharmacy': { en: 'Pharmacy', ar: 'صيدلية' },
   'tile.kids': { en: 'Kids', ar: 'الأطفال' },
-  'tile.exit': { en: 'Exit / Taxi', ar: 'مخرج / تاكسي' },
+  'tile.exit': { en: 'Exit / Taxi', ar: 'مخرج/تاكسي' },
 
   // Search
   'search.title': { en: 'Search', ar: 'بحث' },
@@ -271,11 +321,71 @@ export const STRINGS = Object.freeze({
   'nav.ended': { en: 'Route ended', ar: 'انتهى المسار' },
   'view.button': { en: 'View', ar: 'العرض' },
   'sim.notLiveShort': { en: 'Not your live position', ar: 'ليس موقعك الفعلي' },
+  'sim.notLiveTiny': { en: 'Not live', ar: 'ليس مباشراً' },
   'sim.speedNow': { en: 'Simulation speed {speed}, tap to change', ar: 'سرعة المحاكاة {speed}، المس للتغيير' },
   'car.paintedCode': { en: 'As painted on the floor', ar: 'كما هو مكتوب على الأرض' },
   'connector.lift': { en: 'Lift', ar: 'مصعد' },
   'connector.escalator': { en: 'Escalator', ar: 'سلم متحرك' },
   'connector.stairs': { en: 'Stairs', ar: 'درج' },
+
+  // v0.2: first-person Walk view HUD (DESIGN-GLASS.md Appendix A)
+  'view.fpv': { en: 'Walk view', ar: 'منظور المشي' },
+  'hud.openMap': { en: 'Map', ar: 'الخريطة' },
+  'hud.end': { en: 'End', ar: 'إنهاء' },
+  'hud.summaryLabel': { en: 'Trip summary', ar: 'ملخص الرحلة' },
+  'hud.arrival': { en: 'Arrival', ar: 'الوصول' },
+  'hud.distance': { en: 'Distance', ar: 'المسافة' },
+  'hud.steps': { en: 'Steps', ar: 'الخطوات' },
+  'hud.summary': { en: '{time} arrival · {distance} left', ar: 'الوصول {time} · متبقٍ {distance}' },
+  'hud.turn.straight': { en: 'Keep straight', ar: 'تابع مباشرة' },
+  'hud.turn.slight_left': { en: 'Bear left', ar: 'انحرف يساراً' },
+  'hud.turn.slight_right': { en: 'Bear right', ar: 'انحرف يميناً' },
+  'hud.turn.left': { en: 'Turn left', ar: 'انعطف يساراً' },
+  'hud.turn.right': { en: 'Turn right', ar: 'انعطف يميناً' },
+  'hud.turn.uturn': { en: 'Turn around', ar: 'استدر للخلف' },
+  'hud.verbAt': { en: '{verb} at', ar: '{verb} عند' },
+  'hud.verbPast': { en: '{verb} past', ar: '{verb} بجانب' },
+  'hud.andStraight': { en: 'and {distance} straight', ar: 'ثم {distance} مباشرة' },
+  'hud.thenArrive': { en: 'then you arrive', ar: 'ثم تصل' },
+  'hud.face': { en: 'Face', ar: 'اتجه نحو' },
+  'hud.arriveAt': { en: 'Arrive at', ar: 'الوصول إلى' },
+  'hud.escalatorUp': { en: 'Escalator up', ar: 'السلم المتحرك صعوداً' },
+  'hud.escalatorDown': { en: 'Escalator down', ar: 'السلم المتحرك نزولاً' },
+  'hud.escalatorUpTo': { en: 'Escalator up to', ar: 'السلم المتحرك صعوداً إلى' },
+  'hud.escalatorDownTo': { en: 'Escalator down to', ar: 'السلم المتحرك نزولاً إلى' },
+  'hud.stairsUp': { en: 'Stairs up', ar: 'الدرج صعوداً' },
+  'hud.stairsDown': { en: 'Stairs down', ar: 'الدرج نزولاً' },
+  'hud.stairsTo': { en: 'Stairs to', ar: 'الدرج إلى' },
+  'hud.liftTo': { en: 'Take {name} to', ar: 'استقل {name} إلى' },
+  'hud.toLevel': { en: 'to {level}', ar: 'إلى {level}' },
+  'hud.liftRide': { en: '{name} → {level}', ar: '{name} إلى {level}' },
+  'hud.stairsRide': { en: 'Stairs → {level}', ar: 'الدرج إلى {level}' },
+  'hud.side.left': { en: 'on your left', ar: 'على يسارك' },
+  'hud.side.right': { en: 'on your right', ar: 'على يمينك' },
+  'hud.side.ahead': { en: 'straight ahead', ar: 'أمامك مباشرة' },
+  'hud.side.behind': { en: 'behind you', ar: 'خلفك' },
+  'hud.behind': { en: 'The turn is behind you', ar: 'المنعطف خلفك' },
+  'hud.north': { en: 'N', ar: 'ش' },
+  'hud.northLabel': { en: 'North', ar: 'الشمال' },
+  // v0.2 UI builder additions: the condensed turn card keeps the step text's own preposition ("towards" / "after"),
+  // the lift button to press, and the Place screen's light-numeral minutes ("2" + "min walk")
+  'hud.verbTowards': { en: '{verb} towards', ar: '{verb} باتجاه' },
+  'hud.verbAfter': { en: '{verb} after', ar: '{verb} بعد' },
+  'hud.press': { en: 'Press “{label}”', ar: 'اضغط «{label}»' },
+  'hud.minWalk': { en: 'min walk', ar: 'د مشياً' },
+  'hud.edgeLeft': { en: 'The next turn is to your left', ar: 'المنعطف التالي إلى يسارك' },
+  'hud.edgeRight': { en: 'The next turn is to your right', ar: 'المنعطف التالي إلى يمينك' },
+  // QA round 2: the turn right after a ride (the routing folds it into the connector step's text), the bar's last step
+  'hud.then.left': { en: 'then turn left', ar: 'ثم انعطف يساراً' },
+  'hud.then.right': { en: 'then turn right', ar: 'ثم انعطف يميناً' },
+  'hud.then.slight_left': { en: 'then bear left', ar: 'ثم انحرف يساراً' },
+  'hud.then.slight_right': { en: 'then bear right', ar: 'ثم انحرف يميناً' },
+  'hud.then.uturn': { en: 'then turn around', ar: 'ثم استدر للخلف' },
+  'hud.where.top': { en: '{turn} at the top', ar: '{turn} في الأعلى' },
+  'hud.where.bottom': { en: '{turn} at the bottom', ar: '{turn} في الأسفل' },
+  'hud.where.out': { en: '{turn} as you step out', ar: '{turn} عند الخروج' },
+  'hud.pressThen': { en: '{press}, {then}', ar: '{press}، {then}' },
+  'hud.arrived': { en: 'Arrived', ar: 'وصلت' },
 })
 
 /**

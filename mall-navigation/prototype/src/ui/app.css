@@ -1,41 +1,111 @@
 /*
- * Dallni prototype UI styles (PLAN.md section 9 design system).
+ * Dallni v0.2 "storm glass" UI styles (DESIGN-GLASS.md sections 2, 3, 4, 8, 9).
  * Layout uses logical properties (inline-start / inline-end) so Arabic mirrors without extra rules.
- * Tokens: index.css defines --color-* (Sunlight / Basement); the extra tokens below follow the same themes.
+ *
+ * Glass is measured, not guessed: every text colour below passes WCAG AA (4.5:1) against the WORST scene colour
+ * behind its glass (pure white behind dark / pewter glass, pure black behind frost), without counting on blur.
+ * - dark glass  (--glass-dark-*):  sheets, header, popovers, notices (blurred)
+ * - pewter      (--glass-light-*): small floating controls on the map (blurred) or their tinted variant (no blur)
+ * - raised      (--glass-raised-*): controls INSIDE a dark panel (never blurred: no blur inside blur)
+ * - frost       (--frost-*):        callouts that live in the 3D world (the Walk view bubble, src/ui/hud.css)
+ * Only --ink / --ink-2-raised on raised, only --ink / --ink-2-light on pewter: accent-coloured text fails there.
+ * No backdrop-filter support, reduced transparency or more contrast: opaque fills (variables at the end).
+ * The Walk view HUD has its own file (src/ui/hud.css) loaded with the HUD components.
  */
 
 :root {
-  --line: #C3CBD6;
-  --line-strong: #5B6573;
-  --surface-2: #E3E8EF;
-  --surface-3: #D3DAE3;
-  --on-route: #FFFFFF;
-  --on-ok: #FFFFFF;
-  --route-soft: #E3EDFD;
-  --ok-soft: #E3F4EA;
-  --danger-soft: #FCE8E6;
-  --shadow-card: 0 1px 2px rgba(11, 15, 20, 0.12), 0 6px 18px rgba(11, 15, 20, 0.12);
-  --shadow-sheet: 0 -2px 6px rgba(11, 15, 20, 0.08), 0 -10px 30px rgba(11, 15, 20, 0.16);
-  --ease: cubic-bezier(0.2, 0, 0, 1);
-  --header-h: 64px;
-  /* step card: under 45% of the screen (50% on short phones, see the media query below) */
-  --nav-sheet-max: 45%;
-  color-scheme: light;
-}
+  /* ---- glass recipes ---- */
+  --glass-dark-bg: linear-gradient(180deg, rgba(24, 33, 42, 0.78) 0%, rgba(14, 20, 25, 0.84) 100%);
+  --glass-dark-tint-bg: linear-gradient(180deg, rgba(24, 33, 42, 0.86) 0%, rgba(14, 20, 25, 0.92) 100%);
+  --glass-dark-filter: blur(24px) saturate(160%);
+  --glass-dark-rim: rgba(255, 255, 255, 0.14);
+  --glass-light-bg: linear-gradient(180deg, rgba(78, 87, 98, 0.86) 0%, rgba(70, 79, 89, 0.88) 100%);
+  --glass-light-tint-bg: linear-gradient(180deg, rgba(78, 87, 98, 0.94) 0%, rgba(70, 79, 89, 0.96) 100%);
+  --glass-light-filter: blur(20px) saturate(150%);
+  --glass-light-rim: rgba(255, 255, 255, 0.22);
+  --glass-raised-bg: rgba(255, 255, 255, 0.10);
+  --glass-raised-bg-pressed: rgba(255, 255, 255, 0.16);
+  --glass-raised-rim: rgba(255, 255, 255, 0.16);
+  --frost-bg: linear-gradient(180deg, rgba(246, 248, 250, 0.88) 0%, rgba(238, 242, 246, 0.84) 100%);
+  --frost-filter: blur(20px) saturate(140%);
+  --frost-rim: rgba(255, 255, 255, 0.70);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.20);
+  /* max 4 % white: at 5 % --ink-2 would fall under 4.5:1 over a white scene */
+  --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 32px);
+  /* ref 1: panels catch the storm's amber glow along their top edge (28 px: only the handle zone and white --ink text
+     sit under it; measured: --ink stays >= 7:1 there over a white scene) */
+  --glass-warm-rim: radial-gradient(60% 28px at 70% 0, rgba(255, 159, 85, 0.16) 0%, rgba(255, 159, 85, 0) 100%);
+  /* ref 2: a bright frosted rim, strongest on top (drawn as a masked 1 px ring over the transparent border) */
+  --glass-spec-rim: linear-gradient(180deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.12) 36px, rgba(255, 255, 255, 0.07) 100%);
+  /* sheets: a text-free clear band in the handle zone lets the model and the sky show through the glass */
+  --glass-sheet-bg: linear-gradient(180deg, rgba(24, 33, 42, 0.55) 0, rgba(24, 33, 42, 0.78) 20px, rgba(14, 20, 25, 0.84) 100%);
+  --shadow-panel: 0 24px 48px -12px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.25);
+  --shadow-control: 0 8px 24px -8px rgba(0, 0, 0, 0.45);
+  --shadow-frost: 0 10px 28px -8px rgba(0, 0, 0, 0.50);
 
-:root[data-theme="basement"] {
-  --line: #3A4556;
-  --line-strong: #7A8597;
-  --surface-2: #1E2530;
-  --surface-3: #273040;
-  --on-route: #0B0F14;
-  --on-ok: #0B0F14;
-  --route-soft: #1A2A44;
-  --ok-soft: #10301F;
-  --danger-soft: #3A1C1A;
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 6px 18px rgba(0, 0, 0, 0.45);
-  --shadow-sheet: 0 -2px 6px rgba(0, 0, 0, 0.4), 0 -10px 30px rgba(0, 0, 0, 0.5);
+  /* ---- text on glass ---- */
+  --ink: #FFFFFF;
+  --ink-2: #C9D2DB;
+  --ink-3: #9AA6B2;
+  --ink-2-raised: #DCE3EA;
+  --ink-2-light: #EEF2F6;
+  --amber-text: #FFC57A;
+  --teal-text: #5EEAD4;
+  --mint-text: #7EF0A6;
+  --danger-text: #FFB4AB;
+  --blue-text: #A9D3FF;
+  --frost-ink: #0B1218;
+  --frost-ink-2: #3A4654;
+
+  /* ---- accents ---- */
+  --amber-glow: #FF9F55;
+  --amber-core: #FFD2A0;
+  --amber: #FFB547;
+  --on-amber: #1B1205;
+  --route: #26D9C7;
+  --route-rim: #5EF2DC;
+  --route-body: #14B8A6;
+  --route-glow: #10B5D3;
+  --route-upcoming: #1FA79A;
+  --route-walked: #5F7C80;
+  --chevron: #FFFFFF;
+  --primary-grad: linear-gradient(180deg, #5FF5D6 0%, #22D3BE 55%, #14B8A6 100%);
+  --on-primary: #04211C;
+  --primary-glow: 0 10px 28px -6px rgba(34, 211, 190, 0.55), 0 0 28px -6px rgba(34, 211, 190, 0.50);
+  --you: #4DA3FF;
+  --car: #F5B700;
+  --on-car: #0B0F14;
+  --dest: #5BE584;
+  --ok-grad: linear-gradient(180deg, #8BF5A8 0%, #5BE584 50%, #34C76F 100%);
+  --on-ok: #03200F;
+  --danger: #FF7B6E;
+  --focus: #FFD27A;
+  --chip-arrival: #6CB6FF;
+  --chip-distance: #26D9C7;
+  --chip-steps: #FFB547;
+
+  /* ---- shape, spacing ---- */
+  --r-sheet: 28px;
+  --r-card: 24px;
+  --r-tile: 22px;
+  --r-ctl: 999px;
+  --gutter: 12px;
+  --pad-sheet: 16px;
+  --header-h: 64px;
+  /* step card: under 47% of the screen (Arabic 49%; 52-57% on short phones, see the media queries below) */
+  --nav-sheet-max: 47%;
+
+  /* ---- motion ---- */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emph: cubic-bezier(0.3, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
   color-scheme: dark;
+}
+@media (min-width: 390px) {
+  :root {
+    --pad-sheet: 20px;
+  }
 }
 
 html {
@@ -45,7 +115,7 @@ html {
 body {
   font-weight: 400;
   line-height: 1.5;
-  transition: background-color 300ms var(--ease), color 300ms var(--ease);
+  color: var(--ink);
 }
 :root[dir="rtl"] body {
   line-height: 1.7;
@@ -64,7 +134,7 @@ button:disabled {
   cursor: default;
 }
 :focus-visible {
-  outline: 3px solid var(--color-route);
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -76,9 +146,103 @@ button:disabled {
 .nowrap {
   white-space: nowrap;
 }
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
 /* Back arrows and "more" chevrons follow reading direction; turn arrows never do. */
 :root[dir="rtl"] .flip-rtl {
   transform: scaleX(-1);
+}
+
+/* ---------- glass surfaces ---------- */
+
+/* dark glass, blurred: header, sheets, the view menu, notices */
+.header,
+.sheet,
+.view-menu,
+.map-fallback,
+.app.grid > div {
+  background: var(--glass-sheen), var(--glass-dark-bg);
+  border: 1px solid var(--glass-dark-rim);
+  box-shadow: var(--glass-highlight), var(--shadow-panel);
+  -webkit-backdrop-filter: var(--glass-dark-filter);
+  backdrop-filter: var(--glass-dark-filter);
+}
+/* the big panels (refs 1 + 2): warm edge light on top, a bright frosted rim, and (sheets) a clear band at the handle */
+.header {
+  position: relative;
+  background: var(--glass-warm-rim), var(--glass-sheen), var(--glass-dark-bg);
+  border-color: transparent;
+}
+.sheet {
+  background: var(--glass-warm-rim), var(--glass-sheen), var(--glass-sheet-bg);
+  border-color: transparent;
+}
+.header::after,
+.sheet::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--glass-spec-rim);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+/* pewter, blurred: floating controls on the map */
+.view-ctrl,
+.levels,
+.toast,
+.walk-pill {
+  background: var(--glass-light-bg);
+  border: 1px solid var(--glass-light-rim);
+  box-shadow: var(--glass-highlight), var(--shadow-control);
+  -webkit-backdrop-filter: var(--glass-light-filter);
+  backdrop-filter: var(--glass-light-filter);
+  color: var(--ink);
+}
+/* pewter, tinted (no blur): a control sitting inside a blurred panel */
+.lang-btn {
+  background: var(--glass-light-tint-bg);
+  border: 1px solid var(--glass-light-rim);
+  box-shadow: var(--glass-highlight);
+  color: var(--ink);
+}
+/* raised: controls inside a dark panel (never blurred) */
+.raised,
+.here-chip,
+.search-box,
+.tile,
+.car-chip,
+.chip,
+.icon-btn,
+.btn-secondary,
+.btn-quiet,
+.switch-row,
+.speed-seg,
+.nav-end,
+.view-opt[aria-pressed="true"],
+.plate-code,
+.level-badge,
+.press-label,
+.car-card,
+.brand-mark {
+  background: var(--glass-raised-bg);
+  border: 1px solid var(--glass-raised-rim);
+  color: var(--ink);
+}
+.here-chip:active,
+.tile:active,
+.car-chip:active,
+.chip:active,
+.icon-btn:active,
+.btn-secondary:active,
+.btn-quiet:active,
+.switch-row:active,
+.nav-end:active {
+  background: var(--glass-raised-bg-pressed);
 }
 
 /* ---------- shell ---------- */
@@ -87,29 +251,42 @@ button:disabled {
   position: fixed;
   inset: 0;
   overflow: hidden;
+  background: #0A0F12;
+}
+/* the storm sky behind the 3D model (the engine's own sky pass uses the same stops, no colour jump) */
+.map-layer,
+.app.grid {
+  background:
+    radial-gradient(70% 38% at 64% 42%, rgba(255, 159, 85, 0.50) 0%, rgba(214, 112, 60, 0.22) 34%, rgba(20, 28, 33, 0) 72%),
+    radial-gradient(90% 50% at 18% 12%, rgba(126, 140, 152, 0.30) 0%, rgba(126, 140, 152, 0) 70%),
+    linear-gradient(180deg, #121A1F 0%, #1D262C 22%, #2B2D2F 45%, #0A0F12 100%);
 }
 .map-layer {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: linear-gradient(180deg, #FFFFFF 0%, #E3E9F0 100%);
 }
+/* parking levels: no amber, one cool LED glow */
 :root[data-theme="basement"] .map-layer {
-  background: #0B0F14;
+  background:
+    radial-gradient(70% 38% at 60% 42%, rgba(90, 169, 255, 0.22) 0%, rgba(20, 28, 33, 0) 70%),
+    linear-gradient(180deg, #0C1216 0%, #141B21 22%, #18212A 45%, #070A0D 100%);
+}
+/* loading / error screen: storm backdrop + one dark glass card */
+.app.grid > div {
+  padding: 24px;
+  border-radius: var(--r-card);
 }
 /* no 3D: the notice sits in the free map area, just above the sheet (never under it), below the header */
 .map-fallback {
   position: absolute;
   z-index: 20;
-  inset-inline: 16px;
-  bottom: calc(100% - var(--sheet-top, 70vh) + 16px);
+  inset-inline: var(--gutter);
+  bottom: calc(100% - var(--sheet-top, 70vh) + 12px);
   max-width: 528px;
   margin-inline: auto;
-  padding: 16px;
-  border-radius: 16px;
-  background: var(--color-bg);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-card);
+  padding: 16px 18px;
+  border-radius: var(--r-card);
   font-size: 18px;
   line-height: 26px;
   text-align: center;
@@ -121,24 +298,23 @@ button:disabled {
   inset-inline: 0;
   /* above the sheet, so the View menu is never cut by it (the level picker is capped above the sheet) */
   z-index: 35;
-  padding: calc(env(safe-area-inset-top, 0px) + 8px) 16px 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) calc(var(--gutter) + env(safe-area-inset-right, 0px)) 0 calc(var(--gutter) + env(safe-area-inset-left, 0px));
   pointer-events: none;
 }
 .top > * {
   pointer-events: auto;
 }
 
+/* ---------- header ---------- */
+
 .header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-height: var(--header-h);
-  padding-block: 4px;
-  padding-inline: 10px 4px;
-  border-radius: 18px;
-  background: var(--color-bg);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-card);
+  padding-block: 3px;
+  padding-inline: 9px 3px;
+  border-radius: var(--r-sheet);
   max-width: 560px;
   margin-inline: auto;
 }
@@ -146,46 +322,48 @@ button:disabled {
   flex: none;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: var(--color-route);
-  color: var(--on-route);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--teal-text);
 }
 .header-text {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 2px;
 }
 .venue-name {
+  max-width: 100%;
   font-size: 16px;
   line-height: 22px;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 :root[dir="rtl"] .venue-name {
-  line-height: 28px;
+  line-height: 26px;
 }
+/* PROTOTYPE · SIMULATION: amber pill, dark ink (10.5:1) */
 .badge-sim {
-  align-self: flex-start;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   max-width: 100%;
-  padding: 0 8px;
-  border-radius: 6px;
-  background: var(--color-warn);
-  color: #0B0F14;
-  /* PLAN.md section 9: caption 14/20 is the smallest text allowed */
+  padding: 0 10px;
+  border-radius: var(--r-ctl);
+  background: var(--amber);
+  color: var(--on-amber);
+  box-shadow: 0 0 18px -6px rgba(255, 159, 85, 0.9);
   font-size: 14px;
   line-height: 20px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 :root[dir="rtl"] .badge-sim {
   letter-spacing: 0;
@@ -197,16 +375,23 @@ button:disabled {
   place-items: center;
   width: 56px;
   height: 56px;
-  border-radius: 14px;
-  background: var(--color-surface);
-  border: 1.5px solid var(--line);
+  border-radius: 50%;
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
 }
 .lang-btn[data-target="ar"] {
   font-size: 26px;
   padding-bottom: 4px;
+}
+/* narrow phones: the brand mark gives its room to the venue name and the PROTOTYPE badge */
+@media (max-width: 379px) {
+  .brand-mark {
+    display: none;
+  }
+  .header {
+    padding-inline-start: 16px;
+  }
 }
 
 /* ---------- map controls ---------- */
@@ -231,23 +416,18 @@ button:disabled {
 .view-ctrl {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-height: 56px;
   min-width: 56px;
-  padding-inline: 12px 14px;
-  border-radius: 16px;
-  background: var(--color-bg);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-card);
+  padding-inline: 16px 20px;
+  border-radius: var(--r-ctl);
   font-size: 16px;
   line-height: 20px;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
-  color: var(--color-ink);
 }
 .view-ctrl[aria-expanded="true"] {
-  border-color: var(--color-route);
-  box-shadow: 0 0 0 2px var(--color-route), var(--shadow-card);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 .view-menu {
   position: absolute;
@@ -256,42 +436,45 @@ button:disabled {
   z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-width: 208px;
-  padding: 6px;
-  border-radius: 18px;
-  background: var(--color-bg);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-card);
-  animation: toast-in 200ms var(--ease);
+  gap: 4px;
+  min-width: 224px;
+  padding: 8px;
+  border-radius: var(--r-card);
+  transform-origin: top left;
+  animation: pop-in 180ms var(--ease);
+}
+:root[dir="rtl"] .view-menu {
+  transform-origin: top right;
 }
 .view-opt {
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 56px;
-  padding-inline: 12px;
-  border-radius: 12px;
+  padding-inline: 14px;
+  border-radius: 18px;
+  border: 1px solid transparent;
   font-size: 17px;
   line-height: 22px;
-  font-weight: 600;
+  font-weight: 500;
   text-align: start;
-  color: var(--color-ink);
+  color: var(--ink);
 }
-.view-opt[aria-pressed="true"] {
-  background: var(--route-soft);
-  color: var(--color-ink);
+.view-opt .view-check {
+  color: var(--teal-text);
+}
+/* the active row is raised: its check is an icon (3:1 is enough), the label stays --ink */
+.view-opt[aria-pressed="true"] .view-check {
+  color: var(--route-rim);
 }
 .levels {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 4px;
-  border-radius: 16px;
-  background: var(--color-bg);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-card);
+  gap: 0;
+  width: 56px;
+  padding: 0;
+  border-radius: 28px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
@@ -321,7 +504,8 @@ button:disabled {
   display: grid;
   place-items: center;
   height: 16px;
-  color: var(--color-ink);
+  color: var(--ink);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
   pointer-events: none;
 }
 .levels-more.is-below {
@@ -336,85 +520,130 @@ button:disabled {
 .levels-more .rot-up {
   transform: rotate(-90deg);
 }
+/* 56 px hit box, 48 px visual circle (content-box background) */
 .level-btn {
   position: relative;
   flex: none;
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 13px;
+  width: 56px;
+  height: 56px;
+  padding: 4px;
+  border-radius: 50%;
+  background-clip: content-box;
   font-size: 18px;
-  font-weight: 700;
-  color: var(--color-ink);
+  font-weight: 600;
+  color: var(--ink);
   transition: background-color 200ms var(--ease), color 200ms var(--ease);
 }
 .level-btn[aria-pressed="true"] {
-  background: var(--color-ink);
-  color: var(--color-bg);
-}
-.levels-compact {
-  gap: 8px;
+  background-color: rgba(255, 255, 255, 0.94);
+  color: var(--frost-ink);
+  box-shadow: inset 0 0 0 4px transparent;
 }
 .levels-compact .level-btn {
-  height: 44px;
+  height: 48px;
+  padding-block: 2px;
 }
 .level-btn .level-dot {
   position: absolute;
-  top: 5px;
-  inset-inline-end: 5px;
-  width: 9px;
-  height: 9px;
+  top: 8px;
+  inset-inline-end: 8px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: var(--color-route);
-  box-shadow: 0 0 0 2px var(--color-bg);
+  background: var(--route);
+  box-shadow: 0 0 8px 1px rgba(38, 217, 199, 0.85);
 }
+
+/* floating "Walk view" pill: the map's inline-end bottom corner, 12 px above the sheet (App keeps --sheet-top) */
+.walk-pill {
+  position: absolute;
+  z-index: 25;
+  inset-inline-end: calc(var(--gutter) + env(safe-area-inset-right, 0px));
+  bottom: calc(100% - var(--sheet-top, 70vh) + 12px);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding-inline: 16px 20px;
+  border-radius: var(--r-ctl);
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: transform 100ms var(--ease);
+}
+.walk-pill:active {
+  transform: scale(0.97);
+}
+.walk-pill svg {
+  color: var(--route-rim);
+}
+
+/* ---------- toasts ---------- */
 
 .toast {
   position: absolute;
-  /* just above the bottom sheet (the App keeps --sheet-top up to date) */
-  top: calc(var(--sheet-top, 70vh) - 72px);
-  inset-inline: 16px;
+  /* just above the bottom sheet (the App keeps --sheet-top up to date); under the SIM row in the Walk view */
+  top: calc(var(--sheet-top, 70vh) - 68px);
+  inset-inline: var(--gutter);
   z-index: 25;
   display: flex;
   align-items: center;
   gap: 12px;
-  max-width: 420px;
+  width: max-content;
+  max-width: min(420px, calc(100% - 2 * var(--gutter)));
   margin-inline: auto;
   min-height: 56px;
-  padding: 8px 16px;
-  border-radius: 16px;
-  background: var(--color-ink);
-  color: var(--color-bg);
-  font-size: 18px;
-  font-weight: 600;
-  box-shadow: var(--shadow-card);
-  animation: toast-in 300ms var(--ease);
+  padding: 8px 18px 8px 8px;
+  border-radius: var(--r-ctl);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 500;
+  animation: toast-in 240ms var(--ease);
+}
+:root[dir="rtl"] .toast {
+  padding: 8px 8px 8px 18px;
+}
+:root[data-view="fpv"] .toast {
+  top: var(--walk-toast-top, 220px);
+  /* the Walk view's blur budget is the turn card, the bubble and the dome (DESIGN-GLASS 2.2): the toast is tinted */
+  background: var(--glass-light-tint-bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 .toast .level-chip {
+  flex: none;
   display: grid;
   place-items: center;
   min-width: 40px;
   height: 40px;
-  padding-inline: 6px;
-  border-radius: 10px;
-  background: var(--color-route);
-  color: var(--on-route);
-  font-weight: 700;
+  padding-inline: 8px;
+  border-radius: var(--r-ctl);
+  background: #FFFFFF;
+  color: var(--frost-ink);
+  font-weight: 600;
 }
-.toast-undo {
-  padding-inline-end: 6px;
+.toast-undo,
+:root[dir="rtl"] .toast-undo {
+  padding-block: 6px;
+  padding-inline: 20px 6px;
 }
+/* Undo: a near-white pill with dark ink (raised glass on pewter would fall under 4.5:1 over a white scene) */
 .undo-btn {
   flex: none;
-  min-height: 48px;
+  min-height: 44px;
   min-width: 88px;
-  padding-inline: 16px;
-  border-radius: 12px;
-  background: var(--color-bg);
-  color: var(--color-ink);
-  font-size: 18px;
-  font-weight: 700;
+  padding-inline: 18px;
+  border-radius: var(--r-ctl);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--frost-ink);
+  font-size: 17px;
+  font-weight: 600;
+}
+.undo-btn:active {
+  background: #FFFFFF;
 }
 @keyframes toast-in {
   from {
@@ -426,54 +655,73 @@ button:disabled {
     transform: none;
   }
 }
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 
 /* ---------- bottom sheet ---------- */
 
+/* floating dark glass: 12 px from the sides and the bottom (plus safe area), radius 28 on every corner */
 .sheet {
   position: absolute;
-  inset-inline: 0;
-  bottom: 0;
+  left: calc(var(--gutter) + env(safe-area-inset-left, 0px));
+  right: calc(var(--gutter) + env(safe-area-inset-right, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   z-index: 30;
   max-width: 560px;
   margin-inline: auto;
   display: flex;
   flex-direction: column;
-  background: var(--color-bg);
-  border: 1px solid var(--line);
-  border-bottom: 0;
-  border-radius: 28px 28px 0 0;
-  box-shadow: var(--shadow-sheet);
-  padding: 8px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  border-radius: var(--r-sheet);
+  padding: 8px var(--pad-sheet) var(--pad-sheet);
   overflow-y: auto;
   overscroll-behavior: contain;
-  animation: sheet-in 300ms var(--ease);
+  scrollbar-width: none;
+  /* translate only (never opacity on a blurred element: Safari drops the blur while it animates) */
+  animation: sheet-in 320ms var(--ease-emph);
+}
+.sheet::-webkit-scrollbar {
+  display: none;
 }
 .sheet > * {
   flex-shrink: 0;
+  animation: sheet-content-in 320ms var(--ease-emph);
 }
 .sheet > .sheet-scroll {
   flex-shrink: 1;
 }
+/* scroll areas and the pinned footer are transparent: the sheet's own glass shows through */
 .sheet-scroll {
   overflow-y: auto;
   overscroll-behavior: contain;
   min-height: 0;
   flex: 1;
-  margin-inline: -16px;
-  padding-inline: 16px;
+  margin-inline: calc(-1 * var(--pad-sheet));
+  padding-inline: var(--pad-sheet);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
 }
-/* the primary action stays pinned and fully visible; a soft edge shows that the content above it scrolls */
 .sheet-footer {
   flex: none;
   position: relative;
   padding-top: 12px;
-  background: var(--color-bg);
 }
-.sheet-footer.has-more {
-  box-shadow: 0 -12px 12px -12px rgba(11, 15, 20, 0.32);
-}
-:root[data-theme="basement"] .sheet-footer.has-more {
-  box-shadow: 0 -12px 12px -12px rgba(0, 0, 0, 0.75);
+/* more content above: a 16 px fade of the glass colour over the bottom of the scroll area, never a band */
+.sheet-footer.has-more::before {
+  content: "";
+  position: absolute;
+  inset-inline: calc(-1 * var(--pad-sheet));
+  top: -16px;
+  height: 16px;
+  background: linear-gradient(to top, rgba(14, 20, 25, 0.84), rgba(14, 20, 25, 0));
+  pointer-events: none;
 }
 .sheet-handle {
   flex: none;
@@ -481,36 +729,57 @@ button:disabled {
   height: 5px;
   border-radius: 3px;
   margin: 0 auto 8px;
-  background: var(--line);
+  background: rgba(255, 255, 255, 0.28);
 }
 @keyframes sheet-in {
   from {
     transform: translateY(24px);
-    opacity: 0.6;
   }
   to {
     transform: none;
+  }
+}
+@keyframes sheet-content-in {
+  from {
+    opacity: 0.6;
+  }
+  to {
     opacity: 1;
   }
 }
 
+/* ---------- type ---------- */
+
 .title {
   font-size: 24px;
-  line-height: 32px;
-  font-weight: 700;
+  line-height: 30px;
+  font-weight: 600;
 }
 :root[dir="rtl"] .title {
   line-height: 38px;
 }
+.title-l {
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+:root[dir="rtl"] .title-l {
+  line-height: 40px;
+  letter-spacing: 0;
+}
 .subtitle {
   font-size: 18px;
   line-height: 26px;
-  color: var(--color-ink-2);
+  color: var(--ink-2);
+}
+:root[dir="rtl"] .subtitle {
+  line-height: 30px;
 }
 .caption {
   font-size: 14px;
   line-height: 20px;
-  color: var(--color-ink-2);
+  color: var(--ink-2);
 }
 :root[dir="rtl"] .caption {
   line-height: 22px;
@@ -519,13 +788,35 @@ button:disabled {
   font-size: 14px;
   line-height: 20px;
   font-weight: 600;
-  color: var(--color-ink-2);
+  color: var(--ink-2);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
 }
 :root[dir="rtl"] .section-label {
   letter-spacing: 0;
-  font-size: 15px;
+  text-transform: none;
+  line-height: 22px;
+}
+/* light numerals (weight 300 only from 28 px up) */
+.num-hero {
+  font-size: 56px;
+  line-height: 56px;
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+:root[dir="rtl"] .num-hero {
+  line-height: 64px;
+  letter-spacing: 0;
+}
+.num-card {
+  font-size: 28px;
+  line-height: 32px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+}
+:root[dir="rtl"] .num-card {
+  line-height: 36px;
 }
 
 /* ---------- buttons ---------- */
@@ -536,45 +827,54 @@ button:disabled {
   justify-content: center;
   gap: 10px;
   min-height: 56px;
-  padding-inline: 20px;
-  border-radius: 16px;
+  padding-inline: 22px;
+  border-radius: var(--r-ctl);
   font-size: 18px;
   line-height: 24px;
   font-weight: 600;
   transition: transform 100ms var(--ease), background-color 200ms var(--ease);
 }
-.btn:active {
-  transform: scale(0.98);
+:root[dir="rtl"] .btn {
+  line-height: 28px;
 }
+.btn:active {
+  transform: scale(0.97);
+}
+.btn svg,
+.chip svg,
+.fact svg {
+  flex: none;
+}
+/* the one primary action per screen: glowing teal */
 .btn-primary {
-  background: var(--color-route);
-  color: var(--on-route);
-  box-shadow: 0 2px 0 rgba(11, 15, 20, 0.18);
+  background: var(--primary-grad);
+  color: var(--on-primary);
+  border: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), var(--primary-glow);
 }
 .btn-go {
   min-height: 64px;
   font-size: 22px;
+  line-height: 28px;
   letter-spacing: 0.02em;
 }
+:root[dir="rtl"] .btn-go {
+  letter-spacing: 0;
+  line-height: 32px;
+}
+/* arrival: mint ("Found it") */
 .btn-ok {
-  background: var(--color-ok);
+  background: var(--ok-grad);
   color: var(--on-ok);
-  box-shadow: 0 2px 0 rgba(11, 15, 20, 0.18);
+  border: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 10px 28px -6px rgba(91, 229, 132, 0.55), 0 0 28px -6px rgba(91, 229, 132, 0.5);
 }
+/* the car's own colour (yellow-amber), dark ink 10.7:1 */
 .btn-car {
-  background: var(--color-car);
-  color: #0B0F14;
-  border: 2px solid #0B0F14;
-}
-.btn-secondary {
-  background: var(--color-surface);
-  color: var(--color-ink);
-  border: 1.5px solid var(--line-strong);
-}
-.btn-quiet {
-  background: transparent;
-  color: var(--color-ink);
-  border: 1.5px solid var(--line);
+  background: var(--car);
+  color: var(--on-car);
+  border: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 10px 28px -8px rgba(245, 183, 0, 0.5);
 }
 .btn-block {
   width: 100%;
@@ -583,25 +883,20 @@ button:disabled {
   flex: none;
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  background: var(--color-surface);
-  border: 1.5px solid var(--line);
-  color: var(--color-ink);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
 }
-
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   min-height: 48px;
-  padding-inline: 14px;
-  border-radius: 999px;
-  background: var(--color-surface);
-  border: 1.5px solid var(--line);
+  padding-inline: 16px;
+  border-radius: var(--r-ctl);
   font-size: 16px;
-  font-weight: 600;
+  line-height: 22px;
+  font-weight: 500;
   text-align: start;
 }
 
@@ -610,84 +905,71 @@ button:disabled {
 .home-stack {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
-@media (max-height: 760px) {
-  /* short phones: a tighter home sheet keeps 30% of the screen for the map and the level picker */
-  .home-stack {
-    gap: 8px;
-  }
-  .home-sheet .tile {
-    min-height: 72px;
-    padding-block: 6px;
-  }
+/* the fictional-venue disclaimer is pinned under the scroll area: always on screen, never sliced by the sheet edge */
+.home-sheet .sheet-footer {
+  padding-top: 10px;
 }
-@media (max-height: 700px) {
-  /* a phone browser tab (the address bar takes ~180 px): smaller tile icons so "Save my car" stays in view */
-  .home-sheet {
-    max-height: calc(72% - 72px) !important;
-  }
-  .home-sheet .tile {
-    min-height: 64px;
-    gap: 4px;
-    padding-block: 6px 4px;
-  }
-  .home-sheet .tile-icon {
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
-  }
-  .home-sheet .here-chip {
-    min-height: 48px;
-  }
-}
-
 .here-chip {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  min-height: 52px;
-  padding-inline: 12px 8px;
-  border-radius: 16px;
-  background: var(--route-soft);
-  color: var(--color-ink);
+  min-height: 60px;
+  padding-block: 6px;
+  padding-inline: 16px 8px;
+  border-radius: var(--r-card);
   text-align: start;
 }
 .here-dot {
   flex: none;
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: var(--color-route);
-  box-shadow: 0 0 0 4px var(--color-bg);
+  background: var(--you);
+  box-shadow: 0 0 0 3px #FFFFFF, 0 0 14px 3px rgba(77, 163, 255, 0.85);
 }
 .here-text {
   flex: 1;
   min-width: 0;
-  font-size: 16px;
-  line-height: 20px;
-  font-weight: 600;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 500;
+}
+:root[dir="rtl"] .here-text {
+  line-height: 26px;
 }
 .here-text small {
   display: block;
+  margin-top: 2px;
   font-size: 14px;
+  line-height: 20px;
   font-weight: 400;
-  color: var(--color-ink-2);
+  color: var(--ink-2-raised);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+:root[dir="rtl"] .here-text small {
+  line-height: 22px;
+}
+/* "Change": raised pill inside the raised chip, --ink only (raised on raised fails --ink-2-raised) */
 .here-change {
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   min-height: 44px;
   min-width: 44px;
-  padding-inline: 10px;
-  border-radius: 12px;
+  padding-inline: 12px 14px;
+  border-radius: var(--r-ctl);
+  background: var(--glass-raised-bg);
+  border: 1px solid var(--glass-raised-rim);
   font-size: 15px;
-  font-weight: 600;
-  color: var(--color-route);
+  font-weight: 500;
+  color: var(--ink);
 }
 @media (max-width: 379px) {
   /* narrow phones: "Change" is its icon only (still 44 x 44), so the place name keeps two lines at most */
@@ -695,20 +977,41 @@ button:disabled {
     padding-inline: 0;
   }
 }
+/* the long source note ("Exact · from a sign") only where it fits on one line */
+.here-src-long {
+  display: none;
+}
+@media (min-width: 430px) {
+  .here-src-long {
+    display: inline;
+  }
+  .here-src-short {
+    display: none;
+  }
+}
 
 .search-box {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-height: 56px;
-  padding-inline: 14px;
-  border-radius: 16px;
-  background: var(--color-surface);
-  border: 2px solid var(--line-strong);
-  color: var(--color-ink-2);
+  padding-inline: 18px;
+  border-radius: var(--r-ctl);
+  color: var(--ink-2-raised);
 }
 .search-box:focus-within {
-  border-color: var(--color-route);
+  border-color: var(--route-rim);
+  box-shadow: 0 0 0 1px var(--route-rim), 0 0 18px -6px rgba(94, 242, 220, 0.8);
+}
+.search-box .search-ph {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 18px;
+  line-height: 54px;
+  color: var(--ink-2-raised);
 }
 .search-box input {
   flex: 1;
@@ -717,11 +1020,11 @@ button:disabled {
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--color-ink);
+  color: var(--ink);
   font-size: 18px;
 }
 .search-box input::placeholder {
-  color: var(--color-ink-2);
+  color: var(--ink-2-raised);
   opacity: 1;
 }
 .search-box input::-webkit-search-cancel-button {
@@ -737,22 +1040,19 @@ button:disabled {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* top-aligned: every icon in a row lines up even when a label wraps to two lines */
+  /* top-aligned: every icon in a row lines up even when a label wraps */
   justify-content: flex-start;
-  gap: 6px;
-  min-height: 80px;
-  padding: 10px 2px 8px;
-  border-radius: 16px;
-  background: var(--color-surface);
-  border: 1px solid var(--line);
+  gap: 4px;
+  min-height: 84px;
+  padding: 8px 2px 6px;
+  border-radius: var(--r-tile);
   font-size: 15px;
-  line-height: 18px;
-  font-weight: 600;
+  line-height: 20px;
+  font-weight: 500;
   text-align: center;
   transition: transform 100ms var(--ease);
 }
 :root[dir="rtl"] .tile {
-  font-size: 15px;
   line-height: 22px;
 }
 /* one line per tile label, in both languages, so both tile rows keep the same height */
@@ -766,6 +1066,13 @@ button:disabled {
   .tile,
   :root[dir="rtl"] .tile {
     font-size: 14px;
+    padding-inline: 0;
+  }
+}
+/* Arabic tile labels run wider ("مخرج / تاكسي"): 14 px keeps every label on one line up to 420 px wide */
+@media (max-width: 419px) {
+  :root[dir="rtl"] .tile {
+    font-size: 14px;
   }
 }
 .tile:active {
@@ -774,10 +1081,12 @@ button:disabled {
 .tile-icon {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--tile-c, #475569);
   color: #FFFFFF;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18), 0 0 16px -4px var(--tile-c, #475569);
 }
 
 .car-chip {
@@ -785,24 +1094,92 @@ button:disabled {
   align-items: center;
   gap: 12px;
   width: 100%;
-  min-height: 56px;
-  padding-inline: 8px 12px;
-  border-radius: 16px;
-  background: var(--color-surface);
-  border: 1.5px solid var(--line);
+  min-height: 60px;
+  padding-block: 7px;
+  padding-inline: 8px 14px;
+  border-radius: var(--r-card);
   text-align: start;
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 500;
 }
 .car-chip .car-badge {
+  flex: none;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: var(--color-car);
-  color: #0B0F14;
-  border: 2px solid #0B0F14;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--car);
+  color: var(--on-car);
+  box-shadow: 0 0 16px -4px rgba(245, 183, 0, 0.8);
+}
+
+@media (max-height: 760px) {
+  /* short phones: a tighter home sheet keeps 30% of the screen for the map and the level picker; everything fits at
+     360 x 740 in both languages (Arabic lines are taller), nothing scrolls */
+  .home-stack {
+    gap: 6px;
+  }
+  .home-sheet .sheet-handle {
+    margin-bottom: 6px;
+  }
+  .home-sheet .sheet-footer {
+    padding-top: 8px;
+  }
+  .home-sheet .tile {
+    min-height: 68px;
+    padding-block: 4px;
+    gap: 4px;
+  }
+  .home-sheet .tile-icon {
+    width: 36px;
+    height: 36px;
+  }
+  :root[dir="rtl"] .home-sheet .caption {
+    line-height: 20px;
+  }
+  .home-sheet .here-text {
+    font-size: 16px;
+    line-height: 20px;
+  }
+  .home-sheet .car-chip {
+    min-height: 56px;
+    padding-block: 5px;
+  }
+}
+@media (max-height: 700px) {
+  /* a phone browser tab (the address bar takes ~180 px): smaller tile icons, a one-line here-chip (icon-only Change)
+     and a slimmer search box so "Save my car" stays in view; what still does not fit scrolls above the pinned
+     disclaimer, with the soft edge as the cue */
+  .home-sheet {
+    max-height: calc(72% - 72px) !important;
+    padding-bottom: 12px;
+  }
+  .home-sheet .tile {
+    min-height: 60px;
+    gap: 2px;
+    padding-block: 4px 3px;
+  }
+  .home-sheet .tile-icon {
+    width: 32px;
+    height: 32px;
+  }
+  .home-sheet .here-chip {
+    min-height: 52px;
+  }
+  .home-sheet .here-change .wide-only {
+    display: none !important;
+  }
+  .home-sheet .search-box {
+    min-height: 52px;
+  }
+  .home-stack {
+    gap: 4px;
+  }
+  .home-sheet .sheet-footer {
+    padding-top: 6px;
+  }
 }
 
 /* ---------- lists ---------- */
@@ -818,20 +1195,25 @@ button:disabled {
   width: 100%;
   min-height: 64px;
   padding-block: 8px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   text-align: start;
+  color: var(--ink);
 }
 .row:last-child {
   border-bottom: 0;
+}
+.row:active {
+  background: rgba(255, 255, 255, 0.06);
 }
 .row-icon {
   flex: none;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
   color: #FFFFFF;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14);
 }
 .row-main {
   flex: 1;
@@ -840,7 +1222,7 @@ button:disabled {
 .row-title {
   font-size: 18px;
   line-height: 24px;
-  font-weight: 600;
+  font-weight: 500;
   /* long names wrap to a second line instead of being cut */
   overflow: hidden;
   display: -webkit-box;
@@ -852,10 +1234,13 @@ button:disabled {
 .row-sub {
   font-size: 14px;
   line-height: 20px;
-  color: var(--color-ink-2);
+  color: var(--ink-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.row-sub.is-here {
+  color: var(--blue-text);
 }
 :root[dir="rtl"] .row-title {
   line-height: 30px;
@@ -867,29 +1252,56 @@ button:disabled {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   font-size: 15px;
-  font-weight: 600;
-  color: var(--color-ink-2);
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.row-mins {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  min-width: 40px;
+  justify-content: flex-end;
+  color: var(--ink);
+}
+.row-mins b {
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+}
+.row-mins small {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-2);
 }
 .level-badge {
   display: inline-grid;
   place-items: center;
-  min-width: 30px;
-  height: 26px;
-  padding-inline: 6px;
-  border-radius: 8px;
-  background: var(--surface-2);
-  color: var(--color-ink);
+  min-width: 32px;
+  height: 28px;
+  padding-inline: 8px;
+  border-radius: var(--r-ctl);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
 }
+/* list headings scroll with the list: a sticky heading would need its own fill, i.e. an opaque band in the glass */
 .list-head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: 12px 0 6px;
-  background: var(--color-bg);
+  padding: 14px 0 6px;
+}
+.list-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+}
+:root[dir="rtl"] .list-title {
+  line-height: 34px;
 }
 
 /* ---------- place ---------- */
@@ -900,17 +1312,33 @@ button:disabled {
   gap: 6px;
   min-height: 32px;
   padding-inline: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--r-ctl);
   color: #FFFFFF;
   font-size: 14px;
+  line-height: 20px;
   font-weight: 600;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16), 0 0 14px -4px var(--cat-c, transparent);
+}
+.place-eta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+}
+.place-eta .eta-unit {
+  font-size: 18px;
+  line-height: 26px;
+  color: var(--ink-2);
+}
+.place-eta .eta-dist {
+  color: var(--ink-2);
 }
 .facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 16px;
-  font-size: 17px;
-  line-height: 24px;
+  gap: 6px 16px;
+  font-size: 16px;
+  line-height: 22px;
 }
 .fact {
   display: inline-flex;
@@ -918,12 +1346,12 @@ button:disabled {
   gap: 6px;
 }
 .open-ok {
-  color: var(--color-ok);
-  font-weight: 600;
+  color: var(--mint-text);
+  font-weight: 500;
 }
 .open-closed {
-  color: var(--color-danger);
-  font-weight: 600;
+  color: var(--danger-text);
+  font-weight: 500;
 }
 
 .switch-row {
@@ -932,14 +1360,12 @@ button:disabled {
   gap: 12px;
   width: 100%;
   min-height: 56px;
-  padding: 6px 12px;
-  border-radius: 16px;
-  background: var(--color-surface);
-  border: 1px solid var(--line);
+  padding: 6px 14px;
+  border-radius: var(--r-card);
   text-align: start;
   font-size: 16px;
   line-height: 22px;
-  font-weight: 600;
+  font-weight: 500;
 }
 .switch {
   flex: none;
@@ -947,8 +1373,8 @@ button:disabled {
   width: 52px;
   height: 32px;
   border-radius: 16px;
-  background: var(--surface-3);
-  border: 2px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   transition: background-color 200ms var(--ease);
 }
 .switch::after {
@@ -956,63 +1382,80 @@ button:disabled {
   position: absolute;
   top: 3px;
   inset-inline-start: 3px;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: var(--color-bg);
-  box-shadow: 0 1px 3px rgba(11, 15, 20, 0.35);
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
   transition: inset-inline-start 200ms var(--ease);
 }
 [aria-checked="true"] > .switch {
-  background: var(--color-route);
-  border-color: var(--color-route);
-}
-/* Basement: a light knob on the dark track (>= 3:1 for non-text, PLAN.md section 9); on = dark knob on blue */
-:root[data-theme="basement"] .switch {
-  background: #273040;
-  border-color: #7A8597;
-}
-:root[data-theme="basement"] .switch::after {
-  background: #AEB8C6;
-}
-:root[data-theme="basement"] [aria-checked="true"] > .switch {
-  background: #7AB0FF;
-  border-color: #7AB0FF;
-}
-:root[data-theme="basement"] [aria-checked="true"] > .switch::after {
-  background: #0B0F14;
+  background: var(--route);
+  border-color: var(--route-rim);
+  box-shadow: 0 0 12px -2px rgba(38, 217, 199, 0.7);
 }
 [aria-checked="true"] > .switch::after {
   inset-inline-start: 23px;
+  background: var(--on-primary);
 }
 
 .notice {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  padding: 12px;
-  border-radius: 14px;
-  background: var(--danger-soft);
-  color: var(--color-ink);
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 123, 110, 0.14);
+  border: 1px solid rgba(255, 123, 110, 0.35);
+  color: var(--ink);
   font-size: 16px;
   line-height: 22px;
 }
 
-/* ---------- navigate ---------- */
+/* ---------- navigate (map views) ---------- */
+
+/* Next / Back and the simulator block are the pinned footer; a long step scrolls above them on a short screen. The
+   scroll area keeps room for the step tile's glow (a scroll container clips it into a hard-edged box otherwise) */
+.nav-sheet .sheet-scroll {
+  padding-bottom: 8px;
+}
+.nav-sheet .sheet-footer {
+  padding-top: 2px;
+}
+.nav-sheet .turn-icon {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 16px -6px rgba(38, 217, 199, 0.85);
+}
+.nav-sheet .turn-icon.is-arrive {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 16px -6px rgba(91, 229, 132, 0.85);
+}
+.nav-sheet .sheet-footer .nav-actions {
+  margin-top: 0;
+}
+.step-meta .press-label {
+  min-width: 32px;
+  height: 32px;
+  font-size: 15px;
+}
+.nav-sheet .sheet-handle {
+  margin-bottom: 2px;
+}
+/* Arabic runs taller (1.6x line height): a little more sheet on phones taller than 760 px, so nothing scrolls */
+:root[dir="rtl"] {
+  --nav-sheet-max: 49%;
+}
 
 .nav-top {
   display: flex;
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  margin-top: -6px;
   font-size: 15px;
   line-height: 20px;
-  font-weight: 600;
-  color: var(--color-ink-2);
+  font-weight: 500;
+  color: var(--ink-2);
 }
 .nav-count {
-  color: var(--color-ink);
+  color: var(--ink);
 }
 .nav-left {
   flex: 1;
@@ -1020,6 +1463,7 @@ button:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: end;
+  font-variant-numeric: tabular-nums;
 }
 .nav-end {
   flex: none;
@@ -1027,56 +1471,50 @@ button:disabled {
   place-items: center;
   width: 44px;
   height: 44px;
-  margin-inline-end: -6px;
-  border-radius: 12px;
-  color: var(--color-ink);
-}
-.nav-end:hover {
-  background: var(--color-surface);
+  margin-inline-end: -4px;
+  border-radius: 50%;
 }
 .nav-back {
-  width: 64px;
+  width: 56px;
   padding-inline: 0;
 }
 .nav-actions {
   display: flex;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 .step-top {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 14px;
+  margin-top: 10px;
 }
+/* the same 52 px tile as the Walk view turn card: teal gradient, dark arrow, soft glow */
 .turn-icon {
   flex: none;
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  background: var(--color-route);
-  color: var(--on-route);
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  background: var(--primary-grad);
+  color: var(--on-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 22px -4px rgba(38, 217, 199, 0.8);
 }
 .turn-icon.is-arrive {
-  background: var(--color-ok);
+  background: var(--ok-grad);
   color: var(--on-ok);
-}
-.turn-icon.is-connector {
-  background: var(--color-ink);
-  color: var(--color-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 22px -4px rgba(91, 229, 132, 0.8);
 }
 .step-text {
   flex: 1;
   min-width: 0;
-  font-size: 22px;
-  line-height: 29px;
-  font-weight: 600;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 500;
 }
 :root[dir="rtl"] .step-text {
-  font-size: 22px;
-  line-height: 34px;
+  line-height: 30px;
 }
 .step-meta {
   display: flex;
@@ -1086,20 +1524,18 @@ button:disabled {
   margin-top: 4px;
   font-size: 16px;
   line-height: 22px;
-  color: var(--color-ink-2);
-  font-weight: 600;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
 }
 .press-label {
   display: inline-grid;
   place-items: center;
-  min-width: 34px;
-  height: 34px;
-  padding-inline: 6px;
-  border-radius: 50%;
-  border: 2px solid var(--color-ink);
-  color: var(--color-ink);
+  min-width: 36px;
+  height: 36px;
+  padding-inline: 8px;
+  border-radius: var(--r-ctl);
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .progress {
   display: flex;
@@ -1111,40 +1547,43 @@ button:disabled {
   flex: 1;
   height: 6px;
   border-radius: 3px;
-  background: var(--surface-2);
+  background: rgba(255, 255, 255, 0.18);
 }
-/* the eye lands on "you are here": the current step is the strongest segment */
 .progress span.is-done {
-  background: var(--color-ink-2);
-  opacity: 0.6;
+  background: rgba(94, 234, 212, 0.45);
 }
+/* "you are here" on the trip: the glowing point of ref 1's curve */
 .progress span.is-current {
-  height: 8px;
-  border-radius: 4px;
-  background: var(--color-route);
+  background: var(--route);
+  box-shadow: 0 0 10px rgba(44, 229, 200, 0.8);
 }
 
 .sim-bar {
-  margin-top: 12px;
+  margin-top: 8px;
   padding-top: 10px;
-  border-top: 1.5px dashed var(--line-strong);
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
 }
 .sim-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 22px;
+  gap: 10px;
+  min-height: 28px;
 }
+/* SIMULATION: the amber tag (orange-amber, never the car's yellow) */
 .sim-tag {
   flex: none;
-  padding: 0 6px;
-  border-radius: 6px;
-  background: var(--color-warn);
-  color: #0B0F14;
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 14px;
+  background: var(--amber);
+  color: var(--on-amber);
+  box-shadow: 0 0 18px -6px rgba(255, 159, 85, 0.9);
   font-size: 14px;
   line-height: 20px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 :root[dir="rtl"] .sim-tag {
   letter-spacing: 0;
@@ -1155,8 +1594,7 @@ button:disabled {
   min-width: 0;
   font-size: 14px;
   line-height: 20px;
-  font-weight: 500;
-  color: var(--color-ink-2);
+  color: var(--ink-2);
 }
 :root[dir="rtl"] .sim-status {
   line-height: 22px;
@@ -1170,35 +1608,50 @@ button:disabled {
 .sim-play {
   flex: 1;
   min-width: 0;
-  padding-inline: 12px;
+  gap: 6px;
+  padding-inline: 10px 12px;
+  font-size: 17px;
   white-space: nowrap;
+}
+.sim-play svg {
+  width: 20px;
+  height: 20px;
+}
+.sim-play span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sim-play svg {
+  color: var(--route-rim);
 }
 .speed-seg {
   display: inline-flex;
   flex: none;
-  padding: 3px;
-  gap: 6px;
-  border-radius: 14px;
-  border: 1.5px solid var(--line);
-  background: var(--color-surface);
+  padding: 4px;
+  gap: 0;
+  border-radius: var(--r-ctl);
 }
 .speed-seg button {
-  min-width: 52px;
-  min-height: 48px;
-  border-radius: 11px;
+  min-width: 44px;
+  min-height: 46px;
+  padding-inline: 2px;
+  border-radius: var(--r-ctl);
   font-size: 16px;
-  font-weight: 700;
-  color: var(--color-ink-2);
+  font-weight: 500;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 .speed-seg button[aria-pressed="true"] {
-  background: var(--color-ink);
-  color: var(--color-bg);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--frost-ink);
+  font-weight: 600;
 }
 .speed-cycle {
   flex: none;
   min-width: 64px;
-  padding-inline: 10px;
-  font-weight: 700;
+  padding-inline: 12px;
+  font-variant-numeric: tabular-nums;
 }
 /* width switches: the full speed control from 380 px, one cycling button below */
 .narrow-only {
@@ -1217,14 +1670,17 @@ button:disabled {
 }
 @media (max-height: 760px) {
   :root {
-    --nav-sheet-max: 50%;
+    --nav-sheet-max: 52%;
+  }
+  :root[dir="rtl"] {
+    --nav-sheet-max: 53%;
   }
   /* short phones: tighter step card so the simulator row stays in view */
   .nav-sheet .step-top {
     margin-top: 8px;
   }
-  .nav-sheet .nav-actions {
-    margin-top: 8px;
+  .nav-sheet .sheet-footer {
+    padding-top: 0;
   }
   .nav-sheet .sim-bar {
     margin-top: 8px;
@@ -1240,45 +1696,35 @@ button:disabled {
   :root {
     --nav-sheet-max: 54%;
   }
+  :root[dir="rtl"] {
+    --nav-sheet-max: 57%;
+  }
   .nav-sheet .sim-head {
     display: none;
   }
-  /* the tag sits on the dashed divider, like a fieldset legend: no row of its own */
   .nav-sheet .sim-bar {
     position: relative;
     margin-top: 16px;
-    padding-top: 14px;
+    padding-top: 16px;
   }
   .nav-sheet .sim-tag-inline {
-    display: inline-block;
+    display: inline-flex;
     position: absolute;
-    top: -11px;
+    top: -14px;
     inset-inline-start: 0;
-    box-shadow: 0 0 0 4px var(--color-bg);
   }
   .nav-sheet .sim-row {
     margin-top: 0;
   }
   .nav-sheet .step-text {
-    font-size: 21px;
-    line-height: 28px;
+    font-size: 19px;
+    line-height: 25px;
   }
   :root[dir="rtl"] .nav-sheet .step-text {
-    font-size: 21px;
-    line-height: 32px;
+    line-height: 30px;
   }
   .nav-sheet .step-meta {
     margin-top: 2px;
-  }
-  .nav-sheet .turn-icon {
-    width: 52px;
-    height: 52px;
-  }
-}
-/* narrow phones: the brand mark gives its room to the venue name and the PROTOTYPE badge */
-@media (max-width: 379px) {
-  .brand-mark {
-    display: none;
   }
 }
 .nav-stepfree {
@@ -1286,31 +1732,48 @@ button:disabled {
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
-  background: var(--color-route);
-  color: var(--on-route);
+  border-radius: 50%;
+  background: var(--route);
+  color: var(--on-primary);
 }
 
 /* ---------- arrived ---------- */
 
+/* mint-tinted hero (10 %: --mint-text stays >= 4.5:1 over a white scene) */
 .arrived-hero {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px;
-  border-radius: 20px;
-  background: var(--ok-soft);
+  gap: 16px;
+  padding: 16px;
+  border-radius: var(--r-card);
+  background: rgba(91, 229, 132, 0.10);
+  border: 1px solid rgba(91, 229, 132, 0.28);
 }
 .arrived-check {
   flex: none;
   display: grid;
   place-items: center;
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
-  background: var(--color-ok);
+  background: radial-gradient(circle at 40% 35%, #8BF5A8, #2FB866);
   color: var(--on-ok);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 0 24px -4px rgba(91, 229, 132, 0.8);
   animation: pop 600ms var(--ease);
+}
+.arrived-label {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--mint-text);
+}
+:root[dir="rtl"] .arrived-label {
+  line-height: 24px;
+}
+.arrived-level {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-2-raised);
 }
 @keyframes pop {
   0% {
@@ -1328,18 +1791,15 @@ button:disabled {
 
 .car-card {
   overflow: hidden;
-  border-radius: 20px;
-  border: 2px solid #0B0F14;
-  background: var(--color-bg);
+  border-radius: var(--r-card);
 }
-:root[data-theme="basement"] .car-card {
-  border-color: var(--color-car);
-}
+/* the zone colour exactly, flat (it must match the paint); one light line on top gives the glass edge */
 .zone-block {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 10px 14px;
+  padding: 12px 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 .zone-icon {
   flex: none;
@@ -1348,41 +1808,60 @@ button:disabled {
   width: 56px;
   height: 56px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.18);
-  border: 2px solid currentColor;
+  background: rgba(255, 255, 255, 0.16);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+}
+.zone-label {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
 }
 .zone-name {
   font-size: 24px;
   line-height: 30px;
-  font-weight: 700;
+  font-weight: 600;
 }
 :root[dir="rtl"] .zone-name {
   line-height: 36px;
 }
 .bay-code {
-  font-size: 36px;
-  line-height: 42px;
-  font-weight: 700;
+  font-size: 44px;
+  line-height: 48px;
+  font-weight: 500;
   letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
 }
 .car-card-body {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 14px 6px;
+  padding: 10px 16px 10px;
+}
+.car-card .caption,
+.car-card .car-sub {
+  color: var(--ink-2-raised);
+}
+.saved-at {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--amber-text);
+  white-space: nowrap;
 }
 .plate-code {
   display: inline-grid;
   place-items: center;
   min-width: 56px;
   height: 32px;
-  padding-inline: 6px;
-  border-radius: 8px;
-  background: var(--color-ink);
-  color: var(--color-bg);
+  padding-inline: 10px;
+  border-radius: var(--r-ctl);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .zone-swatch {
   flex: none;
@@ -1390,7 +1869,8 @@ button:disabled {
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
 }
 .car-chip-text {
   flex: 1;
@@ -1405,7 +1885,7 @@ button:disabled {
   place-items: center;
   width: 32px;
   height: 32px;
-  color: var(--color-ink);
+  color: var(--teal-text);
 }
 
 /* "you are here" pulse: a DOM overlay on the projected puck (PLAN 19.2); stops under reduced motion */
@@ -1418,7 +1898,8 @@ button:disabled {
   height: 56px;
   margin: -28px 0 0 -28px;
   border-radius: 50%;
-  border: 3px solid var(--color-route);
+  border: 3px solid var(--you);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.7), 0 0 12px rgba(77, 163, 255, 0.6);
   pointer-events: none;
   animation: pulse 2s var(--ease) infinite;
 }
@@ -1433,19 +1914,6 @@ button:disabled {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 1ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 1ms !important;
-  }
-  .you-pulse {
-    display: none;
-  }
-}
-
 .sr-only {
   position: absolute;
   width: 1px;
@@ -1456,4 +1924,82 @@ button:disabled {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ---------- opaque fallback ----------
+ * No backdrop-filter, reduced transparency or more contrast: the same surfaces as solid fills (DESIGN-GLASS 2.2). */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass-dark-bg: linear-gradient(#1B232B, #1B232B);
+    --glass-dark-tint-bg: linear-gradient(#1B232B, #1B232B);
+    --glass-dark-rim: rgba(255, 255, 255, 0.20);
+    --glass-light-bg: linear-gradient(#4A535D, #4A535D);
+    --glass-light-tint-bg: linear-gradient(#4A535D, #4A535D);
+    --glass-light-rim: rgba(255, 255, 255, 0.28);
+    --glass-raised-bg: #2C353E;
+    --glass-raised-bg-pressed: #36404A;
+    --glass-raised-rim: rgba(255, 255, 255, 0.22);
+    --frost-bg: linear-gradient(#EEF2F6, #EEF2F6);
+    --frost-rim: #FFFFFF;
+    --glass-sheen: linear-gradient(transparent, transparent);
+    --glass-sheet-bg: linear-gradient(#1B232B, #1B232B);
+    --glass-warm-rim: linear-gradient(transparent, transparent);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-dark-bg: linear-gradient(#1B232B, #1B232B);
+    --glass-dark-tint-bg: linear-gradient(#1B232B, #1B232B);
+    --glass-dark-rim: rgba(255, 255, 255, 0.20);
+    --glass-light-bg: linear-gradient(#4A535D, #4A535D);
+    --glass-light-tint-bg: linear-gradient(#4A535D, #4A535D);
+    --glass-light-rim: rgba(255, 255, 255, 0.28);
+    --glass-raised-bg: #2C353E;
+    --glass-raised-bg-pressed: #36404A;
+    --glass-raised-rim: rgba(255, 255, 255, 0.22);
+    --frost-bg: linear-gradient(#EEF2F6, #EEF2F6);
+    --frost-rim: #FFFFFF;
+    --glass-sheen: linear-gradient(transparent, transparent);
+    --glass-sheet-bg: linear-gradient(#1B232B, #1B232B);
+    --glass-warm-rim: linear-gradient(transparent, transparent);
+    --glass-dark-filter: none;
+    --glass-light-filter: none;
+    --frost-filter: none;
+  }
+}
+@media (prefers-contrast: more) {
+  :root {
+    --glass-dark-bg: linear-gradient(#1B232B, #1B232B);
+    --glass-dark-tint-bg: linear-gradient(#1B232B, #1B232B);
+    --glass-dark-rim: rgba(255, 255, 255, 0.20);
+    --glass-light-bg: linear-gradient(#4A535D, #4A535D);
+    --glass-light-tint-bg: linear-gradient(#4A535D, #4A535D);
+    --glass-light-rim: rgba(255, 255, 255, 0.28);
+    --glass-raised-bg: #2C353E;
+    --glass-raised-bg-pressed: #36404A;
+    --glass-raised-rim: rgba(255, 255, 255, 0.22);
+    --frost-bg: linear-gradient(#EEF2F6, #EEF2F6);
+    --frost-rim: #FFFFFF;
+    --glass-sheen: linear-gradient(transparent, transparent);
+    --glass-sheet-bg: linear-gradient(#1B232B, #1B232B);
+    --glass-warm-rim: linear-gradient(transparent, transparent);
+    --glass-dark-filter: none;
+    --glass-light-filter: none;
+    --frost-filter: none;
+  }
+}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+  /* (beats MapView's inline display: the pulse's position only exists inside its keyframes) */
+  .you-pulse {
+    display: none !important;
+  }
 }

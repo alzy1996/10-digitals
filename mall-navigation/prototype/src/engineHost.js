@@ -4,7 +4,7 @@
  * `engine` stands in for the engine singleton (src/engine/engine.js) with the same API, so screens can call it
  * before the chunk has arrived:
  * - commands (setVenue, setView, showRoute, setMarker, flyTo, ...) are queued and replayed in order;
- * - subscriptions (onPick, onRender) are queued too and return an unsubscribe function that works either way;
+ * - subscriptions (onPick, onRender, onAnchors) are queued too and return an unsubscribe function that works either way;
  * - queries (getView, getStats, projectToScreen, ...) return safe defaults until the engine is there;
  * - whenIdle() waits for the engine first.
  * Nothing is downloaded until `loadEngine()` is called: the App calls it once the venue and the first screen are
@@ -24,8 +24,12 @@ const QUERY_DEFAULTS = {
   projectToScreen: () => null,
   pickAt: () => null,
   isFailed: () => false,
+  // v0.2 (CONTRACT 3b)
+  getAnchors: () => ({ frame: 0, mode: 'stack', camera: { headingDeg: 0, pitchDeg: -32, fovDeg: 30 }, nextTurn: null, destination: null, walker: null }),
+  getSceneStyle: () => 'storm',
+  getFpvOptions: () => ({ eyeHeightM: 1.6, fovDeg: 70, pitchDeg: -5 }),
 }
-const SUBSCRIPTIONS = new Set(['onPick', 'onRender'])
+const SUBSCRIPTIONS = new Set(['onPick', 'onRender', 'onAnchors'])
 
 let resolveEngine
 let rejectEngine

@@ -46,11 +46,9 @@ export const ArrivedScreen = forwardRef(function ArrivedScreen({ index, lang, in
           <Icon name="check" size={38} />
         </span>
         <div className="min-w-0">
-          <p className="subtitle" style={{ color: 'var(--color-ok)', fontWeight: 600 }}>
-            {t('arrived.title', lang)}
-          </p>
-          <h2 className="title">{info ? pick(info.name, lang) : ''}</h2>
-          {info?.levelId ? <p className="caption">{levelName(index, info.levelId, lang)}</p> : null}
+          <p className="arrived-label">{t('arrived.title', lang)}</p>
+          <h2 className="title-l">{info ? pick(info.name, lang) : ''}</h2>
+          {info?.levelId ? <p className="arrived-level">{levelName(index, info.levelId, lang)}</p> : null}
         </div>
       </div>
       {simulated ? <p className="caption mt-2 text-center">{t('sim.arrivedNote', lang)}</p> : null}

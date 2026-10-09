@@ -8,6 +8,8 @@ const MODES = [
   { mode: 'floor', key: 'view.floor', icon: 'floor' },
   { mode: 'top', key: 'view.top', icon: 'map2d' },
 ]
+/** v0.2: the first-person Walk view, offered only while a route is shown (navigate, arrived). */
+const WALK_MODE = { mode: 'fpv', key: 'view.fpv', icon: 'eye' }
 
 /**
  * Map controls, kept to the two top corners so the middle of the map stays free:
@@ -16,8 +18,9 @@ const MODES = [
  * - the level picker at the end edge (the edge where reading ends, so it moves to the left in Arabic:
  *   PLAN.md section 9). Levels are listed top floor first, labelled like the lift buttons; the App caps its
  *   height to the space above the bottom sheet, and it scrolls inside that space.
+ * `walkAvailable` (v0.2) adds a 4th menu row, "Walk view" (`onView('fpv')`), while a route is shown.
  */
-export function MapControls({ index, lang, view, onView, onLevel, routeLevelIds, showViews = true, showLevels = true }) {
+export function MapControls({ index, lang, view, onView, onLevel, routeLevelIds, showViews = true, showLevels = true, walkAvailable = false }) {
   const [open, setOpen] = useState(false)
   const [more, setMore] = useState({ above: false, below: false })
   const boxRef = useRef(null)
@@ -72,7 +75,8 @@ export function MapControls({ index, lang, view, onView, onLevel, routeLevelIds,
   if (!index) return null
   const levels = [...index.levels].sort((a, b) => b.ordinal - a.ordinal)
   const onRoute = new Set(routeLevelIds ?? [])
-  const current = MODES.find((m) => m.mode === view.mode) ?? MODES[0]
+  const modes = walkAvailable ? [...MODES, WALK_MODE] : MODES
+  const current = modes.find((m) => m.mode === view.mode) ?? MODES[0]
   return (
     <div className="map-ctrls">
       {showViews ? (
@@ -90,7 +94,7 @@ export function MapControls({ index, lang, view, onView, onLevel, routeLevelIds,
           </button>
           {open ? (
             <div className="view-menu" role="group" aria-label={t('view.label', lang)}>
-              {MODES.map((m) => (
+              {modes.map((m) => (
                 <button
                   key={m.mode}
                   type="button"
@@ -103,7 +107,7 @@ export function MapControls({ index, lang, view, onView, onLevel, routeLevelIds,
                 >
                   <Icon name={m.icon} size={22} />
                   <span className="flex-1">{t(m.key, lang)}</span>
-                  {view.mode === m.mode ? <Icon name="check" size={20} /> : null}
+                  {view.mode === m.mode ? <Icon name="check" size={20} className="view-check" /> : null}
                 </button>
               ))}
             </div>
@@ -130,7 +134,7 @@ export function MapControls({ index, lang, view, onView, onLevel, routeLevelIds,
               title={levelName(index, level.id, lang)}
               onClick={() => onLevel(level.id)}
             >
-              {levelButtonLabel(index, level.id, lang)}
+              <bdi dir="ltr">{levelButtonLabel(index, level.id, lang)}</bdi>
               {onRoute.has(level.id) ? <span className="level-dot" aria-hidden="true" /> : null}
             </button>
           ))}
@@ -148,5 +152,29 @@ export function MapControls({ index, lang, view, onView, onLevel, routeLevelIds,
         </div>
       ) : null}
     </div>
+  )
+}
+
+/**
+ * v0.2 floating "Walk view" pill (DESIGN-GLASS.md 7.5): pewter glass, 56 px, at the map's inline-end bottom corner,
+ * 12 px above the sheet (CSS uses the App's --sheet-top). It opens the first-person Walk view (a SIMULATION inside
+ * the 3D model). The App adds its rect to `engine.setScreenObstacles` (selector `.walk-pill`). While a toast shows
+ * (they sit in the same row above the sheet) it is hidden in place.
+ */
+export function WalkViewButton({ lang, onClick, hidden = false }) {
+  // `hidden`: a toast ("Now on Level 1") is using the row just above the sheet for a moment; the pill keeps its
+  // place (no layout jump), it is only not shown
+  return (
+    <button
+      type="button"
+      className="walk-pill"
+      onClick={onClick}
+      aria-hidden={hidden || undefined}
+      tabIndex={hidden ? -1 : undefined}
+      style={hidden ? { visibility: 'hidden' } : undefined}
+    >
+      <Icon name="eye" size={22} />
+      <span>{t('view.fpv', lang)}</span>
+    </button>
   )
 }

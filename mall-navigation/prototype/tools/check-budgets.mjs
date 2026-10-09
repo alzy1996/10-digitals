@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 /**
- * Load budgets (PLAN.md 19.2 "BUDGETS", enforced on every build): gzip size of the built files in dist/.
+ * Load budgets (PLAN.md 19.2 "BUDGETS", enforced on every build): gzip size of the built files in dist/, measured
+ * with zlib level 9 and counted in KiB (1 KiB = 1024 bytes). Vite's own build log prints decimal kB (1 kB = 1000
+ * bytes) at its default gzip level, so the same file reads about 2-3 % larger there: "51.3 kB" in Vite's log is
+ * 49.8 KiB here. The budget is the KiB figure printed below.
  *
  *   node tools/check-budgets.mjs [distDir]          (npm run build runs it after vite build)
  *
  * - initial JS + CSS (everything dist/index.html loads before the first screen)   <= 110 KB
  * - engine3d-*.js: the 3D libraries, three + troika, loaded lazily (PLAN "three + loaders + troika") <= 220 KB
- * - scene3d-*.js: Dallni's own 3D code (src/engine), loaded lazily with it         <= 50 KB
+ * - scene3d-*.js: Dallni's own 3D code (src/engine), loaded lazily with it         <= 52 KB (50 until QA round 2:
+ *   the Walk view's world fidelity, CONTRACT.md 3b)
  * - the two lazy 3D chunks together                                                <= 260 KB
  * - 3D sign fonts (readex-latin-600 + readex-arabic-600 .woff) in total             <= 50 KB
  * - any single font file                                                            <= 50 KB
@@ -24,7 +28,7 @@ const KB = 1024
 export const BUDGETS = Object.freeze({
   initialKB: 110,
   engineLibsKB: 220,
-  sceneKB: 50,
+  sceneKB: 52,
   lazy3dTotalKB: 260,
   signFontsKB: 50,
   fontKB: 50,
@@ -64,10 +68,11 @@ const invokedDirectly = process.argv[1] && resolve(process.argv[1]) === fileURLT
 if (invokedDirectly) {
   try {
     const { rows, ok } = checkBudgets()
-    console.log(`Load budgets (gzip) · ${DIST}`)
+    console.log(`Load budgets (gzip -9, KiB: 1 KiB = 1024 bytes; Vite's log above uses decimal kB) · ${DIST}`)
     for (const r of rows) {
       const pct = r.budget ? Math.round((r.kb / r.budget) * 100) : 0
-      console.log(`${r.ok ? 'ok  ' : 'OVER'}  ${r.kb.toFixed(1).padStart(6)} / ${String(r.budget).padStart(3)} KB  ${String(pct).padStart(3)}%  ${r.item}${r.files.length ? '' : '  (missing)'}`)
+      const left = Math.round((r.budget - r.kb) * KB)
+      console.log(`${r.ok ? 'ok  ' : 'OVER'}  ${r.kb.toFixed(1).padStart(6)} / ${String(r.budget).padStart(3)} KiB  ${String(pct).padStart(3)}%  ${String(left).padStart(7)} B left  ${r.item}${r.files.length ? '' : '  (missing)'}`)
     }
     if (!ok) {
       console.error('\nBudget check FAILED: a file is over its budget or missing (PLAN.md 19.2 BUDGETS).')

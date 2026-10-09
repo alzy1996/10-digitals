@@ -137,6 +137,8 @@ const PATHS = {
   ),
   play: <path d="M8 4.8v14.4a.8.8 0 0 0 1.2.7l11-7.2a.8.8 0 0 0 0-1.4l-11-7.2A.8.8 0 0 0 8 4.8z" {...F} />,
   pause: <path d="M6.5 4.5h3.6v15H6.5zM13.9 4.5h3.6v15h-3.6z" {...F} />,
+  // End the route (a stop square: never the ✕ that reads as "close this view")
+  stop: <rect x="6" y="6" width="12" height="12" rx="2.6" {...F} />,
   restart: (
     <>
       <path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5" {...S} />
@@ -264,6 +266,27 @@ const PATHS = {
       <circle cx="12" cy="12" r="8.4" {...S} />
     </>
   ),
+  // v0.2 Walk view: arrival flag, the Walk view eye, footprints (steps estimate)
+  flag: (
+    <>
+      <path d="M6.2 21.2V3.4" {...S} strokeWidth="2.4" />
+      <path d="M6.2 4h11.3a.7.7 0 0 1 .6 1.05L15.9 8.6l2.2 3.55a.7.7 0 0 1-.6 1.05H6.2z" {...F} />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M2.5 12S6 5.6 12 5.6 21.5 12 21.5 12 18 18.4 12 18.4 2.5 12 2.5 12z" {...S} />
+      <circle cx="12" cy="12" r="3.1" {...F} />
+    </>
+  ),
+  footprints: (
+    <>
+      <path d="M8.1 3c1.8 0 2.7 1.9 2.7 4.2 0 1.9-.8 3.4-.8 4.7H6.2c0-1.3-.9-2.6-.9-4.6C5.3 4.9 6.4 3 8.1 3z" {...F} />
+      <path d="M6.3 13.4H10V15a1.85 1.85 0 0 1-3.7 0z" {...F} />
+      <path d="M16 7.2c1.8 0 2.7 1.9 2.7 4.2 0 1.9-.8 3.4-.8 4.7h-3.8c0-1.3-.9-2.6-.9-4.6 0-2.4 1.1-4.3 2.8-4.3z" {...F} />
+      <path d="M14.2 17.6h3.7v1.6a1.85 1.85 0 0 1-3.7 0z" {...F} />
+    </>
+  ),
   // parking zone icons (filled): shared with the map pins, see src/engine/tokens.js
   ...Object.fromEntries(
     Object.entries(ZONE_ICON_PATHS).map(([name, parts]) => [
@@ -306,29 +329,5 @@ export function Icon({ name, size = 24, className, title, style }) {
   )
 }
 
-/** Icon name for a step (turn class, connector type, start, arrive). */
-export function stepIconName(step) {
-  if (!step) return 'turn_straight'
-  if (step.kind === 'start') return 'start'
-  if (step.kind === 'arrive') return 'arrive'
-  if (step.kind === 'connector') {
-    const c = step.connector
-    if (c?.type === 'lift') return 'lift'
-    if (c?.type === 'stairs') return 'stairs'
-    return c?.direction === 'down' ? 'escalator_down' : 'escalator_up'
-  }
-  switch (step.turn) {
-    case 'left':
-      return 'turn_left'
-    case 'right':
-      return 'turn_right'
-    case 'slight_left':
-      return 'turn_slight_left'
-    case 'slight_right':
-      return 'turn_slight_right'
-    case 'uturn':
-      return 'turn_uturn'
-    default:
-      return 'turn_straight'
-  }
-}
+/** Icon name for a step (turn class, connector type, start, arrive): pure JS, shared with the HUD model. */
+export { stepIconName } from './stepIcon.js'

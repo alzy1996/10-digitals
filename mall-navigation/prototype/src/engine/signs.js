@@ -164,6 +164,15 @@ export class SignLayer {
     return d
   }
 
+  /** Width (m) of a sign's text as drawn (its wider line), or null before all its lines are measured. */
+  inkWidth(spec) {
+    const it = this.bySpec.get(spec)
+    const p = it?.plan
+    if (!p || Object.keys(it.members).some((l) => !it.fit[l])) return null
+    const w1 = it.fit[it.primary] ?? 0
+    return p.roomForTwo ? Math.max(w1 * p.pScale, (it.fit[it.secondary] ?? 0) * p.sScale) : w1 * p.oneScale
+  }
+
   /** Fixed scales from the measured text widths (two lines, or the active language alone). */
   _plan(it) {
     const langs = Object.keys(it.members)

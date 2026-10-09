@@ -50,7 +50,8 @@ export function MapView({ onError, pulse }) {
       const s = p ? engine.projectToScreen({ levelId: p.levelId, x: p.x, y: p.y, h: 0.3 }) : null
       const host = hostRef.current
       const inside = s && host && s.sx > 0 && s.sy > 0 && s.sx < host.clientWidth && s.sy < host.clientHeight
-      if (!inside) {
+      // reduced motion: no pulse (its position lives in the animation keyframes, DESIGN-GLASS 9)
+      if (!inside || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
         div.style.display = 'none'
         return
       }

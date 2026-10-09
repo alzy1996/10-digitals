@@ -12,6 +12,105 @@ import { Color } from 'three'
 // pulling the 3D engine into the first-screen bundle.
 export { CATEGORY_COLORS, PIN_COLORS, amenityGroup } from './tokens.js'
 
+/** Sky pass colours (DESIGN-GLASS.md 5.2) as palette keys. */
+function sky(skyTop, skyMid, skyHorizon, skyLow, glow, glowCore, cloudDark, cloudLight, cloudLit, cloudAmt) {
+  return { skyTop, skyMid, skyHorizon, skyLow, glow, glowCore, cloudDark, cloudLight, cloudLit, cloudAmt }
+}
+
+/** Storm retail palette (DESIGN-GLASS.md 5.3): cool desaturated greys, teal-green route, blue you / walker. */
+const STORM = {
+  bgTop: '#121A1F',
+  bgBottom: '#0A0F12',
+  slab: '#3E464F',
+  walkway: '#363D45',
+  court: '#3E3F42',
+  seating: '#5E5A53',
+  paving: '#4A4741',
+  lobby: '#3B434C',
+  slabSide: '#262C33',
+  slabEdge: '#1A1F24',
+  roof: '#8A929B',
+  roofService: '#6B737C',
+  wall: '#5A626B',
+  wallInner: '#5D666F',
+  strip: '#D5DCE3',
+  serviceFloor: '#3A4149',
+  glass: '#9DBFCC',
+  metal: '#A9B3BD',
+  door: '#1E242A',
+  escDeck: '#2B3138',
+  escDeck2: '#363D45',
+  escSide: '#9AA4AE',
+  // escalator balustrade panels: drawn with the storefront glass material in storm
+  escPanel: '#9DBFCC',
+  escPit: '#1A1F24',
+  chevron: '#FFFFFF',
+  // painted arrows on the escalator steps: muted metal (the route's own white chevrons ride the ramp in the Walk view)
+  escChev: '#7D8792',
+  stairStep: '#6E7780',
+  stairStep2: '#5A636C',
+  stone: '#6E6A62',
+  stoneDark: '#57534C',
+  water: '#2E8FB0',
+  waterLight: '#6FC3DD',
+  post: '#A9B3BD',
+  qr: '#FFFFFF',
+  qrDark: '#0B0F14',
+  exit: '#1E9E5A',
+  exitMat: '#1F3A2C',
+  wood: '#8A6A50',
+  seat: '#6B6358',
+  leaf: '#3E7F57',
+  leafDark: '#2E6243',
+  trunk: '#6B4E38',
+  planter: '#57534C',
+  asphalt: '#2A3038',
+  aisle: '#333A43',
+  aisleLine: '#DDE3EA',
+  bayLine: '#E8EDF2',
+  lobbyPark: '#4A535D',
+  hatch: '#8A939D',
+  hatchDark: '#2A3038',
+  pillar: '#6E7780',
+  concrete: '#4A535D',
+  concreteTop: '#5A636D',
+  accessibleBay: '#3B4A5C',
+  accessibleSymbol: '#FFFFFF',
+  ghost: '#9AA6B2',
+  routeCore: '#26D9C7',
+  routeUpcoming: '#1FA79A',
+  routeCasing: '#10B5D3',
+  routeWalked: '#5F7C80',
+  you: '#4DA3FF',
+  youRing: '#FFFFFF',
+  lastSeen: '#9AA6B2',
+  car: '#F5B700',
+  carOutline: '#0B0F14',
+  dest: '#5BE584',
+  walker: '#4DA3FF',
+  walkerOutline: '#FFFFFF',
+  labelText: '#FFFFFF',
+  labelHalo: '#0E1418',
+  badgeText: '#FFFFFF',
+  badgeHalo: '#0E1418',
+  // level name badges: thin white type on a slim dark halo (DESIGN-GLASS 5.9), not v0.1's thick sticker outline
+  badgeW: 0.18,
+  signText: '#FFFFFF',
+  floorPaint: '#E6EBF0',
+  routeRim: '#5EF2DC',
+  routeBody: '#14B8A6',
+  routeGlow: '#10B5D3',
+  turnRing: '#5EF2DC',
+  ceiling: '#2B3239',
+  ceilingPanel: '#EAF2F8',
+  bulkhead: '#454D56',
+  // cool slate floor highlight and haze (QA round 2: the warm #C9A88C / #3A2F2A turned the Walk view's floors and far
+  // walls taupe-brown; amber stays a light source only: the skylight glow, the panels' warm rim, the SIMULATION tag)
+  sheen: '#8FA3B3',
+  fog: '#2A3138',
+  ...sky('#121A1F', '#1D262C', '#2B2D2F', '#0A0F12', '#FF9F55', '#FFD2A0', '#2A3238', '#6B737A', '#B47F5F', 0.55),
+}
+
 /** Theme tokens. Keys are referenced by name from the scene builders. */
 export const THEMES = Object.freeze({
   sunlight: Object.freeze({
@@ -39,8 +138,10 @@ export const THEMES = Object.freeze({
     escDeck: '#3B4452',
     escDeck2: '#4B5563',
     escSide: '#E3E8EF',
+    escPanel: '#E3E8EF',
     escPit: '#C9D1DB',
     chevron: '#FFFFFF',
+    escChev: '#FFFFFF',
     stairStep: '#D9DFE7',
     stairStep2: '#BCC5D0',
     stone: '#E4DDCF',
@@ -96,6 +197,16 @@ export const THEMES = Object.freeze({
     badgeHalo: '#1F2937',
     signText: '#FFFFFF',
     floorPaint: '#F5F7FA',
+    // v0.2 keys (classic reuses its nearest colours; it has no sky keys: the sky pass is not drawn in classic)
+    routeRim: '#FFFFFF',
+    routeBody: '#0B57D0',
+    routeGlow: '#5B8EE6',
+    turnRing: '#0B57D0',
+    ceiling: '#E3E8EF',
+    ceilingPanel: '#FFFFFF',
+    bulkhead: '#CDD5DF',
+    sheen: '#FFFFFF',
+    fog: '#E3E9F0',
   }),
   basement: Object.freeze({
     bgTop: '#121821',
@@ -120,8 +231,10 @@ export const THEMES = Object.freeze({
     escDeck: '#2A3342',
     escDeck2: '#3A4556',
     escSide: '#3A4556',
+    escPanel: '#3A4556',
     escPit: '#11161D',
     chevron: '#F5F7FA',
+    escChev: '#F5F7FA',
     stairStep: '#3A4556',
     stairStep2: '#2A3342',
     stone: '#4A5263',
@@ -170,10 +283,69 @@ export const THEMES = Object.freeze({
     badgeHalo: '#E6EAF0',
     signText: '#FFFFFF',
     floorPaint: '#E6EAF0',
+    routeRim: '#0B0F14',
+    routeBody: '#7AB0FF',
+    routeGlow: '#4C7BC0',
+    turnRing: '#7AB0FF',
+    ceiling: '#1E2530',
+    ceilingPanel: '#CFE6FF',
+    bulkhead: '#2A3342',
+    sheen: '#6B7686',
+    fog: '#0B0F14',
+  }),
+  // v0.2 "storm glass" style (DESIGN-GLASS.md 5.3, retail levels)
+  storm: Object.freeze(STORM),
+  // v0.2 storm, parking levels (DESIGN-GLASS.md 5.6)
+  stormBasement: Object.freeze({
+    ...STORM,
+    bgTop: '#0C1216',
+    bgBottom: '#070A0D',
+    slab: '#15191E',
+    asphalt: '#15191E',
+    walkway: '#1F262D',
+    court: '#1F262D',
+    paving: '#1F262D',
+    aisle: '#1C2228',
+    aisleLine: '#A9B6C4',
+    bayLine: '#D7E0EA',
+    lobbyPark: '#2A323B',
+    roof: '#2A323B',
+    lobby: '#262E36',
+    slabSide: '#0E1215',
+    slabEdge: '#2A323B',
+    wall: '#333B44',
+    wallInner: '#2A323B',
+    strip: '#8592A0',
+    pillar: '#3A444F',
+    concrete: '#252C34',
+    concreteTop: '#2E3640',
+    hatch: '#7D8896',
+    hatchDark: '#15191E',
+    glass: '#6F93B8',
+    ghost: '#7D8896',
+    routeWalked: '#4E6366',
+    labelHalo: '#0B0F14',
+    floorPaint: '#D7E0EA',
+    ceiling: '#1A1F25',
+    bulkhead: '#252C34',
+    sheen: '#6E8296',
+    fog: '#121820',
+    ...sky('#0C1216', '#141B21', '#18212A', '#070A0D', '#5AA9FF', '#BFDFFF', '#161C22', '#2E3842', '#3E6E9E', 0.2),
   }),
 })
 
-/** @typedef {'sunlight'|'basement'} ThemeName */
+/** @typedef {'sunlight'|'basement'|'storm'|'stormBasement'} ThemeName  a palette: classic (v0.1) or storm themes */
+
+/**
+ * Palette for a scene style and a theme: classic = the v0.1 tables, storm = the v0.2 "storm glass" tables.
+ * @param {'storm'|'classic'} style
+ * @param {'sunlight'|'basement'} theme
+ * @returns {ThemeName}
+ */
+export function paletteName(style, theme) {
+  if (style !== 'storm') return theme === 'basement' ? 'basement' : 'sunlight'
+  return theme === 'basement' ? 'stormBasement' : 'storm'
+}
 
 /**
  * Mix two hex colours in sRGB space (t = 0 -> a, 1 -> b).
@@ -190,13 +362,25 @@ export function mixHex(a, b, t) {
   return '#' + ((1 << 24) | (m(16) << 16) | (m(8) << 8) | m(0)).toString(16).slice(1).toUpperCase()
 }
 
+// category tints per palette: [roof base, t], [floor base, t], [side base, t], dark t
+const TINTS = {
+  sunlight: [['#FFFFFF', 0.34], ['#FFFFFF', 0.14], ['#D5DCE4', 0.3], 0.28],
+  basement: [['#2A3342', 0.5], ['#1B212B', 0.28], ['#3A4556', 0.35], 0.28],
+  storm: [['#7E8791', 0.3], ['#3E464F', 0.18], ['#5D666F', 0.25], 0.35],
+  stormBasement: [['#2A3342', 0.45], ['#1B212B', 0.25], ['#333B44', 0.3], 0.35],
+}
+
 /**
- * Resolve a colour key for a theme. Keys:
+ * Resolve a colour key for a palette. Keys:
  * - a THEMES token name ("walkway", "strip", ...)
- * - "hex:#RRGGBB"               fixed colour in both themes
+ * - "hex:#RRGGBB"               fixed colour in every palette (zone colours, painted codes)
+ * - "sign:#RRGGBB"              a category sign colour: exact in classic, a little desaturated toward slate and
+ *                               darkened in storm (DESIGN-GLASS.md 5.4: white text >= 6.1:1 on every category)
  * - "roof:#RRGGBB"              category-tinted roof
  * - "floor:#RRGGBB"             category-tinted interior floor
  * - "side:#RRGGBB"              category-tinted outer wall
+ * - "lit:#RRGGBB"               a shop's lit inside walls: storm = the side colour mixed 35 % toward warm light
+ *                               (#E9D9C4), so storefront glass reads as a lit shop; classic = the side colour
  * - "dark:#RRGGBB"              darker shade of a colour (sign box sides)
  * @param {string} key
  * @param {ThemeName} theme
@@ -209,18 +393,23 @@ export function resolveKeyHex(key, theme) {
   if (i < 0) throw new Error(`palette: unknown colour key "${key}"`)
   const kind = key.slice(0, i)
   const hex = key.slice(i + 1)
-  const sun = theme !== 'basement'
+  const tint = TINTS[theme] ?? TINTS.sunlight
   switch (kind) {
     case 'hex':
       return hex
+    case 'sign':
+      return theme === 'storm' || theme === 'stormBasement' ? mixHex(mixHex(hex, '#4B5560', 0.18), '#000000', 0.08) : hex
     case 'roof':
-      return sun ? mixHex('#FFFFFF', hex, 0.34) : mixHex('#2A3342', hex, 0.5)
+      return mixHex(tint[0][0], hex, tint[0][1])
     case 'floor':
-      return sun ? mixHex('#FFFFFF', hex, 0.14) : mixHex('#1B212B', hex, 0.28)
+      return mixHex(tint[1][0], hex, tint[1][1])
     case 'side':
-      return sun ? mixHex('#D5DCE4', hex, 0.3) : mixHex('#3A4556', hex, 0.35)
+    case 'lit': {
+      const sd = mixHex(tint[2][0], hex, tint[2][1])
+      return kind === 'lit' && theme.startsWith('storm') ? mixHex(sd, '#E9D9C4', 0.35) : sd
+    }
     case 'dark':
-      return mixHex(hex, '#000000', 0.28)
+      return mixHex(hex, '#000000', tint[3])
     default:
       throw new Error(`palette: unknown colour key "${key}"`)
   }

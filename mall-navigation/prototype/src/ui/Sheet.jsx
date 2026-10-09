@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useRef, useState } from 'react'
 
 /**
- * Bottom sheet over the always-visible 3D map. `maxHeight` keeps the map in view (navigate: <= 45%).
+ * Bottom sheet over the always-visible 3D map. `maxHeight` keeps the map in view (navigate: <= 47%, Arabic 49%).
  * The App measures the sheet (via the forwarded ref) to tell the engine how much of the screen is free.
  * `footer` (the screen's primary button) stays pinned at the bottom, fully visible; with `scroll` the rest
  * scrolls above it on short screens (a browser tab on a phone is much shorter than the phone), and a soft edge

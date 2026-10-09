@@ -46,7 +46,7 @@ export const CarScreen = forwardRef(function CarScreen(
         label={t('car.confirm', lang)}
         scroll
         footer={
-          <button type="button" className="btn btn-car btn-block btn-go" onClick={() => onSave(plateId)}>
+          <button type="button" className="btn btn-primary btn-block btn-go" onClick={() => onSave(plateId)}>
             <Icon name="car" size={26} />
             {t('car.save', lang)}
           </button>
@@ -146,7 +146,7 @@ function ZoneBlock({ lang, zone }) {
         <Icon name={zone.icon} size={36} />
       </span>
       <div className="min-w-0">
-        <p className="text-[14px] leading-5 font-semibold opacity-90">{t('car.zone', lang)}</p>
+        <p className="zone-label">{t('car.zone', lang)}</p>
         <p className="zone-name">{pick(zone.label, lang)}</p>
       </div>
     </div>
@@ -157,7 +157,9 @@ function LevelBox({ index, lang, levelId }) {
   return (
     <div className="text-end flex-none">
       <p className="caption">{t('car.level', lang)}</p>
-      <p className="text-[28px] leading-9 font-bold">{levelButtonLabel(index, levelId, lang)}</p>
+      <p className="num-card" aria-label={levelName(index, levelId, lang)}>
+        <bdi dir="ltr">{levelButtonLabel(index, levelId, lang)}</bdi>
+      </p>
     </div>
   )
 }
@@ -189,7 +191,7 @@ const CarCard = forwardRef(function CarCard({ index, lang, car, you, etaToCarS, 
           <Icon name="back" size={24} className="flip-rtl" />
         </button>
         <h2 className="title flex-1">{t('car.title', lang)}</h2>
-        <span className="inline-flex items-center gap-1 text-[15px] font-semibold nowrap" style={{ color: 'var(--color-ok)' }}>
+        <span className="saved-at">
           <Icon name="check" size={20} />
           {t('car.savedAt', lang, { time: clockOf(car.savedAt, lang) })}
         </span>

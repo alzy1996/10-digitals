@@ -6,14 +6,21 @@ import { Sheet } from './Sheet.jsx'
 import { TILE_STYLE, levelButtonLabel, paintedBayCode, pick, zoneOfBay } from './model.js'
 
 /**
- * Home (S03): you-are-here chip, search, the six tiles, My car, and the fictional-venue disclaimer.
- * One task: pick where to go.
+ * Home (S03): you-are-here chip, search, the six tiles, My car, and the fictional-venue disclaimer (pinned under
+ * the rest, so it is always fully on screen). One task: pick where to go.
  */
 export const HomeScreen = forwardRef(function HomeScreen({ index, lang, you, car, onScan, onSearchFocus, onTile, onCar }, ref) {
   const zone = car ? zoneOfBay(index, car.bayId) : null
   const code = car ? paintedBayCode(index, car.bayId) : null
   return (
-    <Sheet ref={ref} maxHeight="min(62%, calc(70% - 84px))" label={t('home.title', lang)} className="home-sheet">
+    <Sheet
+      ref={ref}
+      maxHeight="min(62%, calc(70% - 84px))"
+      label={t('home.title', lang)}
+      className="home-sheet"
+      scroll
+      footer={<p className="caption text-center">{pick(index.venue.meta.disclaimer, lang)}</p>}
+    >
       <div className="home-stack">
         <button type="button" className="here-chip" onClick={onScan}>
           <span className="here-dot" aria-hidden="true" />
@@ -21,13 +28,14 @@ export const HomeScreen = forwardRef(function HomeScreen({ index, lang, you, car
             {you ? t('home.youAreHere', lang, { place: pick(you.label, lang) }) : t('home.youAreHereUnknown', lang)}
             {you ? (
               <small>
-                {t('common.level', lang)} {levelButtonLabel(index, you.levelId, lang)} ·{' '}
+                {t('common.level', lang)} <bdi dir="ltr">{levelButtonLabel(index, you.levelId, lang)}</bdi> ·{' '}
                 {you.source === 'sim' ? (
                   t('sim.label', lang)
                 ) : (
                   <>
-                    <span className="wide-only">{t('scan.exact', lang)}</span>
-                    <span className="narrow-only">{t('scan.exactShort', lang)}</span>
+                    {/* the long note only where it fits on one line (CSS: .here-src-long from 430 px wide) */}
+                    <span className="here-src-long">{t('scan.exact', lang)}</span>
+                    <span className="here-src-short">{t('scan.exactShort', lang)}</span>
                   </>
                 )}
               </small>
@@ -42,7 +50,7 @@ export const HomeScreen = forwardRef(function HomeScreen({ index, lang, you, car
 
         <button type="button" className="search-box w-full text-start" onClick={onSearchFocus} aria-label={t('home.searchLabel', lang)}>
           <Icon name="search" size={24} />
-          <span className="flex-1 truncate text-[18px] leading-[52px]">{t('home.searchPlaceholder', lang)}</span>
+          <span className="search-ph">{t('home.searchPlaceholder', lang)}</span>
         </button>
 
         <div className="tiles" role="group" aria-label={t('home.tiles', lang)}>
@@ -50,7 +58,7 @@ export const HomeScreen = forwardRef(function HomeScreen({ index, lang, you, car
             const style = TILE_STYLE[id]
             return (
               <button key={id} type="button" className="tile" onClick={() => onTile(id)}>
-                <span className="tile-icon" style={{ background: style.color }}>
+                <span className="tile-icon" style={{ '--tile-c': style.color }}>
                   <Icon name={style.icon} size={24} />
                 </span>
                 <span>{t(`tile.${id}`, lang)}</span>
@@ -84,10 +92,9 @@ export const HomeScreen = forwardRef(function HomeScreen({ index, lang, you, car
               <Icon name={zone.icon} size={22} />
             </span>
           ) : null}
-          <Icon name="chevron" size={22} className="flip-rtl" />
+          <Icon name="chevron" size={22} className="flip-rtl" style={{ color: 'var(--ink-2-raised)' }} />
         </button>
 
-        <p className="caption text-center">{pick(index.venue.meta.disclaimer, lang)}</p>
       </div>
     </Sheet>
   )

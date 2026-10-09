@@ -1,32 +1,42 @@
 @import "tailwindcss";
 
-/* Self-hosted fonts (no Google Fonts CDN at runtime). */
+/*
+ * Self-hosted UI fonts only (same-origin files bundled by Vite; never Google Fonts or a font CDN).
+ * Readex Pro weights used by the v0.2 "storm glass" UI (DESIGN-GLASS.md section 3): 300 (light numerals, 28 px and
+ * up only), 400, 500 from @fontsource/readex-pro (Latin + Arabic subsets), and 600 from the bundled faces below
+ * (the same files the 3D signs use). 700 is no longer used.
+ */
+@import "@fontsource/readex-pro/latin-300.css";
+@import "@fontsource/readex-pro/arabic-300.css";
+@import "@fontsource/readex-pro/latin-400.css";
+@import "@fontsource/readex-pro/arabic-400.css";
+@import "@fontsource/readex-pro/latin-500.css";
+@import "@fontsource/readex-pro/arabic-500.css";
 @font-face { font-family: "Readex Pro"; font-weight: 600; font-display: swap; src: url("./assets/fonts/readex-latin-600.woff") format("woff"); unicode-range: U+0000-00FF, U+2000-206F; }
 @font-face { font-family: "Readex Pro"; font-weight: 600; font-display: swap; src: url("./assets/fonts/readex-arabic-600.woff") format("woff"); unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF; }
 
-/* Design tokens from PLAN.md §9 / §19.2. Sunlight = light, Basement = dark (parking). */
+/*
+ * Tailwind theme colours follow the storm-glass tokens (src/ui/app.css holds the full token set): the UI is dark
+ * glass in both themes; "basement" (parking levels) only changes the backdrop and the 3D palette.
+ */
 @theme {
   --font-sans: "Readex Pro", system-ui, -apple-system, "Segoe UI", "Noto Sans Arabic", sans-serif;
-  --color-bg: #FFFFFF;
-  --color-surface: #F1F4F8;
-  --color-ink: #0B0F14;
-  --color-ink-2: #3B4452;
-  --color-route: #0B57D0;
+  --color-bg: #0A0F12;
+  --color-surface: rgba(255, 255, 255, 0.10);
+  --color-ink: #FFFFFF;
+  --color-ink-2: #C9D2DB;
+  --color-route: #26D9C7;
   --color-car: #F5B700;
-  --color-ok: #067647;
-  --color-danger: #B42318;
-  --color-warn: #FFB020;
-}
-
-:root[data-theme="basement"] {
-  --color-bg: #0B0F14;
-  --color-surface: #161B22;
-  --color-ink: #F5F7FA;
-  --color-ink-2: #AEB8C6;
-  --color-route: #7AB0FF;
-  --color-ok: #4ADE9B;
-  --color-danger: #FF8A80;
+  --color-ok: #7EF0A6;
+  --color-danger: #FFB4AB;
+  --color-warn: #FFB547;
 }
 
 html, body, #root { height: 100%; margin: 0; }
-body { background: var(--color-bg); color: var(--color-ink); font-family: var(--font-sans); -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+body {
+  background: #0A0F12;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}

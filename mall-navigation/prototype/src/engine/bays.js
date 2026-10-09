@@ -54,16 +54,16 @@ uniform vec3 uLine;
 uniform vec3 uFill;
 uniform vec3 uAccessible;
 varying vec3 vCol;
-void main() {
-  vCol = aFill > 0.5 ? (aKind > 0.5 ? uAccessible : uFill) : uLine;
-  gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+void main(){
+vCol=aFill>0.5?(aKind>0.5?uAccessible:uFill):uLine;
+gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.0);
 }
 `
 const FRAG = /* glsl */ `
 varying vec3 vCol;
-void main() {
-  gl_FragColor = vec4(vCol, 1.0);
-  #include <colorspace_fragment>
+void main(){
+gl_FragColor=vec4(vCol,1.0);
+#include <colorspace_fragment>
 }
 `
 

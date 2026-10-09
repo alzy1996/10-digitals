@@ -54,16 +54,21 @@ export function pick(value, lang) {
 }
 
 /**
- * Short level label as printed on the lift buttons ("B2", "B1", "G", "1" / «ب٢» «ب١» «أ» «١»).
- * Falls back to the level's shortName.
+ * Short level code as printed on the lift panel ("B2", "B1", "G", "1"), in both languages: the Arabic codes «أ»
+ * (Ground) and «١» (Level 1) are a near-identical pair of strokes side by side in the level picker and the result
+ * badges, and «ب١» can read like «با». Render it left-to-right isolated (`<bdi dir="ltr">` / `.ltr-isolate`) inside
+ * Arabic text, and give the full name (levelName) to screen readers. Falls back to the level's shortName.
+ * @param {object} index
+ * @param {string} levelId
+ * @param {'en'|'ar'} [_lang] kept for callers; the code is the same in both languages
  */
-export function levelButtonLabel(index, levelId, lang) {
+export function levelButtonLabel(index, levelId, _lang) {
   for (const conn of index.connectorById.values()) {
     if (conn.type !== 'lift') continue
     const stop = conn.stops?.find((s) => s.levelId === levelId)
-    if (stop?.buttonLabel) return pick(stop.buttonLabel, lang)
+    if (stop?.buttonLabel) return pick(stop.buttonLabel, 'en')
   }
-  return pick(index.levelById.get(levelId)?.shortName, lang) || levelId
+  return pick(index.levelById.get(levelId)?.shortName, 'en') || levelId
 }
 
 export function levelName(index, levelId, lang) {

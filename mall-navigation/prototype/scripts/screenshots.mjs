@@ -7,7 +7,8 @@
  * then run:   node scripts/screenshots.mjs [baseUrl]        (default http://localhost:4202/)
  *
  * Writes .shots/app-<scenario>.png, prints console errors, page errors and any request to a host that is
- * not localhost, and exits with code 1 if there were any.
+ * not localhost, and exits with code 1 if there were any. The `fpv-*` shots are the v0.2 first-person Walk view
+ * (deep links with `simT` keep the simulated walk paused, so the engine settles to 0 frames before the shot).
  *
  * Playwright: uses a local `playwright` package if installed, otherwise the global install at
  * /opt/node22/lib/node_modules/playwright. WebGL runs on SwiftShader (software GPU).
@@ -20,8 +21,51 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const OUT = join(ROOT, '.shots')
 const BASE = process.argv[2] ?? 'http://localhost:4202/'
 
+/** Route to the food-court counter on Level 1 (up escalator) and the step-free trip back to the car on B1 (lift). */
+const KITCHEN = { screen: 'navigate', to: 'occ-muttrah-kitchen' }
+const TO_CAR = { screen: 'navigate', to: 'bay-B1-043', car: 'bay-B1-043', stepFree: '1', from: 'A-L1-C3' }
+const PHONE_360 = { width: 360, height: 740 }
+
 /** The demo scenarios (URL test hooks: see src/ui/urlState.js). */
 const SCENARIOS = [
+  // ---- v0.2 first-person Walk view (a SIMULATION inside the 3D model; DESIGN-GLASS.md 6-7, Appendix B)
+  // start of the trip, walk not started yet
+  { name: 'fpv-start-en', query: { lang: 'en', ...KITCHEN, view: 'fpv' } },
+  // mid-corridor on Level 1: glowing path + chevrons, ring + turn bubble at the next corner, heading-up dome
+  { name: 'fpv-mid-en', query: { lang: 'en', ...KITCHEN, view: 'fpv', simT: '68' } },
+  { name: 'fpv-mid-en-360', viewport: PHONE_360, query: { lang: 'en', ...KITCHEN, view: 'fpv', simT: '68' } },
+  // walking to the escalator on the ground floor (bubble "Escalator up · to Level 1")
+  { name: 'fpv-sim-t20-en', query: { lang: 'en', ...KITCHEN, view: 'fpv', simT: '20' } },
+  // riding the up escalator (Arabic): eye on the ramp, looking up toward Level 1
+  { name: 'fpv-escalator-ar', query: { lang: 'ar', ...KITCHEN, view: 'fpv', simT: '45' } },
+  { name: 'fpv-escalator-ar-360', viewport: PHONE_360, query: { lang: 'ar', ...KITCHEN, view: 'fpv', simT: '45' } },
+  // 1.5 s after stepping off the escalator: "Now on Level 1" under the turn card
+  { name: 'fpv-floor-change-en', query: { lang: 'en', ...KITCHEN, view: 'fpv', simT: '58' } },
+  { name: 'fpv-floor-change-en-360', viewport: PHONE_360, query: { lang: 'en', ...KITCHEN, view: 'fpv', simT: '58' } },
+  // arrival: facing the shop sign, glass Arrived sheet, SIMULATION capsule kept
+  { name: 'fpv-arrived-en', query: { lang: 'en', screen: 'arrived', to: 'occ-muttrah-kitchen', view: 'fpv' } },
+  { name: 'fpv-arrived-en-360', viewport: PHONE_360, query: { lang: 'en', screen: 'arrived', to: 'occ-muttrah-kitchen', view: 'fpv' } },
+  // back to the car: inside the lift ride (lift card), then walking through Parking B1 to the bay
+  { name: 'fpv-lift-en', query: { lang: 'en', ...TO_CAR, view: 'fpv', simT: '99' } },
+  { name: 'fpv-car-b1-en', query: { lang: 'en', ...TO_CAR, view: 'fpv', simT: '115' } },
+  { name: 'fpv-car-b1-en-360', viewport: PHONE_360, query: { lang: 'en', ...TO_CAR, view: 'fpv', simT: '115' } },
+  { name: 'fpv-arrived-car-ar', query: { lang: 'ar', screen: 'arrived', to: 'bay-B1-043', car: 'bay-B1-043', stepFree: '1', from: 'A-L1-C3', view: 'fpv' } },
+  // Parking B2 by the lift from the south entrance
+  { name: 'fpv-car-b2-en', query: { lang: 'en', screen: 'navigate', to: 'bay-B2-041', car: 'bay-B2-041', view: 'fpv', simT: '62' } },
+  // phone browser tabs (address bar shown): compact HUD, no chips row
+  { name: 'fpv-sim-t20-en-390x664', viewport: { width: 390, height: 664 }, query: { lang: 'en', ...KITCHEN, view: 'fpv', simT: '20' } },
+  { name: 'fpv-mid-ar-360x640', viewport: { width: 360, height: 640 }, query: { lang: 'ar', ...KITCHEN, view: 'fpv', simT: '68' } },
+  // QA round 2: the turn bubble in Arabic on a 360 px phone (never over its own text), the escalator verb on one line
+  // at 360 px, the last step (the bar's Arrived), the arrival at a shop facing the atrium void (turned along the
+  // corridor), and the lift ride in Arabic (the button as printed on the panel)
+  { name: 'fpv-start-ar-360', viewport: PHONE_360, query: { lang: 'ar', ...KITCHEN, view: 'fpv' } },
+  { name: 'fpv-escalator-en-360', viewport: PHONE_360, query: { lang: 'en', ...KITCHEN, view: 'fpv', simT: '45' } },
+  { name: 'fpv-laststep-en', query: { lang: 'en', ...KITCHEN, view: 'fpv', step: '6' } },
+  { name: 'fpv-arrived-abaya-en', query: { lang: 'en', screen: 'arrived', to: 'occ-abaya-atelier', view: 'fpv' } },
+  { name: 'fpv-lift-ar-360', viewport: PHONE_360, query: { lang: 'ar', ...TO_CAR, view: 'fpv', simT: '99' } },
+  // the v0.1 look on demand
+  { name: 'home-en-classic', query: { lang: 'en', screen: 'home', style: 'classic' } },
+  // ---- every screen in storm glass (v0.1 scenarios)
   { name: 'home-en', query: { lang: 'en', screen: 'home' } },
   { name: 'home-ar', query: { lang: 'ar', screen: 'home' } },
   { name: 'search-ar-restaurant', query: { lang: 'ar', screen: 'search', q: 'مطعم' } },

@@ -158,6 +158,12 @@ function buildUnitWalls(B, poly, style, openings, onSign) {
       const fp = [P(t0), P(t1), add(P(t1), mul(nIn, T)), add(P(t0), mul(nIn, T))]
       B.opaque.prism(fp, h0, h1, topKey, side, { ao: h0 < 0.01 })
     }
+    // a solid wall, lined inside with the shop's lit back-wall colour (storm: warm and lighter, so the storefront glass
+    // reads as a lit shop; classic: the wall's own colour, unchanged)
+    const wall = (t0, t1) => {
+      box(t0, t1, 0, top, wallKey)
+      if (style.litKey && t1 - t0 > 1e-3) B.opaque.vquad(add(P(t0), mul(nIn, T + 0.003)), add(P(t1), mul(nIn, T + 0.003)), 0, top, style.litKey, nIn, { ao: true })
+    }
     // openings on this edge
     const ops = []
     for (const o of openings) {
@@ -178,7 +184,7 @@ function buildUnitWalls(B, poly, style, openings, onSign) {
     let t = 0
     for (const op of ops) {
       const f0 = Math.max(op.f0, t)
-      box(t, f0, 0, top, wallKey)
+      wall(t, f0)
       // storefront: plinth + glass + category header, open door
       const doorH = Math.min(style.doorH, H - 0.5)
       for (const [s0, s1] of [
@@ -228,7 +234,7 @@ function buildUnitWalls(B, poly, style, openings, onSign) {
       }
       t = op.f1
     }
-    box(t, L, 0, top, wallKey)
+    wall(t, L)
   }
 }
 
@@ -339,8 +345,9 @@ function buildPlate(B, anchor, mounted) {
   if (!mounted) {
     const ang = anchor.facingDeg ?? 0
     const T = 1.1
-    B.opaque.flat(orientedRect(x, y, T, T, ang), 0.03, 'qrDark')
-    B.opaque.flat(orientedRect(x, y, T - 0.16, T - 0.16, ang), 0.034, 'qr', { shade: 1 })
+    const Q = B.plates
+    Q.flat(orientedRect(x, y, T, T, ang), 0.03, 'qrDark')
+    Q.flat(orientedRect(x, y, T - 0.16, T - 0.16, ang), 0.034, 'qr', { shade: 1 })
     // finder squares in three corners (dark ring, white ring, dark centre) and a few modules
     const side = [f[1], -f[0]]
     const at = (s, t) => [x + side[0] * s + f[0] * t, y + side[1] * s + f[1] * t]
@@ -351,9 +358,9 @@ function buildPlate(B, anchor, mounted) {
       [-q, -q],
     ]) {
       const c = at(s0, t0)
-      B.opaque.flat(orientedRect(c[0], c[1], 0.3, 0.3, ang), 0.038, 'qrDark')
-      B.opaque.flat(orientedRect(c[0], c[1], 0.18, 0.18, ang), 0.04, 'qr', { shade: 1 })
-      B.opaque.flat(orientedRect(c[0], c[1], 0.1, 0.1, ang), 0.042, 'qrDark')
+      Q.flat(orientedRect(c[0], c[1], 0.3, 0.3, ang), 0.038, 'qrDark')
+      Q.flat(orientedRect(c[0], c[1], 0.18, 0.18, ang), 0.04, 'qr', { shade: 1 })
+      Q.flat(orientedRect(c[0], c[1], 0.1, 0.1, ang), 0.042, 'qrDark')
     }
     for (const [s0, t0] of [
       [0.12, -0.12],
@@ -363,7 +370,7 @@ function buildPlate(B, anchor, mounted) {
       [-0.02, -0.28],
     ]) {
       const c = at(s0, t0)
-      B.opaque.flat(orientedRect(c[0], c[1], 0.09, 0.09, ang), 0.038, 'qrDark')
+      Q.flat(orientedRect(c[0], c[1], 0.09, 0.09, ang), 0.038, 'qrDark')
     }
     return
   }
@@ -561,6 +568,8 @@ function newBuild(registry, level) {
     glass: new MeshBuilder(registry),
     decals: new MeshBuilder(registry),
     ghost: new MeshBuilder(registry),
+    // free-standing QR floor tiles: their own mesh, hidden in the Walk view
+    plates: new MeshBuilder(registry),
     signs: [],
     floorTexts: [],
     bayTexts: [],
@@ -680,10 +689,11 @@ export function buildRetailLevel(index, level, registry) {
       style = {
         H,
         wallKey: 'side:' + cat,
-        catKey: 'hex:' + cat,
+        catKey: 'sign:' + cat,
         signDark: 'dark:' + cat,
         roofKey: 'roof:' + cat,
         floorKey: 'floor:' + cat,
+        litKey: 'lit:' + cat,
         doorH: big ? 3.0 : 2.6,
         signBottom: big ? 3.15 : 2.72,
         signTop: big ? H + 0.55 : H + 0.36,
@@ -695,10 +705,11 @@ export function buildRetailLevel(index, level, registry) {
       style = {
         H: WALL_H,
         wallKey: 'side:' + col,
-        catKey: 'hex:' + col,
+        catKey: 'sign:' + col,
         signDark: 'dark:' + col,
         roofKey: 'roof:' + col,
         floorKey: 'floor:' + col,
+        litKey: 'lit:' + col,
         doorH: 2.5,
         signBottom: 2.72,
         signTop: WALL_H + 0.3,
@@ -862,14 +873,21 @@ export function buildRetailLevel(index, level, registry) {
   return build
 }
 
-/** Short level code as printed on the lift buttons ("B1", "G", "1" / «ب١» «أ» «١»), else the level's shortName. */
+/**
+ * Short level code as printed on the lift buttons ("B1", "G", "1"), in both languages, like the screens
+ * (ui/model.levelButtonLabel): the Arabic codes «أ» / «١» are a near-identical pair of strokes and «ب١» can read like
+ * «با». Else the level's shortName.
+ */
 function levelCode(index, level) {
+  let code = level.shortName?.en ?? level.id
   for (const conn of index.venue.connectors ?? []) {
-    if (conn.type !== 'lift') continue
-    const stop = (conn.stops ?? []).find((st) => st.levelId === level.id)
-    if (stop?.buttonLabel?.en && stop?.buttonLabel?.ar) return { en: stop.buttonLabel.en, ar: stop.buttonLabel.ar }
+    const stop = conn.type === 'lift' ? (conn.stops ?? []).find((st) => st.levelId === level.id) : null
+    if (stop?.buttonLabel?.en) {
+      code = stop.buttonLabel.en
+      break
+    }
   }
-  return { en: level.shortName?.en ?? level.id, ar: level.shortName?.ar ?? level.name.ar }
+  return { en: code, ar: code }
 }
 
 function levelBadge(index, level) {
@@ -1113,7 +1131,9 @@ export function buildParkingLevel(index, level, registry) {
 
 /**
  * Escalator geometry spanning two levels. Built with rise fractions so the ramp follows the
- * current stack layout (see geometry.setRise).
+ * current stack layout (see geometry.setRise). Returns `{ deck, panels, arrows }`: the opaque deck, steps, truss and
+ * handrail; the balustrade side panels (glass in storm, opaque in classic: engine buildConnectors); the arrows painted
+ * on the steps (map views only).
  * @param {object} conn
  * @param {import('./palette.js').ColorRegistry} registry
  * @param {{elevLow:number, elevHigh:number, lowStop:object, highStop:object}} info
@@ -1149,7 +1169,9 @@ export function buildEscalator(conn, registry, info) {
     B.triN(ia, ib, ic, 0, 1, 0)
     B.triN(ia, ic, ie, 0, 1, 0)
   }
-  // chevrons in the direction of travel
+  // chevrons in the direction of travel, painted on the steps for the map views (their own builder: the Walk view, which
+  // rides the moving steps, does not draw them)
+  const A = new MeshBuilder(registry, { rise: true })
   const nCh = Math.max(3, Math.floor((L - 2 * landing) / 2.2))
   for (let k = 0; k < nCh; k++) {
     const sc = landing + ((L - 2 * landing) * (k + 0.5)) / nCh
@@ -1165,13 +1187,20 @@ export function buildEscalator(conn, registry, info) {
       const p4 = P(tipS - dir * th, 0)
       const ids = [p1, p2, p3, p4].map((p, i) => {
         const s = i === 0 || i === 3 ? (i === 0 ? tipS : tipS - dir * th) : i === 1 ? backS : backS - dir * th
-        return B.v(p[0], p[1], 0.075, 'chevron', 1, frac(s))
+        return A.v(p[0], p[1], 0.075, 'escChev', 1, frac(s))
       })
-      B.triN(ids[0], ids[1], ids[2], 0, 1, 0)
-      B.triN(ids[0], ids[2], ids[3], 0, 1, 0)
+      A.triN(ids[0], ids[1], ids[2], 0, 1, 0)
+      A.triN(ids[0], ids[2], ids[3], 0, 1, 0)
     }
   }
-  // balustrades + skirts (follow the profile)
+  // balustrades (follow the profile): an opaque truss skirt under the deck, then the side panels up to the handrail in
+  // their own builder (storm draws them with the storefront glass, classic opaque as in v0.1; both faces, each culled)
+  const G = new MeshBuilder(registry, { rise: true })
+  const quad = (M, a, b, h0, h1, key, s0, s1, f0, f1, n) => {
+    const q = [M.v(a[0], a[1], h0, key, s0, f0), M.v(b[0], b[1], h0, key, s0, f1), M.v(b[0], b[1], h1, key, s1, f1), M.v(a[0], a[1], h1, key, s1, f0)]
+    M.triN(q[0], q[1], q[2], n[0], 0, -n[1])
+    M.triN(q[0], q[2], q[3], n[0], 0, -n[1])
+  }
   for (const sgn of [-1, 1]) {
     const o = sgn * (hw + 0.08)
     const nOut = mul(side, sgn)
@@ -1183,13 +1212,9 @@ export function buildEscalator(conn, registry, info) {
       const f0 = frac(s0)
       const f1 = frac(s1)
       const sh = wallShade(nOut[0], nOut[1])
-      // side panel from under the deck to the handrail
-      const q = [B.v(a[0], a[1], -0.7, 'escSide', sh * 0.85, f0), B.v(b[0], b[1], -0.7, 'escSide', sh * 0.85, f1), B.v(b[0], b[1], 1.0, 'escSide', sh, f1), B.v(a[0], a[1], 1.0, 'escSide', sh, f0)]
-      B.triN(q[0], q[1], q[2], nOut[0], 0, -nOut[1])
-      B.triN(q[0], q[2], q[3], nOut[0], 0, -nOut[1])
-      const qi = [B.v(a[0], a[1], 0.06, 'escSide', sh * 0.9, f0), B.v(b[0], b[1], 0.06, 'escSide', sh * 0.9, f1), B.v(b[0], b[1], 1.0, 'escSide', sh * 0.9, f1), B.v(a[0], a[1], 1.0, 'escSide', sh * 0.9, f0)]
-      B.triN(qi[0], qi[1], qi[2], -nOut[0], 0, nOut[1])
-      B.triN(qi[0], qi[2], qi[3], -nOut[0], 0, nOut[1])
+      quad(B, a, b, -0.7, 0.06, 'escSide', sh * 0.85, sh * 0.917, f0, f1, nOut)
+      quad(G, a, b, 0.06, 1.0, 'escPanel', sh * 0.917, sh, f0, f1, nOut)
+      quad(G, a, b, 0.06, 1.0, 'escPanel', sh * 0.9, sh * 0.9, f0, f1, mul(nOut, -1))
       // handrail top
       const a2 = P(s0, o + sgn * 0.12)
       const b2 = P(s1, o + sgn * 0.12)
@@ -1212,7 +1237,7 @@ export function buildEscalator(conn, registry, info) {
     B.triN(ids[0], ids[1], ids[2], 0, -1, 0)
     B.triN(ids[0], ids[2], ids[3], 0, -1, 0)
   }
-  return B
+  return { deck: B, panels: G, arrows: A }
 }
 
 /**

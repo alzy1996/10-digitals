@@ -1,4 +1,4 @@
-# Dallni Prototype: Build Contract (v0.1)
+# Dallni Prototype: Build Contract (v0.1, with the v0.2 additions in section 3b)
 
 This file is the single source of truth for module boundaries. Every module MUST follow it.
 If you need to change it, change it here first and keep every module consistent.
@@ -159,7 +159,7 @@ Singleton, render-on-demand (no continuous loop when idle).
   returns defaults for queries, and exposes `enginePromise` (MapView mounts the canvas through it; it rejects
   when the chunk cannot be downloaded). Nothing downloads until `loadEngine()` is called: the App calls it once
   the venue is loaded and the first screen is up (requestIdleCallback). Build output: `engine3d-*.js` (three +
-  troika, budget 220 KB gzip) and `scene3d-*.js` (src/engine, budget 50 KB gzip), checked by
+  troika, budget 220 KB gzip) and `scene3d-*.js` (src/engine, budget 52 KB gzip since QA round 2, see 3b), checked by
   `tools/check-budgets.mjs` after every `npm run build`.
 - No WebGL: `mount()` throws (the app shows its fallback), the engine frees what it built and every command
   becomes a no-op (`isFailed() -> true`); troika text is only typeset once a WebGL renderer exists.
@@ -200,8 +200,10 @@ Singleton, render-on-demand (no continuous loop when idle).
     aisle (heading = `angleDeg`), the painted code upright in front of the car, closer than 25 m so the codes
     show, the code and the car clear of the controls.
   - `flyToShopFront({ levelId, x, y }, durationMs?) -> boolean`: arrival view facing the destination's sign,
-    close enough that both sign lines read (Latin >= 14 px, Arabic >= 16 px) on any screen size, with the arrival
-    ring above the sheet.
+    close enough that both sign lines read (Latin >= 14 px, Arabic >= 16 px) on any screen size, the sign's text clear
+    of the controls (the text's measured width, not the whole sign box: on a 360 px phone the box is wider than the gap
+    between the View control and the level picker), with the arrival ring above the sheet when it fits. Called before
+    the sign's text is typeset (a deep link), it frames again once the text is measured, unless the camera has moved.
   - `setViewportPadding({ top, right, bottom, left })`: screen space taken by UI, so fits frame the free area.
   - `setScreenObstacles([{ x, y, w, h }])`: screen rectangles covered by UI (header, map controls, sheet);
     labels and pins never draw under them (camera moves also keep key points clear of them, see above). Level
@@ -270,12 +272,185 @@ Test hooks (for screenshots): URL params `?lang=ar|en&screen=home|place|navigate
 &to=<occupantId|amenityId|bayId>&view=stack|floor|top&simT=<seconds>&stepFree=1`, and `window.__dallni`
 exposing `{ engine, getState(), setState(partial) }`.
 
+## 3b. v0.2 additions (glass + first-person)
+
+The look, layout and motion are specified in [`DESIGN-GLASS.md`](./DESIGN-GLASS.md); this section is the API the
+engine builder implements and the UI builder calls. **Every v0.1 API above keeps working with the same signature and
+behaviour** (only colours change with the default style). Data, routing, steps, search and simulator modules are not
+touched. The Walk view is a SIMULATION inside the 3D model (not camera AR, not live positioning) and the UI labels it
+so at all times.
+
+### Units and spaces (same as section 1 unless stated)
+
+- Map points: venue metres `{ levelId, x, y }` (x east, y north). Heights `h`: metres above that level's floor as it
+  is drawn (in stack view: above the stacked slab), never scaled.
+- Angles: degrees, compass (0 = north, clockwise). `pitchDeg`: 0 = horizontal, negative = looking down.
+- Screen: **CSS pixels relative to the canvas container's top-left corner**, y down (the same space as
+  `projectToScreen`, `setScreenObstacles` and `setViewportPadding`).
+
+### Engine (`src/engine/engine.js`, and the stand-in `src/engineHost.js`)
+
+All commands are no-ops once WebGL has failed (`isFailed()`), are queued by `engineHost` before the chunk loads (any
+unknown name is already queued as a command), and request at most one render (except `setPathAnimating(true)`, which
+runs frames while the walk plays, and the camera moves they start).
+
+- `setSceneStyle(style: 'storm' | 'classic')`. Default **`'storm'`**. `storm` = palette tables `THEMES.storm` /
+  `THEMES.stormBasement`, procedural sky pass, floor sheen, fresnel storefront glass, desaturated sign boxes
+  (DESIGN-GLASS section 5). `classic` = the v0.1 look exactly. Re-resolves colour keys without rebuilding geometry.
+  `getSceneStyle() -> 'storm' | 'classic'`.
+- `setTheme('sunlight' | 'basement')`: unchanged meaning (retail vs parking colours), applied inside the current
+  style; the App still switches to `basement` when the focused level is a parking level.
+- `setView({ mode: 'stack' | 'floor' | 'top' | 'fpv', levelId?, fit? }, { durationMs? })`:
+  - `'fpv'` = first-person **Walk view**: the camera stands at eye height on the `walker` marker and follows it every
+    frame (smoothing, look-ahead, escalator ride, lift/stairs cut, comfort rules: DESIGN-GLASS 6.1 to 6.4). With no
+    walker it stands on the `you` marker, else the active step's start, else the route start, else the venue's
+    default start anchor, facing the route point 5 m ahead (or the anchor's `facingDeg`); the App sends its own stand
+    heading with `flyTo` (DESIGN-GLASS 6.1). `levelId` is used only when there is nothing to stand on; `fit`
+    is ignored. Entering from a map view = 1.1 s dive, leaving = 1.2 s rise; `opts.durationMs` overrides both (0 = cut,
+    used for deep links); cuts under `prefers-reduced-motion` (as is every map flight there). The eye never slides
+    through floors: a goal on another level outside a ride, or a jump of more than 3 m, is a cut.
+  - In `'fpv'`: OrbitControls are off; one-finger drag = look around (yaw/pitch offsets, spring back while the walk
+    plays), double-tap recentres, taps still go to `onPick`; no pan, no zoom. Only the walker's level (plus the
+    adjacent retail levels, seen through voids, and the exit level during an escalator ride) is drawn; the
+    Walk-view-only geometry (ceiling with void/skylight holes, bulkheads, light panels, floor streaks, fog) is built
+    lazily on first entry and disposed with the venue. The walker marker is not drawn; overlay labels are limited to
+    the forced ones.
+  - `getView()` returns `mode: 'fpv'` (with `blend: 0`, `stackLevels: null`) while in the Walk view.
+- `setFpvOptions({ eyeHeightM?: number, fovDeg?: number, pitchDeg?: number })`: partial update, merged.
+  Defaults **1.6 m, 70° (vertical), -5°** (QA round 1: -10° hid the corridor ahead behind the top HUD); clamps 1.2 to 2.0 m, 50° to 85°, -25° to +5°. `fovDeg` is reduced
+  automatically so the horizontal FOV stays <= 80°. Applies from the next frame. `getFpvOptions()` returns the
+  current values.
+- `setPathStyle(style: 'glow' | 'ribbon')`. Default **`'glow'`**: 1.4 m teal-green ribbon (true size in the Walk
+  view, >= 11 px on maps) with a translucent body, bright rims, soft outer glow and white chevrons (DESIGN-GLASS 5.7).
+  `'ribbon'` = the v0.1 ribbon. Independent of the scene style.
+- `setPathAnimating(on: boolean, opts?: { flowMps?: number })`. Chevrons flow forward along the route and the target
+  ring ripples **only while `on` is true**; `flowMps` (default 1.8, clamped 0.3 to 6) is the chevron speed in metres
+  per second (the UI passes `1.2 · simSpeed + 0.6`). While on, the engine renders continuously, but only while it is
+  mounted, a route is shown and `document.visibilityState === 'visible'` (it pauses itself otherwise and resumes when
+  those hold again). When off: static chevrons and back to render-on-demand (idle = 0 frames). Ignored under
+  `prefers-reduced-motion: reduce` (chevrons stay static).
+- `setNextTurn({ levelId, x, y, label?: { en, ar }, kind?: 'turn' | 'connector' | 'arrive' } | null)`. Places the
+  **target ring + beam** (DESIGN-GLASS 5.8) on the floor at that point and makes it the `nextTurn` anchor. `kind:
+  'arrive'` draws it in the destination colour (in `'fpv'` the destination pin and the destination's own name are then
+  not drawn: the ring and the bubble on its beam mark it). `label` is drawn by the engine only in `'floor'` / `'top'`,
+  as a forced overlay label beside the ring (obstacle-aware); never in `'fpv'` (the UI's DOM bubble; the engine keeps
+  other names clear of the bubble's icon and box) or `'stack'` (the ring is hidden in stack view). `null` removes the
+  ring and the anchor. Kept across view changes; cleared by `showRoute(null)`. In `'fpv'` with a route shown and no
+  next turn (Arrived) the whole route counts as walked (no path, no connector poles drawn), and when the `dest` marker
+  is `state: 'arrived'` the engine stands the target ring in the destination colour at its doorstep instead of the
+  flat arrival ring.
+- `onAnchors(cb) -> unsubscribe` and `getAnchors() -> Anchors`:
+
+  ```js
+  /** @typedef {object} AnchorPoint
+   *  @property {number|null} x, y          CSS px of the bubble anchor: the point lifted 2.2 m above its floor
+   *                                         (the top of the ring beam). null only when the level is not loaded.
+   *                                         Off-screen points keep their raw projected values (may be outside
+   *                                         the canvas); behind-the-camera points: see relBearingDeg.
+   *  @property {number|null} floorX, floorY CSS px of the same point on the floor (h = 0.05 m)
+   *  @property {boolean} visible           in front of the camera AND inside the free viewport (canvas minus
+   *                                         setViewportPadding) AND its level is displayed
+   *  @property {boolean} behind            camera-space depth <= 0 (x, y are then not meaningful). The UI tells a
+   *                                         point behind the camera plane but still ahead (|relBearingDeg| <= 90, or
+   *                                         the eye on it: under 2 m) from one really behind (DESIGN-GLASS 6.5)
+   *  @property {number} relBearingDeg      horizontal angle from the view direction to the point, -180..180,
+   *                                         positive = to the right; always valid (use it to clamp off-screen)
+   *  @property {number} distanceM          metres along the shown route from the walker's route position (riding an
+   *                                         escalator: projected onto that escalator's edge; in 'fpv' with no walker:
+   *                                         where the eye stands; else the route start) to the point's projection on the
+   *                                         route; straight-line metres from the walker / you marker / camera
+   *                                         target when the point is not on the route
+   *  @property {string} levelId
+   */
+  /** @typedef {object} Anchors
+   *  @property {number} frame                         engine frame counter of the frame these belong to
+   *  @property {'stack'|'floor'|'top'|'fpv'} mode
+   *  @property {{ headingDeg: number, pitchDeg: number, fovDeg: number }} camera
+   *            headingDeg = compass heading of the view direction (drives the heading-up mini-map and compass)
+   *  @property {AnchorPoint|null} nextTurn            from setNextTurn (null when none)
+   *  @property {AnchorPoint|null} destination         the 'dest' marker; else the shown route's last point; else null
+   *  @property {{ x: number|null, y: number|null, visible: boolean, headingDeg: number, levelId: string,
+   *              mapX: number, mapY: number } | null} walker
+   *            x, y = CSS px of the walker marker (h = 0.3 m), null and visible = false in 'fpv' (the camera is the
+   *            walker); headingDeg = walker heading of travel; mapX, mapY = venue metres; null when no walker marker
+   */
+  ```
+
+  - **When**: synchronously at the end of **every rendered frame**, after the `onRender` callbacks, in subscription
+    order. Never on a timer and never when no frame renders: idle = 0 calls. At most once per frame.
+  - **No extra renders**: computing anchors is projection only (a few vector multiplies, < 0.1 ms) and never requests
+    a frame. A callback must not cause a render loop: engine commands called from inside an `onAnchors` (or
+    `onRender`) callback are deferred to a microtask after the frame, and `requestRender` from there is coalesced
+    into the next scheduled frame.
+  - Each call receives a new plain object; do not mutate it. Callbacks write to the DOM directly (transforms), never
+    `setState` per frame.
+  - `getAnchors()` returns the anchors of the last rendered frame; before any frame (or after `setNextTurn` without a
+    frame yet) it computes them from the current camera without rendering.
+- Existing APIs in `'fpv'`:
+  - `setFollow(on)`: ignored in `'fpv'` (it always follows); keeps its v0.1 meaning in map views.
+  - `setActiveStep(i, opts)`: highlights the step as before; with no walker it glides the eye to the step's start
+    facing along it (900 ms; `opts.fly === false` = no move). No map-style flight.
+  - `flyTo(p)`: moves the eye to `(p.x, p.y)` on `p.levelId`, facing `p.headingDeg` if given.
+  - `flyToShopFront(p) -> boolean`: first-person arrival framing (stand 8 m in front of the sign, facing it, its
+    centre at 25 % of the free area, both sign lines readable and the arrival ring above the Arrived sheet:
+    DESIGN-GLASS 6.3; where a wall or the atrium void is closer than 6 m, turned up to 60° along the corridor:
+    `interior.arrivalStand`); returns true when a sign was framed.
+  - `flyToBay(bay)`: stand in the aisle 6 m from the bay mouth, facing into the bay, pitch -14°.
+  - `setViewportPadding(p)`: shifts the principal point to the centre of the free area (view offset), as in map views.
+  - `setScreenObstacles(rects)`, `onPick(cb)`, `pickAt`, `projectToScreen(p)`, `onRender(cb)`, `whenIdle()`,
+    `getStats()`: unchanged, valid in every mode.
+  - `getCameraPose()` in `'fpv'`: `{ x, y, distance: 0, tiltDeg: pitchDeg, headingDeg, levelId, eye: true }` (x, y =
+    eye position in venue metres).
+- Connector rides in `'fpv'`: the engine recognises a ride from the walker marker's `connectorId` (sent by the App
+  while riding, v0.1) and the venue connector's `type`. Escalator: the eye rides the ramp. Lift / stairs: the camera
+  does not slide vertically (the marker's `elevation` is ignored for the eye); when the ride ends (the walker marker
+  arrives without `connectorId`, on the exit level) the engine **cuts** to the exit stop facing the next segment. The
+  fade card is the UI's (DESIGN-GLASS 6.2).
+- Budgets: `scene3d` <= **52 KB** gzip (raised from 50 KB in QA round 2, reported: the Walk view's world fidelity, i.e.
+  floor tiles, wall gradient, lit shop interiors, glass escalator balustrades and the arrival ring, plus the arrival
+  stand and the pointer and context-loss fixes, did not fit in the 150 bytes left), `engine3d` <= 220 KB, both <= 260 KB.
+  If engine code does not fit, report it; do not raise a budget silently.
+
+### `src/engineHost.js`
+
+- Add `'onAnchors'` to `SUBSCRIPTIONS`.
+- Add to `QUERY_DEFAULTS`: `getAnchors: () => ({ frame: 0, mode: 'stack', camera: { headingDeg: 0, pitchDeg: -32,
+  fovDeg: 30 }, nextTurn: null, destination: null, walker: null })`, `getSceneStyle: () => 'storm'`,
+  `getFpvOptions: () => ({ eyeHeightM: 1.6, fovDeg: 70, pitchDeg: -5 })`.
+- `getView` default stays (`mode: 'stack'`).
+
+### UI (`src/ui/`, `src/App.jsx`, `src/i18n/`)
+
+- `view.mode` in App state may be `'fpv'`; the View menu gets a 4th option "Walk view" (`view.fpv`) while a route is
+  shown (navigate, arrived), and the navigate screen gets a floating "Walk view" pill. In `'fpv'` the navigate sheet
+  is replaced by the Walk view HUD (stat chips, turn card, SIMULATION capsule, level chip, turn bubble, half-dome
+  mini-map, bottom bar: DESIGN-GLASS 7); the header and the level picker are hidden; Arrived keeps the Walk view with
+  the glass Arrived sheet.
+- Suggested new files: `src/ui/WalkHud.jsx` (top HUD + bar), `src/ui/TurnBubble.jsx`, `src/ui/MiniMapDome.jsx`
+  (Canvas2D from the VenueIndex + simulator state, works without WebGL), `src/ui/LiftCard.jsx`.
+- Calls while in `'fpv'`: `setViewportPadding` / `setScreenObstacles` from the measured HUD; `setNextTurn` on every
+  step change (end point of the current step; connector board point; `null` on Arrived);
+  `setPathAnimating(playing, { flowMps: 1.2 * speed + 0.6 })` on play / pause / speed / done (also in map views while
+  the walk plays); `onAnchors` drives the bubble and the mini-map heading.
+- In `'fpv'` the App does **not** call the map follow-camera moves of v0.1 (the `flyTo(... FOLLOW)` in `handleSim` and
+  `playSim`, `setFollow`): the engine follows the walker by itself. Deep links with `simT` keep the walk paused, so
+  `whenIdle()` settles for screenshots (it never settles while `setPathAnimating(true)`).
+- `src/i18n/strings.js`: the keys of DESIGN-GLASS Appendix A; new pure formatters `formatClock(epochMs, lang,
+  timeZone)`, `formatSteps(metres, lang)`, `formatMinutesParts(seconds, lang)` (unit-tested).
+- URL hooks: `view=fpv`, `style=classic|storm` (calls `engine.setSceneStyle`; default storm).
+- Fonts: `@fontsource/readex-pro` weights 300, 400, 500 (Latin + Arabic CSS imports) + the bundled 600 faces; 700 is
+  no longer imported. Still same-origin only.
+
 ## 4. Quality bars
 
 - `npm run build` passes (including `tools/check-budgets.mjs`: first screen <= 110 KB, engine3d <= 220 KB,
-  scene3d <= 50 KB, both <= 260 KB, sign fonts <= 50 KB, any font <= 50 KB, all gzip); `npm test` passes;
+  scene3d <= 52 KB, both <= 260 KB, sign fonts <= 50 KB, any font <= 50 KB, all gzip); `npm test` passes;
   `node tools/validate-venue.mjs public/venues/demo-muscat/venue.json` passes.
 - Idle scene renders 0 frames (render-on-demand). Dispose geometries/materials on venue change.
 - Every primary button ≥ 56 px tall; nothing interactive < 44 px.
 - RTL: layout mirrors in Arabic; turn arrows and left/right words are NOT mirrored (they follow walking direction).
+- v0.2: idle = 0 frames also in the Walk view and with the glow path (chevrons flow only while
+  `setPathAnimating(true)`); `onAnchors` adds no frames. Every text on glass >= 4.5:1 against a white scene behind
+  dark / pewter glass and a black scene behind frost (DESIGN-GLASS.md 2.3), also with `backdrop-filter` unsupported.
+  The SIMULATION tag is visible in every Walk view state. Nothing under 14 px text, nothing interactive under 44 px.
 - No network calls at runtime except same-origin static files.

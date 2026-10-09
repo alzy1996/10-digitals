@@ -3,7 +3,12 @@
 A phone-first web prototype of **Dallni** (دلّني), the indoor wayfinding app for malls in Oman.
 It shows a game-like 3D model of a mall, finds routes between shops, parking bays and toilets, writes
 turn-by-turn steps in Arabic and English, and plays the walk as a **simulation** so you can see the whole
-journey on your own phone.
+journey on your own phone, from above or **first person, at eye height inside the 3D model** (Walk view).
+
+**v0.2 ("storm glass")**: dark frosted-glass panels over a cloudy storm sky with a warm amber glow, a glowing
+teal path with white chevrons, a target ring at the next turn, and the first-person **Walk view** with a turn card,
+trip chips, a floating turn bubble and a half-dome mini-map (look and layout: [`DESIGN-GLASS.md`](./DESIGN-GLASS.md);
+engine API: [`CONTRACT.md`](./CONTRACT.md) section 3b). Add `?style=classic` to any link for the v0.1 look.
 
 ## Read this first: what this is, and what it is not
 
@@ -33,21 +38,36 @@ The header always shows **PROTOTYPE · SIMULATION**, and the home screen shows t
    instant results with the level and walking minutes. "lift" / «مصعد», "escalator" and "stairs" find those too.
 3. **Place**: level, minutes, opening hours, a **step-free** switch (lifts only), and one big **GO**.
 4. **Navigate**: the step card ("Take the up escalator to Level 1, then turn left at the top · 50 m"),
-   **Next** / Back, and **Simulate walk** with 1× / 2× / 4× speed. While it plays, the walker moves, the
-   camera follows, the step card moves on by itself and you get "Now on Level 1" when you step off the
-   escalator, lift or stairs. The **✕** ends the route at once, with a 5-second **Undo**.
-5. **Arrived**: the camera faces the shop front so its sign reads in both languages. "Found it" (your
-   position becomes the shop), Back to my car, Another shop.
-6. **My car**: pick the parking plate next to your car, **Save my car here**, see the Car Card (zone colour,
+   **Next** / Back, and **Simulate walk** with 1× / 2× / 4× speed. A teal ring and light beam mark where the
+   current step ends. The **✕** ends the route at once, with a 5-second **Undo**.
+5. **Walk view (first person, a SIMULATION)**: **Simulate walk** opens it (or the **Walk view** pill / the View
+   menu). You walk the route at eye height (1.6 m, looking 5° down) inside the 3D model: the glowing path with bold
+   chevrons that flow while it plays, the ring at the next turn with a floating bubble ("Turn left · and 10 m
+   straight") hanging above its icon, a turn card ("Turn left towards · Food court · 30 m"; a ride adds the turn at
+   its end, "then turn left at the top"), Arrival / Distance / Steps chips with their round coloured icons, a
+   heading-up half-dome mini-map with the floor ("1") in its corner and N on its rim (tap it to look at the map), and
+   one frosted bottom bar: **End** (■, ends the route with Undo), speed, the big Play / Pause, Next (on the last step
+   **Arrived ✓**) and **Map** (back to the overhead view; the walk keeps playing there). The model is a cool slate
+   interior with faint floor tiles, shaded walls, lit shop interiors behind the storefront glass and glass escalator
+   sides. Escalators are ridden; lifts and stairs are a cut under a card ("Press “B1”, then turn left as you step out")
+   instead of a slide through floors; "Now on Level 1" when you step off. The orange **SIMULATION**
+   pill in the turn card (and the full "SIMULATION · Not your live position" capsule on arrival) is always on screen:
+   this is not camera AR and not live positioning.
+6. **Arrived**: the camera faces the shop front so its sign reads in both languages (in the Walk view it turns
+   to face the sign from the corridor, along the corridor for a shop facing the atrium, with the mint target ring at
+   the doorstep above the Arrived sheet). "Found it" (your position becomes the shop), Back to my car, Another shop.
+7. **My car**: pick the parking plate next to your car, **Save my car here**, see the Car Card (zone colour,
    icon, and the bay code exactly as painted on the floor, "B1-43", in both languages), then **Take me
-   there** (works step-free too). The map turns dark ("basement" theme) on parking levels; parking zones
-   show as pins with their Omani icon and name.
-7. **Map views**: the **View** button (top corner) switches between Overview (floors stacked), Floor (one floor
-   in 3D) and 2D (top-down); the level buttons B2 / B1 / G / 1 (ب٢ / ب١ / أ / ١ in Arabic) sit in the other
-   corner. During a trip over several floors, Overview stacks only the floors the route uses and makes the
+   there** (works step-free too, and in the Walk view down to B1 / B2, ending in the aisle looking into the bay).
+   The map turns dark ("basement" theme) on parking levels; parking zones show as pins with their Omani icon
+   and name.
+8. **Map views**: the **View** button (top corner) switches between Overview (floors stacked), Floor (one floor
+   in 3D) and 2D (top-down), plus Walk view during a trip; the level buttons B2 / B1 / G / 1 sit in the other
+   corner (the codes as printed on the lift panel, in Arabic too: «أ» and «١» look almost the same side by side). During
+   a trip over several floors, Overview stacks only the floors the route uses and makes the
    upper floor see-through, so the route, the car and the destination below stay visible. Drag to pan,
    pinch to zoom, tap a shop to open it.
-8. **ع / EN** switches the whole app between English and Arabic (right-to-left, Arabic-Indic digits).
+9. **ع / EN** switches the whole app between English and Arabic (right-to-left, Arabic-Indic digits).
 
 Nothing is stored on a server or in localStorage. The saved car lives in memory for this visit only; the
 language choice is kept in sessionStorage. The app makes no network calls except loading its own files.
@@ -96,9 +116,16 @@ Add these to the address (they are also used by the screenshot script):
 | `?screen=car&car=bay-B1-043` | A saved car on B1 (dark parking theme) |
 | `?screen=navigate&to=bay-B1-043&car=bay-B1-043&stepFree=1&from=A-L1-C3` | Step-free route back to the car |
 | `?view=top` / `?view=floor` / `?view=stack` | Start in 2D / Floor / Overview |
+| `?screen=navigate&to=occ-muttrah-kitchen&view=fpv&simT=68` | Walk view, mid-corridor on Level 1 (walk paused) |
+| `?screen=navigate&to=occ-muttrah-kitchen&view=fpv&simT=45&lang=ar` | Walk view riding the up escalator, Arabic |
+| `?screen=navigate&to=bay-B1-043&car=bay-B1-043&stepFree=1&from=A-L1-C3&view=fpv&simT=99` | Walk view inside the lift ride (lift card) |
+| `?screen=arrived&to=occ-muttrah-kitchen&view=fpv` | Walk view arrival, facing the shop sign |
+| `?screen=navigate&to=occ-muttrah-kitchen&view=fpv&step=6` | Walk view on the last step (the bar's Arrived) |
+| `?screen=arrived&to=occ-abaya-atelier&view=fpv` | Walk view arrival at a shop facing the atrium void |
+| `?style=classic` | The v0.1 look (light classic scene, blue ribbon) |
 
 Full list: `screen=home|search|place|navigate|arrived|car|scan`, `from=<plate id>`,
-`to=<shop | amenity | bay | plate id>`, `view`, `level`, `simT=<seconds>`, `step=<n>|connector`,
+`to=<shop | amenity | bay | plate id>`, `view` (`stack|floor|top|fpv`), `style` (`storm|classic`), `level`, `simT=<seconds>`, `step=<n>|connector`,
 `stepFree=1`, `q=<search text>`, `tile=food|restrooms|prayer|pharmacy|kids|exit`, `car=<bay id>`, `play=1`.
 In the browser console, `window.__dallni` gives `{ engine, getState(), setState(partial), index, route, sim }`.
 
@@ -112,10 +139,13 @@ npm run preview    # serves dist/ at http://localhost:4173 to check the build
 `dist/` is plain static files (HTML, JS, CSS, fonts, `venues/demo-muscat/venue.json`). It works from any
 static host and from a sub-folder.
 
-`npm run build` fails if a file is over its load budget (PLAN.md 19.2, `tools/check-budgets.mjs`, gzip):
-first screen JS + CSS 110 KB; the 3D libraries (three.js + troika, `engine3d-*.js`, loaded after the first
-screen) 220 KB; our own 3D code (`scene3d-*.js`, loaded with it) 50 KB; both lazy 3D files together 260 KB;
-the two 3D sign fonts 50 KB together; any font 50 KB. `npm run check:budgets` runs the check alone.
+`npm run build` fails if a file is over its load budget (PLAN.md 19.2, `tools/check-budgets.mjs`, gzip level 9,
+counted in **KiB**, 1 KiB = 1024 bytes): first screen JS + CSS 110 KiB; the 3D libraries (three.js + troika,
+`engine3d-*.js`, loaded after the first screen) 220 KiB; our own 3D code (`scene3d-*.js`, loaded with it) 52 KiB;
+both lazy 3D files together 260 KiB; the two 3D sign fonts 50 KiB together; any font 50 KiB. `npm run check:budgets`
+runs the check alone. Vite's own build log prints decimal kB at its default gzip level, so the same file reads 2-3 %
+larger there (scene3d "53.0 kB" in Vite's log is 51.3 KiB in the budget table): the table is the measure. The 3D-code
+budget was 50 KiB until QA round 2; it is 52 KiB since, to fit the Walk view's world detail (CONTRACT.md 3b).
 
 ## Put it online with Firebase Hosting (free Spark plan is enough)
 
@@ -217,12 +247,30 @@ localhost. Most shots are 390 × 844 (a modern phone); the `-360` ones are 360 �
 `-390x664` and `-360x640` ones are what a phone browser tab really gets once the address bar is shown.
 `SHOTS_ONLY=home-en,arrived-en npm run shots` takes only the named shots.
 
+What the shots cover (`.shots/app-<name>.png`):
+
+| Shots | What |
+|---|---|
+| `fpv-start-en`, `fpv-sim-t20-en` | Walk view at the start of the trip and walking to the escalator (bubble "Escalator up") |
+| `fpv-mid-en`, `fpv-mid-en-360`, `fpv-mid-ar-360x640` | Walk view mid-corridor on Level 1: path + chevrons, ring + bubble, heading-up dome |
+| `fpv-escalator-ar`, `fpv-escalator-ar-360` | Riding the up escalator, Arabic (mirrored HUD, arrows not mirrored) |
+| `fpv-floor-change-en`, `fpv-floor-change-en-360` | Just off the escalator: "Now on Level 1" under the turn card |
+| `fpv-arrived-en`, `fpv-arrived-en-360` | Arrival facing the shop sign, glass Arrived sheet |
+| `fpv-lift-en`, `fpv-car-b1-en`, `fpv-car-b1-en-360`, `fpv-arrived-car-ar`, `fpv-car-b2-en` | Back to the car: lift card, walking through Parking B1, looking into bay B1-43, Parking B2 |
+| `fpv-sim-t20-en-390x664` | Walk view in a phone browser tab (compact HUD: the trip summary moves into the turn card) |
+| `fpv-start-ar-360`, `fpv-escalator-en-360`, `fpv-lift-ar-360` | 360 px phone: the Arabic bubble beside (never over) its icon, the one-line escalator verb, the lift card in Arabic ("Press “B1”") |
+| `fpv-laststep-en`, `fpv-arrived-abaya-en` | The last step (bar Arrived ✓, the bubble an icon on the ring), arrival at a shop facing the atrium void |
+| `home-en`, `home-ar`, `search-ar-restaurant`, `place-en-food-court`, `navigate-step1-floor-en`, `car-card-ar-b1`, ... | Every v0.1 screen, now in storm glass (map views keep the step card and gain the Walk view pill) |
+| `home-en-classic` | The v0.1 look (`?style=classic`) |
+
 ## Where things are
 
 | Path | What |
 |---|---|
 | `src/App.jsx` | App state, screen flow, engine and simulator wiring, URL test hooks |
 | `src/ui/` | Screens (home, search, place, navigate, arrived, car, scan), header, map controls, icons, styles |
+| `src/ui/WalkHud.jsx` + parts | The Walk view HUD (turn card, stat chips, turn bubble, mini-map dome, bottom bar, lift card), loaded on demand |
+| `src/ui/hudModel.js` | What the Walk view HUD says and where the bubble goes (pure, unit-tested) |
 | `src/sim/simulator.js` | The walk simulator (pure `tick` + requestAnimationFrame driver) |
 | `src/engine/` | The 3D engine (three.js + troika-three-text), one canvas, renders only when something changes |
 | `src/engineHost.js` | Loads the engine after the first screen (`loadEngine()`) and queues engine calls made before it arrives |
@@ -233,7 +281,8 @@ localhost. Most shots are 390 × 844 (a modern phone); the `-360` ones are 360 �
 | `src/data/venue.js` | Loads and indexes `venue.json` |
 | `public/venues/demo-muscat/venue.json` | The fictional demo mall |
 | `tools/` | Venue generator and validator, 3D font coverage generator, load budget check |
-| `debug/engine.html` | Engine-only debug page |
+| `debug/engine.html` | Engine-only debug page (`?view=fpv&route=kitchen&simT=40`, `?walkhud=1`, ...) |
+| `debug/ui-gallery.html` | HUD component gallery (dev server only) |
 | `tests/` | Vitest unit tests |
 | `scripts/screenshots.mjs` | Headless screenshots + console/network check |
 
@@ -245,13 +294,25 @@ localhost. Most shots are 390 × 844 (a modern phone); the `-360` ones are 360 �
   camera scanner, no Wi-Fi/BLE positioning and no "I'm lost" panel yet.
 - Arabic text in the 3D signs is shaped by troika-three-text, which lacks two font features; it looks right
   in our screenshots, but a native Arabic reader still has to sign off every sign name (PLAN.md 19.2).
-  The Arabic level codes «ب١» / «ب٢» also need that check: «ب١» can read like «با».
-- The first screen loads about 95 KB gzip (app 44 KB + React 44 KB + CSS 7 KB). The 3D part downloads once the
-  first screen is up: three.js + troika (about 176 KB gzip, budget 220 KB) and our own 3D code (about 38 KB,
-  budget 50 KB), checked on every build. Offline caching (service worker) and the low-end-phone fallbacks from
+  The screens, the Walk view's lift card and bubble ("Press “B1”") and the 3D level badges show the level codes as
+  printed on the lift panel (G / 1 / B1 / B2) in both languages, because the Arabic codes «أ» / «١» were near-identical
+  strokes and «ب١» can read like «با»; the step text from the routing still says «اضغط ب١», level names such as
+  «مواقف ب١» stay names, and a native reader should confirm which form the real lift panels print.
+- The first screen loads about 103.7 KiB gzip (budget 110 KiB; the Walk view HUD is a separate 11 KiB chunk fetched
+  when a route opens). The 3D part downloads once the first screen is up: three.js + troika (about 176 KiB gzip,
+  budget 220 KiB) and our own 3D code (51.3 KiB, budget 52 KiB since QA round 2, about 750 bytes left: nearly **full**,
+  a bigger 3D feature must first save bytes elsewhere), checked on every build. Offline caching (service worker) and the low-end-phone fallbacks from
   PLAN.md 19.2 are not in this spike.
 - While a scan sheet is open, every QR plate shows as a tappable pin on the map (Floor view of your level, or
   the parking level when saving the car).
 - Overview stacks the trip's floors 12 m apart (PLAN.md 19.2). With a 64 m deep floor that still overlaps,
   so the upper floor is drawn see-through rather than relying on the gap.
 - No voice guidance, haptics or screen wake lock yet.
+- The Walk view is a simulation inside a simple model (boxes with shaded walls, tiled glossy floors, lit shop
+  interiors, signs), not a photo or camera view: it reads as a clean 3D model, not as the street photos of the
+  reference AR apps. Its narrow phone field of view (about 36° across at 390 × 844) means a short jog out of a doorway
+  turns the view: the demo route's first frame faces up the corridor toward the fountain (as the step says), and
+  when Play is pressed the view glances about 35° toward the corner 3 m out of the south entrance and back.
+- On a 360 px wide phone, the longest English lift step can need a little scroll in the step card (above the pinned
+  Next / Simulate walk buttons, with a soft edge as the cue); at browser-tab heights the home sheet can too (the
+  disclaimer stays pinned and visible).

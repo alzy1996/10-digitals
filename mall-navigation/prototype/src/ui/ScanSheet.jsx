@@ -46,7 +46,7 @@ export const ScanSheet = forwardRef(function ScanSheet({ index, lang, you, onPic
                   </span>
                   <span className="row-main">
                     <span className="row-title block">{plateLabelInLevel(index, plate, lang)}</span>
-                    {current ? <span className="row-sub block" style={{ color: 'var(--color-route)' }}>{t('scan.exact', lang)}</span> : null}
+                    {current ? <span className="row-sub is-here block">{t('scan.exact', lang)}</span> : null}
                   </span>
                   <span className="row-end">
                     <span className="plate-code">
