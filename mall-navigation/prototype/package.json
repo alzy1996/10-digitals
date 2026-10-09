@@ -6,11 +6,13 @@
   "description": "Dallni 3D mall map + navigation simulator (prototype spike)",
   "scripts": {
     "dev": "vite --host",
-    "build": "vite build",
+    "build": "vite build && node tools/check-budgets.mjs",
+    "check:budgets": "node tools/check-budgets.mjs",
     "preview": "vite preview --host",
     "test": "vitest run",
     "gen:venue": "node tools/generate-demo-venue.mjs",
     "validate:venue": "node tools/validate-venue.mjs public/venues/demo-muscat/venue.json",
+    "gen:fonts": "node tools/font-coverage.mjs",
     "shots": "node scripts/screenshots.mjs"
   },
   "dependencies": {
