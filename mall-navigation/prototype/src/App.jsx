@@ -282,11 +282,12 @@ export default function App() {
   // ------------------------------------------------------------------ engine: venue, language, theme, markers
   useEffect(() => {
     if (!index) return
-    engine.setVenue(index)
-    // v0.2 storm glass by default; ?style=classic is the v0.1 look exactly (classic scene + v0.1 ribbon)
-    const style = pendingRef.current.style === 'classic' ? 'classic' : 'storm'
+    // v0.3 toy world by default; ?style=storm is the v0.2 look, ?style=classic the v0.1 look exactly (classic scene +
+    // v0.1 ribbon). Set before the venue: the toy style builds different geometry (DESIGN-TOY.md)
+    const style = ['classic', 'storm'].includes(pendingRef.current.style) ? pendingRef.current.style : 'toy'
     engine.setSceneStyle(style)
     engine.setPathStyle(style === 'classic' ? 'ribbon' : 'glow')
+    engine.setVenue(index)
     shownRouteRef.current = undefined
     // the engine starts in its own default view: apply ours (from the URL or defaults) right away
     const v = stateRef.current.view

@@ -6,17 +6,18 @@
  * Render-on-demand: a frame is drawn only when the controls move (incl. damping), a camera flight
  * or follow animation runs, text finishes typesetting, or requestRender() is called. Idle = 0 frames.
  *
- * Art direction: PLAN.md §19.2 "architect's model" - unlit, vertex-coloured, flat-shaded geometry,
- * real wall-top strips, no realtime shadows, no bloom.
+ * Art direction: v0.3 "toy world" by default (DESIGN-TOY.md): lit vertex-coloured pastel blocks with bevelled edges, a
+ * hemisphere + sun light rig and soft sun shadows (Showcase quality); meaning colours (route, markers, signs) stay unlit
+ * and exact. The v0.2 "storm" and v0.1 "classic" styles keep PLAN.md §19.2's unlit "architect's model".
  */
-import { Color, DoubleSide, Fog, Group, MOUSE, MathUtils, Mesh, MeshBasicMaterial, PerspectiveCamera, Scene, TOUCH, Vector3, WebGLRenderer } from 'three'
+import { Color, DirectionalLight, DoubleSide, Fog, Group, HemisphereLight, MOUSE, MathUtils, Mesh, MeshBasicMaterial, MeshLambertMaterial, PerspectiveCamera, Scene, TOUCH, Vector3, WebGLRenderer } from 'three'
 // OrbitControls set up exactly like three's MapControls (one-finger pan, two-finger pinch-zoom + rotate, panning on
 // the ground plane), without MapControls' mouse ray-casting: one class (and Raycaster) fewer in the engine chunk
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { configureFonts } from './fonts.js'
 import { ColorRegistry, THEMES, paletteName } from './palette.js'
 import { applyTheme, distToSegment, pointInPolygon, polygonCentroid, setRise } from './geometry.js'
-import { buildEscalator, buildLiftColumn, buildParkingLevel, buildRetailLevel } from './levels.js'
+import { PLAIN, buildEscalator, buildLiftColumn, buildParkingLevel, buildRetailLevel } from './levels.js'
 import { buildBaysMesh } from './bays.js'
 import { createIconAtlas } from './icons.js'
 import { OverlayLayer, buildPinMesh } from './overlay.js'
@@ -92,8 +93,8 @@ export function createEngine() {
     registry: new ColorRegistry(),
     atlas: null,
     theme: /** @type {'sunlight'|'basement'} */ ('sunlight'),
-    /** scene style (CONTRACT 3b): 'storm' (v0.2 default) or 'classic' (v0.1) */
-    style: /** @type {'storm'|'classic'} */ ('storm'),
+    /** scene style (CONTRACT 3c): 'toy' (v0.3 default), 'storm' (v0.2) or 'classic' (v0.1) */
+    style: /** @type {'toy'|'storm'|'classic'} */ ('toy'),
     lang: /** @type {'en'|'ar'} */ ('en'),
     mode: /** @type {'stack'|'floor'|'top'|'fpv'} */ ('stack'),
     focusId: null,
@@ -201,9 +202,10 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     return mat
   }
 
-  const makeMaterials = () => ({
-    opaque: finish(new MeshBasicMaterial({ vertexColors: true }), false),
-    roofs: new MeshBasicMaterial({ vertexColors: true }),
+  // toy: the opaque and roof meshes are lit (Lambert, normals from MeshBuilder); everything else stays unlit
+  const makeMaterials = (lit) => ({
+    opaque: finish(lit ? new MeshLambertMaterial({ vertexColors: true }) : new MeshBasicMaterial({ vertexColors: true }), false),
+    roofs: lit ? new MeshLambertMaterial({ vertexColors: true }) : new MeshBasicMaterial({ vertexColors: true }),
     glass: finish(new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.38, depthWrite: false, side: DoubleSide }), true),
     // escalator balustrade panels (storm): the same glass, one-sided (they carry a face per side)
     escGlass: finish(new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.38, depthWrite: false }), true),
@@ -217,7 +219,17 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     fadeGlass: new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.12, depthWrite: false, side: DoubleSide }),
     fadeDecals: new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.1, depthWrite: false }),
   })
-  S.mats = makeMaterials()
+  S.mats = makeMaterials(true)
+
+  // toy light rig (DESIGN-TOY.md 3): sky / ground fill + a sun from the south-east, ~55 degrees high. With NoToneMapping
+  // a white roof facing the sun renders at about 1.0. Basic (unlit) materials ignore it, so storm and classic are unchanged.
+  S.hemi = new HemisphereLight(0xe6f4ff, 0xf3dcc5, 2.05)
+  S.sun = new DirectionalLight(0xffffff, 1.6)
+  S.sun.position.set(72, 115, -10)
+  S.scene.add(S.hemi, S.sun, S.sun.target)
+
+  /** Geometry flavour of the current style (toy: bevelled edges + normals for the lit materials). */
+  const flavour = () => (S.style === 'toy' ? { bevel: 0.06, lit: true } : PLAIN)
 
   // text batches still typesetting (a Set, so batches of a replaced venue cannot skew the count)
   const pendingSync = new Set()
@@ -1132,7 +1144,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     const lv = S.index.levels
     const above = lv[lv.findIndex((l) => l.id === L.id) + 1]
     // the floor below an atrium looks up through it; the top floor's own voids are a skylight
-    const b = buildInterior(S.index, L.level, S.registry, levelVoids(S.index, above ? above.id : L.id))
+    const b = buildInterior(S.index, L.level, S.registry, levelVoids(S.index, above ? above.id : L.id), flavour())
     const grp = new Group()
     grp.name = 'interior-' + L.id
     addThemedMesh(b.solid, S.mats.opaque, grp, 'ceiling-' + L.id)
@@ -1491,13 +1503,19 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     S.markers.setTheme(P)
     S.ring.setPalette(P)
     S.sky.setPalette(P)
+    const toy = S.style === 'toy'
     S.sky.mesh.visible = S.style === 'storm'
     S.sheenColor.value.set(T.sheen)
-    S.sheenOn.value = S.style === 'storm' ? 1 : 0
-    for (const c of S.connectors) if (c.panels) c.panels.material = S.style === 'storm' ? S.mats.escGlass : S.mats.opaque
+    // toy keeps the Walk view's floor tiles and wall gradient, with a faint white sheen
+    S.sheenOn.value = S.style === 'classic' ? 0 : 1
+    for (const c of S.connectors) if (c.panels) c.panels.material = S.style === 'classic' ? S.mats.opaque : S.mats.escGlass
     S.scene.fog.color.set(T.fog)
     // zone colours stay the paint's; on the dark storm asphalt a lighter wash keeps them from flooding the floor
-    S.mats.decals.opacity = S.style === 'storm' ? 0.2 : 0.3
+    S.mats.decals.opacity = S.style === 'storm' ? 0.2 : toy ? 0.35 : 0.3
+    // toy light rig: a softer light on the parking levels (dusk palette)
+    S.hemi.visible = S.sun.visible = toy
+    S.hemi.intensity = S.theme === 'basement' ? 1.5 : 2.05
+    S.sun.intensity = S.theme === 'basement' ? 0.9 : 1.6
     S.overlay.setColors({ text: T.labelText, halo: T.labelHalo, badgeText: T.badgeText, badgeHalo: T.badgeHalo, badgeW: T.badgeW })
     if (S.renderer) S.renderer.domElement.style.background = `linear-gradient(180deg, ${T.bgTop} 0%, ${T.bgBottom} 100%)`
   }
@@ -1565,7 +1583,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
   }
 
   function buildLevel(level) {
-    const build = level.kind === 'parking' ? buildParkingLevel(S.index, level, S.registry) : buildRetailLevel(S.index, level, S.registry)
+    const build = level.kind === 'parking' ? buildParkingLevel(S.index, level, S.registry, flavour()) : buildRetailLevel(S.index, level, S.registry, flavour())
     const group = new Group()
     group.name = 'level-' + level.id
     const content = new Group()
@@ -1633,10 +1651,10 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
       let e = null
       let material = S.mats.opaque
       if (conn.type === 'escalator') {
-        e = buildEscalator(conn, S.registry, { elevLow: elev(lowStop), elevHigh: elev(highStop), lowStop, highStop })
+        e = buildEscalator(conn, S.registry, { elevLow: elev(lowStop), elevHigh: elev(highStop), lowStop, highStop }, flavour())
         builder = e.deck
       } else if (conn.type === 'lift' && Array.isArray(conn.shaft)) {
-        builder = buildLiftColumn(conn, S.registry)
+        builder = buildLiftColumn(conn, S.registry, flavour())
         material = S.mats.glass
       }
       if (!builder || builder.isEmpty) continue
@@ -2543,18 +2561,33 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     requestRender,
 
     /**
-     * Scene style (CONTRACT 3b): 'storm' (v0.2 default: storm sky, cool architecture, floor sheen, fresnel glass,
-     * desaturated sign boxes) or 'classic' (the v0.1 look exactly). Recolours in place, no rebuild.
-     * @param {'storm'|'classic'} style
+     * Scene style (CONTRACT 3c): 'toy' (v0.3 default: lit pastel blocks, bevels, sun + soft shadows, DESIGN-TOY.md),
+     * 'storm' (v0.2: storm sky, cool architecture, floor sheen, fresnel glass, desaturated sign boxes) or 'classic' (the
+     * v0.1 look exactly). Storm and classic recolour in place. Switching to or from toy changes the geometry (bevels,
+     * normals) and the materials: after setVenue that rebuilds the venue (route and markers must then be sent again), so
+     * the App sets the style before the venue.
+     * @param {'toy'|'storm'|'classic'} style
      */
     setSceneStyle(style) {
-      S.style = style === 'classic' ? 'classic' : 'storm'
+      const next = style === 'classic' || style === 'storm' ? style : 'toy'
+      const wasToy = S.style === 'toy'
+      S.style = next
       if (S.failed) return
+      if ((next === 'toy') !== wasToy) {
+        const old = S.mats
+        S.mats = makeMaterials(next === 'toy')
+        for (const m of Object.values(old)) m.dispose()
+        if (S.index) {
+          const view = S.lastView
+          api.setVenue(S.index)
+          if (view) api.setView(view, { durationMs: 0 })
+        }
+      }
       applyThemeAll()
       requestRender()
     },
 
-    /** @returns {'storm'|'classic'} */
+    /** @returns {'toy'|'storm'|'classic'} */
     getSceneStyle() {
       return S.style
     },
