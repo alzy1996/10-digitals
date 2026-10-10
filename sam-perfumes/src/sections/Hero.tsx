@@ -1,101 +1,137 @@
-import { lazy, Suspense } from 'react'
+import { Component, lazy, Suspense, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { ArrowRight } from 'lucide-react'
-import Nav from '../components/Nav'
-import BestSellers from './BestSellers'
+import { BottleSilhouette } from '../components/ProductImage'
 import { products } from '../content/content'
 import { useI18n } from '../lib/i18n'
+import { markLoaded } from '../lib/loadProgress'
+import { probeGpu } from '../lib/gpu'
 import { scrollToEl } from '../lib/scroll'
 
-// Lazy Canvas: the Three.js bundle streams in after the hero text paints,
-// so first paint stays instant. Until it loads, the stage is simply empty
-// dark space (no layout shift — the box reserves its height).
+// Lazy Canvas: the hero text paints from the entry chunk; the Three.js
+// scene streams in behind the preloader.
 const HeroScene = lazy(() => import('../components/HeroScene'))
 
-interface HeroProps {
-  ready: boolean
+// No WebGL (old phone, blocked GPU) → release the preloader and show the
+// CSS bottle instead of a blank stage.
+class SceneBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  componentDidCatch() {
+    markLoaded('scene')
+    markLoaded('frame')
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children
+  }
 }
 
 function scrollToCollection(e: React.MouseEvent<HTMLAnchorElement>) {
   if (scrollToEl('#collection')) e.preventDefault()
 }
 
-// One big dark rounded panel: nav on top, headline left, floating
-// bottles center, featured price column right (lg+).
-export default function Hero({ ready }: HeroProps) {
-  const { t, lang } = useI18n()
+// Full-screen 3D hero: glass bottle on a full-bleed canvas, headline and
+// corner copy over it. Nav is fixed above (rendered in App).
+export default function Hero({ ready }: { ready: boolean }) {
+  const { t, lang, dir } = useI18n()
   const featured = products[0]
-  const animClass = ready ? 'anim' : 'anim-wait'
-  const delay = (s: number) => ({ animationDelay: `${s}s` })
+  const [webgl] = useState(() => probeGpu() !== 'none')
+
+  useEffect(() => {
+    if (webgl) return
+    markLoaded('scene')
+    markLoaded('frame')
+  }, [webgl])
+  const anim = (kind: 'reveal' | 'fade', delay: number) => ({
+    className: ready ? `hero-anim hero-${kind}` : 'opacity-0',
+    style: { animationDelay: `${delay}s` },
+  })
+  const l1 = anim('reveal', 0.25)
+  const l2 = anim('reveal', 0.42)
+  const left = anim('fade', 0.7)
+  const right = anim('fade', 0.85)
+
+  const fallback = (
+    <div className="absolute inset-0 flex items-start justify-center pt-[16vh] lg:items-center lg:justify-end lg:pe-[14vw] lg:pt-0">
+      <div className="h-[44vh] w-[30vh] max-w-[70vw]">
+        <BottleSilhouette />
+      </div>
+    </div>
+  )
 
   return (
-    <section id="hero" className="px-3 pt-3 sm:px-5 sm:pt-5">
+    <section
+      id="hero"
+      className="relative h-screen overflow-hidden bg-panel"
+      style={{ height: '100dvh' }}
+    >
+      {/* warm studio glow — settles with the house Ken Burns curve */}
       <div
-        className="relative flex min-h-[92dvh] flex-col overflow-hidden rounded-lg2 border border-line"
+        aria-hidden
+        className={`absolute inset-0 ${ready ? 'hero-zoom' : ''}`}
         style={{
+          transform: ready ? undefined : 'scale(1.12)',
           background:
-            'radial-gradient(90% 70% at 72% 12%, var(--panel-soft) 0%, var(--panel) 58%)',
+            'radial-gradient(60% 55% at 68% 42%, rgba(211,160,90,.16) 0%, transparent 60%), radial-gradient(120% 90% at 70% 10%, var(--panel-soft) 0%, var(--panel) 62%)',
         }}
-      >
-        <Nav />
+      />
 
-        <div className="grid flex-1 items-center gap-10 px-6 pb-10 pt-4 sm:px-10 lg:grid-cols-[1.1fr_1.2fr_.7fr] lg:gap-6 xl:px-14">
-          {/* Headline */}
-          <div className="max-w-xl">
-            <h1
-              className={`${animClass} font-display text-5xl leading-[1.02] tracking-tight text-ink sm:text-6xl md:text-7xl`}
-              style={delay(0.1)}
-            >
-              {t.hero.titlePre}
-              <em className="italic" style={{ color: 'var(--accent)' }}>
-                {t.hero.titleAccent}
-              </em>
-              {t.hero.titlePost}
-            </h1>
-            <p className={`${animClass} mt-6 max-w-sm text-sm leading-relaxed text-muted`} style={delay(0.25)}>
-              {t.hero.sub}
-            </p>
-            <div className={`${animClass} mt-9`} style={delay(0.4)}>
-              <a
-                href="#collection"
-                onClick={scrollToCollection}
-                className="inline-flex min-h-11 items-center gap-2 rounded-pill px-7 py-3 text-sm font-medium transition-transform duration-300 hover:scale-[1.04]"
-                style={{ background: 'var(--ink)', color: 'var(--ink-dark)' }}
-              >
-                {t.hero.cta}
-                <ArrowRight size={16} strokeWidth={2} className="rtl:-scale-x-100" />
-              </a>
-            </div>
-          </div>
+      {webgl ? (
+        <SceneBoundary fallback={fallback}>
+          <Suspense fallback={null}>
+            <HeroScene side={dir === 'rtl' ? -1 : 1} ready={ready} />
+          </Suspense>
+        </SceneBoundary>
+      ) : (
+        fallback
+      )}
 
-          {/* Bottle — WebGL, streamed in after first paint */}
-          <div className={animClass} style={delay(0.35)}>
-            <Suspense fallback={<div className="h-[340px] w-full sm:h-[420px] md:h-[480px]" />}>
-              <HeroScene />
-            </Suspense>
-          </div>
+      <div aria-hidden className="hero-scrim-bottom pointer-events-none absolute inset-0" />
+      <div aria-hidden className="hero-scrim-side pointer-events-none absolute inset-0 hidden lg:block" />
 
-          {/* Featured column */}
-          <div className={`${animClass} hidden lg:block`} style={delay(0.55)}>
-            <p className="en-tracking text-[10px] uppercase tracking-[.3em] text-muted">
-              {t.hero.featuredLabel}
-            </p>
-            <p className="mt-3 font-display text-4xl text-ink">{featured.price}</p>
-            <p className="mt-2 text-sm font-medium text-ink">
-              {lang === 'ar' ? featured.nameAr : featured.nameEn}
-            </p>
-            <p className="mt-2 max-w-[200px] text-xs leading-relaxed text-muted">{featured.desc[lang]}</p>
+      <div className="pointer-events-none relative z-50 flex h-full flex-col justify-end px-6 pb-8 pt-28 sm:px-10 sm:pb-10 lg:px-14">
+        <h1 className="max-w-[16ch] font-display text-5xl leading-[0.95] tracking-[-0.03em] text-ink sm:text-7xl md:text-8xl">
+          <span className={`block ${l1.className}`} style={l1.style}>
+            {t.hero.titlePre.trim()}
+          </span>
+          <span className={`block ${l2.className}`} style={l2.style}>
+            <em className="italic" style={{ color: 'var(--accent)' }}>
+              {t.hero.titleAccent}
+            </em>
+            {t.hero.titlePost}
+          </span>
+        </h1>
+
+        <div className="mt-8 flex items-end justify-between gap-8 sm:mt-10">
+          <div className={left.className} style={left.style}>
+            <p className="hidden max-w-[260px] text-sm leading-relaxed text-ink/80 sm:block">{t.hero.sub}</p>
             <a
               href="#collection"
               onClick={scrollToCollection}
-              className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-pill border border-line px-5 py-2.5 text-xs text-ink transition-colors duration-300 hover:border-accent hover:text-accent"
+              className="pointer-events-auto inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full px-7 py-3 text-sm font-medium transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-[#d3a05a]/30 active:scale-95 sm:mt-6"
+              style={{ background: 'var(--accent)', color: 'var(--panel)' }}
             >
               {t.hero.cta}
-              <ArrowRight size={14} strokeWidth={2} className="rtl:-scale-x-100" />
+              <ArrowRight size={16} strokeWidth={2} className="rtl:-scale-x-100" />
             </a>
           </div>
-        </div>
 
-        <BestSellers />
+          <div className={`max-w-[260px] text-end ${right.className}`} style={right.style}>
+            <p className="en-tracking text-[10px] uppercase tracking-[.3em] text-ink/60">
+              {t.hero.featuredLabel}
+            </p>
+            <p className="mt-2 text-sm font-medium text-ink">
+              {lang === 'ar' ? featured.nameAr : featured.nameEn}
+              <span className="text-ink/50"> — </span>
+              <span dir="ltr" className="whitespace-nowrap font-display text-lg" style={{ color: 'var(--accent)' }}>
+                {featured.price}
+              </span>
+            </p>
+            <p className="mt-1 hidden text-sm leading-relaxed text-ink/80 sm:block">{featured.notes[lang]}</p>
+          </div>
+        </div>
       </div>
     </section>
   )

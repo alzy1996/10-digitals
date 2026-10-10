@@ -30,9 +30,11 @@ export default function Order() {
 
   return (
     <section id="order" className="px-5 py-24 text-center sm:px-8 md:py-32">
+      <p className="en-tracking mb-5 text-[11px] uppercase tracking-[.35em] text-muted-dark">{t.order.kicker}</p>
       <h2
-        data-reveal
-        className="anim-wait mx-auto max-w-4xl font-display text-5xl leading-[1.02] tracking-tight text-ink-dark sm:text-6xl md:text-7xl"
+        data-scrub-title
+        data-center
+        className="mx-auto max-w-4xl font-display text-5xl leading-[0.98] tracking-[-0.02em] text-ink-dark sm:text-6xl md:text-7xl"
       >
         {t.order.titlePre}
         <em className="italic" style={{ color: 'var(--accent-deep)' }}>

@@ -7,7 +7,7 @@ export default {
         page: 'var(--page)',
         panel: 'var(--panel)',
         'panel-soft': 'var(--panel-soft)',
-        ink: 'var(--ink)',
+        ink: 'rgb(var(--ink-rgb) / <alpha-value>)',
         'ink-dark': 'var(--ink-dark)',
         accent: 'var(--accent)',
         'accent-deep': 'var(--accent-deep)',

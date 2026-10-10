@@ -103,8 +103,9 @@ export const strings = {
       featuredLabel: 'Featured',
     },
     bestSellers: { label: 'BEST SELLER', index: '01' },
-    collection: { titlePre: 'The ', titleAccent: 'Collection', titlePost: '', order: 'اطلب / Order' },
+    collection: { kicker: '(CH. I)', titlePre: 'The ', titleAccent: 'Collection', titlePost: '', order: 'اطلب / Order' },
     story: {
+      kicker: '(CH. II)',
       titlePre: 'Crafted in ',
       titleAccent: 'Muscat',
       titlePost: '.',
@@ -112,6 +113,7 @@ export const strings = {
       chips: ['Hand-blended', 'Long-lasting oils', 'Since 20XX'], // TODO Sam: real founding year
     },
     signature: {
+      kicker: '(CH. III)',
       titlePre: 'The ',
       titleAccent: 'Signature',
       titlePost: ' scent.',
@@ -123,6 +125,7 @@ export const strings = {
       ],
     },
     order: {
+      kicker: '(CH. IV)',
       titlePre: 'Your signature ',
       titleAccent: 'scent',
       titlePost: ' awaits.',
@@ -158,8 +161,9 @@ export const strings = {
       featuredLabel: 'العطر المميز',
     },
     bestSellers: { label: 'الأكثر مبيعًا', index: '01' },
-    collection: { titlePre: '', titleAccent: 'التشكيلة', titlePost: ' الكاملة', order: 'اطلب الآن' },
+    collection: { kicker: '(الفصل الأول)', titlePre: '', titleAccent: 'التشكيلة', titlePost: ' الكاملة', order: 'اطلب الآن' },
     story: {
+      kicker: '(الفصل الثاني)',
       titlePre: 'صُنع في ',
       titleAccent: 'مسقط',
       titlePost: '.',
@@ -167,6 +171,7 @@ export const strings = {
       chips: ['مزج يدوي', 'زيوت تدوم طويلًا', 'منذ 20XX'], // TODO Sam: سنة التأسيس
     },
     signature: {
+      kicker: '(الفصل الثالث)',
       titlePre: 'العطر ',
       titleAccent: 'التوقيع',
       titlePost: '.',
@@ -178,6 +183,7 @@ export const strings = {
       ],
     },
     order: {
+      kicker: '(الفصل الرابع)',
       titlePre: 'عبيرك ',
       titleAccent: 'الخاص',
       titlePost: ' في انتظارك.',

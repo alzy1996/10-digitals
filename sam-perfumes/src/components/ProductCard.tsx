@@ -21,13 +21,13 @@ export default function ProductCard({ product }: { product: Product }) {
           imgClassName="drop-shadow-[0_18px_24px_rgba(23,16,9,0.4)]"
         />
         <div className="mt-4 h-px w-full" style={{ background: 'var(--line)' }} />
-        <p className="py-3 text-center text-xs text-muted">{product.notes[lang]}</p>
+        <p className="flex min-h-[3.5rem] items-center justify-center py-3 text-center text-xs text-muted">{product.notes[lang]}</p>
       </div>
       <div className="mt-4 px-1">
         <h3 className="font-display text-xl text-ink-dark">{name}</h3>
         <p className="mt-1 text-xs leading-relaxed text-muted-dark">{product.desc[lang]}</p>
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <span className="text-sm font-semibold text-ink-dark">{product.price}</span>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <span dir="ltr" className="whitespace-nowrap font-display text-xl text-ink-dark sm:text-2xl">{product.price}</span>
           <a
             href={waLink(t.whatsappOrderMessage(product.nameEn))}
             target="_blank"

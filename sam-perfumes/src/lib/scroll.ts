@@ -1,6 +1,13 @@
 import type Lenis from 'lenis'
 
 let lenis: Lenis | null = null
+let refresh: (() => void) | null = null
+
+// Recompute trigger positions after a layout change that isn't a window
+// resize (e.g. switching EN ⇄ AR reflows every heading).
+export function refreshScroll() {
+  refresh?.()
+}
 
 // Lenis smooth scroll wired into GSAP's ticker, plus a ScrollTrigger.batch
 // that staggers .anim reveals onto every [data-reveal] element. Call once
@@ -43,8 +50,33 @@ export function initScroll(): () => void {
         }),
     })
 
+    // P3 signature: chapter titles come into focus as they rise — blur
+    // 15px→0 with a slight scale settle, scrubbed to scroll position.
+    const scrubs = reduced
+      ? []
+      : gsap.utils.toArray<HTMLElement>('[data-scrub-title]').map((el) =>
+          gsap.fromTo(
+            el,
+            { opacity: 0.15, scale: 1.08, filter: 'blur(15px)' },
+            {
+              opacity: 1,
+              scale: 1,
+              filter: 'blur(0px)',
+              ease: 'none',
+              scrollTrigger: { trigger: el, start: 'top 95%', end: 'top 55%', scrub: 0.6 },
+            },
+          ),
+        )
+
+    refresh = () => ScrollTrigger.refresh()
+
     cleanup = () => {
       triggers.forEach((st) => st.kill())
+      scrubs.forEach((tw) => {
+        tw.scrollTrigger?.kill()
+        tw.kill()
+      })
+      refresh = null
       if (raf) gsap.ticker.remove(raf)
       lenis?.destroy()
       lenis = null

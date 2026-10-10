@@ -11,6 +11,7 @@ export default function Collection() {
   return (
     <section id="collection" className="px-5 py-20 sm:px-8 md:py-28 lg:px-14">
       <SectionTitle
+        kicker={t.collection.kicker}
         pre={t.collection.titlePre}
         accent={t.collection.titleAccent}
         post={t.collection.titlePost}

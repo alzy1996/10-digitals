@@ -80,6 +80,7 @@ export default function Story() {
         <div className="order-1 lg:order-2 lg:py-6">
           <div className="text-ink">
             <SectionTitle
+              kicker={t.story.kicker}
               pre={t.story.titlePre}
               accent={t.story.titleAccent}
               post={t.story.titlePost}

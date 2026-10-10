@@ -25,7 +25,16 @@ function bottleProfile(): THREE.Vector2[] {
   return p
 }
 
-export default function GlassBottle({ mobile = false }: { mobile?: boolean }) {
+export default function GlassBottle({
+  touch = false,
+  reducedMotion = false,
+  lowQuality = false,
+}: {
+  touch?: boolean
+  reducedMotion?: boolean
+  lowQuality?: boolean
+}) {
+  const mobile = touch
   const group = useRef<THREE.Group>(null)
   const bodyGeo = useMemo(() => new THREE.LatheGeometry(bottleProfile(), 64), [])
   const capGeo = useMemo(() => new THREE.CylinderGeometry(0.22, 0.24, 0.34, 48), [])
@@ -38,16 +47,16 @@ export default function GlassBottle({ mobile = false }: { mobile?: boolean }) {
     return new THREE.LatheGeometry(prof, 48)
   }, [])
 
-  // Signature mechanic B — damped mouse-parallax tilt. Refs only, no
-  // setState per frame (react-three-fiber golden rule).
+  // Signature mechanic B — damped mouse-parallax rig: the bottle turns
+  // toward the cursor and tilts at most ±0.15 rad. On touch there is no
+  // hover, so it degrades to a slow idle turn. Refs only, no setState.
   useFrame((state, delta) => {
-    if (!group.current) return
-    const px = state.pointer.x
-    const py = state.pointer.y
-    group.current.rotation.y = THREE.MathUtils.damp(group.current.rotation.y, px * 0.5, 4, delta)
-    group.current.rotation.x = THREE.MathUtils.damp(group.current.rotation.x, -py * 0.18, 4, delta)
-    // gentle idle drift so it never feels frozen when the cursor is still
-    group.current.position.y = Math.sin(state.clock.elapsedTime * 0.6) * 0.04
+    if (!group.current || reducedMotion) return
+    const t = state.clock.elapsedTime
+    const yaw = touch ? Math.sin(t * 0.35) * 0.45 : state.pointer.x * 0.45
+    const pitch = touch ? 0 : -state.pointer.y * 0.15
+    group.current.rotation.y = THREE.MathUtils.damp(group.current.rotation.y, -0.35 + yaw, 4, delta)
+    group.current.rotation.x = THREE.MathUtils.damp(group.current.rotation.x, pitch, 4, delta)
   })
 
   return (
@@ -55,9 +64,11 @@ export default function GlassBottle({ mobile = false }: { mobile?: boolean }) {
       {/* amber liquid core */}
       <mesh geometry={liquidGeo}>
         <meshPhysicalMaterial
-          color="#8a4a1c"
+          color={lowQuality ? '#6e3a14' : '#8a4a1c'}
           roughness={0.25}
-          transmission={0.6}
+          transmission={lowQuality ? 0 : 0.6}
+          transparent={lowQuality}
+          opacity={lowQuality ? 0.92 : 1}
           thickness={1.2}
           ior={1.33}
           attenuationColor="#e0913f"
@@ -65,8 +76,22 @@ export default function GlassBottle({ mobile = false }: { mobile?: boolean }) {
         />
       </mesh>
 
-      {/* glass body — the killer feature */}
+      {/* glass body — the killer feature. Weak/software GPUs get a glossy
+          clear-coat glass instead of the multi-pass transmission shader. */}
       <mesh geometry={bodyGeo}>
+        {lowQuality ? (
+          <meshPhysicalMaterial
+            color="#f0c489"
+            roughness={0.04}
+            metalness={0}
+            clearcoat={1}
+            clearcoatRoughness={0.04}
+            transparent
+            opacity={0.32}
+            depthWrite={false}
+            envMapIntensity={2.2}
+          />
+        ) : (
         <MeshTransmissionMaterial
           transmission={1}
           thickness={0.9}
@@ -84,6 +109,7 @@ export default function GlassBottle({ mobile = false }: { mobile?: boolean }) {
           resolution={mobile ? 256 : 512}
           background={new THREE.Color('#171009')}
         />
+        )}
       </mesh>
 
       {/* gold collar under the cap */}
@@ -101,7 +127,12 @@ export default function GlassBottle({ mobile = false }: { mobile?: boolean }) {
           Bloom target (a 3D font would need a fetched typeface). */}
       <mesh position={[0, -0.15, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[0.71, 0.02, 16, 96]} />
-        <meshStandardMaterial color="#f4ead9" emissive="#d3a05a" emissiveIntensity={2.2} toneMapped={false} />
+        <meshStandardMaterial
+          color="#f4ead9"
+          emissive="#d3a05a"
+          emissiveIntensity={lowQuality ? 0.9 : 2.2}
+          toneMapped={false}
+        />
       </mesh>
     </group>
   )

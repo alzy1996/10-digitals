@@ -10,6 +10,7 @@ export default function Signature() {
     <section id="signature" className="mt-6 px-3 sm:px-5">
       <div className="rounded-lg2 border border-line bg-panel px-6 py-14 sm:px-10 md:py-20 xl:px-14">
         <SectionTitle
+          kicker={t.signature.kicker}
           pre={t.signature.titlePre}
           accent={t.signature.titleAccent}
           post={t.signature.titlePost}
