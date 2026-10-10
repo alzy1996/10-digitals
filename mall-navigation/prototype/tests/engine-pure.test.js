@@ -161,3 +161,30 @@ describe('builder flavour (v0.3 toy)', () => {
     expect(toy.opaque.build('toyBasement').getAttribute('normal')).toBeTruthy()
   })
 })
+
+describe('shadow rule (v0.3 quality levels)', () => {
+  it('shadows only in toy at showcase quality, and never in the stacked overview', async () => {
+    const { shadowsFor } = await import('../src/engine/quality-rules.js')
+    expect(shadowsFor('floor', 'toy', 'showcase')).toBe(true)
+    expect(shadowsFor('fpv', 'toy', 'showcase')).toBe(true)
+    expect(shadowsFor('top', 'toy', 'showcase')).toBe(true)
+    expect(shadowsFor('stack', 'toy', 'showcase')).toBe(false)
+    expect(shadowsFor('floor', 'toy', 'light')).toBe(false)
+    expect(shadowsFor('floor', 'storm', 'showcase')).toBe(false)
+  })
+})
+
+describe('exact (unlit) faces in the toy style', () => {
+  it('toy sends sign faces, QR plates and zone bands to an unlit mesh; other styles keep one mesh', () => {
+    const toy = buildRetailLevel(index, L1, new ColorRegistry(), { bevel: 0.06, lit: true })
+    const plain = buildRetailLevel(index, L1, new ColorRegistry())
+    expect(toy.exact.vertexCount).toBeGreaterThan(0)
+    expect(plain.exact.vertexCount).toBe(0)
+    const keysOf = (b) => new Set(b.keys.map((k) => b.registry.keys[k]))
+    // the white frame line under every sign is an exact face
+    expect(keysOf(toy.exact).has('hex:#FFFFFF')).toBe(true)
+    expect(keysOf(toy.opaque).has('hex:#FFFFFF')).toBe(false)
+    const B1 = buildParkingLevel(index, index.levelById.get('B1'), new ColorRegistry(), { bevel: 0.06, lit: true })
+    expect(B1.exact.vertexCount).toBeGreaterThan(0)
+  })
+})

@@ -55,7 +55,7 @@ boxes (PLAN §19.2 "architect's model": no light, no shadows), which reads as a 
 
 - `pickQuality({ urlParam, deviceMemory, cores, saveData, dpr }) -> 'showcase' | 'light'` (unit-tested).
   - `?quality=showcase|light` wins.
-  - Otherwise `light` when `saveData` is on, `deviceMemory < 4`, or `cores <= 4`; else `showcase`.
+  - Otherwise `light` when `saveData` is on, `deviceMemory < 4`, or `cores <= 2` (Safari caps the core count it reports, so 4 cores alone never demotes an iPhone); else `showcase`.
 - `showcase`: shadows (2048 map), pixel ratio up to 2.
 - `light`: no shadows, pixel ratio up to 1.5. Lambert light stays (cheap).
 - Auto-downgrade: if 8 consecutive rendered frames during a camera move each take over 45 ms of CPU, switch to `light`

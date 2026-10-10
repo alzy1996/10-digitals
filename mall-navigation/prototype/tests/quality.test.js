@@ -15,9 +15,12 @@ describe('pickQuality (spec 3.2)', () => {
   it('weak or data-saving devices get light', () => {
     expect(pickQuality({ saveData: true, deviceMemory: 8, cores: 8 })).toBe('light')
     expect(pickQuality({ deviceMemory: 3, cores: 8 })).toBe('light')
-    expect(pickQuality({ deviceMemory: 8, cores: 4 })).toBe('light')
+    expect(pickQuality({ deviceMemory: 8, cores: 2 })).toBe('light')
   })
-  it('unknown values (iPhone: no deviceMemory) default to showcase when cores > 4', () => {
+  it('a 4-core device stays showcase (Safari caps the core count it reports; slow phones auto-downgrade)', () => {
+    expect(pickQuality({ cores: 4 })).toBe('showcase')
+  })
+  it('unknown values (iPhone: no deviceMemory) default to showcase', () => {
     expect(pickQuality({ cores: 6 })).toBe('showcase')
     expect(pickQuality({})).toBe('showcase')
   })

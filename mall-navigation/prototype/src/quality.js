@@ -9,6 +9,7 @@ export function pickQuality({ urlParam, deviceMemory, cores, saveData } = {}) {
   if (urlParam === 'showcase' || urlParam === 'light') return urlParam
   if (saveData) return 'light'
   if (Number.isFinite(deviceMemory) && deviceMemory < 4) return 'light'
-  if (Number.isFinite(cores) && cores <= 4) return 'light'
+  // only a 1-2 core device counts: Safari caps the core count it reports, Android Chrome reports memory instead
+  if (Number.isFinite(cores) && cores <= 2) return 'light'
   return 'showcase'
 }

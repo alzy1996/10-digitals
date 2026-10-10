@@ -270,6 +270,12 @@ export class MeshBuilder {
     this.rise = !!opts.rise
     this.bevel = Math.max(0, opts.bevel ?? 0)
     this.lit = !!opts.lit
+    /**
+     * Where faces drawn with { exact: true } go (meaning colours: sign faces, QR plates, zone bands): an unlit builder
+     * in the toy style, so lit materials never shade them; null = this builder (storm / classic, unchanged).
+     * @type {MeshBuilder|null}
+     */
+    this.exactSink = null
     /** @type {number[]} */
     this.pos = []
     /** @type {number[]} */
@@ -359,9 +365,11 @@ export class MeshBuilder {
    * @param {number} h1
    * @param {string} key
    * @param {XY} outward data-space outward normal
-   * @param {{ ao?: boolean, shade?: number, keyTop?: string, unlit?: boolean }} [opts] unlit = no baked shading
+   * @param {{ ao?: boolean, shade?: number, keyTop?: string, unlit?: boolean, exact?: boolean }} [opts] unlit = no baked
+   *   shading; exact = a meaning colour (goes to exactSink when there is one)
    */
   vquad(p0, p1, h0, h1, key, outward, opts = {}) {
+    if (opts.exact && this.exactSink) return this.exactSink.vquad(p0, p1, h0, h1, key, outward, { ...opts, exact: false })
     const s = opts.unlit ? (opts.shade ?? 1) : (opts.shade ?? 1) * wallShade(outward[0], outward[1])
     const sb = opts.ao && !opts.unlit ? s * 0.84 : s
     const kt = opts.keyTop ?? key
@@ -380,9 +388,10 @@ export class MeshBuilder {
    * @param {number} h1
    * @param {string} topKey
    * @param {string} sideKey
-   * @param {{ ao?: boolean, bottom?: string|null, top?: boolean, sideShade?: number, unlit?: boolean }} [opts]
+   * @param {{ ao?: boolean, bottom?: string|null, top?: boolean, sideShade?: number, unlit?: boolean, exact?: boolean }} [opts]
    */
   prism(footprint, h0, h1, topKey, sideKey, opts = {}) {
+    if (opts.exact && this.exactSink) return this.exactSink.prism(footprint, h0, h1, topKey, sideKey, { ...opts, exact: false })
     const poly = ensureCCW(footprint)
     // toy bevel: clamped to 30 % of the shortest edge and of the height; convex footprints only
     let bv = opts.top === false ? 0 : this.bevel

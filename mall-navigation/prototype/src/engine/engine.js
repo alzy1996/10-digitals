@@ -10,7 +10,7 @@
  * hemisphere + sun light rig and soft sun shadows (Showcase quality); meaning colours (route, markers, signs) stay unlit
  * and exact. The v0.2 "storm" and v0.1 "classic" styles keep PLAN.md §19.2's unlit "architect's model".
  */
-import { Color, DirectionalLight, DoubleSide, Fog, Group, HemisphereLight, MOUSE, MathUtils, Mesh, MeshBasicMaterial, MeshLambertMaterial, PerspectiveCamera, Scene, TOUCH, Vector3, WebGLRenderer } from 'three'
+import { Color, DirectionalLight, DoubleSide, Fog, Group, HemisphereLight, MOUSE, MathUtils, Mesh, MeshBasicMaterial, MeshLambertMaterial, PCFShadowMap, PerspectiveCamera, Scene, TOUCH, Vector3, WebGLRenderer } from 'three'
 // OrbitControls set up exactly like three's MapControls (one-finger pan, two-finger pinch-zoom + rotate, panning on
 // the ground plane), without MapControls' mouse ray-casting: one class (and Raycaster) fewer in the engine chunk
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -28,6 +28,7 @@ import { applyPose, boxCenter, easeStandard, fitDistance, lerpPose, readPose } f
 import { SkyLayer } from './sky.js'
 import { TargetRing } from './ring.js'
 import { arrivalStand, buildInterior, levelVoids } from './interior.js'
+import { shadowsFor } from './quality-rules.js'
 
 /** Vertical distance between levels in stack view (metres). */
 export const STACK_GAP_M = 18
@@ -61,6 +62,11 @@ const FPV_DEFAULTS = Object.freeze({ eyeHeightM: 1.6, fovDeg: 70, pitchDeg: -5 }
 const FPV_CLAMPS = { eyeHeightM: [1.2, 2.0], fovDeg: [50, 85], pitchDeg: [-25, 5] }
 /** The Walk view's eye pose written as an orbit pose: the target this far ahead of the eye (the dive lerps to it). */
 const EYE_TARGET_M = 6.1
+/**
+ * Toy light rig intensities (DESIGN-TOY.md 3), NoToneMapping: a white roof in the sun ~1.0, in shadow ~0.46, a wall
+ * facing the sun ~0.84, one facing away ~0.44 (Lambert: (hemi + sun * cos) / pi).
+ */
+const TOY_LIGHT = Object.freeze({ hemi: 1.6, sun: 2.1, hemiBasement: 1.25, sunBasement: 1.2 })
 const bearingDeg = (ax, ay, bx, by) => MathUtils.radToDeg(Math.atan2(bx - ax, by - ay))
 const angDelta = (a, b) => ((((b - a) % 360) + 540) % 360) - 180
 const norm360 = (a) => ((a % 360) + 360) % 360
@@ -95,6 +101,14 @@ export function createEngine() {
     theme: /** @type {'sunlight'|'basement'} */ ('sunlight'),
     /** scene style (CONTRACT 3c): 'toy' (v0.3 default), 'storm' (v0.2) or 'classic' (v0.1) */
     style: /** @type {'toy'|'storm'|'classic'} */ ('toy'),
+    /** 3D quality (DESIGN-TOY.md 4): 'showcase' = soft sun shadows, pixel ratio up to 2; 'light' = none, up to 1.5 */
+    quality: /** @type {'showcase'|'light'} */ ('showcase'),
+    /** bumped on every setVenue (the shadow map is redrawn) */
+    venueGen: 0,
+    /** what the shadow map was last drawn for (fitSun) */
+    shadowSig: '',
+    /** consecutive slow frames while moving (auto-downgrade to light) */
+    slowFrames: 0,
     lang: /** @type {'en'|'ar'} */ ('en'),
     mode: /** @type {'stack'|'floor'|'top'|'fpv'} */ ('stack'),
     focusId: null,
@@ -206,6 +220,8 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
   const makeMaterials = (lit) => ({
     opaque: finish(lit ? new MeshLambertMaterial({ vertexColors: true }) : new MeshBasicMaterial({ vertexColors: true }), false),
     roofs: lit ? new MeshLambertMaterial({ vertexColors: true }) : new MeshBasicMaterial({ vertexColors: true }),
+    // toy: sign faces, QR plates and zone bands, unlit so their colours stay exact (levels.js exact faces)
+    exact: new MeshBasicMaterial({ vertexColors: true }),
     glass: finish(new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.38, depthWrite: false, side: DoubleSide }), true),
     // escalator balustrade panels (storm): the same glass, one-sided (they carry a face per side)
     escGlass: finish(new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.38, depthWrite: false }), true),
@@ -223,9 +239,14 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
 
   // toy light rig (DESIGN-TOY.md 3): sky / ground fill + a sun from the south-east, ~55 degrees high. With NoToneMapping
   // a white roof facing the sun renders at about 1.0. Basic (unlit) materials ignore it, so storm and classic are unchanged.
-  S.hemi = new HemisphereLight(0xe6f4ff, 0xf3dcc5, 2.05)
-  S.sun = new DirectionalLight(0xffffff, 1.6)
+  S.hemi = new HemisphereLight(0xe6f4ff, 0xf3dcc5, TOY_LIGHT.hemi)
+  S.sun = new DirectionalLight(0xffffff, TOY_LIGHT.sun)
   S.sun.position.set(72, 115, -10)
+  // soft PCF shadows (Showcase quality, toy only: quality-rules.js); the box is refitted to the shown levels (fitSun)
+  S.sun.shadow.mapSize.set(2048, 2048)
+  S.sun.shadow.radius = 3
+  S.sun.shadow.bias = -0.0006
+  S.sun.shadow.normalBias = 0.04
   S.scene.add(S.hemi, S.sun, S.sun.target)
 
   /** Geometry flavour of the current style (toy: bevelled edges + normals for the lit materials). */
@@ -360,6 +381,8 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
 
   const _proj = new Vector3()
   const _dir = new Vector3()
+  /** where the toy sun stands: south-east (three.js +x = east, +z = south), about 55 degrees high */
+  const _sunDir = new Vector3(0.45, 0.8, 0.4).normalize()
   function projectWorld(p) {
     const { width, height } = viewSize()
     _proj.copy(p).applyMatrix4(S.camera.matrixWorldInverse)
@@ -743,6 +766,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     })
 
     const r = S.renderer
+    fitSun()
     if (S.sky.mesh.visible) S.sky.update(r, cam, MathUtils.degToRad(pose.headingDeg), width / height, walk)
     r.info.reset()
     r.render(S.scene, cam)
@@ -753,6 +777,14 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     r.autoClear = true
     S.frames++
     S.frameMs = performance.now() - t0
+    // a phone too slow for Showcase while the camera moves: drop to Light once (one-way for the session)
+    if (S.quality === 'showcase' && (S.flight || S.anim.on)) {
+      S.slowFrames = S.frameMs > 45 ? S.slowFrames + 1 : 0
+      if (S.slowFrames >= 8) {
+        console.info('Dallni: switching to light 3D quality (slow frames)')
+        queueMicrotask(() => api.setQuality('light'))
+      }
+    }
     // callbacks: commands they send run after the frame (DEFERRED), a requestRender is coalesced; anchors are pure
     // projection and never request a frame (CONTRACT 3b onAnchors)
     S.inCb = true
@@ -777,6 +809,60 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     } finally {
       S.inCb = false
     }
+  }
+
+  /** Device pixel ratio cap for the quality level. */
+  function pixelRatio() {
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
+    return Math.min(dpr, S.quality === 'light' ? 1.5 : 2)
+  }
+
+  /**
+   * The sun's shadows (DESIGN-TOY.md 4): on only for the toy style at Showcase quality outside the stacked Overview.
+   * When what is shown changes (mode, levels, stack blend, style, quality, venue, the Walk view's floor), the shadow box
+   * is refitted around the shown levels and the shadow map redrawn once; a pure camera move redraws nothing.
+   */
+  function fitSun() {
+    const on = shadowsFor(S.mode, S.style, S.quality)
+    const shown = [...S.levels.values()].filter((L) => isVisible(L.id))
+    const eyeLevel = S.mode === 'fpv' ? (S.fpv?.levelId ?? S.focusId) : null
+    const sig = `${on}|${S.mode}|${S.blend.toFixed(3)}|${shown.map((L) => L.id).join()}|${eyeLevel}|${S.venueGen}`
+    if (sig === S.shadowSig) return
+    S.shadowSig = sig
+    S.sun.castShadow = on
+    if (!on || !shown.length) return
+    // in the Walk view only the eye's own floor casts (the slab above would shade the whole floor), roofs not at all
+    for (const L of S.levels.values()) {
+      const cast = !eyeLevel || L.id === eyeLevel
+      if (L.opaque) L.opaque.castShadow = cast
+      if (L.roofs) L.roofs.castShadow = cast && !eyeLevel
+    }
+    let minX = Infinity
+    let maxX = -Infinity
+    let minZ = Infinity
+    let maxZ = -Infinity
+    let minY = Infinity
+    let maxY = -Infinity
+    for (const L of shown) {
+      const b = L.build.bounds
+      const y = levelY(L.id)
+      minX = Math.min(minX, b.minX)
+      maxX = Math.max(maxX, b.maxX)
+      minZ = Math.min(minZ, -b.maxY)
+      maxZ = Math.max(maxZ, -b.minY)
+      minY = Math.min(minY, y)
+      maxY = Math.max(maxY, y + 6)
+    }
+    const c = new Vector3((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2)
+    const r = Math.hypot(maxX - minX, maxZ - minZ, maxY - minY) / 2 + 4
+    S.sun.target.position.copy(c)
+    S.sun.position.copy(c).addScaledVector(_sunDir, 160)
+    S.sun.target.updateMatrixWorld()
+    S.sun.updateMatrixWorld()
+    const sc = S.sun.shadow.camera
+    Object.assign(sc, { left: -r, right: r, top: r, bottom: -r, near: Math.max(1, 160 - r - 10), far: 160 + r + 10 })
+    sc.updateProjectionMatrix()
+    if (S.renderer) S.renderer.shadowMap.needsUpdate = true
   }
 
   /** 0 = map views, 1 = Walk view; in between during the dive into it and the rise out of it. */
@@ -1147,7 +1233,9 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     const b = buildInterior(S.index, L.level, S.registry, levelVoids(S.index, above ? above.id : L.id), flavour())
     const grp = new Group()
     grp.name = 'interior-' + L.id
-    addThemedMesh(b.solid, S.mats.opaque, grp, 'ceiling-' + L.id)
+    const ceiling = addThemedMesh(b.solid, S.mats.opaque, grp, 'ceiling-' + L.id)
+    // the Walk view's ceiling never casts: the sun would put the whole floor in its shadow
+    if (ceiling) ceiling.castShadow = false
     addThemedMesh(b.glow, S.mats.interiorGlow, grp, 'lights-' + L.id, 4)
     grp.visible = S.mode === 'fpv'
     L.content.add(grp)
@@ -1477,6 +1565,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     L.faded = faded
     if (L.opaque) L.opaque.material = faded ? S.mats.fadeOpaque : S.mats.opaque
     if (L.plates) L.plates.material = L.opaque?.material ?? S.mats.opaque
+    if (L.exact) L.exact.material = faded ? S.mats.fadeOpaque : S.mats.exact
     if (L.roofs) L.roofs.material = faded ? S.mats.fadeOpaque : S.mats.roofs
     if (L.glass) L.glass.material = faded ? S.mats.fadeGlass : S.mats.glass
     if (L.decals) L.decals.material = faded ? S.mats.fadeDecals : S.mats.decals
@@ -1514,8 +1603,8 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     S.mats.decals.opacity = S.style === 'storm' ? 0.2 : toy ? 0.35 : 0.3
     // toy light rig: a softer light on the parking levels (dusk palette)
     S.hemi.visible = S.sun.visible = toy
-    S.hemi.intensity = S.theme === 'basement' ? 1.5 : 2.05
-    S.sun.intensity = S.theme === 'basement' ? 0.9 : 1.6
+    S.hemi.intensity = S.theme === 'basement' ? TOY_LIGHT.hemiBasement : TOY_LIGHT.hemi
+    S.sun.intensity = S.theme === 'basement' ? TOY_LIGHT.sunBasement : TOY_LIGHT.sun
     S.overlay.setColors({ text: T.labelText, halo: T.labelHalo, badgeText: T.badgeText, badgeHalo: T.badgeHalo, badgeW: T.badgeW })
     if (S.renderer) S.renderer.domElement.style.background = `linear-gradient(180deg, ${T.bgTop} 0%, ${T.bgBottom} 100%)`
   }
@@ -1578,6 +1667,8 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     const mesh = new Mesh(g, material)
     mesh.name = name
     mesh.renderOrder = renderOrder
+    // lit (toy) meshes cast and take the sun's soft shadows (fitSun decides when the sun casts)
+    mesh.castShadow = mesh.receiveShadow = Boolean(material.isMeshLambertMaterial)
     parent.add(mesh)
     return mesh
   }
@@ -1598,6 +1689,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     L.decals = addThemedMesh(build.decals, S.mats.decals, content, 'zone-decals-' + level.id, 1)
     L.glass = addThemedMesh(build.glass, S.mats.glass, content, 'glass-' + level.id, 2)
     L.plates = addThemedMesh(build.plates, S.mats.opaque, content, 'plates-' + level.id)
+    L.exact = addThemedMesh(build.exact, S.mats.exact, content, 'exact-' + level.id)
     addThemedMesh(build.ghost, S.mats.ghost, ghostGroup, 'ghost-' + level.id, 1)
     if (build.bays.length) {
       L.bays = buildBaysMesh(build.bays, pal())
@@ -2020,6 +2112,10 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
         S.renderer.setClearColor(0x000000, 0)
         // two passes per frame (scene, then markers): stats are reset once per frame in render()
         S.renderer.info.autoReset = false
+        // the sun's shadow map is redrawn only when the scene changes (fitSun), never on a pure camera move
+        S.renderer.shadowMap.enabled = true
+        S.renderer.shadowMap.type = PCFShadowMap
+        S.renderer.shadowMap.autoUpdate = false
         const el = S.renderer.domElement
         el.style.display = 'block'
         el.style.width = '100%'
@@ -2061,7 +2157,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
         applyControlLimits()
         applyThemeAll()
       }
-      S.renderer.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2))
+      S.renderer.setPixelRatio(pixelRatio())
       containerEl.appendChild(S.renderer.domElement)
       S.mounted = true
       if (S.needsSync) {
@@ -2119,6 +2215,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
       const b = index.venue.meta?.bounds
       S.bounds = b ? { ...b } : { minX: 0, minY: 0, maxX: 128, maxY: 64 }
       S.levelH.value = floorToFloor()
+      S.venueGen++
       for (const level of index.levels) buildLevel(level)
       buildConnectors()
       S.overlay.setLanguage(S.lang)
@@ -2585,6 +2682,27 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
       }
       applyThemeAll()
       requestRender()
+    },
+
+    /**
+     * 3D quality (DESIGN-TOY.md 4): 'showcase' (soft sun shadows in the toy style, pixel ratio up to 2) or 'light'
+     * (no shadows, pixel ratio up to 1.5). The App picks it per device (src/quality.js); the engine drops to 'light' by
+     * itself after 8 slow frames in a row while the camera moves.
+     * @param {'showcase'|'light'} quality
+     */
+    setQuality(quality) {
+      S.quality = quality === 'light' ? 'light' : 'showcase'
+      S.slowFrames = 0
+      if (S.failed || !S.renderer) return
+      S.renderer.setPixelRatio(pixelRatio())
+      const { width, height } = viewSize()
+      S.renderer.setSize(width, height, false)
+      requestRender()
+    },
+
+    /** @returns {'showcase'|'light'} */
+    getQuality() {
+      return S.quality
     },
 
     /** @returns {'toy'|'storm'|'classic'} */

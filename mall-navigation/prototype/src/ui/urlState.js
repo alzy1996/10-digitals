@@ -53,6 +53,7 @@ export function readUrlParams(search = typeof location !== 'undefined' ? locatio
     car: str('car'),
     play: str('play') === '1',
     style: STYLES.includes(str('style')) ? str('style') : null,
+    quality: str('quality') === 'showcase' || str('quality') === 'light' ? str('quality') : null,
     sheet: SHEET_SNAPS.includes(str('sheet')) ? str('sheet') : null,
   }
 }

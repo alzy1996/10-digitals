@@ -216,9 +216,9 @@ function buildUnitWalls(B, poly, style, openings, onSign) {
       // exact-colour front face (unlit look: signs read as illuminated)
       const fa = add(P(s0), mul(nOut, depth + 0.004))
       const fb = add(P(s1), mul(nOut, depth + 0.004))
-      B.opaque.vquad(fa, fb, sb, st, catKey, nOut, { unlit: true })
+      B.opaque.vquad(fa, fb, sb, st, catKey, nOut, { unlit: true, exact: true })
       // thin light frame line at the bottom of the sign
-      B.opaque.vquad(add(fa, mul(nOut, 0.002)), add(fb, mul(nOut, 0.002)), sb, sb + 0.06, 'hex:#FFFFFF', nOut, { unlit: true })
+      B.opaque.vquad(add(fa, mul(nOut, 0.002)), add(fb, mul(nOut, 0.002)), sb, sb + 0.06, 'hex:#FFFFFF', nOut, { unlit: true, exact: true })
       if (signText) {
         const c = add(mul(add(P(s0), P(s1)), 0.5), mul(nOut, depth + 0.03))
         onSign({
@@ -380,11 +380,11 @@ function buildPlate(B, anchor, mounted) {
   // dark body = the frame; white face inset by 4 cm; dark QR square with a white centre
   B.opaque.box(cx, cy, 0.62, 0.06, anchor.facingDeg ?? 0, 1.2, 1.68, 'qrDark', 'qrDark', { ao: false })
   const face = add([cx, cy], mul(f, 0.032))
-  B.opaque.vquad(add(face, mul(side, -0.27)), add(face, mul(side, 0.27)), 1.24, 1.64, 'qr', f, { unlit: true })
+  B.opaque.vquad(add(face, mul(side, -0.27)), add(face, mul(side, 0.27)), 1.24, 1.64, 'qr', f, { unlit: true, exact: true })
   const f2 = add(face, mul(f, 0.002))
-  B.opaque.vquad(add(f2, mul(side, -0.16)), add(f2, mul(side, 0.16)), 1.28, 1.6, 'qrDark', f, { unlit: true })
+  B.opaque.vquad(add(f2, mul(side, -0.16)), add(f2, mul(side, 0.16)), 1.28, 1.6, 'qrDark', f, { unlit: true, exact: true })
   const f3 = add(face, mul(f, 0.004))
-  B.opaque.vquad(add(f3, mul(side, -0.1)), add(f3, mul(side, 0.1)), 1.34, 1.54, 'qr', f, { unlit: true })
+  B.opaque.vquad(add(f3, mul(side, -0.1)), add(f3, mul(side, 0.1)), 1.34, 1.54, 'qr', f, { unlit: true, exact: true })
 }
 
 /** Lift shaft on one level: glass box, metal frame, door, sign. */
@@ -420,7 +420,7 @@ function buildLiftShaft(B, conn, H, onSign, isParking) {
   const sb = Math.min(2.75, H - 0.6)
   const st = sb + 0.8
   B.opaque.prism([s0, s1, add(s1, mul(f, 0.3)), add(s0, mul(f, 0.3))], sb, st, 'hex:#1F2937', 'hex:#1F2937', { ao: false })
-  B.opaque.vquad(add(s0, mul(f, 0.305)), add(s1, mul(f, 0.305)), sb, st, 'hex:' + PIN_COLORS.connector, f, { unlit: true })
+  B.opaque.vquad(add(s0, mul(f, 0.305)), add(s1, mul(f, 0.305)), sb, st, 'hex:' + PIN_COLORS.connector, f, { unlit: true, exact: true })
   const sc = add(mul(add(s0, s1), 0.5), mul(f, 0.33))
   onSign({
     x: sc[0],
@@ -564,7 +564,7 @@ function distToPolygon(p, poly) {
 export const PLAIN = Object.freeze({ bevel: 0, lit: false })
 
 function newBuild(registry, level, flavour = PLAIN) {
-  return {
+  const build = {
     levelId: level.id,
     opaque: new MeshBuilder(registry, { bevel: flavour.bevel, lit: flavour.lit }),
     roofs: new MeshBuilder(registry, { lit: flavour.lit }),
@@ -573,6 +573,8 @@ function newBuild(registry, level, flavour = PLAIN) {
     ghost: new MeshBuilder(registry),
     // free-standing QR floor tiles: their own mesh, hidden in the Walk view
     plates: new MeshBuilder(registry, { bevel: flavour.bevel, lit: flavour.lit }),
+    // toy: meaning colours (sign faces, QR plates, zone bands) stay unlit and exact in their own mesh
+    exact: new MeshBuilder(registry),
     signs: [],
     floorTexts: [],
     bayTexts: [],
@@ -583,6 +585,8 @@ function newBuild(registry, level, flavour = PLAIN) {
     pickPolygons: [],
     bounds: polygonBounds(level.outline),
   }
+  if (flavour.lit) build.opaque.exactSink = build.plates.exactSink = build.exact
+  return build
 }
 
 function levelData(index, levelId) {
@@ -1084,7 +1088,7 @@ export function buildParkingLevel(index, level, registry, flavour = PLAIN) {
     const s = pl.size ?? 0.6
     const [x, y] = pl.center
     build.opaque.box(x, y, s, s, 0, 0, 2.0, 'pillar', 'pillar', { ao: true })
-    build.opaque.box(x, y, s + 0.04, s + 0.04, 0, 2.0, 2.8, 'hex:' + (z?.color ?? '#475569'), 'hex:' + (z?.color ?? '#475569'), { ao: false, unlit: true })
+    build.opaque.box(x, y, s + 0.04, s + 0.04, 0, 2.0, 2.8, 'hex:' + (z?.color ?? '#475569'), 'hex:' + (z?.color ?? '#475569'), { ao: false, unlit: true, exact: true })
     build.opaque.box(x, y, s, s, 0, 2.8, 3.6, 'concreteTop', 'pillar', { ao: false })
     if (z) {
       const word = (str) => String(str).split('·')[0].trim()

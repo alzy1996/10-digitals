@@ -39,6 +39,7 @@ import { ScanSheet } from './ui/ScanSheet.jsx'
 import { bayForPlate, entityInfo, isParkingLevel, levelButtonLabel, levelName, pick } from './ui/model.js'
 import { plateLabel } from './routing/names.js'
 import { initialLang, readUrlParams, rememberLang } from './ui/urlState.js'
+import { pickQuality } from './quality.js'
 import { nextTurnFor } from './ui/hudModel.js'
 import { SheetContext } from './ui/Sheet.jsx'
 import { defaultSnap } from './ui/sheetModel.js'
@@ -219,7 +220,7 @@ export default function App() {
         const defaultMode = scr === 'car' || scr === 'navigate' || scr === 'arrived' ? 'floor' : 'stack'
         // the Walk view needs a route (navigate / arrived); elsewhere view=fpv opens the Floor view
         const urlView = p.view === 'fpv' && scr !== 'navigate' && scr !== 'arrived' ? 'floor' : p.view
-        pendingRef.current = { step: p.step, simT: p.simT, play: p.play, style: p.style }
+        pendingRef.current = { step: p.step, simT: p.simT, play: p.play, style: p.style, quality: p.quality }
         const tileNow = p.tile && ['food', 'restrooms', 'prayer', 'pharmacy', 'kids', 'exit'].includes(p.tile) ? p.tile : null
         const carStage = carNow ? 'card' : 'scan'
         dispatch({
@@ -287,6 +288,9 @@ export default function App() {
     const style = ['classic', 'storm'].includes(pendingRef.current.style) ? pendingRef.current.style : 'toy'
     engine.setSceneStyle(style)
     engine.setPathStyle(style === 'classic' ? 'ribbon' : 'glow')
+    // Showcase (soft shadows) on capable phones, Light on weak ones; ?quality=showcase|light overrides (src/quality.js)
+    const nav = typeof navigator !== 'undefined' ? navigator : {}
+    engine.setQuality(pickQuality({ urlParam: pendingRef.current.quality, deviceMemory: nav.deviceMemory, cores: nav.hardwareConcurrency, saveData: nav.connection?.saveData }))
     engine.setVenue(index)
     shownRouteRef.current = undefined
     // the engine starts in its own default view: apply ours (from the URL or defaults) right away
