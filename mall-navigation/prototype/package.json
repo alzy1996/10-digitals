@@ -1,0 +1,35 @@
+{
+  "name": "dallni-prototype",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Dallni 3D mall map + navigation simulator (prototype spike)",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build && node tools/check-budgets.mjs",
+    "check:budgets": "node tools/check-budgets.mjs",
+    "preview": "vite preview --host",
+    "test": "vitest run",
+    "gen:venue": "node tools/generate-demo-venue.mjs",
+    "validate:venue": "node tools/validate-venue.mjs public/venues/demo-muscat/venue.json",
+    "gen:fonts": "node tools/font-coverage.mjs",
+    "shots": "node scripts/screenshots.mjs"
+  },
+  "dependencies": {
+    "@fontsource/noto-sans-arabic": "5.3.0",
+    "@fontsource/readex-pro": "5.3.0",
+    "ngraph.graph": "20.1.2",
+    "ngraph.path": "1.6.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "three": "0.186.1",
+    "troika-three-text": "0.52.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@vitejs/plugin-react": "6.1.2",
+    "tailwindcss": "4.3.3",
+    "vite": "8.3.4",
+    "vitest": "5.0.3"
+  }
+}

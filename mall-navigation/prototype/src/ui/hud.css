@@ -1,0 +1,877 @@
+/*
+ * Walk view HUD (DESIGN-GLASS.md sections 6.5, 7): stat chips, turn card, SIMULATION capsule, level chip, turn bubble,
+ * half-dome mini-map, bottom bar, lift / stairs card. Imported by the HUD components (src/ui/WalkHud.jsx and its
+ * parts), so it loads with them. Tokens come from src/ui/app.css (:root).
+ *
+ * Blur budget while the walk plays: at most 3 blurred surfaces (turn card, bubble, dome). Chips, the SIMULATION
+ * pill, the level chip, the toast and the bar capsule use the tinted (no blur) glass. Never a blurred element inside
+ * another.
+ * Reference size 390 x 844: chips y 8-56 (three equal chips, each with its round coloured icon, ref 5), card
+ * (SIMULATION pill in its top-end corner) y 64-172, free area y 180-625 (the scene gets ~53 % of the screen), dome
+ * 219 high with the level chip in its start corner and the N chip riding its rim, bar capsule y 764-828 with Play
+ * y 760-832. Under 700 px tall (a phone browser tab): no chips row, the card carries a summary line.
+ */
+
+.walk-hud {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  /* the HUD is laid out physically where the map is (bubble, dome, compass); text inside follows the page dir */
+}
+.walk-hud button {
+  pointer-events: auto;
+}
+
+/* static comfort vignette over the 3D (never animated), with a shade behind the top HUD so bright ceiling lights do
+   not flash between the chips and above the card (refs 3, 5) */
+.walk-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(180deg, rgba(4, 7, 9, 0.55) 0, rgba(4, 7, 9, 0) 200px),
+    radial-gradient(120% 90% at 50% 42%, transparent 55%, rgba(4, 7, 9, 0.45) 100%);
+  pointer-events: none;
+}
+
+/* ---------- top HUD column ---------- */
+
+.walk-top {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  right: 0;
+  max-width: 584px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) calc(var(--gutter) + env(safe-area-inset-right, 0px)) 0 calc(var(--gutter) + env(safe-area-inset-left, 0px));
+  pointer-events: none;
+}
+.walk-top > * {
+  pointer-events: auto;
+}
+
+/* ---------- stat chips (ref 5): pewter tinted, 48 px, 3 equal columns, each with its round coloured icon ---------- */
+
+.stat-chips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.stat-chips.has-end {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+}
+.stat-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 48px;
+  padding-block: 6px;
+  padding-inline: 6px 8px;
+  border-radius: 24px;
+  background: var(--glass-light-tint-bg);
+  border: 1px solid var(--glass-light-rim);
+  box-shadow: var(--glass-highlight), var(--shadow-control);
+}
+.stat-ico {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--glass-raised-bg);
+  color: var(--chip-c);
+  box-shadow: inset 0 0 0 2.5px var(--chip-c), 0 0 12px -2px var(--chip-c);
+}
+.stat-txt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.stat-label {
+  font-size: 14px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--ink-2-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stat-val {
+  font-size: 18px;
+  line-height: 22px;
+  font-weight: 400;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+:root[dir="rtl"] .stat-label {
+  line-height: 18px;
+}
+:root[dir="rtl"] .stat-val {
+  line-height: 24px;
+}
+/* narrow phones (360 px: a 108 px chip): a 26 px ring and tighter insets keep the icon and "Distance" whole */
+@media (max-width: 379px) {
+  .stat-chip {
+    gap: 5px;
+    padding-inline: 5px 6px;
+  }
+  .stat-ico {
+    width: 26px;
+    height: 26px;
+  }
+  .stat-ico svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* ---------- turn card (ref 3): dark glass, blurred ---------- */
+
+.turn-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 104px;
+  padding-block: 12px;
+  padding-inline: 12px 16px;
+  border-radius: var(--r-card);
+  /* the warm edge light stays in the 14 px above the first text line (--ink-2 there keeps 4.5:1 over a white scene) */
+  background: radial-gradient(60% 14px at 70% 0, rgba(255, 159, 85, 0.18) 0%, rgba(255, 159, 85, 0) 100%), var(--glass-sheen), var(--glass-dark-bg);
+  border: 1px solid transparent;
+  box-shadow: var(--glass-highlight), var(--shadow-panel);
+  -webkit-backdrop-filter: var(--glass-dark-filter);
+  backdrop-filter: var(--glass-dark-filter);
+  overflow: hidden;
+}
+.turn-card::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--glass-spec-rim);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+.tc-start {
+  flex: none;
+  width: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: tc-in 240ms var(--ease);
+}
+.tc-tile {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  background: var(--primary-grad);
+  color: var(--on-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 0 22px -4px rgba(38, 217, 199, 0.8);
+}
+.tc-tile.is-arrive {
+  background: var(--ok-grad);
+  color: var(--on-ok);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 0 22px -4px rgba(91, 229, 132, 0.8);
+}
+.tc-dist {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+.tc-dist b {
+  font-size: 28px;
+  line-height: 28px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+}
+.tc-dist small {
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+:root[dir="rtl"] .tc-dist b {
+  line-height: 30px;
+}
+.tc-text {
+  flex: 1;
+  min-width: 0;
+  align-self: flex-start;
+}
+/* the SIMULATION pill floats in the top-end corner: the verb's first line runs beside it, a second line (a long verb
+   on a 360 px phone) takes the full width, the two lines balanced */
+.tc-head {
+  min-height: 26px;
+}
+.tc-head .sim-pill {
+  float: right;
+  margin-inline-start: 8px;
+}
+:root[dir="rtl"] .tc-head .sim-pill {
+  float: left;
+}
+.tc-verb {
+  padding-top: 3px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--ink-2);
+  text-wrap: balance;
+  animation: tc-in 240ms var(--ease);
+}
+.tc-v-short {
+  display: none;
+}
+@media (max-width: 379px) {
+  .tc-v-long {
+    display: none;
+  }
+  .tc-v-short {
+    display: inline;
+  }
+}
+.tc-body {
+  animation: tc-in 240ms var(--ease);
+}
+/* the SIMULATION label while walking: the amber pill in the card's top-end corner (always on screen) */
+.sim-pill {
+  flex: none;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 13px;
+  font-size: 14px;
+  line-height: 18px;
+  letter-spacing: 0.02em;
+  margin-inline-end: -4px;
+}
+.tc-name {
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+:root[dir="rtl"] .tc-verb {
+  padding-top: 1px;
+  line-height: 24px;
+}
+:root[dir="rtl"] .tc-name {
+  line-height: 38px;
+  letter-spacing: 0;
+}
+.tc-press {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+.tc-press .press-label {
+  min-width: 32px;
+  height: 32px;
+  font-size: 15px;
+}
+/* the turn right after a ride ("then turn left at the top") */
+.tc-then {
+  margin-top: 2px;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+:root[dir="rtl"] .tc-then {
+  line-height: 24px;
+}
+/* compact screens: the chips' content (and the level chip) folds into one line here */
+.tc-summary {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tc-summary > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@keyframes tc-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- SIMULATION capsule + level chip ---------- */
+
+.walk-simrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  pointer-events: none;
+}
+.walk-simrow > * {
+  pointer-events: auto;
+}
+.sim-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 36px;
+  padding-block: 4px;
+  padding-inline: 4px 14px;
+  border-radius: 18px;
+  background: var(--glass-dark-tint-bg);
+  border: 1px solid var(--glass-dark-rim);
+  box-shadow: var(--glass-highlight), var(--shadow-control);
+}
+.sim-note {
+  min-width: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* the note stays whenever it fits (SimulationTag measures it: the short note, else the tag alone) */
+.sim-capsule.is-tagonly {
+  padding-inline-end: 4px;
+}
+.level-chip-hud {
+  flex: none;
+  display: grid;
+  place-items: center;
+  min-width: 48px;
+  height: 48px;
+  padding-inline: 10px;
+  border-radius: 24px;
+  background: var(--glass-light-tint-bg);
+  border: 1px solid var(--glass-light-rim);
+  box-shadow: var(--glass-highlight), var(--shadow-control);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.level-chip-hud.is-inline {
+  min-width: 28px;
+  height: 24px;
+  padding-inline: 7px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 18px;
+  box-shadow: var(--glass-highlight);
+}
+.hud-map-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--glass-light-bg);
+  border: 1px solid var(--glass-light-rim);
+  box-shadow: var(--glass-highlight), var(--shadow-control);
+  -webkit-backdrop-filter: var(--glass-light-filter);
+  backdrop-filter: var(--glass-light-filter);
+  color: var(--ink);
+}
+
+/* ---------- turn bubble (ref 5): frost glass, dark ink, positioned from the engine's anchors ---------- */
+
+.tb {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  direction: ltr;
+  will-change: transform;
+  pointer-events: none;
+}
+.tb[data-mode="hidden"] {
+  display: none;
+}
+.tb-icon {
+  position: absolute;
+  z-index: 1;
+  left: -17px;
+  top: -17px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 30%, #3BE3CC 0%, #14A89B 55%, #0B7F76 100%);
+  color: #FFFFFF;
+  box-shadow: 0 0 0 2px #FFFFFF, 0 0 18px 2px rgba(38, 217, 199, 0.7), 0 4px 10px rgba(0, 0, 0, 0.35);
+}
+.tb[data-kind="arrive"] .tb-icon {
+  background: radial-gradient(circle at 50% 30%, #6BEA94 0%, #2FB866 55%, #1E8C4C 100%);
+  box-shadow: 0 0 0 2px #FFFFFF, 0 0 18px 2px rgba(91, 229, 132, 0.7), 0 4px 10px rgba(0, 0, 0, 0.35);
+}
+.tb-icon svg {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+.tb-box {
+  position: absolute;
+  left: 0;
+  top: 0;
+  min-width: 150px;
+  max-width: 240px;
+  padding: 8px 14px;
+  border-radius: 18px;
+  background: var(--frost-bg);
+  border: 1px solid var(--frost-rim);
+  box-shadow: var(--shadow-frost);
+  -webkit-backdrop-filter: var(--frost-filter);
+  backdrop-filter: var(--frost-filter);
+  color: var(--frost-ink);
+  transition: opacity 160ms var(--ease);
+}
+.tb-in {
+  display: block;
+  animation: tb-in 200ms var(--ease);
+}
+.tb-box[dir="rtl"] {
+  text-align: right;
+}
+.tb-title {
+  display: block;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tb-sub {
+  display: block;
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--frost-ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tb-box[dir="rtl"] .tb-title {
+  line-height: 26px;
+}
+.tb-box[dir="rtl"] .tb-sub {
+  line-height: 22px;
+}
+/* near the turn: the icon alone (the card above still says it) */
+.tb[data-near] .tb-box {
+  opacity: 0;
+}
+@keyframes tb-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* off screen: a frost pill at the free area's edge (the side the turn really is), or bottom centre when behind */
+.tb-pill {
+  position: absolute;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  left: -36px;
+  top: -22px;
+  width: 72px;
+  height: 44px;
+  border-radius: 22px;
+  background: var(--frost-bg);
+  border: 1px solid var(--frost-rim);
+  box-shadow: var(--shadow-frost);
+  -webkit-backdrop-filter: var(--frost-filter);
+  backdrop-filter: var(--frost-filter);
+  color: var(--frost-ink);
+}
+.tb-pill .tb-mini {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 30%, #3BE3CC 0%, #14A89B 55%, #0B7F76 100%);
+  color: #FFFFFF;
+  box-shadow: 0 0 0 1.5px #FFFFFF;
+}
+.tb[data-side="left"] .tb-pill {
+  flex-direction: row-reverse;
+}
+.tb[data-side="left"] .tb-pill .tb-chev {
+  transform: scaleX(-1);
+}
+.tb[data-mode="edge"] .tb-pill,
+.tb[data-mode="behind"] .tb-pill.is-behind {
+  display: flex;
+}
+.tb[data-mode="behind"] .tb-pill.is-edge,
+.tb[data-mode="edge"] .tb-pill.is-behind {
+  display: none;
+}
+.tb[data-mode="edge"] .tb-icon,
+.tb[data-mode="edge"] .tb-box,
+.tb[data-mode="behind"] .tb-icon,
+.tb[data-mode="behind"] .tb-box {
+  display: none;
+}
+.tb-pill.is-behind {
+  left: -22px;
+  width: 44px;
+}
+
+/* ---------- half-dome mini-map (ref 5): dark glass, blurred, heading-up ---------- */
+
+/* the dome's box; the N chip and the level chip sit in it, outside the dome's clip (the N chip rides the rim line,
+   half over the scene) */
+.dome-wrap {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+  height: calc(clamp(180px, 26vh, 32vh) + env(safe-area-inset-bottom, 0px));
+  height: calc(clamp(180px, 26dvh, 32dvh) + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+.dome {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* the map content ends at the bar's top: the canvas reads this padding */
+  padding: 0 0 calc(84px + env(safe-area-inset-bottom, 0px));
+  border: 0;
+  pointer-events: auto;
+  clip-path: ellipse(78% 100% at 50% 100%);
+  background: var(--glass-dark-bg);
+  -webkit-backdrop-filter: var(--glass-dark-filter);
+  backdrop-filter: var(--glass-dark-filter);
+  cursor: pointer;
+}
+.dome canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+/* 24 px, centred on the rim line: never over the route ahead (heading-up: the route runs to the top centre) */
+.dome-north {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  color: var(--frost-ink);
+  box-shadow: 0 0 0 2px rgba(94, 242, 220, 0.35), 0 2px 8px rgba(0, 0, 0, 0.45);
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 600;
+  pointer-events: none;
+  will-change: transform;
+}
+/* the floor you are on ("G", "1", "B1", as printed on the lift panel), in the dome's start corner above the bar */
+.dome-level {
+  position: absolute;
+  z-index: 1;
+  inset-inline-start: calc(14px + env(safe-area-inset-left, 0px));
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+.dome-level .level-chip-hud {
+  min-width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  font-size: 17px;
+}
+.dome-north-chev {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  display: none;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 7px solid #FFFFFF;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+.dome-north[data-pinned] .dome-north-chev {
+  display: block;
+}
+
+/* ---------- bottom bar (ref 5): one frosted capsule, labelled side actions, one glowing round action ---------- */
+
+/* the whole bar takes taps (a near miss of Play never lands on the mini-map under it) */
+.walk-bar {
+  position: absolute;
+  z-index: 4;
+  left: calc(var(--gutter) + env(safe-area-inset-left, 0px));
+  right: calc(var(--gutter) + env(safe-area-inset-right, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  max-width: 560px;
+  height: 72px;
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  pointer-events: auto;
+}
+/* the 64 px pewter capsule behind the side groups; Play stands out of it */
+.walk-bar::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 4px 0;
+  border-radius: 32px;
+  background: var(--glass-light-tint-bg);
+  border: 1px solid var(--glass-light-rim);
+  box-shadow: var(--glass-highlight), var(--shadow-control);
+}
+.bar-side {
+  display: flex;
+  gap: 4px;
+  padding-inline: 4px;
+}
+.bar-side.is-start {
+  justify-self: start;
+}
+.bar-side.is-end {
+  justify-self: end;
+}
+.bar-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  transition: transform 100ms var(--ease);
+}
+.bar-btn:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+.bar-label {
+  max-width: 100%;
+  font-size: 14px;
+  line-height: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:root[dir="rtl"] .bar-label {
+  line-height: 18px;
+}
+.bar-btn:active,
+.bar-play:active {
+  transform: scale(0.97);
+}
+.bar-btn:disabled {
+  opacity: 0.45;
+}
+/* the last step: Arrived (a check in the arrival mint; the label stays white on the pewter) */
+.bar-btn.is-arrive svg {
+  color: #5BE584;
+}
+.bar-btn:disabled:active {
+  transform: none;
+}
+.bar-speed-val {
+  font-size: 17px;
+  line-height: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.bar-play {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  margin-inline: 12px;
+  border-radius: 50%;
+  border: 0;
+  background: radial-gradient(circle at 50% 35%, #8BFBE6 0%, #2CE5C8 45%, #12A99A 100%);
+  color: #04211C;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), 0 0 0 6px rgba(38, 217, 199, 0.18), 0 0 36px rgba(38, 217, 199, 0.65);
+  transition: transform 100ms var(--ease);
+}
+
+/* ---------- lift / stairs card: a short fade over the cut between floors ---------- */
+
+.lift-overlay {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--walk-free-top, 220px) 24px var(--walk-dome-h, 287px);
+  background: rgba(10, 15, 18, 0.92);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  transition: opacity 240ms var(--ease);
+  pointer-events: none;
+}
+.lift-overlay.is-in {
+  opacity: 1;
+}
+.lift-overlay.is-out {
+  opacity: 0;
+  transition-duration: 320ms;
+  transition-timing-function: var(--ease-exit);
+}
+/* the card sits on the overlay's blur: tinted glass (no second blur) */
+.lift-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(320px, 100%);
+  padding: 22px 22px 20px;
+  border-radius: var(--r-card);
+  background: var(--glass-dark-tint-bg);
+  border: 1px solid var(--glass-dark-rim);
+  box-shadow: var(--glass-highlight), var(--shadow-panel);
+  text-align: center;
+}
+.lift-disc {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--primary-grad);
+  color: var(--on-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 0 24px -4px rgba(38, 217, 199, 0.85);
+}
+.lift-head {
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 500;
+}
+:root[dir="rtl"] .lift-head {
+  line-height: 32px;
+}
+.lift-body {
+  font-size: 16px;
+  line-height: 22px;
+  color: var(--ink-2);
+}
+.lift-progress {
+  width: 100%;
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+}
+.lift-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--route);
+  box-shadow: 0 0 10px rgba(44, 229, 200, 0.8);
+  transition: width 160ms linear;
+}
+:root[dir="rtl"] .lift-progress > span {
+  margin-inline-start: 0;
+}
+
+/* ---------- arrived in the Walk view: only the SIMULATION capsule and a Map button stay at the top ---------- */
+.walk-hud.is-arrived .walk-simrow {
+  min-height: 56px;
+}
+
+/* ---------- 360 x 740: chips 8-56, card 64-172, dome 26 % ---------- */
+/* ---------- compact (under 700 px tall): no chips row; the card carries the summary line ---------- */
+@media (max-height: 699.98px) {
+  .stat-chips {
+    display: none;
+  }
+  .tc-summary {
+    display: flex;
+  }
+  .turn-card {
+    min-height: 124px;
+  }
+  .dome-wrap {
+    height: calc(clamp(170px, 27vh, 32vh) + env(safe-area-inset-bottom, 0px));
+    height: calc(clamp(170px, 27dvh, 32dvh) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ---------- opaque fallback for the HUD's own surfaces (the variables switch in app.css) ---------- */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .lift-overlay {
+    background: #0A0F12;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tb-in,
+  .tc-start,
+  .tc-verb,
+  .tc-body {
+    animation: none;
+  }
+}
