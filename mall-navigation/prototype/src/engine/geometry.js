@@ -221,6 +221,39 @@ export function wallShade(nx, ny) {
   return 0.74 + 0.26 * (0.5 + 0.5 * d)
 }
 
+/** Convexity test for a CCW polygon. */
+function isConvexPoly(p) {
+  for (let i = 0; i < p.length; i++) {
+    const a = p[i]
+    const b = p[(i + 1) % p.length]
+    const c = p[(i + 2) % p.length]
+    if ((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) < -1e-9) return false
+  }
+  return true
+}
+
+/** Inset a convex CCW polygon by d: each corner moves along its bisector so every edge shifts d inward. */
+function insetPolygon(p, d) {
+  const n = p.length
+  const out = []
+  for (let i = 0; i < n; i++) {
+    const a = p[(i - 1 + n) % n]
+    const b = p[i]
+    const c = p[(i + 1) % n]
+    const l1 = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1
+    const l2 = Math.hypot(c[0] - b[0], c[1] - b[1]) || 1
+    // inward normals of a CCW polygon's edges
+    const n1 = [-(b[1] - a[1]) / l1, (b[0] - a[0]) / l1]
+    const n2 = [-(c[1] - b[1]) / l2, (c[0] - b[0]) / l2]
+    const mx = n1[0] + n2[0]
+    const my = n1[1] + n2[1]
+    const ml = Math.hypot(mx, my) || 1
+    const k = d / Math.max(0.3, (mx / ml) * n1[0] + (my / ml) * n1[1])
+    out.push([b[0] + (mx / ml) * k, b[1] + (my / ml) * k])
+  }
+  return out
+}
+
 // ---------------------------------------------------------------------------------------------
 // MeshBuilder
 // ---------------------------------------------------------------------------------------------
@@ -228,11 +261,15 @@ export function wallShade(nx, ny) {
 export class MeshBuilder {
   /**
    * @param {import('./palette.js').ColorRegistry} registry
-   * @param {{ rise?: boolean }} [opts] rise=true stores a per-vertex rise fraction (see setRise)
+   * @param {{ rise?: boolean, bevel?: number, lit?: boolean }} [opts] rise=true stores a per-vertex rise fraction (see
+   *   setRise); bevel (metres) chamfers the top edges of convex prisms (v0.3 toy); lit=true builds vertex normals for lit
+   *   materials and softens the baked shade (the real sun does most of that job)
    */
   constructor(registry, opts = {}) {
     this.registry = registry
     this.rise = !!opts.rise
+    this.bevel = Math.max(0, opts.bevel ?? 0)
+    this.lit = !!opts.lit
     /** @type {number[]} */
     this.pos = []
     /** @type {number[]} */
@@ -347,7 +384,19 @@ export class MeshBuilder {
    */
   prism(footprint, h0, h1, topKey, sideKey, opts = {}) {
     const poly = ensureCCW(footprint)
-    if (opts.top !== false) this.flat(poly, h1, topKey)
+    // toy bevel: clamped to 30 % of the shortest edge and of the height; convex footprints only
+    let bv = opts.top === false ? 0 : this.bevel
+    if (bv > 0) {
+      let minEdge = Infinity
+      for (let i = 0; i < poly.length; i++) {
+        const q = poly[(i + 1) % poly.length]
+        minEdge = Math.min(minEdge, Math.hypot(q[0] - poly[i][0], q[1] - poly[i][1]))
+      }
+      bv = Math.min(bv, minEdge * 0.3, (h1 - h0) * 0.3)
+      if (bv < 0.005 || !isConvexPoly(poly)) bv = 0
+    }
+    const inner = bv > 0 ? insetPolygon(poly, bv) : poly
+    if (opts.top !== false) this.flat(inner, h1, topKey)
     if (opts.bottom) this.flat(poly, h0, opts.bottom, { down: true })
     for (let i = 0; i < poly.length; i++) {
       const p0 = poly[i]
@@ -356,7 +405,20 @@ export class MeshBuilder {
       const dy = p1[1] - p0[1]
       const l = Math.hypot(dx, dy)
       if (l < 1e-6) continue
-      this.vquad(p0, p1, h0, h1, sideKey, [dy / l, -dx / l], { ao: opts.ao, shade: opts.sideShade, unlit: opts.unlit })
+      const out = [dy / l, -dx / l]
+      this.vquad(p0, p1, h0, h1 - bv, sideKey, out, { ao: opts.ao, shade: opts.sideShade, unlit: opts.unlit })
+      if (bv > 0) {
+        // sloped band from the outer edge at h1 - bv up to the inset edge at h1, in the top colour
+        const q0 = inner[i]
+        const q1 = inner[(i + 1) % inner.length]
+        const s = 0.5 * (1 + wallShade(out[0], out[1]))
+        const a = this.v(p0[0], p0[1], h1 - bv, topKey, s)
+        const b = this.v(p1[0], p1[1], h1 - bv, topKey, s)
+        const c = this.v(q1[0], q1[1], h1, topKey, s)
+        const d = this.v(q0[0], q0[1], h1, topKey, s)
+        this.triN(a, b, c, out[0], 1, -out[1])
+        this.triN(a, c, d, out[0], 1, -out[1])
+      }
     }
   }
 
@@ -441,11 +503,13 @@ export class MeshBuilder {
     g.userData.colorKeys = Uint16Array.from(this.keys)
     g.userData.shades = Float32Array.from(this.shades)
     g.userData.registry = this.registry
+    g.userData.lit = this.lit
     if (this.rise) {
       g.userData.base = Float32Array.from(this.pos)
       g.userData.fracs = Float32Array.from(this.fracs)
     }
     applyTheme(g, theme)
+    if (this.lit) g.computeVertexNormals()
     g.computeBoundingSphere()
     g.computeBoundingBox()
     return g
@@ -462,14 +526,15 @@ export class MeshBuilder {
  * @param {import('./palette.js').ThemeName} theme
  */
 export function applyTheme(g, theme) {
-  const { colorKeys, shades, registry } = g.userData
+  const { colorKeys, shades, registry, lit } = g.userData
   if (!colorKeys || !registry) return
   const tab = registry.table(theme)
   const col = g.getAttribute('color')
   const arr = col.array
   for (let i = 0; i < colorKeys.length; i++) {
     const k = colorKeys[i] * 3
-    const s = shades[i]
+    // lit geometry: the baked shade keeps under half its strength (contact darkening stays, the fake sun fades)
+    const s = lit ? 1 - (1 - shades[i]) * 0.45 : shades[i]
     arr[i * 3] = tab[k] * s
     arr[i * 3 + 1] = tab[k + 1] * s
     arr[i * 3 + 2] = tab[k + 2] * s
