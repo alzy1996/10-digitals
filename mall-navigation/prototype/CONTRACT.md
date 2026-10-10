@@ -478,11 +478,14 @@ Look, light, shadows and UI values: [`DESIGN-TOY.md`](./DESIGN-TOY.md). Every AP
   - **Showcase:** soft sun shadows (toy only, never in `stack`), pixel ratio up to 2.
   - **Light:** no shadows, pixel ratio up to 1.5.
   - The App picks the level per device with `pickQuality` (`src/quality.js`, outside the 3D chunk). `?quality=` overrides it.
-  - The engine drops to `light` by itself after 8 consecutive frames over 45 ms while flying or animating the path.
-  - The shadow map is redrawn only when what is shown changes (mode, levels, blend, venue, the Walk view's floor), never
-    on a camera move. Idle stays 0 frames.
-- **Builders.** `buildRetailLevel`, `buildParkingLevel`, `buildEscalator`, `buildLiftColumn` and `buildInterior` take a
-  last `flavour = { bevel, lit }` argument (default `PLAIN`, as before). A level build gains `exact` (a MeshBuilder,
+  - The engine drops to `light` by itself after 8 consecutive animation frames more than 45 ms apart. That covers
+    flights, controls damping and the walk, and it is measured frame to frame, so a GPU-bound phone counts too.
+  - The sun always stands south-east of the shown levels. Shadows are off in `stack` and while a stack blend animates.
+  - The shadow map is redrawn only when what is shown changes (mode, levels, blend, venue, the Walk view's floor, a
+    restored context), never on a camera move. Idle stays 0 frames.
+  - `getStats()` gains `sun: { dir, shadowDraws }`.
+- **Builders.** `buildRetailLevel`, `buildParkingLevel`, `buildEscalator` and `buildLiftColumn` take a last
+  `flavour = { bevel, lit }` argument (default `PLAIN`, as before). The Walk view interior stays unlit in every style. A level build gains `exact` (a MeshBuilder,
   empty unless lit).
 - **engineHost defaults:** `getSceneStyle: () => 'toy'`, `getQuality: () => 'showcase'`.
 - **URL hooks:** `style=toy|storm|classic`, `quality=showcase|light`.

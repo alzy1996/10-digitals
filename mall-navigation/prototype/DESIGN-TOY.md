@@ -54,8 +54,9 @@ The default look since v0.3, chosen by Sam from three live mocks ("B · Bright T
   the sun is about 0.84, one facing away about 0.44. Lambert: (hemi + sun · cos) / π.
 - **Lit meshes** (`MeshLambertMaterial`, vertex colours, normals from `MeshBuilder({ lit: true })`):
   - each level's opaque, roof and plate meshes;
-  - escalator decks;
-  - the Walk view's ceiling and bulkheads.
+  - escalator decks and their painted arrows.
+- **Unlit (baked shades), so they read white:** the Walk view's ceiling, bulkheads, light panels and outer walls. A lit
+  ceiling faces down and gets only the hemisphere's ground colour, which turned it taupe.
 - **Baked contact darkening** (wall bases) keeps 45 % of its strength (`applyTheme`, `userData.lit`).
 - **Bevels:** 6 cm chamfers on the top edges of every convex prism (`MeshBuilder({ bevel })`). They are clamped to 30 % of
   the shortest edge and of the height. Concave footprints stay square.
@@ -65,14 +66,18 @@ The default look since v0.3, chosen by Sam from three live mocks ("B · Bright T
 | Level | When | What |
 |---|---|---|
 | **Showcase** | default | soft PCF sun shadows (2048 map), pixel ratio up to 2 |
-| **Light** | `?quality=light`; Save-Data on; `deviceMemory < 4` (Android Chrome); 1–2 CPU cores; or 8 slow frames (> 45 ms) in a row while the camera moves (one-way per session) | no shadows, pixel ratio up to 1.5; the same lit look otherwise |
+| **Light** | `?quality=light`; Save-Data on; `deviceMemory < 4` (Android Chrome); 1–2 CPU cores; or 8 animation frames in a row more than 45 ms apart (camera flights, pan / pinch / rotate damping, the walk), measured frame to frame so a GPU-bound phone counts too (one-way per session) | no shadows, pixel ratio up to 1.5; the same lit look and the same sun direction otherwise |
 
 - `?quality=showcase` forces Showcase. The picker is `src/quality.js`, outside the 3D chunk.
 - Safari caps the core count it reports, so 4 cores alone never demotes an iPhone.
-- **Shadows** (`shadowsFor` in `src/engine/quality-rules.js`): only in the toy style at Showcase, and never in the stacked
-  Overview (upper slabs would black out the floors below).
-- **Redraw:** the shadow box is refitted around the shown levels, and the map is redrawn only when what is shown changes
-  (mode, levels, blend, venue, the Walk view's floor). A pure camera move redraws nothing, and idle stays at 0 frames.
+- **Shadows** (`shadowsFor` in `src/engine/quality-rules.js`): only in the toy style at Showcase, never in the stacked
+  Overview (upper slabs would black out the floors below), and not while a stack ↔ floor blend animates. The map is
+  drawn once when the blend settles.
+- **Sun:** it always stands south-east of the shown levels, with or without shadows, so Overview and Light look the same.
+- **Redraw:** the sun and the shadow box are refitted, and the map redrawn, only when what is shown changes (mode,
+  levels, blend, venue, the Walk view's floor, or a restored WebGL context). A pure camera move redraws nothing, and idle
+  stays at 0 frames.
+- `getStats().sun = { dir, shadowDraws }` reports the sun direction and how many times the map was redrawn.
 - **Walk view:** only the eye's own floor casts; roofs and the ceiling never do.
 
 ## 5. UI (`src/ui/app.css`, `src/ui/hud.css`, `src/index.css`)
@@ -90,7 +95,9 @@ Same token names and layout as v0.2; new values:
 | Accent text: amber / teal / mint / danger / blue | `#8A5300` / `#0B7A6E` / `#16794A` / `#B42318` / `#1D5FC2` |
 | Primary button | teal `#2DD4C0 → #1FC7B4`, ink `#04211C`, edge `0 4px 0 #149C8C` |
 | Found it / Take me there | green edge `#23964F` / amber edge `#D9A300` |
-| Pressed level, speed and undo | teal `#1FC7B4`, dark ink |
+| Pressed level, speed and undo | teal `#1FC7B4`, dark ink; the route dot on the active level button `#04211C` |
+| Indicators on white: `--route-rim` (selected View option, search focus ring, Walk view pill and play icons), done progress | `#149C8C` (≥ 3:1 on white and on `#F3F7FC`) |
+| Browser bar (`theme-color`) | `#9FD4FF`, parking `#2B3A67` |
 | Focus ring | `#1D5FC2` |
 
 - All text is at least 4.5:1 on its panel, whatever the scene behind it. The panels are opaque, so the old opaque-fallback

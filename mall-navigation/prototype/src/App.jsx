@@ -56,7 +56,7 @@ const TOAST_MS = 3200
 const UNDO_MS = 5000
 const ROUTE_SCREENS = new Set(['place', 'navigate', 'arrived'])
 /** Browser theme colour per theme (DESIGN-GLASS.md 2.1): storm retail / parking. */
-const THEME_COLOR = { sunlight: '#0E1418', basement: '#070A0D' }
+const THEME_COLOR = { sunlight: '#9FD4FF', basement: '#2B3A67' }
 
 const INITIAL = {
   ready: false,

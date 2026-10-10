@@ -28,7 +28,7 @@ import { applyPose, boxCenter, easeStandard, fitDistance, lerpPose, readPose } f
 import { SkyLayer } from './sky.js'
 import { TargetRing } from './ring.js'
 import { arrivalStand, buildInterior, levelVoids } from './interior.js'
-import { shadowsFor } from './quality-rules.js'
+import { SLOW_FRAMES, nextSlowFrames, shadowsFor } from './quality-rules.js'
 
 /** Vertical distance between levels in stack view (metres). */
 export const STACK_GAP_M = 18
@@ -109,6 +109,8 @@ export function createEngine() {
     shadowSig: '',
     /** consecutive slow frames while moving (auto-downgrade to light) */
     slowFrames: 0,
+    /** how many times the shadow map was asked to redraw (getStats) */
+    shadowDraws: 0,
     lang: /** @type {'en'|'ar'} */ ('en'),
     mode: /** @type {'stack'|'floor'|'top'|'fpv'} */ ('stack'),
     focusId: null,
@@ -222,6 +224,9 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     roofs: lit ? new MeshLambertMaterial({ vertexColors: true }) : new MeshBasicMaterial({ vertexColors: true }),
     // toy: sign faces, QR plates and zone bands, unlit so their colours stay exact (levels.js exact faces)
     exact: new MeshBasicMaterial({ vertexColors: true }),
+    // the Walk view's ceiling, bulkheads, light panels and outer walls: unlit in every style (baked shades), so a lit
+    // ceiling never turns taupe under the hemisphere's ground colour
+    interior: finish(new MeshBasicMaterial({ vertexColors: true }), false),
     glass: finish(new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.38, depthWrite: false, side: DoubleSide }), true),
     // escalator balustrade panels (storm): the same glass, one-sided (they carry a face per side)
     escGlass: finish(new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.38, depthWrite: false }), true),
@@ -241,7 +246,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
   // a white roof facing the sun renders at about 1.0. Basic (unlit) materials ignore it, so storm and classic are unchanged.
   S.hemi = new HemisphereLight(0xe6f4ff, 0xf3dcc5, TOY_LIGHT.hemi)
   S.sun = new DirectionalLight(0xffffff, TOY_LIGHT.sun)
-  S.sun.position.set(72, 115, -10)
+  S.sun.position.set(72, 128, 64)
   // soft PCF shadows (Showcase quality, toy only: quality-rules.js); the box is refitted to the shown levels (fitSun)
   S.sun.shadow.mapSize.set(2048, 2048)
   S.sun.shadow.radius = 3
@@ -418,6 +423,14 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     S.rafId = 0
     if (!S.mounted) return
     const dt = S.lastTick ? Math.min(0.1, (now - S.lastTick) / 1000) : 1 / 60
+    // a frame that continues an animation: a phone too slow for Showcase drops to Light once (one-way per session)
+    if (S.lastTick && S.quality === 'showcase') {
+      S.slowFrames = nextSlowFrames(S.slowFrames, now - S.lastTick)
+      if (S.slowFrames >= SLOW_FRAMES) {
+        console.info('Dallni: switching to light 3D quality (slow frames)')
+        api.setQuality('light')
+      }
+    }
     S.lastTick = now
     let animating = false
     const wasFlying = !!S.flight
@@ -777,14 +790,6 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     r.autoClear = true
     S.frames++
     S.frameMs = performance.now() - t0
-    // a phone too slow for Showcase while the camera moves: drop to Light once (one-way for the session)
-    if (S.quality === 'showcase' && (S.flight || S.anim.on)) {
-      S.slowFrames = S.frameMs > 45 ? S.slowFrames + 1 : 0
-      if (S.slowFrames >= 8) {
-        console.info('Dallni: switching to light 3D quality (slow frames)')
-        queueMicrotask(() => api.setQuality('light'))
-      }
-    }
     // callbacks: commands they send run after the frame (DEFERRED), a requestRender is coalesced; anchors are pure
     // projection and never request a frame (CONTRACT 3b onAnchors)
     S.inCb = true
@@ -818,25 +823,20 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
   }
 
   /**
-   * The sun's shadows (DESIGN-TOY.md 4): on only for the toy style at Showcase quality outside the stacked Overview.
-   * When what is shown changes (mode, levels, stack blend, style, quality, venue, the Walk view's floor), the shadow box
-   * is refitted around the shown levels and the shadow map redrawn once; a pure camera move redraws nothing.
+   * The toy sun (DESIGN-TOY.md 4): it always stands south-east of the shown levels; its shadows are on only for the toy
+   * style at Showcase quality, outside the stacked Overview and not while a stack blend animates. When what is shown
+   * changes (mode, levels, stack blend, style, quality, venue, the Walk view's floor, a restored context), the sun and
+   * the shadow box are refitted and the shadow map redrawn once; a pure camera move redraws nothing.
    */
   function fitSun() {
-    const on = shadowsFor(S.mode, S.style, S.quality)
+    const on = shadowsFor(S.mode, S.style, S.quality, S.blend)
     const shown = [...S.levels.values()].filter((L) => isVisible(L.id))
     const eyeLevel = S.mode === 'fpv' ? (S.fpv?.levelId ?? S.focusId) : null
     const sig = `${on}|${S.mode}|${S.blend.toFixed(3)}|${shown.map((L) => L.id).join()}|${eyeLevel}|${S.venueGen}`
     if (sig === S.shadowSig) return
     S.shadowSig = sig
     S.sun.castShadow = on
-    if (!on || !shown.length) return
-    // in the Walk view only the eye's own floor casts (the slab above would shade the whole floor), roofs not at all
-    for (const L of S.levels.values()) {
-      const cast = !eyeLevel || L.id === eyeLevel
-      if (L.opaque) L.opaque.castShadow = cast
-      if (L.roofs) L.roofs.castShadow = cast && !eyeLevel
-    }
+    if (!shown.length) return
     let minX = Infinity
     let maxX = -Infinity
     let minZ = Infinity
@@ -855,14 +855,23 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     }
     const c = new Vector3((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2)
     const r = Math.hypot(maxX - minX, maxZ - minZ, maxY - minY) / 2 + 4
+    // the sun stands south-east of what is shown, with or without shadows (the same lighting at every quality)
     S.sun.target.position.copy(c)
     S.sun.position.copy(c).addScaledVector(_sunDir, 160)
     S.sun.target.updateMatrixWorld()
     S.sun.updateMatrixWorld()
+    if (!on) return
+    // in the Walk view only the eye's own floor casts (the slab above would shade the whole floor), roofs not at all
+    for (const L of S.levels.values()) {
+      const cast = !eyeLevel || L.id === eyeLevel
+      if (L.opaque) L.opaque.castShadow = cast
+      if (L.roofs) L.roofs.castShadow = cast && !eyeLevel
+    }
     const sc = S.sun.shadow.camera
     Object.assign(sc, { left: -r, right: r, top: r, bottom: -r, near: Math.max(1, 160 - r - 10), far: 160 + r + 10 })
     sc.updateProjectionMatrix()
     if (S.renderer) S.renderer.shadowMap.needsUpdate = true
+    S.shadowDraws++
   }
 
   /** 0 = map views, 1 = Walk view; in between during the dive into it and the rise out of it. */
@@ -1230,12 +1239,10 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     const lv = S.index.levels
     const above = lv[lv.findIndex((l) => l.id === L.id) + 1]
     // the floor below an atrium looks up through it; the top floor's own voids are a skylight
-    const b = buildInterior(S.index, L.level, S.registry, levelVoids(S.index, above ? above.id : L.id), flavour())
+    const b = buildInterior(S.index, L.level, S.registry, levelVoids(S.index, above ? above.id : L.id))
     const grp = new Group()
     grp.name = 'interior-' + L.id
-    const ceiling = addThemedMesh(b.solid, S.mats.opaque, grp, 'ceiling-' + L.id)
-    // the Walk view's ceiling never casts: the sun would put the whole floor in its shadow
-    if (ceiling) ceiling.castShadow = false
+    addThemedMesh(b.solid, S.mats.interior, grp, 'ceiling-' + L.id)
     addThemedMesh(b.glow, S.mats.interiorGlow, grp, 'lights-' + L.id, 4)
     grp.visible = S.mode === 'fpv'
     L.content.add(grp)
@@ -2150,6 +2157,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
         // the cloud texture lives in a render target: after a context loss it comes back empty, draw it again
         el.addEventListener('webglcontextrestored', () => {
           S.sky.invalidate()
+          S.shadowSig = ''
           requestRender()
         })
         // the chevron flow pauses on a hidden page and resumes when it shows again
@@ -2795,6 +2803,8 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
         totalFramesRendered: S.frames,
         geometries: info?.memory.geometries ?? 0,
         textures: info?.memory.textures ?? 0,
+        // the toy sun: unit direction toward it and shadow map redraws (DESIGN-TOY.md 4)
+        sun: { dir: _dir.copy(S.sun.position).sub(S.sun.target.position).normalize().toArray().map((v) => Math.round(v * 100) / 100), shadowDraws: S.shadowDraws },
       }
     },
 

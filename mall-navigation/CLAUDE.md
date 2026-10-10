@@ -19,7 +19,7 @@ Indoor mall navigation and find-my-car product by **10 Digital** (Sam Ubi, Musca
 ```
 npm install
 npm run dev               # LAN URL works on a phone on the same Wi-Fi
-npm test                  # vitest, 273 tests
+npm test                  # vitest, 297 tests
 npm run validate:venue    # venue data checks
 npm run build             # vite build + load-budget check (fails if over budget)
 npm run gen:venue         # regenerate public/venues/demo-muscat/venue.json

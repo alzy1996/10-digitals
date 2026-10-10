@@ -65,7 +65,7 @@
   --amber: #FFB547;
   --on-amber: #1B1205;
   --route: #26D9C7;
-  --route-rim: #5EF2DC;
+  --route-rim: #149C8C;
   --route-body: #14B8A6;
   --route-glow: #10B5D3;
   --route-upcoming: #1FA79A;
@@ -553,6 +553,9 @@ button:disabled {
 .levels-wrap.levels-compact .level-btn {
   height: 48px;
   padding-block: 2px;
+}
+.level-btn[aria-pressed="true"] .level-dot {
+  background: #04211C;
 }
 .level-btn .level-dot {
   position: absolute;
@@ -1670,7 +1673,7 @@ button:disabled {
   background: #E4EBF5;
 }
 .progress span.is-done {
-  background: rgba(94, 234, 212, 0.45);
+  background: #149C8C;
 }
 /* "you are here" on the trip: the glowing point of ref 1's curve */
 .progress span.is-current {

@@ -58,8 +58,9 @@ boxes (PLAN §19.2 "architect's model": no light, no shadows), which reads as a 
   - Otherwise `light` when `saveData` is on, `deviceMemory < 4`, or `cores <= 2` (Safari caps the core count it reports, so 4 cores alone never demotes an iPhone); else `showcase`.
 - `showcase`: shadows (2048 map), pixel ratio up to 2.
 - `light`: no shadows, pixel ratio up to 1.5. Lambert light stays (cheap).
-- Auto-downgrade: if 8 consecutive rendered frames during a camera move each take over 45 ms of CPU, switch to `light`
-  once. One-way per session, logged to the console.
+- Auto-downgrade: if 8 consecutive animation frames (flights, pan / pinch damping, the walk) are each more than 45 ms
+  apart, switch to `light` once. This is measured frame to frame, not as CPU time, so a GPU-bound phone counts too.
+  One-way per session, logged to the console.
 - API: `setQuality(q)`, `getQuality()`; engineHost default `getQuality: () => 'showcase'`.
 
 ### 3.3 UI: bright game look (src/ui, src/index.css)

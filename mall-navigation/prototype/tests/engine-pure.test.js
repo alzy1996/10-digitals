@@ -188,3 +188,21 @@ describe('exact (unlit) faces in the toy style', () => {
     expect(B1.exact.vertexCount).toBeGreaterThan(0)
   })
 })
+
+describe('quality rules (review #3, #9)', () => {
+  it('no shadow redraw while a stack <-> floor blend animates; shadows back once it settles', async () => {
+    const { shadowsFor } = await import('../src/engine/quality-rules.js')
+    expect(shadowsFor('floor', 'toy', 'showcase', 0.5)).toBe(false)
+    expect(shadowsFor('floor', 'toy', 'showcase', 0)).toBe(true)
+  })
+
+  it('slow frames are counted from the frame interval (GPU-bound phones too), reset by a fast one', async () => {
+    const { nextSlowFrames, SLOW_FRAMES } = await import('../src/engine/quality-rules.js')
+    expect(SLOW_FRAMES).toBe(8)
+    let n = 0
+    for (let i = 0; i < 8; i++) n = nextSlowFrames(n, 60)
+    expect(n).toBe(8)
+    expect(nextSlowFrames(n, 16)).toBe(0)
+    expect(nextSlowFrames(3, 45)).toBe(0)
+  })
+})
