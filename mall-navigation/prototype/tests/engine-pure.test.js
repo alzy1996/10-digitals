@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import { indexVenue } from '../src/data/venue.js'
 import { buildRetailLevel, buildParkingLevel } from '../src/engine/levels.js'
-import { ColorRegistry, THEMES, resolveKeyHex } from '../src/engine/palette.js'
+import { ColorRegistry, THEMES, paletteName, resolveKeyHex } from '../src/engine/palette.js'
 import { arrivalStand, freeRun } from '../src/engine/interior.js'
 
 const VENUE_PATH = fileURLToPath(new URL('../public/venues/demo-muscat/venue.json', import.meta.url))
@@ -62,5 +62,33 @@ describe('storm palette (QA round 2)', () => {
     expect(resolveKeyHex('lit:' + cat, 'sunlight')).toBe(resolveKeyHex('side:' + cat, 'sunlight'))
     const lum = (h) => [1, 3, 5].reduce((s, i) => s + parseInt(h.slice(i, i + 2), 16), 0)
     expect(lum(resolveKeyHex('lit:' + cat, 'storm'))).toBeGreaterThan(lum(resolveKeyHex('side:' + cat, 'storm')))
+  })
+})
+
+describe('toy palette (v0.3)', () => {
+  it('has every key the classic tables have, in both themes', () => {
+    for (const k of Object.keys(THEMES.sunlight)) {
+      expect(THEMES.toy[k], 'toy.' + k).toMatch(/^#[0-9A-F]{6}$/i)
+      expect(THEMES.toyBasement[k], 'toyBasement.' + k).toMatch(/^#[0-9A-F]{6}$/i)
+    }
+  })
+
+  it('paletteName maps the toy style', () => {
+    expect(paletteName('toy', 'sunlight')).toBe('toy')
+    expect(paletteName('toy', 'basement')).toBe('toyBasement')
+    expect(paletteName('storm', 'basement')).toBe('stormBasement')
+  })
+
+  it('category sign faces stay exact, zone paint stays exact, bay lines white', () => {
+    expect(resolveKeyHex('sign:#C2410C', 'toy')).toBe('#C2410C')
+    expect(resolveKeyHex('hex:#1E5BD8', 'toyBasement')).toBe('#1E5BD8')
+    expect(THEMES.toyBasement.bayLine).toBe('#FFFFFF')
+  })
+
+  it('shop walls are a pastel of the category, lighter than classic grey-blue walls', () => {
+    const lum = (h) => parseInt(h.slice(1, 3), 16) + parseInt(h.slice(3, 5), 16) + parseInt(h.slice(5, 7), 16)
+    const toy = resolveKeyHex('side:#6D28D9', 'toy')
+    expect(lum(toy)).toBeGreaterThan(lum('#6D28D9') + 200)
+    expect(lum(toy)).toBeGreaterThan(lum(resolveKeyHex('side:#6D28D9', 'sunlight')))
   })
 })
