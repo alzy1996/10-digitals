@@ -5,12 +5,14 @@ Indoor mall navigation and find-my-car product by **10 Digital** (Sam Ubi, Musca
 
 ## Files
 - `PLAN.md`: the master plan, v1.1. **§19 overrides earlier sections.** It covers the honesty box, positioning, the map, find-my-car, design, architecture, free tier, pricing, go-to-market, PDPL, the roadmap and the Step 0 questions.
-- `prototype/`: a working prototype, version 0.2.1, approved by Sam.
+- `prototype/`: a working prototype, version 0.3 "toy world" (built 2026-10-11, over the v0.2.1 that Sam approved).
   - **What it is:** a 3D mall map and navigation simulator on a FICTIONAL small Muscat mall.
   - **Stack:** React 18.3.1, Vite 8, Tailwind 4, plain three.js 0.186.1 and troika-three-text. No React Three Fiber.
   - `prototype/README.md`: how to run, build and deploy to Firebase Hosting.
   - `prototype/CONTRACT.md`: module boundaries and the engine API, including §3b (Walk view).
-  - `prototype/DESIGN-GLASS.md`: the frosted-glass design tokens and the Walk view layout.
+  - `prototype/DESIGN-GLASS.md`: the v0.2 frosted-glass design tokens and the Walk view layout.
+  - `prototype/DESIGN-TOY.md`: the v0.3 toy-world palette, light rig, shadows, quality levels and UI tokens (the default).
+  - `docs/superpowers/specs/` and `docs/superpowers/plans/`: the v0.3 design spec and its implementation plan.
 - Live demo (Claude artifact): https://claude.ai/artifact/11qH3qSbt8ac3qdzLfUm64.
 
 ## Commands (run in `prototype/`)
@@ -24,8 +26,8 @@ npm run gen:venue         # regenerate public/venues/demo-muscat/venue.json
 npm run shots -- <url>    # headless screenshots; locally: npm i --no-save playwright && npx playwright install chromium
 ```
 - **Budgets are tight:**
-  - first screen: 109.7 of 110 KiB;
-  - `scene3d`: 51.4 of 52 KiB.
+  - first screen: 109.5 of 110 KiB;
+  - `scene3d`: about 53.5 of 60 KiB (raised from 52 in v0.3, reported to Sam).
 - Trim code before adding features. Never raise a budget without telling Sam.
 
 ## Sam's rules (follow strictly)
@@ -56,9 +58,12 @@ npm run shots -- <url>    # headless screenshots; locally: npm i --no-save playw
 - Option A assumed: Muscat Grand Mall is the paid pilot, Mall of Oman the showcase. Sam has not objected.
 - "Simulate walk" opens Walk view automatically: YES (built).
 
+- Q1d: Sam knows **nobody** at any mall (answered 2026-10-10; do not ask again).
+- 3D direction: Sam picked **"Bright Toy Game"** from three live mocks. v0.3 was built on 2026-10-11 under "complete
+  it": toy 3D, soft shadows, quality levels and a bright game UI (D3, the UI choice, was made by Claude; Sam can switch).
+
 **Next question to ask (one at a time):**
-1. **Q1d:** who does Sam know at Muscat Grand Mall, or at Mall of Muscat as the backup (name and role)?
-2. Then the remaining questions in PLAN §19 / §17:
+1. The remaining questions in PLAN §19 / §17:
    - hosting for the pilot;
    - Firestore region;
    - GitHub Actions as the only server;
@@ -70,7 +75,7 @@ npm run shots -- <url>    # headless screenshots; locally: npm i --no-save playw
    - which digits to use;
    - the short domain;
    - budget.
-3. After the last answer: a one-paragraph summary → "CONFIRMED?" → Phase 1 (architecture, data model and file structure, text only).
+2. After the last answer: a one-paragraph summary → "CONFIRMED?" → Phase 1 (architecture, data model and file structure, text only).
 
 **Open polish:**
 - On navigate with the sheet at full, the start dot can sit at the sheet's edge after the re-fit (`refitAfterSnapRef` in `prototype/src/App.jsx`).

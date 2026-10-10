@@ -159,7 +159,7 @@ Singleton, render-on-demand (no continuous loop when idle).
   returns defaults for queries, and exposes `enginePromise` (MapView mounts the canvas through it; it rejects
   when the chunk cannot be downloaded). Nothing downloads until `loadEngine()` is called: the App calls it once
   the venue is loaded and the first screen is up (requestIdleCallback). Build output: `engine3d-*.js` (three +
-  troika, budget 220 KB gzip) and `scene3d-*.js` (src/engine, budget 52 KB gzip since QA round 2, see 3b), checked by
+  troika, budget 220 KB gzip) and `scene3d-*.js` (src/engine, budget 60 KB gzip since v0.3, see 3c), checked by
   `tools/check-budgets.mjs` after every `npm run build`.
 - No WebGL: `mount()` throws (the app shows its fallback), the engine frees what it built and every command
   becomes a no-op (`isFailed() -> true`); troika text is only typeset once a WebGL renderer exists.
@@ -457,10 +457,42 @@ runs frames while the walk plays, and the camera moves they start).
 - Fonts: `@fontsource/readex-pro` weights 300, 400, 500 (Latin + Arabic CSS imports) + the bundled 600 faces; 700 is
   no longer imported. Still same-origin only.
 
+## 3c. v0.3 additions (toy world)
+
+Look, light, shadows and UI values: [`DESIGN-TOY.md`](./DESIGN-TOY.md). Every API above keeps its signature.
+
+- **`setSceneStyle(style)`.**
+  - Accepts `'toy' | 'storm' | 'classic'`; the default is **`'toy'`**.
+  - Toy is lit:
+    - palettes `THEMES.toy` / `THEMES.toyBasement`;
+    - Lambert vertex-coloured opaque, roof and plate meshes with normals;
+    - a hemisphere + sun rig;
+    - 6 cm bevels on convex prisms.
+  - Meaning colours stay unlit and exact (sign faces, QR faces, zone bands in an `exact` mesh; route, rings, markers,
+    pins and text as before).
+  - Toy builds different geometry. Switching to or from toy after `setVenue` rebuilds the venue, and the route and
+    markers must then be sent again. So the App sets the style **before** `setVenue`. Storm ↔ classic still recolours
+    in place.
+  - `getSceneStyle()` returns the style.
+- **`setQuality('showcase' | 'light')`, `getQuality()`.**
+  - **Showcase:** soft sun shadows (toy only, never in `stack`), pixel ratio up to 2.
+  - **Light:** no shadows, pixel ratio up to 1.5.
+  - The App picks the level per device with `pickQuality` (`src/quality.js`, outside the 3D chunk). `?quality=` overrides it.
+  - The engine drops to `light` by itself after 8 consecutive frames over 45 ms while flying or animating the path.
+  - The shadow map is redrawn only when what is shown changes (mode, levels, blend, venue, the Walk view's floor), never
+    on a camera move. Idle stays 0 frames.
+- **Builders.** `buildRetailLevel`, `buildParkingLevel`, `buildEscalator`, `buildLiftColumn` and `buildInterior` take a
+  last `flavour = { bevel, lit }` argument (default `PLAIN`, as before). A level build gains `exact` (a MeshBuilder,
+  empty unless lit).
+- **engineHost defaults:** `getSceneStyle: () => 'toy'`, `getQuality: () => 'showcase'`.
+- **URL hooks:** `style=toy|storm|classic`, `quality=showcase|light`.
+- **Budgets:** `scene3d` <= **60 KB** (raised from 52 KB in v0.3, reported to Sam), `engine3d` <= 220 KB, both <= 260 KB,
+  first screen <= 110 KB.
+
 ## 4. Quality bars
 
 - `npm run build` passes (including `tools/check-budgets.mjs`: first screen <= 110 KB, engine3d <= 220 KB,
-  scene3d <= 52 KB, both <= 260 KB, sign fonts <= 50 KB, any font <= 50 KB, all gzip); `npm test` passes;
+  scene3d <= 60 KB, both <= 260 KB, sign fonts <= 50 KB, any font <= 50 KB, all gzip); `npm test` passes;
   `node tools/validate-venue.mjs public/venues/demo-muscat/venue.json` passes.
 - Idle scene renders 0 frames (render-on-demand). Dispose geometries/materials on venue change.
 - Every primary button ≥ 56 px tall; nothing interactive < 44 px.

@@ -5,10 +5,27 @@ It shows a game-like 3D model of a mall, finds routes between shops, parking bay
 turn-by-turn steps in Arabic and English, and plays the walk as a **simulation** so you can see the whole
 journey on your own phone, from above or **first person, at eye height inside the 3D model** (Walk view).
 
-**v0.2 ("storm glass")**: dark frosted-glass panels over a cloudy storm sky with a warm amber glow, a glowing
-teal path with white chevrons, a target ring at the next turn, and the first-person **Walk view** with a turn card,
-trip chips, a floating turn bubble and a half-dome mini-map (look and layout: [`DESIGN-GLASS.md`](./DESIGN-GLASS.md);
-engine API: [`CONTRACT.md`](./CONTRACT.md) section 3b). Add `?style=classic` to any link for the v0.1 look.
+**v0.3 ("toy world", the default)**: the mall looks like a friendly mobile game.
+- **The 3D:**
+  - pastel shop blocks with soft bevelled edges;
+  - a real sun with soft shadows on capable phones;
+  - a sky-blue backdrop and a friendly dusk on the parking levels;
+  - exact, unlit sign faces;
+  - a teal route.
+- **The UI:** white chunky game panels with a raised "press me" edge, dark ink and a teal primary button.
+- **Quality:** two levels. Showcase has soft shadows. Light (no shadows) switches on by itself on weak phones and is
+  forced with `?quality=light`.
+- Everything is drawn by code: no downloaded models, textures or new libraries.
+- Look and numbers: [`DESIGN-TOY.md`](./DESIGN-TOY.md); engine API: [`CONTRACT.md`](./CONTRACT.md) section 3c.
+
+**v0.2 ("storm glass", `?style=storm` for its 3D)**:
+- a cloudy storm sky with a warm amber glow;
+- a glowing teal path with white chevrons;
+- a target ring at the next turn;
+- the first-person **Walk view**: a turn card, trip chips, a floating turn bubble and a half-dome mini-map
+  ([`DESIGN-GLASS.md`](./DESIGN-GLASS.md); CONTRACT.md section 3b).
+
+Add `?style=classic` to any link for the v0.1 look.
 
 ## Read this first: what this is, and what it is not
 
@@ -130,6 +147,8 @@ Add these to the address (they are also used by the screenshot script):
 | `?screen=navigate&to=occ-muttrah-kitchen&view=fpv&step=6` | Walk view on the last step (the bar's Arrived) |
 | `?screen=arrived&to=occ-abaya-atelier&view=fpv` | Walk view arrival at a shop facing the atrium void |
 | `?style=classic` | The v0.1 look (light classic scene, blue ribbon) |
+| `?style=storm` | The v0.2 3D look (storm sky, dark architecture); the UI stays the v0.3 one |
+| `?quality=light` / `?quality=showcase` | Force the 3D quality level (Light = no shadows; default: picked per device) |
 | `?sheet=peek` / `?sheet=full` | The first screen's bottom sheet folded / full (default: half) |
 
 Full list: `screen=home|search|place|navigate|arrived|car|scan`, `from=<plate id>`,
@@ -151,11 +170,12 @@ static host and from a sub-folder.
 
 `npm run build` fails if a file is over its load budget (PLAN.md 19.2, `tools/check-budgets.mjs`, gzip level 9,
 counted in **KiB**, 1 KiB = 1024 bytes): first screen JS + CSS 110 KiB; the 3D libraries (three.js + troika,
-`engine3d-*.js`, loaded after the first screen) 220 KiB; our own 3D code (`scene3d-*.js`, loaded with it) 52 KiB;
+`engine3d-*.js`, loaded after the first screen) 220 KiB; our own 3D code (`scene3d-*.js`, loaded with it) 60 KiB;
 both lazy 3D files together 260 KiB; the two 3D sign fonts 50 KiB together; any font 50 KiB. `npm run check:budgets`
 runs the check alone. Vite's own build log prints decimal kB at its default gzip level, so the same file reads 2-3 %
 larger there (scene3d "53.0 kB" in Vite's log is 51.3 KiB in the budget table): the table is the measure. The 3D-code
-budget was 50 KiB until QA round 2; it is 52 KiB since, to fit the Walk view's world detail (CONTRACT.md 3b).
+budget was 50 KiB until QA round 2 and 52 KiB until v0.3; it is 60 KiB since, for the toy world's light, shadows and
+bevels (CONTRACT.md 3c).
 
 ## Put it online with Firebase Hosting (free Spark plan is enough)
 
@@ -317,10 +337,12 @@ What the shots cover (`.shots/app-<name>.png`):
   printed on the lift panel (G / 1 / B1 / B2) in both languages, because the Arabic codes «أ» / «١» were near-identical
   strokes and «ب١» can read like «با»; the step text from the routing still says «اضغط ب١», level names such as
   «مواقف ب١» stay names, and a native reader should confirm which form the real lift panels print.
-- The first screen loads about 103.7 KiB gzip (budget 110 KiB; the Walk view HUD is a separate 11 KiB chunk fetched
-  when a route opens). The 3D part downloads once the first screen is up: three.js + troika (about 176 KiB gzip,
-  budget 220 KiB) and our own 3D code (51.3 KiB, budget 52 KiB since QA round 2, about 750 bytes left: nearly **full**,
-  a bigger 3D feature must first save bytes elsewhere), checked on every build. Offline caching (service worker) and the low-end-phone fallbacks from
+- **Load sizes** (gzip, checked on every build):
+  - The first screen loads about 109.5 KiB, budget 110 KiB, so it is nearly **full**. The Walk view HUD is a separate
+    chunk fetched when a route opens.
+  - The 3D part downloads once the first screen is up:
+    - three.js + troika: about 177 KiB, budget 220 KiB;
+    - our own 3D code: about 53.5 KiB, budget 60 KiB since v0.3 (toy light, shadows and bevels). Offline caching (service worker) and the low-end-phone fallbacks from
   PLAN.md 19.2 are not in this spike.
 - While a scan sheet is open, every QR plate shows as a tappable pin on the map (Floor view of your level, or
   the parking level when saving the car).

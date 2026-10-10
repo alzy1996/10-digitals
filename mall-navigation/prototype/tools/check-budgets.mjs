@@ -9,7 +9,8 @@
  *
  * - initial JS + CSS (everything dist/index.html loads before the first screen)   <= 110 KB
  * - engine3d-*.js: the 3D libraries, three + troika, loaded lazily (PLAN "three + loaders + troika") <= 220 KB
- * - scene3d-*.js: Dallni's own 3D code (src/engine), loaded lazily with it         <= 52 KB (50 until QA round 2:
+ * - scene3d-*.js: Dallni's own 3D code (src/engine), loaded lazily with it         <= 60 KB (v0.3 toy world, reported
+ *   to Sam: toy palettes, light rig, shadows, bevels, quality levels; 52 from QA round 2, 50 before it:
  *   the Walk view's world fidelity, CONTRACT.md 3b)
  * - the two lazy 3D chunks together                                                <= 260 KB
  * - 3D sign fonts (readex-latin-600 + readex-arabic-600 .woff) in total             <= 50 KB
@@ -28,7 +29,7 @@ const KB = 1024
 export const BUDGETS = Object.freeze({
   initialKB: 110,
   engineLibsKB: 220,
-  sceneKB: 52,
+  sceneKB: 60,
   lazy3dTotalKB: 260,
   signFontsKB: 50,
   fontKB: 50,

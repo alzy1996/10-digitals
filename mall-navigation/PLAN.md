@@ -2159,6 +2159,9 @@ Add these rows to §15.1. Only Q1 (the mall) is answered; everything else is sti
 | Map Studio scope (changes the v1 row) | A01, A02, A04–A13 in the MVP; A14 in Phase 6; A15 and A16 in Phase 7; A03 after mall #2 | PROPOSED |
 | Build phases (naming rule) | PHASE 1–7 (6 = 3D view, 7 = Offers). Stage letters unchanged | PROPOSED |
 | Legal | Omani counsel brief: trademarks, amended PDPL (RD 68/2026), Media Law, CPA, MOCIIP. §14 rewritten before any DPA | PROPOSED |
+| Contacts at malls (Q1d) | Sam knows nobody at Muscat Grand Mall, Mall of Muscat or any mall: the pilot needs a cold introduction | **ANSWERED (Q1d, 2026-10-10)** |
+| 3D art direction (overrides §19.2 "unlit architect's model, no realtime shadows" for the default look) | v0.3 "toy world": lit pastel blocks, bevels, a sun with soft shadows (Showcase quality only, never in the stacked Overview), white chunky game UI. Meaning colours (route, markers, sign faces, zone bands) stay unlit and exact. Storm (v0.2) and classic (v0.1) stay available | **ANSWERED (Sam picked "Bright Toy Game" from live mocks, 2026-10-10; built 2026-10-11)** |
+| 3D quality levels | Showcase (shadows, pixel ratio 2) vs Light (no shadows, 1.5), picked per device, `?quality=` override, auto-drop after 8 slow frames. Prototype `scene3d` budget 52 → 60 KiB (reported) | BUILT in the prototype (v0.3) |
 
 **TIMELINE DELTA (§15.2, Option A)**
 
