@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ════════════════════════════════════════════
+   THEME TOKENS V1 — single source of truth.
+   Sam's design examples change ONLY this block.
+   ════════════════════════════════════════════ */
+:root {
+  --page: #c08a5e;              /* warm bronze page bg */
+  --page-glow: #dba876;         /* radial highlight */
+  --panel: #171009;             /* dark hero/section panel */
+  --panel-soft: #241811;
+  --ink: #f4ead9;               /* cream text on dark */
+  --ink-rgb: 244 234 217;       /* same, as channels for /opacity utilities */
+  --ink-dark: #241811;          /* text on bronze */
+  --muted: rgba(244, 234, 217, 0.62);
+  --muted-dark: rgba(36, 24, 17, 0.66);   /* muted text on bronze */
+  --line-dark: rgba(36, 24, 17, 0.28);    /* hairlines on bronze */
+  --accent: #d3a05a;            /* gold */
+  --accent-deep: #8a5a2b;
+  --line: rgba(244, 234, 217, 0.16);
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+  --font-display: 'Fraunces', serif;
+  --font-body: 'Inter', sans-serif;
+  --font-ar: 'IBM Plex Sans Arabic', sans-serif;
+  --font-ar-display: 'Amiri', serif;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: radial-gradient(120% 90% at 70% 10%, var(--page-glow), var(--page)) fixed;
+  color: var(--ink-dark);
+  font-family: var(--font-body);
+  font-weight: 400;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Font utilities driven by tokens — RTL swaps them once, globally. */
+.font-display { font-family: var(--font-display); }
+.font-body { font-family: var(--font-body); }
+html[dir='rtl'] .font-display { font-family: var(--font-ar-display); }
+html[dir='rtl'] .font-body,
+html[dir='rtl'] body { font-family: var(--font-ar); }
+html[dir='rtl'] .en-tracking { letter-spacing: 0 !important; }
+
+.text-muted { color: var(--muted); }
+.text-muted-dark { color: var(--muted-dark); }
+
+/* House entrance choreography */
+@keyframes revealUp {
+  0% { opacity: 0; transform: translateY(26px); filter: blur(10px); }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+.anim {
+  opacity: 0;
+  animation: revealUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+/* Pre-reveal state: elements wait invisibly until .anim is applied */
+.anim-wait { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .anim { animation: none; opacity: 1; }
+  .anim-wait { opacity: 1; }
+}
+
+/* Hero DNA keyframes — the exact house set (headline L1 .25s, L2 .42s,
+   corner blocks .7s / .85s, background Ken Burns settle). */
+@keyframes heroReveal { 0% { opacity: 0; transform: translateY(28px); filter: blur(12px); } 100% { opacity: 1; transform: translateY(0); filter: blur(0); } }
+@keyframes heroFadeUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+@keyframes heroZoom { 0% { transform: scale(1.12); } 100% { transform: scale(1); } }
+.hero-anim { opacity: 0; animation-fill-mode: forwards; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+.hero-reveal { animation-name: heroReveal; animation-duration: 1.1s; }
+.hero-fade { animation-name: heroFadeUp; animation-duration: 1s; }
+.hero-zoom { animation: heroZoom 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .hero-anim, .hero-zoom { animation: none; opacity: 1; }
+}
+
+/* Readability scrims over the full-bleed canvas */
+.hero-scrim-bottom {
+  background: linear-gradient(to top, rgba(23, 16, 9, 0.94) 0%, rgba(23, 16, 9, 0.6) 28%, transparent 58%);
+}
+.hero-scrim-side {
+  background: linear-gradient(to right, rgba(23, 16, 9, 0.72) 0%, rgba(23, 16, 9, 0.25) 38%, transparent 58%);
+}
+html[dir='rtl'] .hero-scrim-side {
+  background: linear-gradient(to left, rgba(23, 16, 9, 0.72) 0%, rgba(23, 16, 9, 0.25) 38%, transparent 58%);
+}
+
+/* P3 chapter titles scrub blur→sharp from their reading edge */
+[data-scrub-title] { transform-origin: 0% 60%; }
+html[dir='rtl'] [data-scrub-title] { transform-origin: 100% 60%; }
+
+/* Bestseller marquee — list rendered ×3, track slides one third */
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-33.333%); } }
+@keyframes marqueeRtl { from { transform: translateX(0); } to { transform: translateX(33.333%); } }
+.marquee-track { animation: marquee 38s linear infinite; }
+html[dir='rtl'] .marquee-track { animation-name: marqueeRtl; }
+.marquee:hover .marquee-track,
+.marquee:focus-within .marquee-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+}
+
+/* Hidden scrollbar for drag rows (used by the bestseller strip) */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+[data-scrub-title][data-center] { transform-origin: 50% 60%; }
