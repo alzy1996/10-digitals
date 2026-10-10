@@ -30,8 +30,8 @@
   inset: 0;
   z-index: 0;
   background:
-    linear-gradient(180deg, rgba(4, 7, 9, 0.55) 0, rgba(4, 7, 9, 0) 200px),
-    radial-gradient(120% 90% at 50% 42%, transparent 55%, rgba(4, 7, 9, 0.45) 100%);
+    linear-gradient(180deg, rgba(234, 247, 255, 0.55) 0, rgba(234, 247, 255, 0) 200px),
+    radial-gradient(120% 90% at 50% 42%, transparent 60%, rgba(30, 60, 110, 0.16) 100%);
   pointer-events: none;
 }
 
@@ -145,7 +145,7 @@
   padding-inline: 12px 16px;
   border-radius: var(--r-card);
   /* the warm edge light stays in the 14 px above the first text line (--ink-2 there keeps 4.5:1 over a white scene) */
-  background: radial-gradient(60% 14px at 70% 0, rgba(255, 159, 85, 0.18) 0%, rgba(255, 159, 85, 0) 100%), var(--glass-sheen), var(--glass-dark-bg);
+  background: var(--glass-dark-bg);
   border: 1px solid transparent;
   box-shadow: var(--glass-highlight), var(--shadow-panel);
   -webkit-backdrop-filter: var(--glass-dark-filter);
@@ -705,7 +705,7 @@
   transition: transform 100ms var(--ease);
 }
 .bar-btn:active {
-  background: rgba(255, 255, 255, 0.12);
+  background: #E4EBF5;
 }
 .bar-label {
   max-width: 100%;
@@ -728,7 +728,7 @@
 }
 /* the last step: Arrived (a check in the arrival mint; the label stays white on the pewter) */
 .bar-btn.is-arrive svg {
-  color: #5BE584;
+  color: var(--mint-text);
 }
 .bar-btn:disabled:active {
   transform: none;
@@ -763,7 +763,7 @@
   align-items: center;
   justify-content: center;
   padding: var(--walk-free-top, 220px) 24px var(--walk-dome-h, 287px);
-  background: rgba(10, 15, 18, 0.92);
+  background: rgba(234, 247, 255, 0.95);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   opacity: 0;
@@ -820,7 +820,7 @@
   height: 4px;
   margin-top: 6px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.18);
+  background: #E4EBF5;
   overflow: hidden;
 }
 .lift-progress > span {
@@ -861,7 +861,7 @@
 /* ---------- opaque fallback for the HUD's own surfaces (the variables switch in app.css) ---------- */
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .lift-overlay {
-    background: #0A0F12;
+    background: #EAF7FF;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }

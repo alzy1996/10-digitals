@@ -1,5 +1,7 @@
 /*
- * Dallni v0.2 "storm glass" UI styles (DESIGN-GLASS.md sections 2, 3, 4, 8, 9).
+ * Dallni UI styles. v0.3 "toy world" colours (DESIGN-TOY.md 5): white chunky panels with a soft blue-grey shadow and a
+ * raised "press me" edge, dark ink, teal primary; opaque, so no text depends on the scene behind it. The token names and
+ * the layout keep v0.2's "storm glass" structure (DESIGN-GLASS.md sections 2, 3, 4, 8, 9).
  * Layout uses logical properties (inline-start / inline-end) so Arabic mirrors without extra rules.
  *
  * Glass is measured, not guessed: every text colour below passes WCAG AA (4.5:1) against the WORST scene colour
@@ -15,45 +17,45 @@
 
 :root {
   /* ---- glass recipes ---- */
-  --glass-dark-bg: linear-gradient(180deg, rgba(24, 33, 42, 0.78) 0%, rgba(14, 20, 25, 0.84) 100%);
-  --glass-dark-tint-bg: linear-gradient(180deg, rgba(24, 33, 42, 0.86) 0%, rgba(14, 20, 25, 0.92) 100%);
-  --glass-dark-filter: blur(24px) saturate(160%);
-  --glass-dark-rim: rgba(255, 255, 255, 0.14);
-  --glass-light-bg: linear-gradient(180deg, rgba(78, 87, 98, 0.86) 0%, rgba(70, 79, 89, 0.88) 100%);
-  --glass-light-tint-bg: linear-gradient(180deg, rgba(78, 87, 98, 0.94) 0%, rgba(70, 79, 89, 0.96) 100%);
-  --glass-light-filter: blur(20px) saturate(150%);
-  --glass-light-rim: rgba(255, 255, 255, 0.22);
-  --glass-raised-bg: rgba(255, 255, 255, 0.10);
-  --glass-raised-bg-pressed: rgba(255, 255, 255, 0.16);
-  --glass-raised-rim: rgba(255, 255, 255, 0.16);
-  --frost-bg: linear-gradient(180deg, rgba(246, 248, 250, 0.88) 0%, rgba(238, 242, 246, 0.84) 100%);
-  --frost-filter: blur(20px) saturate(140%);
-  --frost-rim: rgba(255, 255, 255, 0.70);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.20);
+  --glass-dark-bg: linear-gradient(#FFFFFF, #FFFFFF);
+  --glass-dark-tint-bg: linear-gradient(#FFFFFF, #FFFFFF);
+  --glass-dark-filter: none;
+  --glass-dark-rim: #E4EBF5;
+  --glass-light-bg: linear-gradient(#FFFFFF, #FFFFFF);
+  --glass-light-tint-bg: linear-gradient(#F3F7FC, #F3F7FC);
+  --glass-light-filter: none;
+  --glass-light-rim: #E4EBF5;
+  --glass-raised-bg: #F3F7FC;
+  --glass-raised-bg-pressed: #E4EBF5;
+  --glass-raised-rim: #E4EBF5;
+  --frost-bg: linear-gradient(#FFFFFF, #FFFFFF);
+  --frost-filter: none;
+  --frost-rim: #E4EBF5;
+  --glass-highlight: inset 0 -3px 0 rgba(29, 36, 51, 0.06);
   /* max 4 % white: at 5 % --ink-2 would fall under 4.5:1 over a white scene */
-  --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 32px);
+  --glass-sheen: linear-gradient(transparent, transparent);
   /* ref 1: panels catch the storm's amber glow along their top edge (28 px: only the handle zone and white --ink text
      sit under it; measured: --ink stays >= 7:1 there over a white scene) */
-  --glass-warm-rim: radial-gradient(60% 28px at 70% 0, rgba(255, 159, 85, 0.16) 0%, rgba(255, 159, 85, 0) 100%);
+  --glass-warm-rim: linear-gradient(transparent, transparent);
   /* ref 2: a bright frosted rim, strongest on top (drawn as a masked 1 px ring over the transparent border) */
-  --glass-spec-rim: linear-gradient(180deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.12) 36px, rgba(255, 255, 255, 0.07) 100%);
+  --glass-spec-rim: linear-gradient(transparent, transparent);
   /* sheets: a text-free clear band in the handle zone lets the model and the sky show through the glass */
-  --glass-sheet-bg: linear-gradient(180deg, rgba(24, 33, 42, 0.55) 0, rgba(24, 33, 42, 0.78) 20px, rgba(14, 20, 25, 0.84) 100%);
-  --shadow-panel: 0 24px 48px -12px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.25);
-  --shadow-control: 0 8px 24px -8px rgba(0, 0, 0, 0.45);
-  --shadow-frost: 0 10px 28px -8px rgba(0, 0, 0, 0.50);
+  --glass-sheet-bg: linear-gradient(#FFFFFF, #FFFFFF);
+  --shadow-panel: 0 4px 0 #D9E2EF, 0 14px 30px -10px rgba(30, 60, 110, 0.28);
+  --shadow-control: 0 4px 0 #D9E2EF, 0 10px 22px -10px rgba(30, 60, 110, 0.25);
+  --shadow-frost: 0 4px 0 #D9E2EF, 0 10px 28px -8px rgba(30, 60, 110, 0.3);
 
   /* ---- text on glass ---- */
-  --ink: #FFFFFF;
-  --ink-2: #C9D2DB;
-  --ink-3: #9AA6B2;
-  --ink-2-raised: #DCE3EA;
-  --ink-2-light: #EEF2F6;
-  --amber-text: #FFC57A;
-  --teal-text: #5EEAD4;
-  --mint-text: #7EF0A6;
-  --danger-text: #FFB4AB;
-  --blue-text: #A9D3FF;
+  --ink: #1D2433;
+  --ink-2: #4B5568;
+  --ink-3: #6B7487;
+  --ink-2-raised: #4B5568;
+  --ink-2-light: #4B5568;
+  --amber-text: #8A5300;
+  --teal-text: #0B7A6E;
+  --mint-text: #16794A;
+  --danger-text: #B42318;
+  --blue-text: #1D5FC2;
   --frost-ink: #0B1218;
   --frost-ink-2: #3A4654;
 
@@ -69,17 +71,17 @@
   --route-upcoming: #1FA79A;
   --route-walked: #5F7C80;
   --chevron: #FFFFFF;
-  --primary-grad: linear-gradient(180deg, #5FF5D6 0%, #22D3BE 55%, #14B8A6 100%);
+  --primary-grad: linear-gradient(180deg, #2DD4C0 0%, #1FC7B4 100%);
   --on-primary: #04211C;
-  --primary-glow: 0 10px 28px -6px rgba(34, 211, 190, 0.55), 0 0 28px -6px rgba(34, 211, 190, 0.50);
+  --primary-glow: 0 4px 0 #149C8C, 0 10px 20px -8px rgba(20, 156, 140, 0.45);
   --you: #4DA3FF;
   --car: #F5B700;
   --on-car: #0B0F14;
   --dest: #5BE584;
-  --ok-grad: linear-gradient(180deg, #8BF5A8 0%, #5BE584 50%, #34C76F 100%);
+  --ok-grad: linear-gradient(180deg, #4ADE80 0%, #34C76F 100%);
   --on-ok: #03200F;
   --danger: #FF7B6E;
-  --focus: #FFD27A;
+  --focus: #1D5FC2;
   --chip-arrival: #6CB6FF;
   --chip-distance: #26D9C7;
   --chip-steps: #FFB547;
@@ -98,7 +100,7 @@
   --ease-emph: cubic-bezier(0.3, 0, 0, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 
-  color-scheme: dark;
+  color-scheme: light;
 }
 @media (min-width: 390px) {
   :root {
@@ -249,15 +251,12 @@ button:disabled {
   position: fixed;
   inset: 0;
   overflow: hidden;
-  background: #0A0F12;
+  background: #EAF7FF;
 }
-/* the storm sky behind the 3D model (the engine's own sky pass uses the same stops, no colour jump) */
+/* the toy sky behind the 3D model (the engine paints the same gradient on its canvas: palette bgTop / bgBottom) */
 .map-layer,
 .app.grid {
-  background:
-    radial-gradient(70% 38% at 64% 42%, rgba(255, 159, 85, 0.50) 0%, rgba(214, 112, 60, 0.22) 34%, rgba(20, 28, 33, 0) 72%),
-    radial-gradient(90% 50% at 18% 12%, rgba(126, 140, 152, 0.30) 0%, rgba(126, 140, 152, 0) 70%),
-    linear-gradient(180deg, #121A1F 0%, #1D262C 22%, #2B2D2F 45%, #0A0F12 100%);
+  background: linear-gradient(180deg, #9FD4FF 0%, #EAF7FF 100%);
 }
 .map-layer {
   position: absolute;
@@ -267,8 +266,7 @@ button:disabled {
 /* parking levels: no amber, one cool LED glow */
 :root[data-theme="basement"] .map-layer {
   background:
-    radial-gradient(70% 38% at 60% 42%, rgba(90, 169, 255, 0.22) 0%, rgba(20, 28, 33, 0) 70%),
-    linear-gradient(180deg, #0C1216 0%, #141B21 22%, #18212A 45%, #070A0D 100%);
+    linear-gradient(180deg, #2B3A67 0%, #4A5A8C 100%);
 }
 /* loading / error screen: storm backdrop + one dark glass card */
 .app.grid > div {
@@ -425,7 +423,7 @@ button:disabled {
   white-space: nowrap;
 }
 .view-ctrl[aria-expanded="true"] {
-  border-color: rgba(255, 255, 255, 0.5);
+  border-color: var(--route-body);
 }
 .view-menu {
   position: absolute;
@@ -509,7 +507,7 @@ button:disabled {
   place-items: center;
   height: 16px;
   color: var(--ink);
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+  filter: drop-shadow(0 1px 2px rgba(30, 60, 110, 0.35));
   pointer-events: none;
 }
 /* (inside the picker, over its own fade: never on the header above it or the sheet below it) */
@@ -543,8 +541,8 @@ button:disabled {
   transition: background-color 200ms var(--ease), color 200ms var(--ease);
 }
 .level-btn[aria-pressed="true"] {
-  background-color: rgba(255, 255, 255, 0.94);
-  color: var(--frost-ink);
+  background-color: #1FC7B4;
+  color: var(--on-primary);
   box-shadow: inset 0 0 0 4px transparent;
 }
 /* the sheet pulled up over the map controls (full): they step aside; a picker with no room for one level hides */
@@ -632,7 +630,7 @@ button:disabled {
   height: 40px;
   padding-inline: 8px;
   border-radius: var(--r-ctl);
-  background: #FFFFFF;
+  background: #E4EBF5;
   color: var(--frost-ink);
   font-weight: 600;
 }
@@ -648,8 +646,8 @@ button:disabled {
   min-width: 88px;
   padding-inline: 18px;
   border-radius: var(--r-ctl);
-  background: rgba(255, 255, 255, 0.94);
-  color: var(--frost-ink);
+  background: #1FC7B4;
+  color: var(--on-primary);
   font-size: 17px;
   font-weight: 600;
 }
@@ -745,7 +743,7 @@ button:disabled {
 }
 .sheet-grip:hover .sheet-handle,
 .sheet-grip:focus-visible .sheet-handle {
-  background: rgba(255, 255, 255, 0.55);
+  background: #9AA6B8;
 }
 .sheet-grip:focus-visible {
   outline-offset: -6px;
@@ -766,7 +764,7 @@ button:disabled {
   margin-inline: calc(-1 * var(--pad-sheet));
   padding-inline: var(--pad-sheet);
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+  scrollbar-color: rgba(29, 36, 51, 0.25) transparent;
 }
 .sheet > .sheet-body {
   flex-shrink: 1;
@@ -789,7 +787,7 @@ button:disabled {
   inset-inline: 8px;
   top: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  background: linear-gradient(90deg, transparent, rgba(29, 36, 51, 0.16), transparent);
 }
 .sheet-more-cue::after {
   content: "";
@@ -798,8 +796,8 @@ button:disabled {
   top: 2px;
   width: 7px;
   height: 7px;
-  border-right: 2px solid rgba(255, 255, 255, 0.6);
-  border-bottom: 2px solid rgba(255, 255, 255, 0.6);
+  border-right: 2px solid #6B7487;
+  border-bottom: 2px solid #6B7487;
   transform: translateX(-50%) rotate(45deg);
 }
 .sheet.is-moving .sheet-more-cue {
@@ -817,7 +815,7 @@ button:disabled {
   margin-inline: calc(-1 * var(--pad-sheet));
   padding-inline: var(--pad-sheet);
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+  scrollbar-color: rgba(29, 36, 51, 0.25) transparent;
 }
 .sheet-footer {
   flex: none;
@@ -831,7 +829,7 @@ button:disabled {
   height: 5px;
   border-radius: 3px;
   margin: 0 auto 8px;
-  background: rgba(255, 255, 255, 0.28);
+  background: #D5DDE9;
 }
 /* while a sheet moves, the floating Walk view pill (placed from the settled sheet top) steps aside */
 :root[data-sheet-moving] .walk-pill {
@@ -973,14 +971,14 @@ button:disabled {
   background: var(--ok-grad);
   color: var(--on-ok);
   border: 0;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 10px 28px -6px rgba(91, 229, 132, 0.55), 0 0 28px -6px rgba(91, 229, 132, 0.5);
+  box-shadow: 0 4px 0 #23964F, 0 10px 20px -8px rgba(35, 150, 79, 0.45);
 }
 /* the car's own colour (yellow-amber), dark ink 10.7:1 */
 .btn-car {
   background: var(--car);
   color: var(--on-car);
   border: 0;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 10px 28px -8px rgba(245, 183, 0, 0.5);
+  box-shadow: 0 4px 0 #D9A300, 0 10px 20px -8px rgba(217, 163, 0, 0.45);
 }
 .btn-block {
   width: 100%;
@@ -1289,7 +1287,7 @@ button:disabled {
   width: 100%;
   min-height: 64px;
   padding-block: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid #EEF3FA;
   text-align: start;
   color: var(--ink);
 }
@@ -1297,7 +1295,7 @@ button:disabled {
   border-bottom: 0;
 }
 .row:active {
-  background: rgba(255, 255, 255, 0.06);
+  background: #F3F7FC;
 }
 .row-icon {
   flex: none;
@@ -1467,8 +1465,8 @@ button:disabled {
   width: 52px;
   height: 32px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: #D5DDE9;
+  border: 1px solid #C3CEDD;
   transition: background-color 200ms var(--ease);
 }
 .switch::after {
@@ -1669,7 +1667,7 @@ button:disabled {
   flex: 1;
   height: 6px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.18);
+  background: #E4EBF5;
 }
 .progress span.is-done {
   background: rgba(94, 234, 212, 0.45);
@@ -1683,7 +1681,7 @@ button:disabled {
 .sim-bar {
   margin-top: 8px;
   padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.10);
+  border-top: 1px solid #EEF3FA;
 }
 .sim-head {
   display: flex;
@@ -1765,8 +1763,8 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 .speed-seg button[aria-pressed="true"] {
-  background: rgba(255, 255, 255, 0.94);
-  color: var(--frost-ink);
+  background: #1FC7B4;
+  color: var(--on-primary);
   font-weight: 600;
 }
 .speed-cycle {
@@ -2124,69 +2122,6 @@ button:disabled {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-/* ---------- opaque fallback ----------
- * No backdrop-filter, reduced transparency or more contrast: the same surfaces as solid fills (DESIGN-GLASS 2.2). */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root {
-    --glass-dark-bg: linear-gradient(#1B232B, #1B232B);
-    --glass-dark-tint-bg: linear-gradient(#1B232B, #1B232B);
-    --glass-dark-rim: rgba(255, 255, 255, 0.20);
-    --glass-light-bg: linear-gradient(#4A535D, #4A535D);
-    --glass-light-tint-bg: linear-gradient(#4A535D, #4A535D);
-    --glass-light-rim: rgba(255, 255, 255, 0.28);
-    --glass-raised-bg: #2C353E;
-    --glass-raised-bg-pressed: #36404A;
-    --glass-raised-rim: rgba(255, 255, 255, 0.22);
-    --frost-bg: linear-gradient(#EEF2F6, #EEF2F6);
-    --frost-rim: #FFFFFF;
-    --glass-sheen: linear-gradient(transparent, transparent);
-    --glass-sheet-bg: linear-gradient(#1B232B, #1B232B);
-    --glass-warm-rim: linear-gradient(transparent, transparent);
-  }
-}
-@media (prefers-reduced-transparency: reduce) {
-  :root {
-    --glass-dark-bg: linear-gradient(#1B232B, #1B232B);
-    --glass-dark-tint-bg: linear-gradient(#1B232B, #1B232B);
-    --glass-dark-rim: rgba(255, 255, 255, 0.20);
-    --glass-light-bg: linear-gradient(#4A535D, #4A535D);
-    --glass-light-tint-bg: linear-gradient(#4A535D, #4A535D);
-    --glass-light-rim: rgba(255, 255, 255, 0.28);
-    --glass-raised-bg: #2C353E;
-    --glass-raised-bg-pressed: #36404A;
-    --glass-raised-rim: rgba(255, 255, 255, 0.22);
-    --frost-bg: linear-gradient(#EEF2F6, #EEF2F6);
-    --frost-rim: #FFFFFF;
-    --glass-sheen: linear-gradient(transparent, transparent);
-    --glass-sheet-bg: linear-gradient(#1B232B, #1B232B);
-    --glass-warm-rim: linear-gradient(transparent, transparent);
-    --glass-dark-filter: none;
-    --glass-light-filter: none;
-    --frost-filter: none;
-  }
-}
-@media (prefers-contrast: more) {
-  :root {
-    --glass-dark-bg: linear-gradient(#1B232B, #1B232B);
-    --glass-dark-tint-bg: linear-gradient(#1B232B, #1B232B);
-    --glass-dark-rim: rgba(255, 255, 255, 0.20);
-    --glass-light-bg: linear-gradient(#4A535D, #4A535D);
-    --glass-light-tint-bg: linear-gradient(#4A535D, #4A535D);
-    --glass-light-rim: rgba(255, 255, 255, 0.28);
-    --glass-raised-bg: #2C353E;
-    --glass-raised-bg-pressed: #36404A;
-    --glass-raised-rim: rgba(255, 255, 255, 0.22);
-    --frost-bg: linear-gradient(#EEF2F6, #EEF2F6);
-    --frost-rim: #FFFFFF;
-    --glass-sheen: linear-gradient(transparent, transparent);
-    --glass-sheet-bg: linear-gradient(#1B232B, #1B232B);
-    --glass-warm-rim: linear-gradient(transparent, transparent);
-    --glass-dark-filter: none;
-    --glass-light-filter: none;
-    --frost-filter: none;
-  }
 }
 
 /* ---------- reduced motion ---------- */

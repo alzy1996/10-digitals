@@ -10,7 +10,7 @@ const PX_PER_M = 3.2
 const YOU_AT = 0.62
 /** Dome shape, the same as the CSS clip-path: ellipse(78% 100% at 50% 100%). */
 const RX = 0.78
-const GLASS = [18, 25, 32]
+const GLASS = [255, 255, 255]
 
 function hexRgb(hex) {
   const n = parseInt(String(hex).replace('#', ''), 16)
@@ -28,10 +28,10 @@ function polyPath(pts) {
   return p
 }
 
-// corridors light enough to read as streets; shops only faintly tinted: the route is the one saturated colour (ref 5)
-const WALK_FILL = '#5A6570'
-const BLOCK_FILL = '#2A323A'
-const VOID_FILL = '#0E1418'
+// toy world: cream corridors, pastel shops, light-blue voids; the route is the one saturated colour (ref 5)
+const WALK_FILL = '#FBF8F2'
+const BLOCK_FILL = '#D5DDE9'
+const VOID_FILL = '#BFE3FF'
 const levelArtCache = new WeakMap()
 
 /**
@@ -46,8 +46,8 @@ function levelArt(index) {
   const out = new Map()
   for (const level of index.levels) out.set(level.id, { fills: [], edges: [], rails: [] })
   const add = (levelId, pts, fill) => out.get(levelId)?.fills.push({ path: polyPath(pts), fill })
-  for (const level of index.levels) add(level.id, level.outline, '#252C33')
-  for (const z of v.parking?.zones ?? []) add(z.levelId, z.polygon, mix('#20272E', z.color, 0.35))
+  for (const level of index.levels) add(level.id, level.outline, '#E9EEF5')
+  for (const z of v.parking?.zones ?? []) add(z.levelId, z.polygon, mix('#E9EEF5', z.color, 0.35))
   for (const a of v.areas ?? []) {
     if (a.kind === 'bays') continue // the zone tint shows through
     if (a.kind === 'void') {
@@ -55,11 +55,11 @@ function levelArt(index) {
       out.get(a.levelId)?.rails.push(polyPath(a.polygon))
       continue
     }
-    add(a.levelId, a.polygon, a.walkable ? (a.kind === 'outdoor' ? '#3B444D' : WALK_FILL) : BLOCK_FILL)
+    add(a.levelId, a.polygon, a.walkable ? (a.kind === 'outdoor' ? '#DDE6F0' : WALK_FILL) : BLOCK_FILL)
   }
   for (const u of v.units ?? []) {
     const occ = u.occupantId ? index.occupantById.get(u.occupantId) : null
-    const fill = occ && CATEGORY_COLORS[occ.category] ? mix('#20272E', CATEGORY_COLORS[occ.category], 0.12) : BLOCK_FILL
+    const fill = occ && CATEGORY_COLORS[occ.category] ? mix('#FFFFFF', CATEGORY_COLORS[occ.category], 0.35) : BLOCK_FILL
     const path = polyPath(u.polygon)
     out.get(u.levelId)?.fills.push({ path, fill })
     out.get(u.levelId)?.edges.push(path)
@@ -156,9 +156,9 @@ export function MiniMapDome({ index, lang, route, levelId, position, headingDeg 
         ctx.fill(it.path)
       }
       ctx.lineWidth = 1 / s
-      ctx.strokeStyle = 'rgba(255,255,255,0.10)'
+      ctx.strokeStyle = 'rgba(29,36,51,0.10)'
       for (const p of L2.edges) ctx.stroke(p)
-      ctx.strokeStyle = 'rgba(255,255,255,0.18)'
+      ctx.strokeStyle = 'rgba(29,36,51,0.22)'
       for (const p of L2.rails) ctx.stroke(p)
 
       // route on this floor: walked part grey, the rest teal with a soft glow
@@ -178,7 +178,7 @@ export function MiniMapDome({ index, lang, route, levelId, position, headingDeg 
         }
         strokeAll(parts.walked, 4, 'rgba(154,166,178,0.6)')
         strokeAll(parts.ahead, 14, 'rgba(34,211,197,0.30)')
-        strokeAll(parts.ahead, 5, '#26D9C7')
+        strokeAll(parts.ahead, 5, '#1FC7B4')
       }
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -196,7 +196,7 @@ export function MiniMapDome({ index, lang, route, levelId, position, headingDeg 
         ctx.fillStyle = 'rgba(38,217,199,0.18)'
         ctx.fill()
         ctx.lineWidth = 2.5
-        ctx.strokeStyle = '#5EF2DC'
+        ctx.strokeStyle = '#1FC7B4'
         ctx.stroke()
       }
     }
@@ -284,9 +284,9 @@ export function MiniMapDome({ index, lang, route, levelId, position, headingDeg 
     ctx.beginPath()
     ctx.ellipse(ex, ey, rx - 0.75, ry - 0.75, 0, Math.PI, Math.PI * 2)
     ctx.lineWidth = 1.5
-    ctx.strokeStyle = 'rgba(255,255,255,0.32)'
+    ctx.strokeStyle = 'rgba(29,36,51,0.18)'
     ctx.stroke()
-    ctx.fillStyle = 'rgba(255,255,255,0.35)'
+    ctx.fillStyle = 'rgba(29,36,51,0.25)'
     for (let deg = -90; deg <= 90; deg += 5.6) {
       const th = (deg * Math.PI) / 180
       const tx = ex + (rx - 7) * Math.sin(th)

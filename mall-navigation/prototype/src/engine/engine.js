@@ -1600,7 +1600,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     for (const c of S.connectors) if (c.panels) c.panels.material = S.style === 'classic' ? S.mats.opaque : S.mats.escGlass
     S.scene.fog.color.set(T.fog)
     // zone colours stay the paint's; on the dark storm asphalt a lighter wash keeps them from flooding the floor
-    S.mats.decals.opacity = S.style === 'storm' ? 0.2 : toy ? 0.35 : 0.3
+    S.mats.decals.opacity = S.style === 'storm' || toy ? 0.2 : 0.3
     // toy light rig: a softer light on the parking levels (dusk palette)
     S.hemi.visible = S.sun.visible = toy
     S.hemi.intensity = S.theme === 'basement' ? TOY_LIGHT.hemiBasement : TOY_LIGHT.hemi

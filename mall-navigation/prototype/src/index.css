@@ -16,15 +16,15 @@
 @font-face { font-family: "Readex Pro"; font-weight: 600; font-display: swap; src: url("./assets/fonts/readex-arabic-600.woff") format("woff"); unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF; }
 
 /*
- * Tailwind theme colours follow the storm-glass tokens (src/ui/app.css holds the full token set): the UI is dark
- * glass in both themes; "basement" (parking levels) only changes the backdrop and the 3D palette.
+ * Tailwind theme colours follow the toy-world tokens (src/ui/app.css holds the full token set): white chunky panels in
+ * both themes; "basement" (parking levels) only changes the backdrop and the 3D palette.
  */
 @theme {
   --font-sans: "Readex Pro", system-ui, -apple-system, "Segoe UI", "Noto Sans Arabic", sans-serif;
-  --color-bg: #0A0F12;
-  --color-surface: rgba(255, 255, 255, 0.10);
-  --color-ink: #FFFFFF;
-  --color-ink-2: #C9D2DB;
+  --color-bg: #EAF7FF;
+  --color-surface: #FFFFFF;
+  --color-ink: #1D2433;
+  --color-ink-2: #4B5568;
   --color-route: #26D9C7;
   --color-car: #F5B700;
   --color-ok: #7EF0A6;
@@ -34,7 +34,7 @@
 
 html, body, #root { height: 100%; margin: 0; }
 body {
-  background: #0A0F12;
+  background: #EAF7FF;
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
