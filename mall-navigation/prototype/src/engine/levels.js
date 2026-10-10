@@ -560,16 +560,19 @@ function distToPolygon(p, poly) {
  * @property {{minX:number,minY:number,maxX:number,maxY:number}} bounds
  */
 
-function newBuild(registry, level) {
+/** Geometry flavour of the scene style: v0.3 toy = bevelled top edges + normals for lit materials. */
+export const PLAIN = Object.freeze({ bevel: 0, lit: false })
+
+function newBuild(registry, level, flavour = PLAIN) {
   return {
     levelId: level.id,
-    opaque: new MeshBuilder(registry),
-    roofs: new MeshBuilder(registry),
+    opaque: new MeshBuilder(registry, { bevel: flavour.bevel, lit: flavour.lit }),
+    roofs: new MeshBuilder(registry, { lit: flavour.lit }),
     glass: new MeshBuilder(registry),
     decals: new MeshBuilder(registry),
     ghost: new MeshBuilder(registry),
     // free-standing QR floor tiles: their own mesh, hidden in the Walk view
-    plates: new MeshBuilder(registry),
+    plates: new MeshBuilder(registry, { bevel: flavour.bevel, lit: flavour.lit }),
     signs: [],
     floorTexts: [],
     bayTexts: [],
@@ -627,10 +630,11 @@ function slab(build, level, holes, topKey) {
  * @param {object} index VenueIndex
  * @param {object} level
  * @param {import('./palette.js').ColorRegistry} registry
+ * @param {{ bevel: number, lit: boolean }} [flavour] geometry flavour of the scene style (PLAIN unless toy)
  * @returns {LevelBuild}
  */
-export function buildRetailLevel(index, level, registry) {
-  const build = newBuild(registry, level)
+export function buildRetailLevel(index, level, registry, flavour = PLAIN) {
+  const build = newBuild(registry, level, flavour)
   const D = levelData(index, level.id)
   const voids = D.areas.filter((a) => a.kind === 'void').map((a) => a.polygon)
   const atrium = D.landmarks.find((l) => l.kind === 'atrium' && Array.isArray(l.polygon))
@@ -976,8 +980,8 @@ function buildAnchors(build, level, D, pillars) {
  * @param {import('./palette.js').ColorRegistry} registry
  * @returns {LevelBuild}
  */
-export function buildParkingLevel(index, level, registry) {
-  const build = newBuild(registry, level)
+export function buildParkingLevel(index, level, registry, flavour = PLAIN) {
+  const build = newBuild(registry, level, flavour)
   const D = levelData(index, level.id)
   slab(build, level, [], 'asphalt')
 
@@ -1138,8 +1142,8 @@ export function buildParkingLevel(index, level, registry) {
  * @param {import('./palette.js').ColorRegistry} registry
  * @param {{elevLow:number, elevHigh:number, lowStop:object, highStop:object}} info
  */
-export function buildEscalator(conn, registry, info) {
-  const B = new MeshBuilder(registry, { rise: true })
+export function buildEscalator(conn, registry, info, flavour = PLAIN) {
+  const B = new MeshBuilder(registry, { rise: true, lit: flavour.lit })
   const pl = info.lowStop.point
   const ph = info.highStop.point
   const d = sub(ph, pl)
@@ -1171,7 +1175,7 @@ export function buildEscalator(conn, registry, info) {
   }
   // chevrons in the direction of travel, painted on the steps for the map views (their own builder: the Walk view, which
   // rides the moving steps, does not draw them)
-  const A = new MeshBuilder(registry, { rise: true })
+  const A = new MeshBuilder(registry, { rise: true, lit: flavour.lit })
   const nCh = Math.max(3, Math.floor((L - 2 * landing) / 2.2))
   for (let k = 0; k < nCh; k++) {
     const sc = landing + ((L - 2 * landing) * (k + 0.5)) / nCh
@@ -1195,7 +1199,7 @@ export function buildEscalator(conn, registry, info) {
   }
   // balustrades (follow the profile): an opaque truss skirt under the deck, then the side panels up to the handrail in
   // their own builder (storm draws them with the storefront glass, classic opaque as in v0.1; both faces, each culled)
-  const G = new MeshBuilder(registry, { rise: true })
+  const G = new MeshBuilder(registry, { rise: true, lit: flavour.lit })
   const quad = (M, a, b, h0, h1, key, s0, s1, f0, f1, n) => {
     const q = [M.v(a[0], a[1], h0, key, s0, f0), M.v(b[0], b[1], h0, key, s0, f1), M.v(b[0], b[1], h1, key, s1, f1), M.v(a[0], a[1], h1, key, s1, f0)]
     M.triN(q[0], q[1], q[2], n[0], 0, -n[1])
@@ -1244,8 +1248,8 @@ export function buildEscalator(conn, registry, info) {
  * Lift glass column joining all its stops (stack view only). Rise geometry: fraction 0 at the lowest
  * stop, 1 at the highest.
  */
-export function buildLiftColumn(conn, registry) {
-  const B = new MeshBuilder(registry, { rise: true })
+export function buildLiftColumn(conn, registry, flavour = PLAIN) {
+  const B = new MeshBuilder(registry, { rise: true, lit: flavour.lit })
   const shaft = ensureCCW(conn.shaft)
   const c = polygonCentroid(shaft)
   const small = shaft.map((p) => add(c, mul(sub(p, c), 0.7)))

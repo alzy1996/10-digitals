@@ -555,6 +555,8 @@ export function setRise(g, rise) {
   const arr = pos.array
   for (let i = 0; i < fracs.length; i++) arr[i * 3 + 1] = base[i * 3 + 1] + fracs[i] * rise
   pos.needsUpdate = true
+  // lit ramps change slope with the rise: their normals follow
+  if (g.userData.lit) g.computeVertexNormals()
   g.computeBoundingSphere()
   g.computeBoundingBox()
 }

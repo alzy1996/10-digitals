@@ -71,12 +71,13 @@ export function arrivalStand(index, levelId, sign, want) {
  * @param {object} level
  * @param {import('./palette.js').ColorRegistry} registry
  * @param {Array<Array<[number, number]>>} holes ceiling openings (voids of the level above, or a skylight)
+ * @param {{ lit?: boolean }} [flavour] lit = normals for the lit materials of the v0.3 toy style
  * @returns {{ solid: MeshBuilder, glow: MeshBuilder, ceilH: number }}
  */
-export function buildInterior(index, level, registry, holes) {
+export function buildInterior(index, level, registry, holes, flavour = {}) {
   const v = index.venue
   const parking = level.kind === 'parking'
-  const solid = new MeshBuilder(registry)
+  const solid = new MeshBuilder(registry, { lit: !!flavour.lit })
   const glow = new MeshBuilder(registry)
   const units = (v.units ?? []).filter((u) => u.levelId === level.id)
   const occ = (u) => (u.occupantId ? index.occupantById.get(u.occupantId) : null)

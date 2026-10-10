@@ -144,3 +144,20 @@ describe('MeshBuilder bevel + lit (v0.3)', () => {
     expect(g.getAttribute('color').array[0]).toBeGreaterThan(flat.build('toy').getAttribute('color').array[0])
   })
 })
+
+describe('builder flavour (v0.3 toy)', () => {
+  it('toy flavour bevels the retail opaque mesh and carries normals; the default stays unlit', () => {
+    const plain = buildRetailLevel(index, L1, new ColorRegistry())
+    const toy = buildRetailLevel(index, L1, new ColorRegistry(), { bevel: 0.06, lit: true })
+    expect(toy.opaque.vertexCount).toBeGreaterThan(plain.opaque.vertexCount)
+    expect(toy.opaque.build('toy').getAttribute('normal')).toBeTruthy()
+    expect(toy.roofs.build('toy').getAttribute('normal')).toBeTruthy()
+    expect(plain.opaque.build('storm').getAttribute('normal')).toBeUndefined()
+  })
+
+  it('parking levels take the flavour too', () => {
+    const B1 = index.levelById.get('B1')
+    const toy = buildParkingLevel(index, B1, new ColorRegistry(), { bevel: 0.06, lit: true })
+    expect(toy.opaque.build('toyBasement').getAttribute('normal')).toBeTruthy()
+  })
+})
