@@ -1,0 +1,374 @@
+/* v0.5 Offers page and the offer card on a shop's place screen (DESIGN-MALL.md 3.3). A lazy chunk's stylesheet: it
+   loads with the Offers page / place screen, never with the first screen. Category colours keep white text >= 4.5:1. */
+
+.page {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background:
+    radial-gradient(circle at 10% 10%, #FFEEDB 0%, transparent 40%),
+    radial-gradient(circle at 90% 12%, #E8EAFF 0%, transparent 45%),
+    radial-gradient(circle at 80% 85%, #FFE4E4 0%, transparent 40%),
+    radial-gradient(circle at 15% 80%, #E4F9F5 0%, transparent 45%),
+    #F4F7FE;
+  color: var(--ink);
+  animation: page-in 260ms var(--ease-emph);
+}
+@keyframes page-in {
+  from { transform: translateY(16px); opacity: 0.6; }
+  to { transform: none; opacity: 1; }
+}
+.page-top {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) var(--gutter) 8px;
+  background: linear-gradient(#F4F7FE 70%, rgba(244, 247, 254, 0));
+}
+.page-top .header-row {
+  max-width: 1120px;
+}
+.page-body {
+  max-width: 1120px;
+  margin-inline: auto;
+  padding: 4px var(--gutter) calc(env(safe-area-inset-bottom, 0px) + 32px);
+}
+.page-body > .main-tabs {
+  max-width: 420px;
+}
+.page-title {
+  margin-top: 8px;
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 700;
+}
+.offers-demo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid #F59E0B;
+  background: #FFFBEB;
+  color: #78350F;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+}
+.chip-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+.chip-row::-webkit-scrollbar {
+  display: none;
+}
+.filter-chip {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: #FFFFFF;
+  border: 1px solid #E4EBF5;
+  box-shadow: var(--shadow-pill);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.filter-chip[aria-checked="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #FFFFFF;
+}
+.page-section {
+  margin-top: 22px;
+}
+.section-h {
+  font-size: 19px;
+  line-height: 26px;
+  font-weight: 700;
+}
+.page-section > .caption {
+  margin-top: 2px;
+}
+.deal-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 12px;
+}
+@media (min-width: 640px) {
+  .deal-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (min-width: 1024px) {
+  .deal-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.deal-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-bento);
+  background: #FFFFFF;
+  box-shadow: 0 10px 30px -12px rgba(16, 42, 67, 0.28);
+  overflow: hidden;
+  transition: box-shadow 200ms var(--ease);
+}
+.deal-card:hover {
+  box-shadow: 0 16px 36px -12px rgba(16, 42, 67, 0.36);
+}
+.deal-band {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  min-height: 108px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, var(--cat), color-mix(in srgb, var(--cat) 70%, #000000));
+  color: #FFFFFF;
+}
+.deal-figure {
+  margin-inline-start: auto;
+  font-size: 44px;
+  line-height: 48px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.deal-tag,
+.badge-new {
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 700;
+}
+.deal-tag {
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--ink);
+}
+.badge-new {
+  background: #FDE68A;
+  color: #78350F;
+}
+.deal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 16px;
+  flex: 1;
+}
+.deal-shop {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 700;
+}
+.deal-title {
+  font-size: 15px;
+  line-height: 21px;
+  color: var(--ink-2);
+}
+.deal-meta,
+.brand-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+.deal-level {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--glass-raised-bg);
+  border: 1px solid var(--glass-raised-rim);
+  color: var(--ink);
+  font-weight: 700;
+}
+.deal-mins {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.deal-show {
+  margin-top: auto;
+  width: 100%;
+  min-height: 48px;
+}
+.deal-body .deal-show {
+  margin-top: 10px;
+}
+.brand-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(220px, 72%);
+  gap: 12px;
+  margin-top: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  padding-bottom: 6px;
+}
+.brand-row::-webkit-scrollbar {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .brand-row {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(4, 1fr);
+    overflow: visible;
+  }
+}
+.brand-card {
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px;
+  border-radius: var(--r-bento);
+  background: #FFFFFF;
+  border: 2px solid #FFE4E4;
+  box-shadow: var(--shadow-pill);
+}
+.brand-mono {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 6px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, var(--cat), color-mix(in srgb, var(--cat) 70%, #000000));
+  color: #FFFFFF;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.brand-name {
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 700;
+}
+.brand-origin {
+  font-size: 14px;
+  line-height: 20px;
+  color: #9F1239;
+  font-weight: 600;
+}
+.brand-opened {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 2px solid var(--vibrant);
+  color: #1D4ED8;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.brand-show {
+  margin-top: 10px;
+  align-self: stretch;
+}
+.offers-foot {
+  margin-top: 22px;
+  text-align: center;
+}
+.filter-chip:focus-visible,
+.deal-show:focus-visible,
+.btn-ghost:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* the offer card on a shop's place screen */
+.offer-card {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-top: 12px;
+  border-radius: 20px;
+  background: #FFFFFF;
+  border: 1px solid #E4EBF5;
+  box-shadow: var(--shadow-pill);
+  overflow: hidden;
+}
+.offer-card-band {
+  flex: none;
+  display: grid;
+  place-items: center;
+  min-width: 84px;
+  padding: 10px;
+  background: linear-gradient(135deg, var(--cat), color-mix(in srgb, var(--cat) 70%, #000000));
+  color: #FFFFFF;
+  font-size: 22px;
+  line-height: 26px;
+  font-weight: 700;
+  text-align: center;
+}
+.offer-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  min-width: 0;
+}
+.offer-card-label {
+  color: #BE123C;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+:root[dir="rtl"] .offer-card-label {
+  letter-spacing: 0;
+}
+.offer-card-title {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+}
+.offer-card-until {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-2);
+}
+.title .badge-new {
+  vertical-align: middle;
+  margin-inline-start: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page {
+    animation: none;
+  }
+  .deal-card {
+    transition: none;
+  }
+}

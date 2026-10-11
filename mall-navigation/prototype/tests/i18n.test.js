@@ -138,3 +138,20 @@ describe('addStrings', () => {
     expect(t('test.extra', 'ar', { name: 'سام' })).toBe('مرحبا سام')
   })
 })
+
+describe('strings for the lazy screens (strings-more.js)', () => {
+  it('has English and Arabic for every key, the same placeholders, Arabic in Arabic script, no clash with the main table', async () => {
+    const { MORE } = await import('../src/i18n/strings-more.js')
+    const names = (s) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort()
+    const text = (s) => s.replace(/\{\w+\}/g, '')
+    for (const [key, entry] of Object.entries(MORE)) {
+      expect(entry.en, key).toBeTruthy()
+      expect(entry.ar, key).toBeTruthy()
+      expect(names(entry.ar), key).toEqual(names(entry.en))
+      expect(text(entry.ar), key).not.toMatch(/[A-Za-z0-9]/)
+      expect(entry.ar, key).toMatch(ARABIC_LETTER)
+      expect(entry.en, key).not.toMatch(ARABIC_LETTER)
+      expect(STRINGS[key], `${key} is also in the main table`).toBeUndefined()
+    }
+  })
+})

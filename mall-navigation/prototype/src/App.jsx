@@ -34,7 +34,7 @@ import { Icon } from './ui/icons.jsx'
 import { firstScreen } from './ui/firstScreen.js'
 import { mallStatus } from './ui/hours.js'
 import { homeCards } from './ui/homeModel.js'
-import { liveDeals, loadOffers, newBrands } from './offers/offers.js'
+import { dealFor, liveDeals, loadOffers, newBrands } from './offers/offers.js'
 import { bayForPlate, entityInfo, isParkingLevel, levelButtonLabel, levelName, pick } from './ui/model.js'
 import { plateLabel } from './routing/names.js'
 import { initialLang, readUrlParams, rememberLang } from './ui/urlState.js'
@@ -60,7 +60,9 @@ const NavigateScreen = lazyScreen(() => import('./ui/NavigateScreen.jsx'), 'Navi
 const ArrivedScreen = lazyScreen(() => import('./ui/ArrivedScreen.jsx'), 'ArrivedScreen')
 const CarScreen = lazyScreen(() => import('./ui/CarScreen.jsx'), 'CarScreen')
 const ScanSheet = lazyScreen(() => import('./ui/ScanSheet.jsx'), 'ScanSheet')
-const SCREEN_CHUNKS = { search: SearchScreen, place: PlaceScreen, navigate: NavigateScreen, arrived: ArrivedScreen, car: CarScreen, scan: ScanSheet }
+/** v0.5 pages and sheets past the first screen */
+const OffersPage = lazyScreen(() => import('./ui/OffersPage.jsx'), 'OffersPage')
+const SCREEN_CHUNKS = { search: SearchScreen, place: PlaceScreen, navigate: NavigateScreen, arrived: ArrivedScreen, car: CarScreen, scan: ScanSheet, offers: OffersPage }
 /** The chunks a first screen needs before it shows (a route screen can step back to place and forward to arrived). */
 function chunksFor(screen) {
   if (screen === 'navigate' || screen === 'arrived') return [PlaceScreen, NavigateScreen, ArrivedScreen]
@@ -1173,7 +1175,7 @@ export default function App() {
   }
 
   const openPlace = (id, from = stateRef.current.screen) => {
-    patch({ targetId: id, screen: 'place', returnTo: from === 'search' ? 'search' : 'home', stepIndex: 0, userView: false })
+    patch({ targetId: id, screen: 'place', returnTo: from === 'search' || from === 'offers' ? from : 'home', stepIndex: 0, userView: false })
   }
 
   const goStep = (i) => {
@@ -1308,6 +1310,18 @@ export default function App() {
   const walking = Boolean(index && route && view.mode === 'fpv' && (screen === 'navigate' || screen === 'arrived'))
   const carBay = index && car ? index.bayById.get(car.bayId) : null
 
+  const headerEl = (
+    <Header
+      index={index}
+      lang={lang}
+      onToggleLang={toggleLang}
+      status={index ? mallStatus(index, lang, new Date(), state.hoursPreview) : null}
+      stamps={state.stamps.length}
+      questTotal={brands.length}
+      onQuest={() => patch({ screen: 'offers' })}
+    />
+  )
+
   return (
     <div className={`app${wide ? ' is-wide' : ''}`}>
       <MapView onError={(e) => patch({ no3d: e?.kind === 'load' ? 'load' : 'webgl' })} pulse={pulse} />
@@ -1346,16 +1360,8 @@ export default function App() {
           />
         </Suspense>
       ) : (
-        <div className="top" ref={topRef}>
-          <Header
-            index={index}
-            lang={lang}
-            onToggleLang={toggleLang}
-            status={index ? mallStatus(index, lang, new Date(), state.hoursPreview) : null}
-            stamps={state.stamps.length}
-            questTotal={brands.length}
-            onQuest={() => patch({ screen: 'offers' })}
-          />
+        <div className="top" ref={topRef} hidden={screen === 'offers'}>
+          {headerEl}
           {index && screen !== 'search' && !state.no3d ? (
             <MapControls
               index={index}
@@ -1403,6 +1409,23 @@ export default function App() {
             {t('common.undo', lang)}
           </button>
         </div>
+      ) : null}
+
+      {/* v0.5 Offers: the second top-level screen, a page over the map (the map stays mounted and idle under it) */}
+      {index && screen === 'offers' ? (
+        <Suspense fallback={null}>
+          <OffersPage
+            index={index}
+            lang={lang}
+            you={you}
+            stepFree={state.stepFree}
+            offers={state.offers}
+            hoursPreview={state.hoursPreview}
+            header={headerEl}
+            onTab={(tab) => tab === 'map' && patch({ screen: 'home' })}
+            onShow={(id) => openPlace(id, 'offers')}
+          />
+        </Suspense>
       ) : null}
 
       <SheetContext.Provider value={sheetCtx}>
@@ -1493,6 +1516,8 @@ export default function App() {
           you={you}
           stepFree={state.stepFree}
           hoursPreview={state.hoursPreview}
+          deal={dealFor(deals, state.targetId)}
+          isNew={brands.some((b) => b.occupantId === state.targetId)}
           onToggleStepFree={() => patch({ stepFree: !state.stepFree })}
           onGo={() => patch({ screen: 'navigate', stepIndex: 0, userView: false })}
           onBack={() => patch({ screen: state.returnTo, targetId: state.returnTo === 'search' ? state.targetId : null })}

@@ -1,5 +1,10 @@
 import { forwardRef } from 'react'
-import { formatDistance, formatDuration, formatMinutesParts, t } from '../i18n/strings.js'
+import { addStrings, formatDistance, formatDuration, formatMinutesParts, t } from '../i18n/strings.js'
+import { MORE } from '../i18n/strings-more.js'
+import { CATEGORY_COLORS } from '../engine/tokens.js'
+import { formatDay } from './OffersPage.jsx'
+import { venueDate } from './hours.js'
+import './offers.css'
 import { Icon } from './icons.jsx'
 import { Sheet } from './Sheet.jsx'
 import { hoursLine, levelName, pick, viaLine } from './model.js'
@@ -8,7 +13,9 @@ import { hoursLine, levelName, pick, viaLine } from './model.js'
  * Place (S05): name, level, minutes, hours, step-free toggle and one primary action: GO.
  * The 3D map behind shows the route preview. Folded, the sheet keeps the name row (its head) and GO (its footer).
  */
-export const PlaceScreen = forwardRef(function PlaceScreen({ index, lang, info, route, you, stepFree, hoursPreview = null, onToggleStepFree, onGo, onBack }, ref) {
+addStrings(MORE)
+
+export const PlaceScreen = forwardRef(function PlaceScreen({ index, lang, info, route, you, stepFree, hoursPreview = null, deal = null, isNew = false, onToggleStepFree, onGo, onBack }, ref) {
   if (!info) return null
   // Ramadan / Eid aware; the Mall info switch previews a special's hours (v0.5)
   const hours = info.hours ? hoursLine(index, info, lang, new Date(), hoursPreview) : null
@@ -26,7 +33,10 @@ export const PlaceScreen = forwardRef(function PlaceScreen({ index, lang, info, 
             <Icon name="back" size={24} className="flip-rtl" />
           </button>
           <div className="flex-1 min-w-0">
-            <h2 className="title">{pick(info.name, lang)}</h2>
+            <h2 className="title">
+              {pick(info.name, lang)}
+              {isNew ? <span className="badge-new">{t('offers.badgeNew', lang)}</span> : null}
+            </h2>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               {info.categoryLabelKey ? (
                 <span className="cat-chip" style={{ background: info.color, '--cat-c': info.color }}>
@@ -62,6 +72,17 @@ export const PlaceScreen = forwardRef(function PlaceScreen({ index, lang, info, 
           <Icon name="clock" size={20} />
           {hours.text}
         </p>
+      ) : null}
+      {/* v0.5: the shop's demo offer (pull: shown on its own place screen, never pushed) */}
+      {deal ? (
+        <div className="offer-card" style={{ '--cat': CATEGORY_COLORS[deal.category] ?? CATEGORY_COLORS.services }}>
+          <span className="offer-card-band">{pick(deal.figure, lang)}</span>
+          <span className="offer-card-text">
+            <span className="offer-card-label">{t('offers.offer', lang)}</span>
+            <span className="offer-card-title">{pick(deal.title, lang)}</span>
+            <span className="offer-card-until">{t('offers.until', lang, { date: formatDay(deal.to, lang, venueDate(index).ymd.slice(0, 4)) })}</span>
+          </span>
+        </div>
       ) : null}
       {route && (via || you) ? (
         <p className="caption mt-1">
