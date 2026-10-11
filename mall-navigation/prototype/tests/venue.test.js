@@ -21,6 +21,28 @@ describe('demo venue file', () => {
     expect(v.meta.disclaimer.en).toMatch(/Fictional/)
     expect(v.meta.defaultStartAnchorId).toBe('A-G-ENT-S')
   })
+
+  it('has mall hours (longer Thursday and Friday), Ramadan and Eid specials, and Ramadan hours for two shops (v0.5)', () => {
+    const v = fresh()
+    expect(v.meta.hours.weekly.sun).toEqual([{ open: '10:00', close: '22:00' }])
+    expect(v.meta.hours.weekly.thu).toEqual([{ open: '10:00', close: '23:00' }])
+    expect(v.meta.hours.specials.map((s) => s.id)).toEqual(['ramadan-2027', 'eid-fitr-2027'])
+    expect(v.meta.hours.specials[0]).toMatchObject({ kind: 'ramadan', from: '2027-02-08', to: '2027-03-09', expected: true, shops: 'mall' })
+    const byId = new Map(v.occupants.map((o) => [o.id, o]))
+    expect(byId.get('occ-sidab-fresh').ramadan).toEqual([{ open: '08:00', close: '02:00' }])
+    expect(byId.get('occ-majlis-cinemas').ramadan).toEqual([{ open: '20:00', close: '02:00' }])
+  })
+
+  it('the validator refuses malformed hours', () => {
+    const v = fresh()
+    v.meta.hours.weekly.mon = [{ open: '10', close: '22:00' }]
+    v.meta.hours.specials[0].to = '2027-13-40'
+    v.occupants[0].ramadan = [{ open: 'x', close: '02:00' }]
+    const { errors } = validateVenue(v)
+    expect(errors.some((e) => /hours\.weekly\.mon/.test(e))).toBe(true)
+    expect(errors.some((e) => /ramadan-2027/.test(e))).toBe(true)
+    expect(errors.some((e) => /ramadan/.test(e) && /occupant/.test(e))).toBe(true)
+  })
 })
 
 describe('indexVenue', () => {

@@ -5,6 +5,7 @@
 import { CATEGORY_COLORS, PIN_COLORS, amenityGroup } from '../engine/tokens.js'
 import { bayCode, labelWithoutLevel, plateBayCode, plateLabel } from '../routing/names.js'
 import { t, toArabicDigits } from '../i18n/strings.js'
+import { hoursText, shopIntervals, venueDate } from './hours.js'
 
 /** Icon per occupant category (src/ui/icons.jsx names). */
 const CATEGORY_ICONS = {
@@ -121,6 +122,7 @@ export function entityInfo(index, id) {
       icon: CATEGORY_ICONS[occ.category] ?? 'shop',
       categoryLabelKey: `category.${occ.category}`,
       hours: occ.hours ?? null,
+      ramadan: occ.ramadan ?? null,
       category: occ.category,
     }
   }
@@ -249,45 +251,13 @@ export function bayForPlate(index, anchorId) {
   return nearestBay(index, anchor.levelId, anchor.point)
 }
 
-/** Current time in the venue's time zone as "HH:MM" (24 h). */
-export function venueClock(index, date = new Date()) {
-  const tz = index?.venue?.meta?.timezone || 'Asia/Muscat'
-  try {
-    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(date)
-    const h = parts.find((p) => p.type === 'hour')?.value ?? '00'
-    const m = parts.find((p) => p.type === 'minute')?.value ?? '00'
-    return `${h === '24' ? '00' : h}:${m}`
-  } catch {
-    const h = String(date.getHours()).padStart(2, '0')
-    const m = String(date.getMinutes()).padStart(2, '0')
-    return `${h}:${m}`
-  }
-}
-
-/** Open-now check on "HH:MM" strings ("24:00" = midnight close). */
-export function openState(hours, clock) {
-  if (!hours?.open || !hours?.close) return null
-  const open = hours.open
-  const close = hours.close
-  const isOpen = close > open ? clock >= open && clock < close : clock >= open || clock < close
-  return { isOpen, open, close }
-}
-
-/** "HH:MM" for display ("24:00" shown as "00:00"); Arabic-Indic digits in Arabic. */
-export function formatClock(hhmm, lang) {
-  const s = hhmm === '24:00' ? '00:00' : hhmm
-  return lang === 'ar' ? toArabicDigits(s) : s
-}
-
-/** One line for opening hours, e.g. "Open until 22:00" / "Closed now · Opens at 10:00". */
-export function hoursLine(index, hours, lang, date = new Date()) {
-  const st = openState(hours, venueClock(index, date))
-  if (!st) return null
-  if (st.isOpen) {
-    const midnight = st.close === '24:00' || st.close === '00:00'
-    return { ok: true, text: midnight ? t('common.openUntilMidnight', lang) : t('common.openUntil', lang, { time: formatClock(st.close, lang) }) }
-  }
-  return { ok: false, text: `${t('common.closedNow', lang)} · ${t('common.opensAt', lang, { time: formatClock(st.open, lang) })}` }
+/**
+ * One line for a shop's opening hours now, e.g. "Open until 22:00" / "Closed now · Opens at 20:00". Ramadan / Eid aware
+ * (src/ui/hours.js); `previewId` shows the hours of that special (the "Preview Ramadan hours" switch, v0.5).
+ * @param {{ hours: { open: string, close: string } | null, ramadan?: { open: string, close: string }[] | null }} shop
+ */
+export function hoursLine(index, shop, lang, date = new Date(), previewId = null) {
+  return hoursText(shopIntervals(index, shop, date, previewId), venueDate(index, date).clock, lang)
 }
 
 /** Connectors a route rides, in order: [{ id, type, direction, name }]. */

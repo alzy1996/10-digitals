@@ -8,9 +8,10 @@ import { hoursLine, levelName, pick, viaLine } from './model.js'
  * Place (S05): name, level, minutes, hours, step-free toggle and one primary action: GO.
  * The 3D map behind shows the route preview. Folded, the sheet keeps the name row (its head) and GO (its footer).
  */
-export const PlaceScreen = forwardRef(function PlaceScreen({ index, lang, info, route, you, stepFree, onToggleStepFree, onGo, onBack }, ref) {
+export const PlaceScreen = forwardRef(function PlaceScreen({ index, lang, info, route, you, stepFree, hoursPreview = null, onToggleStepFree, onGo, onBack }, ref) {
   if (!info) return null
-  const hours = info.hours ? hoursLine(index, info.hours, lang) : null
+  // Ramadan / Eid aware; the Mall info switch previews a special's hours (v0.5)
+  const hours = info.hours ? hoursLine(index, info, lang, new Date(), hoursPreview) : null
   const via = route ? viaLine(route, lang) : null
   const eta = route ? formatMinutesParts(route.etaS, lang) : null
   // lifts and stairs serve several levels: name the level the route takes you to

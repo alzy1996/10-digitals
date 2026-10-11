@@ -95,6 +95,8 @@ const INITIAL = {
   sim: { active: false, playing: false, done: false, speed: 1, distanceDoneM: 0, phase: 'walk', connectorType: null, onConnector: false, rideProgress: 0 },
   toast: null,
   undo: null,
+  /** v0.5: a special's id (e.g. 'ramadan-2027') whose hours every hours line shows; null = today's real hours */
+  hoursPreview: null,
   /** bottom sheet snap: `snap` applies while the sheet is `key` (sheetKeyOf); otherwise the screen's default */
   sheet: { key: null, snap: null },
 }
@@ -1304,6 +1306,7 @@ export default function App() {
           route={route}
           you={you}
           stepFree={state.stepFree}
+          hoursPreview={state.hoursPreview}
           onToggleStepFree={() => patch({ stepFree: !state.stepFree })}
           onGo={() => patch({ screen: 'navigate', stepIndex: 0, userView: false })}
           onBack={() => patch({ screen: state.returnTo, targetId: state.returnTo === 'search' ? state.targetId : null })}

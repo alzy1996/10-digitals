@@ -288,6 +288,14 @@ const ARABIC_LETTER = /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/
 const ASCII_DIGIT = /[0-9]/
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$|^24:00$/
 
+const YMD = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
+const DAYS = ['sat', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri']
+
+/** Interval list ([{ open: "HH:MM", close: "HH:MM" }], v0.5 hours; a close at or before the open runs past midnight). */
+function badIntervals(v) {
+  return !Array.isArray(v) || v.some((iv) => !iv || !HHMM.test(iv.open ?? '') || !HHMM.test(iv.close ?? ''))
+}
+
 function isBilingual(v) {
   return v && typeof v === 'object' && !Array.isArray(v) && 'en' in v && 'ar' in v
 }
@@ -320,6 +328,19 @@ export function validateVenue(venue, options = {}) {
   if (meta.units !== undefined && meta.units !== 'meters') err('meta.units must be "meters"')
   const b = meta.bounds
   if (b && !(b.maxX > b.minX && b.maxY > b.minY)) err('meta.bounds is empty or inverted')
+  // v0.5 hours (optional): mall weekly hours and dated specials (Ramadan, Eid)
+  if (meta.hours !== undefined) {
+    const h = meta.hours ?? {}
+    for (const d of DAYS) if (badIntervals(h.weekly?.[d])) err(`meta.hours.weekly.${d} must be a list of { open, close } "HH:MM"`)
+    for (const [i, sp] of (Array.isArray(h.specials) ? h.specials : []).entries()) {
+      const w = `meta.hours special ${sp?.id ?? i}`
+      if (!sp?.id || !['ramadan', 'eid'].includes(sp.kind)) err(`${w}: needs an id and kind "ramadan" | "eid"`)
+      if (!isBilingual(sp?.name)) err(`${w}: name must be { en, ar }`)
+      if (!YMD.test(sp?.from ?? '') || !YMD.test(sp?.to ?? '') || sp.to < sp.from) err(`${w}: from / to must be "YYYY-MM-DD", from <= to`)
+      if (badIntervals(sp?.mall)) err(`${w}: mall must be a list of { open, close } "HH:MM"`)
+      if (!['mall', 'own'].includes(sp?.shops)) err(`${w}: shops must be "mall" | "own"`)
+    }
+  }
 
   const arr = (v) => (Array.isArray(v) ? v : [])
   const levels = arr(venue.levels)
@@ -479,6 +500,7 @@ export function validateVenue(venue, options = {}) {
     if (!isBilingual(o.keywords) || !Array.isArray(o.keywords.en) || !Array.isArray(o.keywords.ar)) err(`${w}: keywords must be { en: [], ar: [] }`)
     if (!o.hours || !HHMM.test(o.hours.open ?? '') || !HHMM.test(o.hours.close ?? '')) err(`${w}: hours must be { open: "HH:MM", close: "HH:MM" }`)
     else if (o.hours.close !== '24:00' && o.hours.close <= o.hours.open) warn(`${w}: closes (${o.hours.close}) before it opens (${o.hours.open})`)
+    if (o.ramadan !== undefined && badIntervals(o.ramadan)) err(`${w}: ramadan hours must be a list of { open, close } "HH:MM"`)
     if (!Number.isInteger(o.landmarkScore) || o.landmarkScore < 0 || o.landmarkScore > 3) err(`${w}: landmarkScore must be an integer 0-3`)
     const uIds = arr(o.unitIds)
     if (uIds.length < 1) err(`${w}: needs at least one unit`)

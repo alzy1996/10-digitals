@@ -101,6 +101,18 @@ function occ(id, category, nameEn, nameAr, signEn, signAr, kwEn, kwAr, landmarkS
     landmarkScore,
   }
 }
+/** v0.5: mall hours, Sat-Wed 10-22, Thu-Fri 10-23; Ramadan / Eid 2027 on expected dates (moon sighting: UNVERIFIED). */
+const iv = (open, close) => ({ open, close })
+const MALL_HOURS = {
+  weekly: {
+    sat: [iv('10:00', '22:00')], sun: [iv('10:00', '22:00')], mon: [iv('10:00', '22:00')], tue: [iv('10:00', '22:00')],
+    wed: [iv('10:00', '22:00')], thu: [iv('10:00', '23:00')], fri: [iv('10:00', '23:00')],
+  },
+  specials: [
+    { id: 'ramadan-2027', kind: 'ramadan', name: bi('Ramadan', 'رمضان'), from: '2027-02-08', to: '2027-03-09', expected: true, mall: [iv('10:00', '15:00'), iv('20:00', '01:00')], shops: 'mall' },
+    { id: 'eid-fitr-2027', kind: 'eid', name: bi('Eid al-Fitr', 'عيد الفطر'), from: '2027-03-10', to: '2027-03-12', expected: true, mall: [iv('10:00', '24:00')], shops: 'mall' },
+  ],
+}
 const OCCUPANTS = {
   // Ground level
   hyper: occ('occ-sidab-fresh', 'grocery', 'Sidab Fresh Hypermarket', 'هايبرماركت سداب الطازج', 'SIDAB FRESH', 'سداب الطازج',
@@ -462,6 +474,10 @@ function parkingPlan(levelId) {
 // ---------------------------------------------------------------------------
 const units = []
 const openings = []
+// Ramadan: the hypermarket and the cinema keep their own late hours (every other shop follows the mall)
+OCCUPANTS.hyper.ramadan = [iv('08:00', '02:00')]
+OCCUPANTS.cinema.ramadan = [iv('20:00', '02:00')]
+
 const occupants = []
 const amenities = []
 const anchors = []
@@ -861,6 +877,7 @@ const venue = resolveRefs({
     version: 1,
     units: 'meters',
     timezone: 'Asia/Muscat',
+    hours: MALL_HOURS,
     defaultStartAnchorId: 'A-G-ENT-S',
     bounds: { minX: round2(minX), minY: round2(minY), maxX: round2(maxX), maxY: round2(maxY) },
     floorToFloorM: FLOOR_TO_FLOOR,

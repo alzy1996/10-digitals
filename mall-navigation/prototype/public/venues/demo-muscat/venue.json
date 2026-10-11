@@ -7,6 +7,39 @@
     "version": 1,
     "units": "meters",
     "timezone": "Asia/Muscat",
+    "hours": {
+      "weekly": {
+        "sat": [{"open":"10:00","close":"22:00"}],
+        "sun": [{"open":"10:00","close":"22:00"}],
+        "mon": [{"open":"10:00","close":"22:00"}],
+        "tue": [{"open":"10:00","close":"22:00"}],
+        "wed": [{"open":"10:00","close":"22:00"}],
+        "thu": [{"open":"10:00","close":"23:00"}],
+        "fri": [{"open":"10:00","close":"23:00"}]
+      },
+      "specials": [
+        {
+          "id": "ramadan-2027",
+          "kind": "ramadan",
+          "name": {"en":"Ramadan","ar":"رمضان"},
+          "from": "2027-02-08",
+          "to": "2027-03-09",
+          "expected": true,
+          "mall": [{"open":"10:00","close":"15:00"},{"open":"20:00","close":"01:00"}],
+          "shops": "mall"
+        },
+        {
+          "id": "eid-fitr-2027",
+          "kind": "eid",
+          "name": {"en":"Eid al-Fitr","ar":"عيد الفطر"},
+          "from": "2027-03-10",
+          "to": "2027-03-12",
+          "expected": true,
+          "mall": [{"open":"10:00","close":"24:00"}],
+          "shops": "mall"
+        }
+      ]
+    },
     "defaultStartAnchorId": "A-G-ENT-S",
     "bounds": {"minX":0,"minY":-10,"maxX":128,"maxY":64},
     "floorToFloorM": 5.5,
@@ -227,6 +260,7 @@
       },
       "hours": {"open":"08:00","close":"24:00"},
       "landmarkScore": 3,
+      "ramadan": [{"open":"08:00","close":"02:00"}],
       "unitIds": ["u-G-01"],
       "entranceNodeIds": ["n-G-032"]
     },
@@ -491,6 +525,7 @@
       "keywords": {"en":["cinema","movies","films","tickets","entertainment","fun"],"ar":["سينما","أفلام","تذاكر","ترفيه"]},
       "hours": {"open":"10:00","close":"24:00"},
       "landmarkScore": 3,
+      "ramadan": [{"open":"20:00","close":"02:00"}],
       "unitIds": ["u-L1-02"],
       "entranceNodeIds": ["n-L1-040"]
     },
