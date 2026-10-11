@@ -2,7 +2,8 @@ import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import { formatDuration, formatMinutesParts, t } from '../i18n/strings.js'
 import { CATEGORY_COLORS, PIN_COLORS } from '../engine/tokens.js'
 import { resolveTarget, travelTimesFrom } from '../routing/route.js'
-import { TILE_IDS } from '../search/search.js'
+import { createSearch } from '../search/search.js'
+import { TILE_IDS } from '../search/tileIds.js'
 import { Icon } from './icons.jsx'
 import { Sheet } from './Sheet.jsx'
 import { TILE_STYLE, entityInfo, levelButtonLabel, levelName, pick } from './model.js'
@@ -10,6 +11,17 @@ import { TILE_STYLE, entityInfo, levelButtonLabel, levelName, pick } from './mod
 const CATEGORY_ICON = {
   fashion: 'fashion', food: 'food', cafe: 'cafe', electronics: 'electronics', beauty: 'beauty', kids: 'kids',
   grocery: 'grocery', entertainment: 'entertainment', home: 'home', health: 'health', services: 'services', parking: 'parking',
+}
+
+/** One search engine per venue index (built on first use: the search chunk loads on demand, v0.5). */
+const searchCache = new WeakMap()
+function searchFor(index) {
+  let s = searchCache.get(index)
+  if (!s) {
+    s = createSearch(index)
+    searchCache.set(index, s)
+  }
+  return s
 }
 
 /** Debounced copy of a value (instant results without searching on every key press). */
@@ -29,10 +41,11 @@ function useDebounced(value, ms) {
  * focusing) the field of a folded search sheet brings it back to full, where the results show.
  */
 export const SearchScreen = forwardRef(function SearchScreen(
-  { index, lang, search, you, stepFree, query, tile, category, onQuery, onTile, onCategory, onPick, onCar, onBack, autoFocus = true },
+  { index, lang, you, stepFree, query, tile, category, onQuery, onTile, onCategory, onPick, onCar, onBack, autoFocus = true },
   ref,
 ) {
   const inputRef = useRef(null)
+  const search = useMemo(() => searchFor(index), [index])
   const q = useDebounced(query, 120)
   const times = useMemo(() => (you ? travelTimesFrom(index, you.nodeId, { stepFree }) : new Map()), [index, you, stepFree])
 

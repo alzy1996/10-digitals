@@ -1,6 +1,6 @@
 import { forwardRef } from 'react'
 import { t } from '../i18n/strings.js'
-import { TILE_IDS } from '../search/search.js'
+import { TILE_IDS } from '../search/tileIds.js'
 import { Icon } from './icons.jsx'
 import { Sheet } from './Sheet.jsx'
 import { TILE_STYLE, levelButtonLabel, paintedBayCode, pick, zoneOfBay } from './model.js'

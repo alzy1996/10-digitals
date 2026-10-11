@@ -128,3 +128,13 @@ describe('formatDuration', () => {
     expect(formatDuration(6000, 'ar')).toBe('حوالي ١٠٠ دقيقة')
   })
 })
+
+describe('addStrings', () => {
+  it('registers extra keys that t() and hasString() see, with Arabic and params', async () => {
+    const { addStrings } = await import('../src/i18n/strings.js')
+    addStrings({ 'test.extra': { en: 'Hello {name}', ar: 'مرحبا {name}' } })
+    expect(hasString('test.extra')).toBe(true)
+    expect(t('test.extra', 'en', { name: 'Sam' })).toBe('Hello Sam')
+    expect(t('test.extra', 'ar', { name: 'سام' })).toBe('مرحبا سام')
+  })
+})

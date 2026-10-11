@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import { indexVenue } from '../src/data/venue.js'
 import { deArabizi, editDistance, maxEditsFor, normalize, tokenize } from '../src/search/normalize.js'
-import { createSearch, TILE_IDS } from '../src/search/search.js'
+import { createSearch, TILES, TILE_IDS } from '../src/search/search.js'
 
 const VENUE_PATH = fileURLToPath(new URL('../public/venues/demo-muscat/venue.json', import.meta.url))
 const index = indexVenue(JSON.parse(readFileSync(VENUE_PATH, 'utf8')))
@@ -207,6 +207,8 @@ describe('createSearch', () => {
 describe('search.tile', () => {
   it('knows the six home tiles', () => {
     expect(TILE_IDS).toEqual(['food', 'restrooms', 'prayer', 'pharmacy', 'kids', 'exit'])
+    // tileIds.js (no search engine import, for the first screen) lists the search engine's tiles in their order
+    expect(TILE_IDS).toEqual(Object.keys(TILES))
     expect(search.tile('nope')).toEqual([])
   })
 

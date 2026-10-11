@@ -391,6 +391,9 @@ export const STRINGS = Object.freeze({
   'sheet.expand': { en: 'Expand panel', ar: 'وسّع اللوحة' },
 })
 
+/** Keys added at run time by lazy chunks (addStrings). */
+const EXTRA = Object.create(null)
+
 /**
  * Look up a UI string.
  * @param {string} key
@@ -399,7 +402,7 @@ export const STRINGS = Object.freeze({
  * @returns {string}
  */
 export function t(key, lang, params) {
-  const entry = STRINGS[key]
+  const entry = STRINGS[key] ?? EXTRA[key]
   if (!entry) return key
   const ar = isArabic(lang)
   let text = ar ? (entry.ar ?? entry.en) : entry.en
@@ -413,7 +416,16 @@ export function t(key, lang, params) {
   return text
 }
 
-/** True when the table has this key (both languages are required by the i18n test). */
+/** True when the table (or an added table) has this key (both languages are required by the i18n test). */
 export function hasString(key) {
-  return Object.prototype.hasOwnProperty.call(STRINGS, key)
+  return Object.prototype.hasOwnProperty.call(STRINGS, key) || Object.prototype.hasOwnProperty.call(EXTRA, key)
+}
+
+/**
+ * Strings of the screens that load on demand (v0.5: src/i18n/strings-more.js): each lazy chunk registers its table
+ * when it loads, so the first screen never carries them.
+ * @param {Record<string, { en: string, ar: string }>} table
+ */
+export function addStrings(table) {
+  for (const [k, v] of Object.entries(table)) EXTRA[k] = v
 }

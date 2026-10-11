@@ -25,6 +25,7 @@
  */
 import { STRINGS } from '../i18n/strings.js'
 import { deArabizi, editDistance, maxEditsFor, normalize, tokenize } from './normalize.js'
+import { TILE_IDS } from './tileIds.js'
 
 /** Score tiers (higher is better). */
 export const SCORES = Object.freeze({
@@ -208,7 +209,7 @@ export const TILES = Object.freeze({
   kids: ['kids'],
   exit: ['exit', 'taxi'],
 })
-export const TILE_IDS = Object.freeze(Object.keys(TILES))
+export { TILE_IDS }
 
 const CATEGORY_LABEL_KEYS = {
   fashion: 'category.fashion',

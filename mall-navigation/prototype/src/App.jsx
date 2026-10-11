@@ -23,19 +23,12 @@ import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import { engine, loadEngine } from './engineHost.js'
 import { loadVenue } from './data/venue.js'
 import { findRouteToTarget, resolveTarget, travelTimesFrom } from './routing/route.js'
-import { createSearch } from './search/search.js'
 import { createSimulator } from './sim/simulator.js'
 import { dirFor, t } from './i18n/strings.js'
 import { Header } from './ui/Header.jsx'
 import { MapControls, WalkViewButton } from './ui/MapControls.jsx'
 import { MapView } from './ui/MapView.jsx'
 import { HomeScreen } from './ui/HomeScreen.jsx'
-import { SearchScreen } from './ui/SearchScreen.jsx'
-import { PlaceScreen } from './ui/PlaceScreen.jsx'
-import { NavigateScreen } from './ui/NavigateScreen.jsx'
-import { ArrivedScreen } from './ui/ArrivedScreen.jsx'
-import { CarScreen } from './ui/CarScreen.jsx'
-import { ScanSheet } from './ui/ScanSheet.jsx'
 import { bayForPlate, entityInfo, isParkingLevel, levelButtonLabel, levelName, pick } from './ui/model.js'
 import { plateLabel } from './routing/names.js'
 import { initialLang, readUrlParams, rememberLang } from './ui/urlState.js'
@@ -43,10 +36,32 @@ import { pickQuality } from './quality.js'
 import { nextTurnFor } from './ui/hudModel.js'
 import { SheetContext } from './ui/Sheet.jsx'
 import { defaultSnap } from './ui/sheetModel.js'
+import { lazyScreen } from './ui/lazyScreen.js'
 
 /** The Walk view HUD loads on demand (it is not part of the first screen: PLAN.md 19.2 load budget). */
 const loadWalkHud = () => import('./ui/WalkHud.jsx')
 const WalkHud = lazy(loadWalkHud)
+
+/**
+ * v0.5: the screens past the first one are chunks of their own (the first-screen load budget, PLAN.md 19.2). A deep
+ * link waits for its screen's chunk before the app is ready; the rest preload while the shopper reads the first screen,
+ * so a tap renders them at once (lazyScreen: no Suspense flash once loaded).
+ */
+const SearchScreen = lazyScreen(() => import('./ui/SearchScreen.jsx'), 'SearchScreen')
+const PlaceScreen = lazyScreen(() => import('./ui/PlaceScreen.jsx'), 'PlaceScreen')
+const NavigateScreen = lazyScreen(() => import('./ui/NavigateScreen.jsx'), 'NavigateScreen')
+const ArrivedScreen = lazyScreen(() => import('./ui/ArrivedScreen.jsx'), 'ArrivedScreen')
+const CarScreen = lazyScreen(() => import('./ui/CarScreen.jsx'), 'CarScreen')
+const ScanSheet = lazyScreen(() => import('./ui/ScanSheet.jsx'), 'ScanSheet')
+const SCREEN_CHUNKS = { search: SearchScreen, place: PlaceScreen, navigate: NavigateScreen, arrived: ArrivedScreen, car: CarScreen, scan: ScanSheet }
+/** The chunks a first screen needs before it shows (a route screen can step back to place and forward to arrived). */
+function chunksFor(screen) {
+  if (screen === 'navigate' || screen === 'arrived') return [PlaceScreen, NavigateScreen, ArrivedScreen]
+  return SCREEN_CHUNKS[screen] ? [SCREEN_CHUNKS[screen]] : []
+}
+const preloadAllScreens = () => {
+  for (const c of Object.values(SCREEN_CHUNKS)) c.preload().catch(() => {})
+}
 
 const VENUE_URL = `${import.meta.env.BASE_URL}venues/demo-muscat/venue.json`
 /** Camera while following the simulated walker: about 35 m of route visible above the step card. */
@@ -163,12 +178,21 @@ function walkStand(route, i) {
   return { levelId: a.levelId, x: a.x, y: a.y, headingDeg: ((heading ?? first ?? 0) + 360) % 360 }
 }
 
+/** The sheet shown while the venue (or a screen's chunk) loads. */
+function LoadingSheet({ lang }) {
+  return (
+    <section className="sheet" aria-busy="true">
+      <div className="sheet-handle" />
+      <p className="subtitle py-6 text-center">{t('app.loading', lang)}</p>
+    </section>
+  )
+}
+
 export default function App() {
   const [state, dispatch] = useReducer(reducer, INITIAL, (s) => ({ ...s, lang: initialLang(readUrlParams().lang) }))
   const stateRef = useRef(state)
   stateRef.current = state
   const indexRef = useRef(null)
-  const searchRef = useRef(null)
   const pendingRef = useRef({ step: null, simT: null, play: false })
   const simRef = useRef(null)
   const simMeta = useRef({ step: -1, level: null, lastUi: 0, doneTimer: 0, phase: null })
@@ -201,11 +225,13 @@ export default function App() {
   useEffect(() => {
     let cancelled = false
     loadVenue(VENUE_URL)
-      .then((idx) => {
+      .then(async (idx) => {
+        if (cancelled) return
+        const p = readUrlParams()
+        // a deep link's screen (and the route screens around it) render in the same commit as the app is ready
+        await Promise.all(chunksFor(p.screen ?? 'home').map((c) => c.preload()))
         if (cancelled) return
         indexRef.current = idx
-        searchRef.current = createSearch(idx)
-        const p = readUrlParams()
         const startId = p.from && idx.anchorById.has(p.from) ? p.from : idx.venue.meta.defaultStartAnchorId
         const youNow = youFromAnchor(idx, startId)
         const carNow = p.car && idx.bayById.has(p.car) ? { bayId: p.car, savedAt: Date.now(), plateId: null } : null
@@ -259,6 +285,8 @@ export default function App() {
       loadEngine().catch(() => {
         // MapView reports the failed download (no3d: 'load') and offers Try again
       })
+      // the other screens' chunks, so the shopper's next tap opens its sheet at once
+      preloadAllScreens()
     }
     if (typeof window.requestIdleCallback === 'function') {
       handle = window.requestIdleCallback(go, { timeout: 600 })
@@ -1226,12 +1254,9 @@ export default function App() {
       ) : null}
 
       <SheetContext.Provider value={sheetCtx}>
-      {!index ? (
-        <section className="sheet" aria-busy="true">
-          <div className="sheet-handle" />
-          <p className="subtitle py-6 text-center">{t('app.loading', lang)}</p>
-        </section>
-      ) : null}
+      {!index ? <LoadingSheet lang={lang} /> : null}
+      {/* a screen tapped before its chunk arrived (rare: they preload on idle) shows the loading sheet meanwhile */}
+      <Suspense fallback={<LoadingSheet lang={lang} />}>
 
       {index && screen === 'home' ? (
         <HomeScreen
@@ -1252,7 +1277,6 @@ export default function App() {
           ref={sheetRef}
           index={index}
           lang={lang}
-          search={searchRef.current}
           you={you}
           stepFree={state.stepFree}
           query={state.query}
@@ -1350,6 +1374,7 @@ export default function App() {
           onBack={() => patch({ screen: state.returnTo === 'scan' ? 'home' : state.returnTo })}
         />
       ) : null}
+      </Suspense>
       </SheetContext.Provider>
 
       <span className="sr-only" aria-live="polite">
