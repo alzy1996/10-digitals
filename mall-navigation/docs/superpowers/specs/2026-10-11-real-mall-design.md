@@ -51,7 +51,8 @@ Date: 2026-10-11 · Branch: `claude/mall-navigation-mapping-app-ioijj1` · Statu
   | 2 | plaster | `wall`, `wallInner`, `side:*`, `lit:*`, `bulkhead`, `ceiling` | plaster diffuse + normal, 2.5 m repeat | 0.85 / 0 |
   | 3 | wood | `floor:*` (shop floors), `wood`, `seat` | wood diffuse, 3 m repeat | 0.6 / 0 |
   | 4 | stone | `stone`, `stoneDark`, `planter`, `pillar`, `concrete*`, `slabSide` | plaster diffuse at 0.6 m repeat, desaturated | 0.5 / 0 |
-  | 5 | metal | `metal`, `escSide`, `post`, `strip` (in real) | none | 0.3 / 1 |
+  | 5 | metal | `metal`, `escSide`, `post`, `brass` | none | 0.3 / 1 |
+  | 6 | water | `water`, `waterLight` | none | 0.04 / 0.1 (mirror-like) |
 
 - **Mapping:** planar by the dominant world normal: floors use `xz`, walls use `xy` or `zy`. Texture colour × vertex
   colour × 1.1, so the category tints still show.
@@ -61,7 +62,7 @@ Date: 2026-10-11 · Branch: `claude/mall-navigation-mapping-app-ioijj1` · Statu
   - hemisphere 0.3.
 - **Glass:** storefront glass and the rails become a `MeshPhysicalMaterial` with low roughness, opacity 0.16 and
   environment reflections.
-- **Water:** the fountain water becomes clearcoat.
+- **Water:** the fountain water is surface 6, smooth and mirror-like.
 
 ### 3.3 Real-mall details (procedural, from venue data)
 
