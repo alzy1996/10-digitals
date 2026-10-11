@@ -203,7 +203,8 @@ describe('findRoute', () => {
         }
       }
     }
-  })
+    // (hundreds of routes: alone it takes about 1 s; next to 13 other test workers on an 8 GB laptop up to 7 s)
+  }, 20000)
 
   it('handles unknown nodes and a zero-length route', () => {
     expect(findRoute(index, 'n-nope', START)).toBeNull()
