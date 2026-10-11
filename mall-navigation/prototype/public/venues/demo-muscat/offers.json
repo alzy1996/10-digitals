@@ -1,0 +1,180 @@
+{
+  "version": 1,
+  "note": "Demo offers for fictional shops. Not real prices.",
+  "deals": [
+    {
+      "id": "d-sahil-autumn",
+      "occupantId": "occ-sahil-fashion",
+      "figure": {
+        "en": "30%",
+        "ar": "٣٠٪"
+      },
+      "title": {
+        "en": "Off the new autumn collection",
+        "ar": "خصم على تشكيلة الخريف الجديدة"
+      },
+      "from": "2026-10-01",
+      "to": "2026-10-31"
+    },
+    {
+      "id": "d-strideline-open",
+      "occupantId": "occ-strideline",
+      "figure": {
+        "en": "20%",
+        "ar": "٢٠٪"
+      },
+      "title": {
+        "en": "Opening offer on running shoes",
+        "ar": "عرض الافتتاح على أحذية الجري"
+      },
+      "from": "2026-10-01",
+      "to": "2026-11-15"
+    },
+    {
+      "id": "d-kaze-2for1",
+      "occupantId": "occ-kaze-ramen",
+      "figure": {
+        "en": "2 for 1",
+        "ar": "١ + ١"
+      },
+      "title": {
+        "en": "Ramen bowls, weekdays 12–4 pm",
+        "ar": "أطباق الرامن، أيام الأسبوع ١٢–٤ مساءً"
+      },
+      "from": "2026-10-05",
+      "to": "2026-11-30"
+    },
+    {
+      "id": "d-lumel-coffee",
+      "occupantId": "occ-maison-lumel",
+      "figure": {
+        "en": "OMR 1",
+        "ar": "١ ر.ع."
+      },
+      "title": {
+        "en": "Any coffee with a pastry",
+        "ar": "أي قهوة مع قطعة معجنات"
+      },
+      "from": "2026-10-01",
+      "to": "2026-12-31"
+    },
+    {
+      "id": "d-nova-pass",
+      "occupantId": "occ-nova-arcade",
+      "figure": {
+        "en": "40%",
+        "ar": "٤٠٪"
+      },
+      "title": {
+        "en": "Off kids' game passes",
+        "ar": "خصم على بطاقات ألعاب الأطفال"
+      },
+      "from": "2026-10-10",
+      "to": "2026-10-25"
+    },
+    {
+      "id": "d-rose-gifts",
+      "occupantId": "occ-rose-petal",
+      "figure": {
+        "en": "25%",
+        "ar": "٢٥٪"
+      },
+      "title": {
+        "en": "Off fragrance gift sets",
+        "ar": "خصم على أطقم العطور"
+      },
+      "from": "2026-09-20",
+      "to": "2026-10-20"
+    },
+    {
+      "id": "d-wasl-protector",
+      "occupantId": "occ-wasl-telecom",
+      "figure": {
+        "en": "FREE",
+        "ar": "مجاناً"
+      },
+      "title": {
+        "en": "Screen protector with any new phone",
+        "ar": "واقي شاشة مع أي هاتف جديد"
+      },
+      "from": "2026-10-01",
+      "to": "2026-10-31"
+    },
+    {
+      "id": "d-muttrah-iftar",
+      "occupantId": "occ-muttrah-kitchen",
+      "figure": {
+        "en": "OMR 6",
+        "ar": "٦ ر.ع."
+      },
+      "title": {
+        "en": "Iftar for two",
+        "ar": "إفطار لشخصين"
+      },
+      "from": "2027-02-08",
+      "to": "2027-03-09"
+    },
+    {
+      "id": "d-luqaimat-ramadan",
+      "occupantId": "occ-sweet-luqaimat",
+      "figure": {
+        "en": "15%",
+        "ar": "١٥٪"
+      },
+      "title": {
+        "en": "Off luqaimat boxes for Ramadan nights",
+        "ar": "خصم على علب اللقيمات لليالي رمضان"
+      },
+      "from": "2027-02-08",
+      "to": "2027-03-09"
+    },
+    {
+      "id": "d-toy-summer",
+      "occupantId": "occ-toy-souq",
+      "figure": {
+        "en": "50%",
+        "ar": "٥٠٪"
+      },
+      "title": {
+        "en": "Summer toys clearance",
+        "ar": "تصفية ألعاب الصيف"
+      },
+      "from": "2026-08-01",
+      "to": "2026-08-31"
+    }
+  ],
+  "newBrands": [
+    {
+      "occupantId": "occ-strideline",
+      "origin": {
+        "en": "From Melbourne",
+        "ar": "من ملبورن"
+      },
+      "openedOn": "2026-09-15"
+    },
+    {
+      "occupantId": "occ-maison-lumel",
+      "origin": {
+        "en": "From Paris",
+        "ar": "من باريس"
+      },
+      "openedOn": "2026-09-28"
+    },
+    {
+      "occupantId": "occ-kaze-ramen",
+      "origin": {
+        "en": "From Tokyo",
+        "ar": "من طوكيو"
+      },
+      "openedOn": "2026-10-02"
+    },
+    {
+      "occupantId": "occ-nova-arcade",
+      "origin": {
+        "en": "From Seoul",
+        "ar": "من سيول"
+      },
+      "openedOn": "2026-10-08"
+    }
+  ]
+}
