@@ -4,6 +4,7 @@ import { MORE } from '../i18n/strings-more.js'
 import { CATEGORY_COLORS } from '../engine/tokens.js'
 import { travelTimesFrom } from '../routing/route.js'
 import { dealCategories, liveDeals, newBrands, occupantEta, sortDeals } from '../offers/offers.js'
+import { formatDay } from './dates.js'
 import { venueDate } from './hours.js'
 import { MainTabs } from './MainTabs.jsx'
 import { Icon } from './icons.jsx'
@@ -11,13 +12,6 @@ import { levelButtonLabel, pick } from './model.js'
 import './offers.css'
 
 addStrings(MORE)
-
-/** "31 Oct" / «٣١ أكتوبر», with the year only when it is not this year. */
-export function formatDay(ymd, lang, thisYear) {
-  const d = new Date(`${ymd}T12:00:00Z`)
-  const opts = { day: 'numeric', month: 'short', timeZone: 'UTC', ...(ymd.slice(0, 4) !== thisYear ? { year: 'numeric' } : {}) }
-  return new Intl.DateTimeFormat(lang === 'ar' ? 'ar-OM' : 'en-GB', opts).format(d)
-}
 
 /**
  * Offers (v0.5, the second top-level screen; DESIGN-MALL.md 3.3): today's demo deals nearest first (walk time from the

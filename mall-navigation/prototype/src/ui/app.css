@@ -2843,3 +2843,44 @@ button:disabled {
     animation: none;
   }
 }
+
+/* v0.5: the mall pill is a button (opens Mall info); the hours-preview pill under the header */
+button.header {
+  width: 100%;
+  text-align: start;
+  font: inherit;
+  cursor: pointer;
+}
+button.header:disabled {
+  cursor: default;
+}
+.header-text,
+.venue-line {
+  display: flex;
+}
+.header-text {
+  flex-direction: column;
+}
+.preview-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 560px;
+  min-height: 44px;
+  margin: 8px auto 0;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #FEF3C7;
+  border: 1px solid #F59E0B;
+  color: #78350F;
+  font-size: 14px;
+  font-weight: 600;
+}
+.preview-pill-clear {
+  margin-inline-start: auto;
+  text-decoration: underline;
+}
+.app.is-wide .preview-pill {
+  width: var(--panel-w);
+  margin-inline: 0;
+}

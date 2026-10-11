@@ -23,7 +23,6 @@ import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import { engine, loadEngine } from './engineHost.js'
 import { loadVenue } from './data/venue.js'
 import { findRouteToTarget, resolveTarget, travelTimesFrom } from './routing/route.js'
-import { createSimulator } from './sim/simulator.js'
 import { dirFor, t } from './i18n/strings.js'
 import { Header } from './ui/Header.jsx'
 import { MapControls, WalkViewButton } from './ui/MapControls.jsx'
@@ -39,7 +38,6 @@ import { bayForPlate, entityInfo, isParkingLevel, levelButtonLabel, levelName, p
 import { plateLabel } from './routing/names.js'
 import { initialLang, readUrlParams, rememberLang } from './ui/urlState.js'
 import { pickQuality } from './quality.js'
-import { nextTurnFor } from './ui/hudModel.js'
 import { SheetContext } from './ui/Sheet.jsx'
 import { defaultSnap } from './ui/sheetModel.js'
 import { lazyScreen } from './ui/lazyScreen.js'
@@ -62,14 +60,25 @@ const CarScreen = lazyScreen(() => import('./ui/CarScreen.jsx'), 'CarScreen')
 const ScanSheet = lazyScreen(() => import('./ui/ScanSheet.jsx'), 'ScanSheet')
 /** v0.5 pages and sheets past the first screen */
 const OffersPage = lazyScreen(() => import('./ui/OffersPage.jsx'), 'OffersPage')
-const SCREEN_CHUNKS = { search: SearchScreen, place: PlaceScreen, navigate: NavigateScreen, arrived: ArrivedScreen, car: CarScreen, scan: ScanSheet, offers: OffersPage }
+const MallInfoScreen = lazyScreen(() => import('./ui/MallInfoScreen.jsx'), 'MallInfoScreen')
+const FacilitiesScreen = lazyScreen(() => import('./ui/FacilitiesScreen.jsx'), 'FacilitiesScreen')
+const SCREEN_CHUNKS = { search: SearchScreen, place: PlaceScreen, navigate: NavigateScreen, arrived: ArrivedScreen, car: CarScreen, scan: ScanSheet, offers: OffersPage, info: MallInfoScreen, facilities: FacilitiesScreen }
+/** The walk simulator and the next-turn model (src/navKit.js): needed on a trip only, loaded with the route screens. */
+let navKit = null
+const NAV_KIT = {
+  preload: () =>
+    import('./navKit.js').then((m) => {
+      navKit = m
+    }),
+}
 /** The chunks a first screen needs before it shows (a route screen can step back to place and forward to arrived). */
 function chunksFor(screen) {
-  if (screen === 'navigate' || screen === 'arrived') return [PlaceScreen, NavigateScreen, ArrivedScreen]
+  if (screen === 'navigate' || screen === 'arrived') return [PlaceScreen, NavigateScreen, ArrivedScreen, NAV_KIT]
+  if (screen === 'place') return [PlaceScreen, NAV_KIT]
   return SCREEN_CHUNKS[screen] ? [SCREEN_CHUNKS[screen]] : []
 }
 const preloadAllScreens = () => {
-  for (const c of Object.values(SCREEN_CHUNKS)) c.preload().catch(() => {})
+  for (const c of [...Object.values(SCREEN_CHUNKS), NAV_KIT]) c.preload().catch(() => {})
 }
 
 const VENUE_URL = `${import.meta.env.BASE_URL}venues/demo-muscat/venue.json`
@@ -79,6 +88,8 @@ const TOAST_MS = 3200
 /** How long "Route ended · Undo" stays (PLAN.md section 9: undo instead of "Are you sure?"). */
 const UNDO_MS = 5000
 const ROUTE_SCREENS = new Set(['place', 'navigate', 'arrived'])
+/** v0.5: the screens Mall info opens from (and goes back to) */
+const INFO_FROM = new Set(['home', 'welcome', 'search', 'facilities', 'offers'])
 /** Browser theme colour per theme (DESIGN-GLASS.md 2.1): storm retail / parking. */
 const THEME_COLOR = { sunlight: '#9FD4FF', basement: '#2B3A67' }
 
@@ -235,6 +246,8 @@ export default function App() {
   /** v0.5 wide layout (900 x 560 px and up): the sheets dock in a side panel, the map takes the rest (DESIGN-MALL.md) */
   const [wide, setWide] = useState(() => typeof matchMedia === 'function' && matchMedia(WIDE_QUERY).matches)
   const wideRef = useRef(wide)
+  /** bumps once the trip chunk (navKit) has loaded, for the effects that need it */
+  const [navKitTick, setNavKitTick] = useState(0)
   wideRef.current = wide
   useEffect(() => {
     if (typeof matchMedia !== 'function') return undefined
@@ -438,11 +451,16 @@ export default function App() {
       engine.setNextTurn(null)
       return
     }
-    const nt = nextTurnFor(index, shownRoute, stepIndex)
+    if (!navKit) {
+      // (the trip chunk is still on its way: come back when it is here)
+      NAV_KIT.preload().then(() => setNavKitTick((n) => n + 1), () => {})
+      return
+    }
+    const nt = navKit.nextTurnFor(index, shownRoute, stepIndex)
     const st = shownRoute.steps[stepIndex]
     const exit = riding && st?.kind === 'connector' ? shownRoute.points[st.connector?.exitIndex ?? st.to] : null
     engine.setNextTurn(nt && exit ? { ...nt, levelId: exit.levelId, x: exit.x, y: exit.y } : nt)
-  }, [index, shownRoute, screen, stepIndex, riding])
+  }, [index, shownRoute, screen, stepIndex, riding, navKitTick])
 
   // chevrons flow (and the engine renders frames) only while the simulated walk plays; idle = 0 frames otherwise
   const animating = Boolean(screen === 'navigate' && state.sim.active && state.sim.playing && !state.sim.done)
@@ -635,9 +653,11 @@ export default function App() {
 
   const ensureSim = useCallback(() => {
     if (simRef.current) return simRef.current
+    // (the trip chunk preloads with the route screens; without it there is no walk to simulate yet)
+    if (!navKit) return null
     const r = routeRef.current
     const s = stateRef.current
-    const sim = createSimulator({ route: r, speedMultiplier: s.sim.speed, index: indexRef.current })
+    const sim = navKit.createSimulator({ route: r, speedMultiplier: s.sim.speed, index: indexRef.current })
     simMeta.current = { step: s.stepIndex, level: stepLevelOf(r, s.stepIndex), lastUi: 0, doneTimer: 0, phase: null }
     sim.onChange(handleSim)
     simRef.current = sim
@@ -680,6 +700,7 @@ export default function App() {
       return
     }
     const sim = ensureSim()
+    if (!sim) return
     if (fresh) sim.seekStep(stateRef.current.stepIndex)
     if (sim.getState().done) {
       simMeta.current.step = 0
@@ -994,6 +1015,11 @@ export default function App() {
         goView('stack', s.you?.levelId ?? s.view.levelId, 'level')
         break
       }
+      case 'info':
+      case 'facilities': {
+        if (s.you) goView(s.view.mode === 'stack' ? 'stack' : 'floor', s.you.levelId, 'level')
+        break
+      }
       case 'home': {
         if (s.you && foundRef.current) {
           // "Found you": the floor you are on, the camera on you, the toast with the place and level
@@ -1025,6 +1051,7 @@ export default function App() {
         else if (pending.step != null) i = Math.min(pending.step, r.steps.length - 1)
         if (pending.simT != null) {
           const sim = ensureSim()
+          if (!sim) break
           // walk up to that time in 1 s steps, as playback would, so the engine's walked distance follows the walker;
           // "Now on Level 1" only when the deep link lands within the toast's time after stepping off
           const T = Math.max(0, pending.simT)
@@ -1175,7 +1202,7 @@ export default function App() {
   }
 
   const openPlace = (id, from = stateRef.current.screen) => {
-    patch({ targetId: id, screen: 'place', returnTo: from === 'search' || from === 'offers' ? from : 'home', stepIndex: 0, userView: false })
+    patch({ targetId: id, screen: 'place', returnTo: ['search', 'offers', 'info', 'facilities'].includes(from) ? from : 'home', stepIndex: 0, userView: false })
   }
 
   const goStep = (i) => {
@@ -1319,6 +1346,8 @@ export default function App() {
       stamps={state.stamps.length}
       questTotal={brands.length}
       onQuest={() => patch({ screen: 'offers' })}
+      // (Mall info opens from the browsing screens only: never in the middle of a trip, a car flow or an emergency)
+      onInfo={INFO_FROM.has(screen) ? () => patch({ screen: 'info', returnTo: screen }) : undefined}
     />
   )
 
@@ -1362,6 +1391,14 @@ export default function App() {
       ) : (
         <div className="top" ref={topRef} hidden={screen === 'offers'}>
           {headerEl}
+          {state.hoursPreview && index ? (
+            // v0.5: every hours line shows a special's hours (Mall info / dashboard switch): say so, one tap back to today
+            <button type="button" className="preview-pill" onClick={() => patch({ hoursPreview: null })}>
+              <Icon name="clock" size={16} />
+              <span>{t('info.previewOn', lang, { name: pick(index.venue.meta.hours?.specials?.find((x) => x.id === state.hoursPreview)?.name ?? { en: '', ar: '' }, lang) })}</span>
+              <span className="preview-pill-clear">{t('info.previewClear', lang)}</span>
+            </button>
+          ) : null}
           {index && screen !== 'search' && !state.no3d ? (
             <MapControls
               index={index}
@@ -1481,6 +1518,31 @@ export default function App() {
             </span>
           </button>
         </div>
+      ) : null}
+
+      {index && screen === 'info' ? (
+        <MallInfoScreen
+          ref={sheetRef}
+          index={index}
+          lang={lang}
+          hoursPreview={state.hoursPreview}
+          onPreview={(id) => patch({ hoursPreview: id })}
+          onOpen={(id) => openPlace(id, 'info')}
+          onBack={() => patch({ screen: INFO_FROM.has(state.returnTo) ? state.returnTo : 'home' })}
+        />
+      ) : null}
+
+      {index && screen === 'facilities' ? (
+        <FacilitiesScreen
+          ref={sheetRef}
+          index={index}
+          lang={lang}
+          you={you}
+          stepFree={state.stepFree}
+          onToggleStepFree={() => patch({ stepFree: !state.stepFree })}
+          onOpen={(id) => openPlace(id, 'facilities')}
+          onBack={() => patch({ screen: 'home' })}
+        />
       ) : null}
 
       {index && screen === 'search' ? (

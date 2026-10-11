@@ -7,17 +7,24 @@ import { pick } from './model.js'
  * PROTOTYPE · SIMULATION badge on the second line; then the demo stamp-quest pill (when the offers are loaded) and the
  * round "ع / EN" toggle, labelled in the language it switches to (PLAN.md section 8).
  */
-export function Header({ index, lang, onToggleLang, status = null, stamps = 0, questTotal = 0, onQuest }) {
+export function Header({ index, lang, onToggleLang, status = null, stamps = 0, questTotal = 0, onQuest, onInfo }) {
   const target = lang === 'ar' ? 'en' : 'ar'
   const name = index ? pick(index.venue.meta.name, lang) : t('app.name', lang)
   return (
     <header className="header-row">
-      <div className="header">
-        <div className="brand-mark" aria-hidden="true">
+      {/* v0.5: the mall pill opens Mall info (hours, Ramadan, services) */}
+      <button
+        type="button"
+        className="header"
+        onClick={onInfo}
+        disabled={!onInfo}
+        aria-label={`${name} · ${t('app.badge', lang)}${status ? ` · ${status.text}` : ''}${onInfo ? ` · ${t('info.openLabel', lang)}` : ''}`}
+      >
+        <span className="brand-mark" aria-hidden="true">
           <Icon name="pin" size={22} />
-        </div>
-        <div className="header-text">
-          <div className="venue-line">
+        </span>
+        <span className="header-text">
+          <span className="venue-line">
             <span className="venue-name" title={name}>
               {name}
             </span>
@@ -26,10 +33,10 @@ export function Header({ index, lang, onToggleLang, status = null, stamps = 0, q
                 {status.short}
               </span>
             ) : null}
-          </div>
+          </span>
           <span className="badge-sim">{t('app.badge', lang)}</span>
-        </div>
-      </div>
+        </span>
+      </button>
       {questTotal ? (
         <button type="button" className="quest-btn" onClick={onQuest} aria-label={`${t('home.questLabel', lang)} · ${t('home.questPill', lang, { n: stamps })}`}>
           <Icon name="star" size={18} />

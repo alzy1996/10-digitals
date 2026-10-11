@@ -1,0 +1,122 @@
+/* v0.5 Mall info + Facilities sheets (DESIGN-MALL.md 3.5, 3.6): a lazy chunk's stylesheet. */
+
+.info-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 6px;
+}
+.info-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: var(--glass-raised-bg);
+  border: 1px solid var(--glass-raised-rim);
+}
+.info-card-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 700;
+}
+.info-hours {
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.hours-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+  line-height: 22px;
+}
+.hours-table th {
+  text-align: start;
+  font-weight: 500;
+  color: var(--ink-2);
+  padding: 4px 0;
+}
+.hours-table td {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 0;
+}
+.hours-table tr[aria-current="date"] th,
+.hours-table tr[aria-current="date"] td {
+  color: var(--ink);
+  font-weight: 700;
+}
+.special-row {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid #E4EBF5;
+}
+.special-row:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+.special-name {
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 700;
+}
+.special-hours {
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.special-switch {
+  margin-top: 4px;
+  background: #FFFFFF;
+  border: 1px solid #E4EBF5;
+}
+.special-switch:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.emergency-info {
+  background: #FEF2F2;
+  border-color: #FCA5A5;
+  color: #7F1D1D;
+}
+.emergency-info .info-card-h {
+  color: #B42318;
+}
+.info-demo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 2px solid var(--vibrant);
+  color: #1D4ED8;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.info-demo-btn {
+  border-color: #B42318;
+  color: #B42318;
+}
+.fac-stepfree {
+  margin-bottom: 4px;
+}

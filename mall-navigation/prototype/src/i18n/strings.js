@@ -432,6 +432,9 @@ export const STRINGS = Object.freeze({
   'home.start': { en: 'Start walking', ar: 'ابدأ المشي' },
   'home.minutes': { en: '{n} min', ar: '{n} د' },
   'quest.stamp': { en: 'Stamp collected · {n}/4', ar: 'حصلت على ختم · {n}/٤' },
+  'info.previewOn': { en: 'Showing {name} hours', ar: 'تعرض الآن ساعات {name}' },
+  'info.previewClear': { en: 'Back to today', ar: 'العودة إلى اليوم' },
+  'info.openLabel': { en: 'Mall info and opening hours', ar: 'معلومات المول وساعات العمل' },
 })
 
 /** Keys added at run time by lazy chunks (addStrings). */
