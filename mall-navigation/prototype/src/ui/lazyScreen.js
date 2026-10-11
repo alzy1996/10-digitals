@@ -12,9 +12,16 @@ export function lazyScreen(load, exportName) {
   let Comp = null
   let pending = null
   const preload = () =>
-    (pending ??= load().then((m) => {
-      Comp = m[exportName]
-    }))
+    (pending ??= load().then(
+      (m) => {
+        Comp = m[exportName]
+      },
+      (e) => {
+        // a failed download (offline, a deploy in between) is tried again on the next open
+        pending = null
+        throw e
+      },
+    ))
   const Lazy = lazy(() => preload().then(() => ({ default: Comp })))
   const Screen = forwardRef(function LazyScreen(props, ref) {
     return createElement(Comp ?? Lazy, { ...props, ref })

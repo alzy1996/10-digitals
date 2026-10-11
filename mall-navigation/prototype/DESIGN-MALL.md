@@ -72,7 +72,7 @@ section 2.
     shops".
   - Pull only, ordered by walk time from the you-are-here the shopper set; never on parking levels or outside their
     dates.
-- **New global brands** (fictional): Strideline (from Melbourne), Maison Lumel (Paris), Kaze Ramen Lab (Tokyo),
+- **New global brands** (fictional): Strivano (from Melbourne), Maison Lumel (Paris), Hoshikaze Ramen Lab (Tokyo),
   Nova Arcade (Seoul). Monogram tiles, no logos.
 - **Ops bus** (`src/ops/opsBus.js`):
   - state: `{ rev, emergency: { on, message }, hoursPreview }` on `BroadcastChannel('dallni-ops')`;

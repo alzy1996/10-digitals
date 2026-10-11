@@ -40,7 +40,8 @@ export function Header({ index, lang, onToggleLang, status = null, stamps = 0, q
           <span className="badge-sim">{t('app.badge', lang)}</span>
         </span>
       </button>
-      {questTotal ? (
+      {/* (only on the browsing screens: never a way out of a trip, a car flow or an emergency) */}
+      {questTotal && onQuest ? (
         <button type="button" className="quest-btn" onClick={onQuest} aria-label={`${t('home.questLabel', lang)} · ${t('home.questPill', lang, { n: stamps })}`}>
           <Icon name="star" size={18} />
           <span>

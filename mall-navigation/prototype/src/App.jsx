@@ -31,9 +31,9 @@ import { HomeScreen } from './ui/HomeScreen.jsx'
 import { WelcomeScreen } from './ui/WelcomeScreen.jsx'
 import { Icon } from './ui/icons.jsx'
 import { firstScreen } from './ui/firstScreen.js'
-import { mallStatus } from './ui/hours.js'
+import { mallStatus, venueDate } from './ui/hours.js'
 import { homeCards } from './ui/homeModel.js'
-import { dealFor, liveDeals, loadOffers, newBrands } from './offers/offers.js'
+import { dealFor, liveDeals, loadOffers, newBrands, resolveOfferDates } from './offers/offers.js'
 import { bayForPlate, entityInfo, isParkingLevel, levelButtonLabel, levelName, pick } from './ui/model.js'
 import { plateLabel } from './routing/names.js'
 import { initialLang, readUrlParams, rememberLang } from './ui/urlState.js'
@@ -287,7 +287,8 @@ export default function App() {
         const p = readUrlParams()
         // a deep link's screen (and the route screens around it) render in the same commit as the app is ready
         const first = firstScreen(p, { kiosk: Boolean(p.kiosk) })
-        await Promise.all([...chunksFor(first.screen), ...(p.kiosk ? [KioskAttract] : [])].map((c) => c.preload()))
+        const wantsEmergency = p.emergency || p.screen === 'emergency'
+        await Promise.all([...chunksFor(first.screen), ...(p.kiosk ? [KioskAttract] : []), ...(wantsEmergency ? [EmergencyScreen] : [])].map((c) => c.preload()))
         if (cancelled) return
         indexRef.current = idx
         const kioskId = p.kiosk && idx.anchorById.has(p.kiosk) ? p.kiosk : null
@@ -356,7 +357,7 @@ export default function App() {
       preloadAllScreens()
       // v0.5 offers (deals + new brands): small, same origin; no offers file means no offer surfaces
       loadOffers()
-        .then((d) => patch({ offers: d }))
+        .then((d) => patch({ offers: resolveOfferDates(indexRef.current, d, venueDate(indexRef.current).ymd) }))
         .catch(() => patch({ offers: { deals: [], newBrands: [] } }))
     }
     if (typeof window.requestIdleCallback === 'function') {
@@ -543,6 +544,12 @@ export default function App() {
     toastTimer.current = setTimeout(() => patch({ toast: null }), ms)
   }, [patch])
   const openSearch = useCallback(() => patch({ screen: 'search', tile: null, category: null }), [patch])
+  /**
+   * v0.5 review: a lazy page or sheet opens once its chunk is here (they preload on idle, so usually at once): the
+   * screen never switches to something that cannot mount yet (no blank page, no framing without its sheet).
+   */
+  const openWhenReady = useCallback((chunk, p) => chunk.preload().then(() => patch(p), () => {}), [patch])
+  const openOffers = useCallback(() => openWhenReady(OffersPage, { screen: 'offers' }), [openWhenReady])
 
   // ------------------------------------------------------------------ v0.5 mall operations (emergency, hours preview)
   // A dashboard tab publishes on a BroadcastChannel (same browser; no backend in the prototype); this tab says hello on
@@ -556,7 +563,7 @@ export default function App() {
       // directions stop: the walk, the route, a card's pick; the Walk view rises to the map (camera effect)
       stopSimRef.current?.()
       engine.setFollow(false)
-      Object.assign(patchOps, { screen: 'emergency', targetId: null, stepIndex: 0, homePick: null })
+      Object.assign(patchOps, { screen: 'emergency', targetId: null, stepIndex: 0, homePick: null, attract: false })
     } else if (!ops.emergency.on && was && s.screen === 'emergency') patchOps.screen = 'home'
     patch(patchOps)
   }, [patch])
@@ -599,14 +606,17 @@ export default function App() {
     if (!state.kiosk || !index) return undefined
     const idle = createIdleTimer({
       ms: state.kioskIdleS * 1000,
+      // once per idle period (any input re-arms it): no reset loop while nobody is there (idle = 0 frames)
       onIdle: () => {
         const s = stateRef.current
+        // an emergency stays on screen until mall operations end it
+        if (s.ops.emergency.on) return
         stopSimRef.current?.()
         engine.setFollow(false)
         mapModeRef.current = 'stack'
-        patch({ screen: 'home', targetId: null, stepIndex: 0, query: '', tile: null, category: null, homePick: null, sheet: { key: null, snap: null }, attract: true, userView: false, you: youFromAnchor(index, s.kiosk) })
+        // the next shopper starts clean: no route, search, step-free choice, stamps or car of the last one
+        patch({ screen: 'home', targetId: null, stepIndex: 0, query: '', tile: null, category: null, homePick: null, sheet: { key: null, snap: null }, attract: true, userView: false, stepFree: false, stamps: [], car: null, you: youFromAnchor(index, s.kiosk) })
         goView('stack', index.anchorById.get(s.kiosk)?.levelId ?? s.view.levelId, 'level')
-        idle.reset()
       },
     })
     return () => idle.stop()
@@ -910,7 +920,9 @@ export default function App() {
   const sheetTopLimit = useCallback(() => {
     const header = topRef.current?.querySelector('.header-row')
     const r = header?.getBoundingClientRect()
-    if (r && r.height > 0) return Math.round(r.bottom + (wideRef.current ? 12 : 8))
+    // (the hours-preview pill under the header counts: a sheet at full or docked never slides under it)
+    const pill = topRef.current?.querySelector('.preview-pill')?.getBoundingClientRect()
+    if (r && r.height > 0) return Math.round(Math.max(r.bottom, pill && pill.height > 0 ? pill.bottom : 0) + (wideRef.current ? 12 : 8))
     return Math.round(walkLayoutRef.current?.padding?.top ?? 88)
   }, [])
   const sheetCtx = useMemo(
@@ -981,7 +993,8 @@ export default function App() {
       // (Arrived in the Walk view: the HUD's SIMULATION row on top, the Arrived sheet at the bottom)
       // (v0.5 home: the search pill's row is under the header too)
       const leadR = !fpv ? top?.querySelector('.search-pill')?.getBoundingClientRect() : null
-      const topPx = fpv ? (wl?.padding.top ?? 0) : header ? Math.max(headerBottom, vcR && vcR.height > 0 ? vcR.bottom : 0, leadR && leadR.height > 0 ? leadR.bottom : 0) + 8 : 0
+      const pillR = !fpv ? top?.querySelector('.preview-pill')?.getBoundingClientRect() : null
+      const topPx = fpv ? (wl?.padding.top ?? 0) : header ? Math.max(headerBottom, vcR && vcR.height > 0 ? vcR.bottom : 0, leadR && leadR.height > 0 ? leadR.bottom : 0, pillR && pillR.height > 0 && !wideNow ? pillR.bottom : 0) + 8 : 0
       // sheets float 12 px above the bottom edge: everything below the sheet's top is taken
       const bottomPx = sheetRect ? appH - sheetRect.top + 8 : 0
       // the level picker never runs under the sheet (nor the Walk view pill below it): compact buttons, then scrolling,
@@ -1046,6 +1059,7 @@ export default function App() {
       }
       add(pill)
       add(document.querySelector('.here-float'))
+      add(top?.querySelector('.preview-pill'))
       // (a docked sheet is a plain obstacle: kind 'sheet' would cut the map off below its top edge, the whole map here)
       if (sheetRect) rects.push({ x: appRect.left + sheetRect.left - host.left, y: appRect.top + sheetRect.top - host.top - 6, w: sheetRect.width, h: sheetRect.height + 6, ...(wideNow ? {} : { kind: 'sheet' }) })
       sendObstacles(rects)
@@ -1061,7 +1075,7 @@ export default function App() {
       ro.disconnect()
       window.removeEventListener('resize', update)
     }
-  }, [index, screen, state.carStage, state.plateId, lang, state.sim.active, state.no3d, view.mode, walkPill, wide])
+  }, [index, screen, state.carStage, state.plateId, lang, state.sim.active, state.no3d, view.mode, walkPill, wide, state.hoursPreview])
 
   /** The Walk view HUD reports its layout (free area + obstacles); the App forwards it to the engine. */
   const onWalkLayout = useCallback((layout) => {
@@ -1370,7 +1384,8 @@ export default function App() {
   const arriveAndStay = (next) => {
     const r = routeRef.current
     const s = stateRef.current
-    const youNext = r && info ? youFromRouteEnd(r, info.name) : s.you
+    // (a kiosk does not move: its you-are-here stays at its plate, as its QR code says)
+    const youNext = s.kiosk ? youFromAnchor(indexRef.current, s.kiosk) : r && info ? youFromRouteEnd(r, info.name) : s.you
     stopSim()
     patch({ you: youNext, ...next })
   }
@@ -1436,6 +1451,17 @@ export default function App() {
       </Suspense>
     ) : null
 
+  // v0.5: every hours line (and the offers) show a special's hours (Mall info / dashboard switch): say so, one tap back
+  // to today; also on the Offers page, never in an emergency
+  const previewPillEl =
+    state.hoursPreview && index && !state.ops.emergency.on ? (
+      <button type="button" className="preview-pill" onClick={() => publishOps({ hoursPreview: null })}>
+        <Icon name="clock" size={16} />
+        <span>{t('info.previewOn', lang, { name: pick(index.venue.meta.hours?.specials?.find((x) => x.id === state.hoursPreview)?.name ?? { en: '', ar: '' }, lang) })}</span>
+        <span className="preview-pill-clear">{t('info.previewClear', lang)}</span>
+      </button>
+    ) : null
+
   const headerEl = (
     <Header
       index={index}
@@ -1444,9 +1470,9 @@ export default function App() {
       status={index ? mallStatus(index, lang, new Date(), state.hoursPreview) : null}
       stamps={state.stamps.length}
       questTotal={brands.length}
-      onQuest={() => patch({ screen: 'offers' })}
+      onQuest={INFO_FROM.has(screen) && screen !== 'offers' ? openOffers : undefined}
       // (Mall info opens from the browsing screens only: never in the middle of a trip, a car flow or an emergency)
-      onInfo={INFO_FROM.has(screen) ? () => patch({ screen: 'info', returnTo: screen }) : undefined}
+      onInfo={INFO_FROM.has(screen) ? () => openWhenReady(MallInfoScreen, { screen: 'info', returnTo: screen }) : undefined}
       emergency={state.ops.emergency.on}
       kiosk={Boolean(state.kiosk)}
     />
@@ -1492,14 +1518,7 @@ export default function App() {
       ) : (
         <div className="top" ref={topRef} hidden={screen === 'offers'}>
           {headerEl}
-          {state.hoursPreview && index ? (
-            // v0.5: every hours line shows a special's hours (Mall info / dashboard switch): say so, one tap back to today
-            <button type="button" className="preview-pill" onClick={() => publishOps({ hoursPreview: null })}>
-              <Icon name="clock" size={16} />
-              <span>{t('info.previewOn', lang, { name: pick(index.venue.meta.hours?.specials?.find((x) => x.id === state.hoursPreview)?.name ?? { en: '', ar: '' }, lang) })}</span>
-              <span className="preview-pill-clear">{t('info.previewClear', lang)}</span>
-            </button>
-          ) : null}
+          {previewPillEl}
           {index && screen !== 'search' && !state.no3d ? (
             <MapControls
               index={index}
@@ -1559,7 +1578,12 @@ export default function App() {
             stepFree={state.stepFree}
             offers={state.offers}
             hoursPreview={state.hoursPreview}
-            header={headerEl}
+            header={
+              <>
+                {headerEl}
+                {previewPillEl}
+              </>
+            }
             onTab={(tab) => tab === 'map' && patch({ screen: 'home' })}
             onShow={(id) => openPlace(id, 'offers')}
           />
@@ -1598,14 +1622,14 @@ export default function App() {
           stamps={state.stamps.length}
           questTotal={brands.length}
           picked={picked}
-          onTab={(tab) => tab === 'offers' && patch({ screen: 'offers' })}
+          onTab={(tab) => tab === 'offers' && openOffers()}
           onSearch={openSearch}
           onTile={(id) => patch({ screen: 'search', tile: id, category: null, query: '' })}
           onCar={() => patch({ screen: 'car', carStage: car ? 'card' : 'scan', plateId: null })}
           onSelect={(id) => patch({ homePick: state.homePick === id ? null : id })}
           onStart={() => patch({ targetId: state.homePick, homePick: null, screen: 'navigate', stepIndex: 0, userView: false })}
-          onFacilities={() => patch({ screen: 'facilities' })}
-          onOffers={() => patch({ screen: 'offers' })}
+          onFacilities={() => openWhenReady(FacilitiesScreen, { screen: 'facilities' })}
+          onOffers={openOffers}
         />
       ) : null}
 
@@ -1766,7 +1790,7 @@ export default function App() {
       </Suspense>
       </SheetContext.Provider>
 
-      {index && state.kiosk && state.attract ? (
+      {index && state.kiosk && state.attract && !state.ops.emergency.on ? (
         <Suspense fallback={null}>
           <KioskAttract index={index} lang={lang} onStart={() => patch({ attract: false })} />
         </Suspense>

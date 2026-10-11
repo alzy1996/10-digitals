@@ -149,8 +149,9 @@ const OCCUPANTS = {
     ['books', 'stationery', 'school supplies'], ['كتب', 'قرطاسية', 'أدوات مدرسية'], 0),
   dishdasha: occ('occ-dishdasha-house', 'fashion', 'Dishdasha House', 'بيت الدشداشة', 'DISHDASHA HOUSE', 'بيت الدشداشة',
     ['dishdasha', 'kumma', 'omani dress', 'men'], ['دشداشة', 'كمة', 'زي عماني', 'رجال'], 1),
-  // v0.5: four fictional "global brands" new in the mall (offers.json newBrands); demo names, not real brands
-  sports: occ('occ-strideline', 'fashion', 'Strideline', 'سترايدلاين', 'STRIDELINE', 'سترايدلاين',
+  // v0.5: four fictional "global brands" new in the mall (offers.json newBrands); invented names, checked against real
+  // brands (the v0.5 review found "Strideline" and "Kaze Ramen" in use: renamed)
+  sports: occ('occ-strivano', 'fashion', 'Strivano', 'سترايفانو', 'STRIVANO', 'سترايفانو',
     ['sports', 'running', 'shoes', 'trainers', 'gym'], ['رياضة', 'جري', 'أحذية', 'أحذية رياضية'], 1),
   tech: occ('occ-falaj-tech', 'electronics', 'Falaj Tech', 'فلج تك', 'FALAJ TECH', 'فلج تك',
     ['phones', 'laptops', 'tv', 'headphones', 'computers'], ['هواتف', 'حواسيب', 'تلفزيون', 'سماعات'], 2),
@@ -199,7 +200,7 @@ const OCCUPANTS = {
     ['falafel', 'shawarma', 'sandwich', 'hummus'], ['فلافل', 'شاورما', 'ساندويتش', 'حمص'], 1),
   burger: occ('occ-burger-bandar', 'food', 'Burger Bandar', 'برجر البندر', 'BURGER BANDAR', 'برجر البندر',
     ['burger', 'fries', 'chicken'], ['برجر', 'بطاطس', 'دجاج'], 1),
-  noodle: occ('occ-kaze-ramen', 'food', 'Kaze Ramen Lab', 'مختبر كازي رامن', 'KAZE RAMEN', 'كازي رامن',
+  noodle: occ('occ-hoshikaze-ramen', 'food', 'Hoshikaze Ramen Lab', 'مختبر هوشيكازي رامن', 'HOSHIKAZE', 'هوشيكازي',
     ['ramen', 'noodles', 'japanese', 'asian'], ['رامن', 'نودلز', 'ياباني', 'آسيوي'], 1),
   luqaimat: occ('occ-sweet-luqaimat', 'food', 'Sweet Luqaimat', 'لقيمات حلوة', 'SWEET LUQAIMAT', 'لقيمات حلوة',
     ['luqaimat', 'dessert', 'sweets', 'ice cream'], ['لقيمات', 'حلويات', 'آيس كريم'], 1),

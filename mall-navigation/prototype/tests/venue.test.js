@@ -33,6 +33,12 @@ describe('demo venue file', () => {
     expect(byId.get('occ-majlis-cinemas').ramadan).toEqual([{ open: '20:00', close: '02:00' }])
   })
 
+  it('the four new "global brands" are invented names, not real brands (v0.5 review: Strideline and Kaze Ramen exist)', () => {
+    const names = new Set(fresh().occupants.map((o) => o.name.en))
+    for (const n of ['Strivano', 'Maison Lumel', 'Hoshikaze Ramen Lab', 'Nova Arcade']) expect(names.has(n), n).toBe(true)
+    for (const n of ['Strideline', 'Kaze Ramen Lab']) expect(names.has(n), n).toBe(false)
+  })
+
   it('the validator refuses malformed hours', () => {
     const v = fresh()
     v.meta.hours.weekly.mon = [{ open: '10', close: '22:00' }]

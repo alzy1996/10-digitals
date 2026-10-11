@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { addStrings, dirFor, t, toArabicDigits } from '../i18n/strings.js'
 import { MORE } from '../i18n/strings-more.js'
 import { loadVenue } from '../data/venue.js'
-import { loadOffers } from '../offers/offers.js'
+import { loadOffers, resolveOfferDates } from '../offers/offers.js'
 import { DEFAULT_OPS, createOpsBus } from '../ops/opsBus.js'
 import { venueDate } from '../ui/hours.js'
 import { Icon } from '../ui/icons.jsx'
@@ -43,8 +43,9 @@ export function DashboardApp() {
   useEffect(() => {
     let off = false
     Promise.all([loadVenue(VENUE_URL), loadOffers().catch(() => ({ deals: [], newBrands: [] }))])
-      .then(([index, offers]) => {
+      .then(([index, raw]) => {
         if (off) return
+        const offers = resolveOfferDates(index, raw, venueDate(index).ymd)
         setData({ index, offers, stats: buildStats(index, offers, { today: venueDate(index).ymd }) })
       })
       .catch((e) => !off && setError(String(e?.message ?? e)))

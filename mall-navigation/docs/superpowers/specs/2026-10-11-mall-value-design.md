@@ -214,9 +214,9 @@ Everything still runs on the free tier, with no backend.
   - `ramadan` hours on the grocery and the cinema;
   - four occupants renamed to fictional global brands. Their ids, categories and units stay; the old ids are not
     referenced by tests or docs:
-    - `occ-jebel-sports` → `occ-strideline` "Strideline" / «سترايدلاين» (fashion, G, from Melbourne);
+    - `occ-jebel-sports` → `occ-strivano` "Strivano" / «سترايفانو» (fashion, G, from Melbourne);
     - `occ-mango-breeze` → `occ-maison-lumel` "Maison Lumel" / «ميزون لوميل» (cafe, G, from Paris);
-    - `occ-noodle-dhow` → `occ-kaze-ramen` "Kaze Ramen Lab" / «مختبر كازي رامن» (food, L1, from Tokyo);
+    - `occ-noodle-dhow` → `occ-hoshikaze-ramen` "Hoshikaze Ramen Lab" / «مختبر هوشيهوشيكازي» (food, L1, from Tokyo);
     - `occ-pixel-souq` → `occ-nova-arcade` "Nova Arcade" / «نوفا أركيد» (electronics, L1, from Seoul).
 - **`public/venues/demo-muscat/offers.json`:**
   - `deals`: 9, each `{ id, occupantId, figure{en,ar}, title{en,ar}, from, to }`, dates around today and into Ramadan;

@@ -26,9 +26,9 @@ describe('kiosk idle timer', () => {
 
 describe('handoff URL', () => {
   it('keeps the origin and path, sets from, to, screen and lang', () => {
-    const u = new URL(handoffUrl({ href: 'http://192.168.1.5:5173/app/?kiosk=A-G-ENT-S&lang=en#x', anchorId: 'A-G-ENT-S', targetId: 'occ-kaze-ramen', lang: 'ar' }))
+    const u = new URL(handoffUrl({ href: 'http://192.168.1.5:5173/app/?kiosk=A-G-ENT-S&lang=en#x', anchorId: 'A-G-ENT-S', targetId: 'occ-hoshikaze-ramen', lang: 'ar' }))
     expect(u.origin + u.pathname).toBe('http://192.168.1.5:5173/app/')
-    expect(Object.fromEntries(u.searchParams)).toEqual({ from: 'A-G-ENT-S', to: 'occ-kaze-ramen', screen: 'place', lang: 'ar' })
+    expect(Object.fromEntries(u.searchParams)).toEqual({ from: 'A-G-ENT-S', to: 'occ-hoshikaze-ramen', screen: 'place', lang: 'ar' })
     expect(u.hash).toBe('')
   })
   it('knows a local host', () => {

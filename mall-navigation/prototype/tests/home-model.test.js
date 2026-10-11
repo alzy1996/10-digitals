@@ -6,12 +6,12 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import { indexVenue } from '../src/data/venue.js'
-import { liveDeals, newBrands } from '../src/offers/offers.js'
+import { liveDeals, newBrands, resolveOfferDates } from '../src/offers/offers.js'
 import { homeCards, maxPercent } from '../src/ui/homeModel.js'
 
 const read = (p) => JSON.parse(readFileSync(fileURLToPath(new URL(p, import.meta.url)), 'utf8'))
 const index = indexVenue(read('../public/venues/demo-muscat/venue.json'))
-const offers = read('../public/venues/demo-muscat/offers.json')
+const offers = resolveOfferDates(index, read('../public/venues/demo-muscat/offers.json'), '2026-10-11')
 const deals = liveDeals(index, offers, { date: new Date('2026-10-11T08:00:00Z') })
 const brands = newBrands(index, offers)
 

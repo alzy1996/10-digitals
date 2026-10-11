@@ -475,14 +475,14 @@ adjust the test to `toContain('٢٢')`.)
 
 - [ ] **Step 1: rename the brands in the generator.** For each, change the id, the name, the sign text and the
   keywords. Keep the unit and the category.
-  - `occ-jebel-sports` → `occ-strideline`:
-    - name { en: 'Strideline', ar: 'سترايدلاين' }, sign { en: 'STRIDELINE', ar: 'سترايدلاين' };
+  - `occ-jebel-sports` → `occ-strivano`:
+    - name { en: 'Strivano', ar: 'سترايفانو' }, sign { en: 'STRIDELINE', ar: 'سترايفانو' };
     - keywords en ['sports','running','shoes','trainers','gym'], ar ['رياضة','جري','أحذية','رياضية'].
   - `occ-mango-breeze` → `occ-maison-lumel`:
     - name { en: 'Maison Lumel', ar: 'ميزون لوميل' }, sign { en: 'MAISON LUMEL', ar: 'ميزون لوميل' };
     - keywords en ['cafe','coffee','pastry','croissant','bakery'], ar ['مقهى','قهوة','معجنات','كرواسون'].
-  - `occ-noodle-dhow` → `occ-kaze-ramen`:
-    - name { en: 'Kaze Ramen Lab', ar: 'مختبر كازي رامن' }, sign { en: 'KAZE RAMEN', ar: 'كازي رامن' };
+  - `occ-noodle-dhow` → `occ-hoshikaze-ramen`:
+    - name { en: 'Hoshikaze Ramen Lab', ar: 'مختبر هوشيهوشيكازي' }, sign { en: 'HOSHIKAZE', ar: 'هوشيكازي' };
     - keywords en ['ramen','noodles','japanese','food'], ar ['رامن','نودلز','ياباني','مطعم'].
   - `occ-pixel-souq` → `occ-nova-arcade`:
     - name { en: 'Nova Arcade', ar: 'نوفا أركيد' }, sign { en: 'NOVA ARCADE', ar: 'نوفا أركيد' };
@@ -498,8 +498,8 @@ adjust the test to `toContain('٢٢')`.)
   "note": "Demo offers for fictional shops. Not real prices.",
   "deals": [
     { "id": "d-sahil-autumn", "occupantId": "occ-sahil-fashion", "figure": { "en": "30%", "ar": "٣٠٪" }, "title": { "en": "Off the new autumn collection", "ar": "خصم على تشكيلة الخريف الجديدة" }, "from": "2026-10-01", "to": "2026-10-31" },
-    { "id": "d-strideline-open", "occupantId": "occ-strideline", "figure": { "en": "20%", "ar": "٢٠٪" }, "title": { "en": "Opening offer on running shoes", "ar": "عرض الافتتاح على أحذية الجري" }, "from": "2026-10-01", "to": "2026-11-15" },
-    { "id": "d-kaze-2for1", "occupantId": "occ-kaze-ramen", "figure": { "en": "2 for 1", "ar": "١ + ١" }, "title": { "en": "Ramen bowls, weekdays 12–4 pm", "ar": "أطباق الرامن، أيام الأسبوع ١٢–٤ مساءً" }, "from": "2026-10-05", "to": "2026-11-30" },
+    { "id": "d-strivano-open", "occupantId": "occ-strivano", "figure": { "en": "20%", "ar": "٢٠٪" }, "title": { "en": "Opening offer on running shoes", "ar": "عرض الافتتاح على أحذية الجري" }, "from": "2026-10-01", "to": "2026-11-15" },
+    { "id": "d-hoshikaze-2for1", "occupantId": "occ-hoshikaze-ramen", "figure": { "en": "2 for 1", "ar": "١ + ١" }, "title": { "en": "Ramen bowls, weekdays 12–4 pm", "ar": "أطباق الرامن، أيام الأسبوع ١٢–٤ مساءً" }, "from": "2026-10-05", "to": "2026-11-30" },
     { "id": "d-lumel-coffee", "occupantId": "occ-maison-lumel", "figure": { "en": "OMR 1", "ar": "١ ر.ع." }, "title": { "en": "Any coffee with a pastry", "ar": "أي قهوة مع قطعة معجنات" }, "from": "2026-10-01", "to": "2026-12-31" },
     { "id": "d-nova-pass", "occupantId": "occ-nova-arcade", "figure": { "en": "40%", "ar": "٤٠٪" }, "title": { "en": "Off kids' game passes", "ar": "خصم على بطاقات ألعاب الأطفال" }, "from": "2026-10-10", "to": "2026-10-25" },
     { "id": "d-rose-gifts", "occupantId": "occ-rose-petal", "figure": { "en": "25%", "ar": "٢٥٪" }, "title": { "en": "Off fragrance gift sets", "ar": "خصم على أطقم العطور" }, "from": "2026-09-20", "to": "2026-10-20" },
@@ -509,9 +509,9 @@ adjust the test to `toContain('٢٢')`.)
     { "id": "d-toy-summer", "occupantId": "occ-toy-souq", "figure": { "en": "50%", "ar": "٥٠٪" }, "title": { "en": "Summer toys clearance", "ar": "تصفية ألعاب الصيف" }, "from": "2026-08-01", "to": "2026-08-31" }
   ],
   "newBrands": [
-    { "occupantId": "occ-strideline", "origin": { "en": "From Melbourne", "ar": "من ملبورن" }, "openedOn": "2026-09-15" },
+    { "occupantId": "occ-strivano", "origin": { "en": "From Melbourne", "ar": "من ملبورن" }, "openedOn": "2026-09-15" },
     { "occupantId": "occ-maison-lumel", "origin": { "en": "From Paris", "ar": "من باريس" }, "openedOn": "2026-09-28" },
-    { "occupantId": "occ-kaze-ramen", "origin": { "en": "From Tokyo", "ar": "من طوكيو" }, "openedOn": "2026-10-02" },
+    { "occupantId": "occ-hoshikaze-ramen", "origin": { "en": "From Tokyo", "ar": "من طوكيو" }, "openedOn": "2026-10-02" },
     { "occupantId": "occ-nova-arcade", "origin": { "en": "From Seoul", "ar": "من سيول" }, "openedOn": "2026-10-08" }
   ]
 }
@@ -563,10 +563,10 @@ describe('offers', () => {
     expect(dealFor(live, 'occ-sahil-fashion').id).toBe('d-sahil-autumn')
     expect(dealFor(live, 'occ-toy-souq')).toBeNull()
     const brands = newBrands(index, data)
-    expect(brands.map((b) => b.occupant.name.en)).toEqual(['Strideline', 'Maison Lumel', 'Kaze Ramen Lab', 'Nova Arcade'])
+    expect(brands.map((b) => b.occupant.name.en)).toEqual(['Strivano', 'Maison Lumel', 'Hoshikaze Ramen Lab', 'Nova Arcade'])
     expect(brands.every((b) => b.levelId === 'G' || b.levelId === 'L1')).toBe(true)
-    expect(isNewBrand(data, 'occ-kaze-ramen')).toBe(true)
-    expect(live.find((d) => d.occupantId === 'occ-strideline').isNew).toBe(true)
+    expect(isNewBrand(data, 'occ-hoshikaze-ramen')).toBe(true)
+    expect(live.find((d) => d.occupantId === 'occ-strivano').isNew).toBe(true)
   })
 })
 ```
@@ -1627,9 +1627,9 @@ describe('kiosk idle timer', () => {
 
 describe('handoff URL', () => {
   it('keeps the origin and path, sets from, to, screen and lang', () => {
-    const u = new URL(handoffUrl({ href: 'http://192.168.1.5:5173/app/?kiosk=A-G-ENT-S&lang=en#x', anchorId: 'A-G-ENT-S', targetId: 'occ-kaze-ramen', lang: 'ar' }))
+    const u = new URL(handoffUrl({ href: 'http://192.168.1.5:5173/app/?kiosk=A-G-ENT-S&lang=en#x', anchorId: 'A-G-ENT-S', targetId: 'occ-hoshikaze-ramen', lang: 'ar' }))
     expect(u.origin + u.pathname).toBe('http://192.168.1.5:5173/app/')
-    expect(Object.fromEntries(u.searchParams)).toEqual({ from: 'A-G-ENT-S', to: 'occ-kaze-ramen', screen: 'place', lang: 'ar' })
+    expect(Object.fromEntries(u.searchParams)).toEqual({ from: 'A-G-ENT-S', to: 'occ-hoshikaze-ramen', screen: 'place', lang: 'ar' })
     expect(u.hash).toBe('')
   })
   it('knows a local host', () => {
@@ -1746,7 +1746,7 @@ export function KioskQr({ url, size = 168, label }) {
 - [ ] **Step 7: probe K (RED → GREEN).**
   - `?kiosk=A-G-ENT-S&kioskIdle=4&lang=en` at 1440×900.
   - Expect `.attract` visible; click it; open a shop through search: `__dallni.setState({ screen: 'place',
-    targetId: 'occ-kaze-ramen' })`.
+    targetId: 'occ-hoshikaze-ramen' })`.
   - Expect `svg.kiosk-qr` present and its aria-label text set.
   - Wait 5 s; expect `.attract` visible again and `getState().screen === 'home'`, `targetId === null`.
 
