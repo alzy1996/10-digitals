@@ -1652,7 +1652,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
   function applyRealEnv(T) {
     const real = matKind() === 'real'
     S.scene.environment = real ? S.envTex : null
-    S.scene.environmentIntensity = 1.0
+    S.scene.environmentIntensity = 1.2
     if (real && S.realMaps && S.mats.opaque.userData.real) setRealMaps(S.mats.opaque, S.realMaps)
     if (S.bgTex) S.bgTex.dispose()
     S.bgTex = null

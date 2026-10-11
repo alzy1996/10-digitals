@@ -71,16 +71,19 @@ The default look since v0.4. Sam picked "B · photo-real materials" from two liv
 
 | | Value |
 |---|---|
-| HDRI environment | `environmentIntensity` 1.0 |
+| HDRI environment | `environmentIntensity` 1.2 |
 | Hemisphere fill | 0.6 (1.5 until the HDRI has loaded); parking 1.25 |
 | Sun (south-east, ~55° high) | 2.2; parking 1.2; soft shadows as v0.3 (Showcase, never in stack or during a blend) |
-| Post (`post.js`) | MSAA scene pass + marker pass (depth cleared) → UnrealBloom (strength 0.3, radius 0.35, **threshold 2.0**, half resolution) → Neutral tone mapping, exposure 1.15 |
+| Post (`post.js`) | MSAA scene pass → UnrealBloom (strength 0.3, radius 0.35, **threshold 2.0**, half resolution) → Neutral tone mapping (exposure 1.0) to the screen → **markers drawn after it**, straight to the screen (depth cleared) |
 | Backdrop | a gradient from `bgTop` to `bgBottom`, drawn as the scene background (the post chain outputs an opaque image) |
 | Walk view lamps | the light panels as their own mesh, HDR (3, 2.8, 2.5), glowing |
 
 - **Bloom threshold:** 2.0 rather than the spec's 1.25. At 1.25, glossy marble and water reflecting the HDRI bloomed into
   white blobs in map views.
-- **Neutral tone mapping** leaves colours under ~0.76 untouched, so meaning colours keep their hues.
+- **Neutral tone mapping** leaves colours under ~0.76 linear untouched, so the route teal, the destination green and the
+  category accents keep their hues.
+- **Markers** are drawn after tone mapping, so the you-blue and car-amber stay exact. They reach above 0.76, and a probe
+  measured the you-marker 12–17 off when it went through Neutral. Exposure stays 1.0 for the same reason.
 - **Map views** remove roofs as before; the Walk view has its ceiling and lamps.
 - **Idle:** 0 frames; the post chain renders only when the engine renders.
 
