@@ -5,3 +5,6 @@ dist
 
 # downloaded asset sources (tools/build_real_assets.py)
 .cache/
+
+# Firebase CLI deploy cache
+.firebase/
