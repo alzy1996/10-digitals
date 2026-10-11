@@ -1,0 +1,59 @@
+/* v0.5 emergency sheet (PLAN S20, DESIGN-MALL.md 3.7): a lazy chunk's stylesheet. Red #B42318 with white text is
+   6.6:1; dark red on the pale red body text 9:1. */
+
+.emergency-sheet {
+  border: 2px solid #B42318;
+}
+.emergency-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.emergency-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #B42318;
+  color: #FFFFFF;
+}
+.emergency-title {
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 700;
+  color: #B42318;
+}
+.emergency-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+.emergency-msg {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  color: #7F1D1D;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+}
+.emergency-exit-icon {
+  background: #15803D;
+  color: #FFFFFF;
+}
+.emergency-nolifts {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #7F1D1D;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 600;
+}
+.emergency-end {
+  width: 100%;
+  color: #B42318;
+}

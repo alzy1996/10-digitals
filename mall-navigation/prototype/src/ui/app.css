@@ -2884,3 +2884,29 @@ button.header:disabled {
   width: var(--panel-w);
   margin-inline: 0;
 }
+
+/* v0.5 emergency mode: the header turns red and says so (white on #B42318: 6.6:1) */
+.header-row.is-emergency .header {
+  background: #B42318;
+  color: #FFFFFF;
+  border-color: #B42318;
+}
+.header-row.is-emergency .venue-name {
+  color: #FFFFFF;
+}
+.venue-line[hidden] {
+  display: none;
+}
+.emergency-badge {
+  align-self: flex-start;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #FFFFFF;
+  color: #B42318;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+:root[dir="rtl"] .emergency-badge {
+  letter-spacing: 0;
+}

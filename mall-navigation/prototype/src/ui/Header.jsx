@@ -7,11 +7,11 @@ import { pick } from './model.js'
  * PROTOTYPE · SIMULATION badge on the second line; then the demo stamp-quest pill (when the offers are loaded) and the
  * round "ع / EN" toggle, labelled in the language it switches to (PLAN.md section 8).
  */
-export function Header({ index, lang, onToggleLang, status = null, stamps = 0, questTotal = 0, onQuest, onInfo }) {
+export function Header({ index, lang, onToggleLang, status = null, stamps = 0, questTotal = 0, onQuest, onInfo, emergency = false }) {
   const target = lang === 'ar' ? 'en' : 'ar'
   const name = index ? pick(index.venue.meta.name, lang) : t('app.name', lang)
   return (
-    <header className="header-row">
+    <header className={`header-row${emergency ? ' is-emergency' : ''}`}>
       {/* v0.5: the mall pill opens Mall info (hours, Ramadan, services) */}
       <button
         type="button"
@@ -24,7 +24,9 @@ export function Header({ index, lang, onToggleLang, status = null, stamps = 0, q
           <Icon name="pin" size={22} />
         </span>
         <span className="header-text">
-          <span className="venue-line">
+          {/* v0.5 emergency mode: the badge takes the name's line (the SIMULATION badge stays whole below it) */}
+          {emergency ? <span className="emergency-badge">{t('emergency.badge', lang)}</span> : null}
+          <span className="venue-line" hidden={emergency}>
             <span className="venue-name" title={name}>
               {name}
             </span>

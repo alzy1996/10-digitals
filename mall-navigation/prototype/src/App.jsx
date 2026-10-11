@@ -42,6 +42,7 @@ import { SheetContext } from './ui/Sheet.jsx'
 import { defaultSnap } from './ui/sheetModel.js'
 import { lazyScreen } from './ui/lazyScreen.js'
 import { WIDE_QUERY, widePadding } from './ui/layoutModel.js'
+import { DEFAULT_OPS, createOpsBus } from './ops/opsBus.js'
 
 /** The Walk view HUD loads on demand (it is not part of the first screen: PLAN.md 19.2 load budget). */
 const loadWalkHud = () => import('./ui/WalkHud.jsx')
@@ -62,7 +63,8 @@ const ScanSheet = lazyScreen(() => import('./ui/ScanSheet.jsx'), 'ScanSheet')
 const OffersPage = lazyScreen(() => import('./ui/OffersPage.jsx'), 'OffersPage')
 const MallInfoScreen = lazyScreen(() => import('./ui/MallInfoScreen.jsx'), 'MallInfoScreen')
 const FacilitiesScreen = lazyScreen(() => import('./ui/FacilitiesScreen.jsx'), 'FacilitiesScreen')
-const SCREEN_CHUNKS = { search: SearchScreen, place: PlaceScreen, navigate: NavigateScreen, arrived: ArrivedScreen, car: CarScreen, scan: ScanSheet, offers: OffersPage, info: MallInfoScreen, facilities: FacilitiesScreen }
+const EmergencyScreen = lazyScreen(() => import('./ui/EmergencyScreen.jsx'), 'EmergencyScreen')
+const SCREEN_CHUNKS = { search: SearchScreen, place: PlaceScreen, navigate: NavigateScreen, arrived: ArrivedScreen, car: CarScreen, scan: ScanSheet, offers: OffersPage, info: MallInfoScreen, facilities: FacilitiesScreen, emergency: EmergencyScreen }
 /** The walk simulator and the next-turn model (src/navKit.js): needed on a trip only, loaded with the route screens. */
 let navKit = null
 const NAV_KIT = {
@@ -123,6 +125,8 @@ const INITIAL = {
   homePick: null,
   /** v0.5 demo stamp quest: new brands the shopper arrived at (memory only) */
   stamps: [],
+  /** v0.5 mall operations state (emergency mode, hours preview): from the ops channel (dashboard tab) or the demo */
+  ops: DEFAULT_OPS,
   /** bottom sheet snap: `snap` applies while the sheet is `key` (sheetKeyOf); otherwise the screen's default */
   sheet: { key: null, snap: null },
 }
@@ -223,6 +227,8 @@ export default function App() {
   const indexRef = useRef(null)
   const pendingRef = useRef({ step: null, simT: null, play: false })
   const simRef = useRef(null)
+  /** stopSim for callbacks defined before it (v0.5 ops: emergency stops the walk) */
+  const stopSimRef = useRef(null)
   const simMeta = useRef({ step: -1, level: null, lastUi: 0, doneTimer: 0, phase: null })
   /** "Simulate walk" from a map view: the walk starts once the dive into the Walk view is over. */
   const startTimer = useRef(0)
@@ -283,6 +289,9 @@ export default function App() {
         // v0.5: Find me ("welcome") first, unless the URL says where you are (a plate link: "Found you") or names a screen
         let scr = first.screen
         if (ROUTE_SCREENS.has(scr) && !target) scr = 'home'
+        // ?emergency=1 or ?screen=emergency: start in (demo) emergency mode, published once the app is up
+        const startEmergency = p.emergency || scr === 'emergency'
+        if (scr === 'emergency') scr = 'home'
         foundRef.current = first.found
         const carLevel = carNow ? idx.bayById.get(carNow.bayId).levelId : null
         const parkingTop = [...idx.levels].filter((l) => l.kind === 'parking').sort((a, b) => b.ordinal - a.ordinal)[0]?.id
@@ -292,7 +301,7 @@ export default function App() {
         const defaultMode = scr === 'car' || scr === 'navigate' || scr === 'arrived' ? 'floor' : 'stack'
         // the Walk view needs a route (navigate / arrived); elsewhere view=fpv opens the Floor view
         const urlView = p.view === 'fpv' && scr !== 'navigate' && scr !== 'arrived' ? 'floor' : p.view
-        pendingRef.current = { step: p.step, simT: p.simT, play: p.play, style: p.style, quality: p.quality }
+        pendingRef.current = { step: p.step, simT: p.simT, play: p.play, style: p.style, quality: p.quality, emergency: startEmergency }
         const tileNow = p.tile && ['food', 'restrooms', 'prayer', 'pharmacy', 'kids', 'exit'].includes(p.tile) ? p.tile : null
         const carStage = carNow ? 'card' : 'scan'
         dispatch({
@@ -469,7 +478,7 @@ export default function App() {
   }, [animating, state.sim.speed])
 
   // QR plate pins while a scan sheet asks the shopper to tap the plate in front of them
-  const scanPins = screen === 'scan' ? true : screen === 'car' && state.carStage !== 'card' ? ['parking_pillar'] : null
+  const scanPins = screen === 'scan' ? true : screen === 'car' && state.carStage !== 'card' ? ['parking_pillar'] : screen === 'emergency' ? ['entrance'] : null
   const scanKey = Array.isArray(scanPins) ? scanPins.join(',') : String(scanPins)
   useEffect(() => {
     if (!index) return
@@ -522,6 +531,41 @@ export default function App() {
     toastTimer.current = setTimeout(() => patch({ toast: null }), ms)
   }, [patch])
   const openSearch = useCallback(() => patch({ screen: 'search', tile: null, category: null }), [patch])
+
+  // ------------------------------------------------------------------ v0.5 mall operations (emergency, hours preview)
+  // A dashboard tab publishes on a BroadcastChannel (same browser; no backend in the prototype); this tab says hello on
+  // start and gets the current state. Mall info's switch and demo button publish too, so every tab agrees.
+  const opsRef = useRef(null)
+  const applyOps = useCallback((ops) => {
+    const s = stateRef.current
+    const was = s.ops.emergency.on
+    const patchOps = { ops, hoursPreview: ops.hoursPreview }
+    if (ops.emergency.on && !was) {
+      // directions stop: the walk, the route, a card's pick; the Walk view rises to the map (camera effect)
+      stopSimRef.current?.()
+      engine.setFollow(false)
+      Object.assign(patchOps, { screen: 'emergency', targetId: null, stepIndex: 0, homePick: null })
+    } else if (!ops.emergency.on && was && s.screen === 'emergency') patchOps.screen = 'home'
+    patch(patchOps)
+  }, [patch])
+  useEffect(() => {
+    const bus = createOpsBus({ onState: (st) => applyOps(st) })
+    opsRef.current = bus
+    bus.hello()
+    return () => bus.close()
+  }, [applyOps])
+  const publishOps = useCallback((p) => opsRef.current?.publish(p), [])
+  // ?emergency=1: the demo starts in emergency mode once the app is up
+  useEffect(() => {
+    if (state.ready && pendingRef.current.emergency) {
+      pendingRef.current.emergency = false
+      publishOps({ emergency: { on: true, message: null } })
+    }
+  }, [state.ready, publishOps])
+  // while emergency mode is on, no other screen opens (a stray tap or deep link lands back on the emergency sheet)
+  useEffect(() => {
+    if (state.ops.emergency.on && screen !== 'emergency') patch({ screen: 'emergency', targetId: null, homePick: null })
+  }, [state.ops.emergency.on, screen, patch])
   useEffect(
     () => () => {
       clearTimeout(toastTimer.current)
@@ -676,6 +720,8 @@ export default function App() {
     engine.setFollow(false)
     dispatch({ type: 'sim', patch: { active: false, playing: false, done: false, distanceDoneM: 0, phase: 'walk', connectorType: null, onConnector: false, rideProgress: 0 } })
   }, [])
+
+  stopSimRef.current = stopSim
 
   const playSim = useCallback(() => {
     const r = routeRef.current
@@ -1015,6 +1061,13 @@ export default function App() {
         goView('stack', s.you?.levelId ?? s.view.levelId, 'level')
         break
       }
+      case 'emergency': {
+        // the exits are the entrance plates (ground level): on it, its floor; elsewhere the stack shows them and you
+        const lvl = s.you?.levelId ?? s.view.levelId
+        if (lvl === 'G') goView('floor', 'G', 'level')
+        else goView('stack', lvl, 'level')
+        break
+      }
       case 'info':
       case 'facilities': {
         if (s.you) goView(s.view.mode === 'stack' ? 'stack' : 'floor', s.you.levelId, 'level')
@@ -1232,6 +1285,8 @@ export default function App() {
     const s = stateRef.current
     const idx = indexRef.current
     if (!idx || !hit) return
+    // emergency: directions are off, a tap on the map opens nothing
+    if (s.screen === 'emergency') return
     if (s.screen === 'scan' && hit.type === 'anchor') {
       patch({ you: youFromAnchor(idx, hit.id), screen: s.returnTo === 'scan' ? 'home' : s.returnTo })
       return
@@ -1348,6 +1403,7 @@ export default function App() {
       onQuest={() => patch({ screen: 'offers' })}
       // (Mall info opens from the browsing screens only: never in the middle of a trip, a car flow or an emergency)
       onInfo={INFO_FROM.has(screen) ? () => patch({ screen: 'info', returnTo: screen }) : undefined}
+      emergency={state.ops.emergency.on}
     />
   )
 
@@ -1393,7 +1449,7 @@ export default function App() {
           {headerEl}
           {state.hoursPreview && index ? (
             // v0.5: every hours line shows a special's hours (Mall info / dashboard switch): say so, one tap back to today
-            <button type="button" className="preview-pill" onClick={() => patch({ hoursPreview: null })}>
+            <button type="button" className="preview-pill" onClick={() => publishOps({ hoursPreview: null })}>
               <Icon name="clock" size={16} />
               <span>{t('info.previewOn', lang, { name: pick(index.venue.meta.hours?.specials?.find((x) => x.id === state.hoursPreview)?.name ?? { en: '', ar: '' }, lang) })}</span>
               <span className="preview-pill-clear">{t('info.previewClear', lang)}</span>
@@ -1520,13 +1576,18 @@ export default function App() {
         </div>
       ) : null}
 
+      {index && screen === 'emergency' ? (
+        <EmergencyScreen ref={sheetRef} index={index} lang={lang} you={you} message={state.ops.emergency.message} onEnd={() => publishOps({ emergency: { on: false, message: null } })} />
+      ) : null}
+
       {index && screen === 'info' ? (
         <MallInfoScreen
           ref={sheetRef}
           index={index}
           lang={lang}
           hoursPreview={state.hoursPreview}
-          onPreview={(id) => patch({ hoursPreview: id })}
+          onPreview={(id) => publishOps({ hoursPreview: id })}
+          onEmergencyDemo={() => publishOps({ emergency: { on: true, message: null } })}
           onOpen={(id) => openPlace(id, 'info')}
           onBack={() => patch({ screen: INFO_FROM.has(state.returnTo) ? state.returnTo : 'home' })}
         />

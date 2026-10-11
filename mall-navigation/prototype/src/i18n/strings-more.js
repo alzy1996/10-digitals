@@ -52,4 +52,13 @@ export const MORE = Object.freeze({
   'fac.help': { en: 'Help', ar: 'المساعدة' },
   'fac.stepFree': { en: 'Step-free times (lifts only)', ar: 'أوقات بدون درج (المصاعد فقط)' },
   'fac.from': { en: 'Walk times from {place}', ar: 'أوقات المشي من {place}' },
+  // emergency mode (PLAN S20): routing stops, exits shown, never lifts
+  'emergency.title': { en: 'Emergency', ar: 'حالة طوارئ' },
+  'emergency.default': { en: 'Follow mall staff and the green exit signs. Do not use lifts.', ar: 'اتبع موظفي المول وإشارات الخروج الخضراء. لا تستخدم المصاعد.' },
+  'emergency.exits': { en: 'Nearest exits', ar: 'أقرب المخارج' },
+  'emergency.about': { en: 'about {m}', ar: 'حوالي {m}' },
+  'emergency.otherLevel': { en: 'Ground level · use the stairs', ar: 'الطابق الأرضي · استخدم الدرج' },
+  'emergency.noLifts': { en: 'Lifts are not safe in an emergency.', ar: 'المصاعد غير آمنة في حالات الطوارئ.' },
+  'emergency.routingOff': { en: 'Directions are off until the mall ends the emergency.', ar: 'الإرشادات متوقفة حتى ينهي المول حالة الطوارئ.' },
+  'emergency.end': { en: 'Demo: end emergency', ar: 'عرض تجريبي: إنهاء الطوارئ' },
 })
