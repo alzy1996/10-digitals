@@ -198,9 +198,10 @@ function buildUnitWalls(B, poly, style, openings, onSign) {
         const g0 = add(P(s0), mul(nIn, T * 0.5))
         const g1 = add(P(s1), mul(nIn, T * 0.5))
         B.glass.vquad(g0, g1, PLINTH, doorH, 'glass', nOut, { unlit: true })
-        // mullions at both ends
+        // mullions at both ends (real: slim dark frames every 1.5 m across the glass too)
         box(s0, Math.min(s1, s0 + 0.18), PLINTH, doorH, catKey, catKey)
         box(Math.max(s0, s1 - 0.18), s1, PLINTH, doorH, catKey, catKey)
+        if (B.real) for (let m = s0 + 1.5; m < s1 - 0.4; m += 1.5) box(m, m + 0.06, PLINTH, doorH, 'strip', 'strip')
       }
       box(op.d0, op.d1, doorH, top, catKey)
       // threshold mat in the doorway
@@ -212,13 +213,16 @@ function buildUnitWalls(B, poly, style, openings, onSign) {
       const st = style.signTop
       const depth = 0.38
       const fp = [P(s0), P(s1), add(P(s1), mul(nOut, depth)), add(P(s0), mul(nOut, depth))]
-      B.opaque.prism(fp, sb, st, style.signDark, style.signDark, { ao: false })
+      // real (DESIGN-REAL.md 4): a dark neutral fascia with backlit letters and a category-colour accent line; else the
+      // category-colour sign box with a white line
+      const signKey = B.real ? 'fascia' : style.signDark
+      B.opaque.prism(fp, sb, st, signKey, signKey, { ao: false })
       // exact-colour front face (unlit look: signs read as illuminated)
       const fa = add(P(s0), mul(nOut, depth + 0.004))
       const fb = add(P(s1), mul(nOut, depth + 0.004))
-      B.opaque.vquad(fa, fb, sb, st, catKey, nOut, { unlit: true, exact: true })
-      // thin light frame line at the bottom of the sign
-      B.opaque.vquad(add(fa, mul(nOut, 0.002)), add(fb, mul(nOut, 0.002)), sb, sb + 0.06, 'hex:#FFFFFF', nOut, { unlit: true, exact: true })
+      B.opaque.vquad(fa, fb, sb, st, B.real ? 'fascia' : catKey, nOut, B.real ? { unlit: true } : { unlit: true, exact: true })
+      // thin line at the bottom of the sign: white, or the category colour on a real fascia
+      B.opaque.vquad(add(fa, mul(nOut, 0.002)), add(fb, mul(nOut, 0.002)), sb, sb + 0.06, B.real ? catKey : 'hex:#FFFFFF', nOut, { unlit: true, exact: true })
       if (signText) {
         const c = add(mul(add(P(s0), P(s1)), 0.5), mul(nOut, depth + 0.03))
         onSign({
@@ -230,6 +234,7 @@ function buildUnitWalls(B, poly, style, openings, onSign) {
           height: st - sb,
           text: signText,
           size: (st - sb) * 0.42 * (signScale ?? 1),
+          ...(B.real ? { glow: true, color: '#FFFFFF' } : {}),
         })
       }
       t = op.f1
@@ -309,11 +314,34 @@ function buildRail(B, poly, railH) {
   }
 }
 
-/** Low-poly palm in a planter. */
+/** Low-poly palm in a planter (lit flavours: a leaning 3-part trunk and two rings of fronds, 11 drooping + 7 upper). */
 function buildPalm(B, x, y, scale = 1) {
   const s = scale
   B.opaque.box(x, y, 1.3 * s, 1.3 * s, 0, 0, 0.55, 'planter', 'stoneDark')
   B.opaque.flat(orientedRect(x, y, 1.05 * s, 1.05 * s, 0), 0.56, 'trunk')
+  if (B.opaque.lit) {
+    const topH = 3.4 * s
+    for (let k = 0; k < 3; k++) B.opaque.cylinder(x + 0.05 * k * s, y, (0.17 - 0.02 * k) * s, 0.55 + ((topH - 0.55) * k) / 3, 0.55 + ((topH - 0.55) * (k + 1)) / 3 + 0.02, 8, 'trunk', 'trunk')
+    const cx = x + 0.15 * s
+    for (const [n, tip, drop, mid, raise, w, off] of [
+      [11, 2.1, -1.1, 1.1, 0.15, 0.36, 0],
+      [7, 1.4, 0.35, 0.7, 0.5, 0.3, 0.5],
+    ]) {
+      for (let k = 0; k < n; k++) {
+        const ang = ((k + off) / n) * Math.PI * 2
+        const dir = [Math.cos(ang), Math.sin(ang)]
+        const side = [-dir[1], dir[0]]
+        const key = k % 2 ? 'leaf' : 'leafDark'
+        const a = B.opaque.v(cx, y, topH + 0.15, key, 1)
+        const b = B.opaque.v(cx + (dir[0] * mid + side[0] * w) * s, y + (dir[1] * mid + side[1] * w) * s, topH + raise * s, key, 0.95)
+        const c = B.opaque.v(cx + dir[0] * tip * s, y + dir[1] * tip * s, topH + drop * s, key, 0.85)
+        const d = B.opaque.v(cx + (dir[0] * mid - side[0] * w) * s, y + (dir[1] * mid - side[1] * w) * s, topH + raise * s, key, 0.95)
+        B.opaque.triN(a, b, c, 0, 1, 0)
+        B.opaque.triN(a, c, d, 0, 1, 0)
+      }
+    }
+    return
+  }
   B.opaque.cylinder(x, y, 0.16 * s, 0.55, 3.4 * s, 8, 'trunk', 'trunk')
   const topH = 3.4 * s
   for (let k = 0; k < 7; k++) {
@@ -371,6 +399,13 @@ function buildPlate(B, anchor, mounted) {
     ]) {
       const c = at(s0, t0)
       Q.flat(orientedRect(c[0], c[1], 0.09, 0.09, ang), 0.038, 'qrDark')
+    }
+    if (B.real) {
+      // a directory totem behind the plate: dark pylon, glowing map screen facing the same way as the plate
+      const c = add([x, y], mul(f, -0.95))
+      B.opaque.box(c[0], c[1], 0.9, 0.28, ang, 0, 2.1, 'fascia', 'fascia', { ao: true })
+      const face = add(c, mul(f, 0.145))
+      B.opaque.vquad(add(face, mul(side, -0.36)), add(face, mul(side, 0.36)), 0.55, 1.95, 'screen', f, { unlit: true, exact: true })
     }
     return
   }
@@ -562,17 +597,19 @@ function distToPolygon(p, poly) {
 
 /** Geometry flavour of the scene style: v0.3 toy = bevelled top edges + normals for lit materials. */
 export const PLAIN = Object.freeze({ bevel: 0, lit: false })
+/** v0.4 real: the toy geometry + surface ids (textures), neutral fascias, columns, totems, furnished shops. */
+export const REAL = Object.freeze({ bevel: 0.06, lit: true, real: true })
 
 function newBuild(registry, level, flavour = PLAIN) {
   const build = {
     levelId: level.id,
-    opaque: new MeshBuilder(registry, { bevel: flavour.bevel, lit: flavour.lit }),
-    roofs: new MeshBuilder(registry, { lit: flavour.lit }),
+    opaque: new MeshBuilder(registry, { bevel: flavour.bevel, lit: flavour.lit, surfaces: !!flavour.real }),
+    roofs: new MeshBuilder(registry, { lit: flavour.lit, surfaces: !!flavour.real }),
     glass: new MeshBuilder(registry),
     decals: new MeshBuilder(registry),
     ghost: new MeshBuilder(registry),
     // free-standing QR floor tiles: their own mesh, hidden in the Walk view
-    plates: new MeshBuilder(registry, { bevel: flavour.bevel, lit: flavour.lit }),
+    plates: new MeshBuilder(registry, { bevel: flavour.bevel, lit: flavour.lit, surfaces: !!flavour.real }),
     // toy: meaning colours (sign faces, QR plates, zone bands) stay unlit and exact in their own mesh
     exact: new MeshBuilder(registry),
     signs: [],
@@ -586,6 +623,7 @@ function newBuild(registry, level, flavour = PLAIN) {
     bounds: polygonBounds(level.outline),
   }
   if (flavour.lit) build.opaque.exactSink = build.plates.exactSink = build.exact
+  build.real = !!flavour.real
   return build
 }
 
@@ -768,6 +806,9 @@ export function buildRetailLevel(index, level, registry, flavour = PLAIN) {
     }
   }
 
+  const edgeSegs = D.edges.map((e) => [index.nodeById.get(e.from).point, index.nodeById.get(e.to).point])
+  const clearOfEdges = (p, r) => edgeSegs.every(([a, b]) => distToSegment(p, a, b) > r)
+
   // landmarks
   for (const lm of D.landmarks) {
     if (lm.kind === 'fountain') buildFountain(build, lm.point, lm.radius ?? 3)
@@ -787,9 +828,24 @@ export function buildRetailLevel(index, level, registry, flavour = PLAIN) {
     })
   }
 
+  // real: stone-clad columns with brass rings at the atrium void corners, kept clear of walking edges
+  if (build.real) {
+    for (const v of voids) {
+      const p = ensureCCW(v)
+      for (let i = 0; i < p.length; i++) {
+        const a = p[(i - 1 + p.length) % p.length]
+        const b = p[i]
+        const c = p[(i + 1) % p.length]
+        const out = norm(add(norm(sub(b, a)), norm(sub(b, c))))
+        const q = add(b, mul(out, 0.9))
+        if (pointInPolygon(q, v) || !clearOfEdges(q, 0.8)) continue
+        build.opaque.cylinder(q[0], q[1], 0.45, 0, WALL_H + 1.3, 24, 'stone', 'stone')
+        for (const h of [0, 3.2]) build.opaque.cylinder(q[0], q[1], 0.5, h, h + 0.12, 24, 'brass', 'brass')
+      }
+    }
+  }
+
   // food court tables, kept clear of walking edges
-  const edgeSegs = D.edges.map((e) => [index.nodeById.get(e.from).point, index.nodeById.get(e.to).point])
-  const clearOfEdges = (p, r) => edgeSegs.every(([a, b]) => distToSegment(p, a, b) > r)
   for (const ar of D.areas.filter((a) => a.kind === 'seating')) {
     const bb = polygonBounds(ar.polygon)
     for (let x = bb.minX + 2.2; x <= bb.maxX - 2.0; x += 3.6) {

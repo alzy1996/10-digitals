@@ -255,3 +255,30 @@ describe('MeshBuilder surface attribute (v0.4)', () => {
     expect(new MeshBuilder(new ColorRegistry()).build('toy').getAttribute('surface')).toBeUndefined()
   })
 })
+
+describe('real flavour builders (v0.4)', () => {
+  const REALF = { bevel: 0.06, lit: true, real: true }
+  const keysOf = (b) => new Set(b.keys.map((k) => b.registry.keys[k]))
+
+  it('fascias are neutral with an exact category accent line; signs glow', () => {
+    const r = buildRetailLevel(index, L1, new ColorRegistry(), REALF)
+    expect(keysOf(r.opaque).has('fascia')).toBe(true)
+    expect([...keysOf(r.exact)].some((k) => k.startsWith('sign:'))).toBe(true)
+    expect(r.signs.length).toBeGreaterThan(0)
+    const shopSigns = r.signs.filter((s) => s.refId?.startsWith('occ-'))
+    expect(shopSigns.length).toBeGreaterThan(0)
+    expect(shopSigns.every((s) => s.glow === true)).toBe(true)
+  })
+
+  it('columns stand at the atrium void corners (the void is on Level 1), brass-ringed', () => {
+    const r = buildRetailLevel(index, L1, new ColorRegistry(), REALF)
+    expect(keysOf(r.opaque).has('brass')).toBe(true)
+  })
+
+  it('toy builds are unchanged by the real flavour code', () => {
+    const t = buildRetailLevel(index, L1, new ColorRegistry(), { bevel: 0.06, lit: true })
+    expect(keysOf(t.opaque).has('fascia')).toBe(false)
+    expect(keysOf(t.opaque).has('brass')).toBe(false)
+    expect(t.signs.some((s) => s.glow)).toBe(false)
+  })
+})
