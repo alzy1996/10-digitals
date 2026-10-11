@@ -2141,3 +2141,54 @@ button:disabled {
     display: none !important;
   }
 }
+
+/* ---------- wide layout (v0.5, DESIGN-MALL.md: 900 x 560 px and up) ----------
+   The sheet docks in a side panel at the start edge (under the header card); the map controls sit at the top of the
+   map area beside it; the map is framed in what is left (App: layoutModel.widePadding). */
+.app.is-wide {
+  --panel-w: 400px;
+}
+@media (min-width: 1280px) {
+  .app.is-wide {
+    --panel-w: 432px;
+  }
+}
+.app.is-wide .top {
+  padding: 16px;
+}
+.app.is-wide .header {
+  width: var(--panel-w);
+  max-width: none;
+  margin-inline: 0;
+}
+.app.is-wide .map-ctrls {
+  position: absolute;
+  top: 16px;
+  inset-inline-start: calc(32px + var(--panel-w));
+  inset-inline-end: 16px;
+  margin: 0;
+  max-width: none;
+}
+.app.is-wide .sheet,
+.app.is-wide .sheet.sheet-snap {
+  left: 16px;
+  right: auto;
+  bottom: 16px;
+  width: var(--panel-w);
+  max-width: none;
+  margin-inline: 0;
+  padding-top: var(--pad-sheet);
+}
+:root[dir="rtl"] .app.is-wide .sheet,
+:root[dir="rtl"] .app.is-wide .sheet.sheet-snap {
+  left: auto;
+  right: 16px;
+}
+.app.is-wide .toast {
+  inset-inline-start: calc(32px + var(--panel-w));
+  inset-inline-end: 16px;
+}
+.app.is-wide .map-fallback {
+  inset-inline-start: calc(32px + var(--panel-w));
+  inset-inline-end: 16px;
+}

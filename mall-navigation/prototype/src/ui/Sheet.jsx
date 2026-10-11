@@ -72,7 +72,11 @@ export const Sheet = forwardRef(function Sheet(
 ) {
   const ctx = useContext(SheetContext)
   const [ownSnap, setOwnSnap] = useState('half')
-  const snap = ctx?.snap ?? ownSnap
+  // v0.5 wide layout: the sheet is docked in the side panel: always full height, no handle, no dragging
+  const docked = Boolean(ctx?.docked)
+  const dockedRef = useRef(docked)
+  dockedRef.current = docked
+  const snap = docked ? 'full' : (ctx?.snap ?? ownSnap)
   const lang = ctx?.lang ?? langProp ?? 'en'
   const ctxRef = useRef(ctx)
   ctxRef.current = ctx
@@ -103,7 +107,7 @@ export const Sheet = forwardRef(function Sheet(
   const [more, setMore] = useState(false)
   const bodyId = useId()
   const stretchRef = useRef(stretch)
-  stretchRef.current = stretch
+  stretchRef.current = stretch || docked
   const afterRef = useRef(bodyAfterFooter)
   afterRef.current = bodyAfterFooter
 
@@ -397,6 +401,7 @@ export const Sheet = forwardRef(function Sheet(
   // handle and head: pointer events (touch, pen and mouse)
   const onGrabDown = useCallback(
     (e) => {
+      if (dockedRef.current) return
       if (e.pointerType === 'mouse' && e.button !== 0) return
       if (dragRef.current || !heightsRef.current) return
       const d = { id: e.pointerId, y0: e.clientY, started: false, samples: [{ t: e.timeStamp, y: e.clientY }], el: e.currentTarget }
@@ -456,6 +461,7 @@ export const Sheet = forwardRef(function Sheet(
       endDrag(b.d, cancelled)
     }
     const start = (e) => {
+      if (dockedRef.current) return
       if (bt) {
         // another finger while the first is down: ignored (the first finger keeps the gesture)
         if (find(e.touches, bt.id)) return
@@ -532,7 +538,7 @@ export const Sheet = forwardRef(function Sheet(
   }
 
   const onKeyDown = (e) => {
-    if (e.key !== 'Escape' || e.defaultPrevented) return
+    if (e.key !== 'Escape' || e.defaultPrevented || dockedRef.current) return
     // Escape in a text field that has text is the field's own (a search box clears it): the sheet stays
     const field = editableOf(e.target)
     if (field && fieldHasText(field)) return
@@ -590,7 +596,7 @@ export const Sheet = forwardRef(function Sheet(
   return (
     <section
       ref={setSecRef}
-      className={`sheet sheet-snap ${className}`}
+      className={`sheet sheet-snap${docked ? ' sheet-docked' : ''} ${className}`}
       aria-label={label}
       data-snap={canon}
       onKeyDown={onKeyDown}
@@ -598,6 +604,7 @@ export const Sheet = forwardRef(function Sheet(
       onFocus={expandOnType ? expandForTyping : undefined}
       onInput={expandOnType ? expandForTyping : undefined}
     >
+      {docked ? null : (
       <button
         ref={gripRef}
         type="button"
@@ -616,6 +623,7 @@ export const Sheet = forwardRef(function Sheet(
       >
         <span className="sheet-handle" aria-hidden="true" />
       </button>
+      )}
       {head ? (
         <div ref={headRef} className="sheet-head" onPointerDown={onGrabDown}>
           {head}
