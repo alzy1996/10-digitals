@@ -8,6 +8,7 @@
  * per theme by applyTheme(), so a theme switch never rebuilds geometry.
  */
 import { BufferAttribute, BufferGeometry, ShapeUtils, Vector2 } from 'three'
+import { surfaceOf } from './palette.js'
 
 /** @typedef {[number, number]} XY */
 
@@ -261,15 +262,17 @@ function insetPolygon(p, d) {
 export class MeshBuilder {
   /**
    * @param {import('./palette.js').ColorRegistry} registry
-   * @param {{ rise?: boolean, bevel?: number, lit?: boolean }} [opts] rise=true stores a per-vertex rise fraction (see
-   *   setRise); bevel (metres) chamfers the top edges of convex prisms (v0.3 toy); lit=true builds vertex normals for lit
-   *   materials and softens the baked shade (the real sun does most of that job)
+   * @param {{ rise?: boolean, bevel?: number, lit?: boolean, surfaces?: boolean }} [opts] rise=true stores a per-vertex
+   *   rise fraction (see setRise); bevel (metres) chamfers the top edges of convex prisms (v0.3 toy); lit=true builds
+   *   vertex normals for lit materials and softens the baked shade (the real sun does most of that job); surfaces=true
+   *   writes a per-vertex `surface` id from each colour key (v0.4 real: realMaterials.js picks textures by it)
    */
   constructor(registry, opts = {}) {
     this.registry = registry
     this.rise = !!opts.rise
     this.bevel = Math.max(0, opts.bevel ?? 0)
     this.lit = !!opts.lit
+    this.surfaces = !!opts.surfaces
     /**
      * Where faces drawn with { exact: true } go (meaning colours: sign faces, QR plates, zone bands): an unlit builder
      * in the toy style, so lit materials never shade them; null = this builder (storm / classic, unchanged).
@@ -513,6 +516,10 @@ export class MeshBuilder {
     g.userData.shades = Float32Array.from(this.shades)
     g.userData.registry = this.registry
     g.userData.lit = this.lit
+    if (this.surfaces) {
+      const reg = this.registry
+      g.setAttribute('surface', new BufferAttribute(Float32Array.from(this.keys, (k) => surfaceOf(reg.keys[k])), 1))
+    }
     if (this.rise) {
       g.userData.base = Float32Array.from(this.pos)
       g.userData.fracs = Float32Array.from(this.fracs)

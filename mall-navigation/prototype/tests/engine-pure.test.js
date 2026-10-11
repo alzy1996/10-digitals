@@ -242,3 +242,16 @@ describe('real palette + surfaces (v0.4)', () => {
     expect(effectiveStyle('storm', 'light')).toBe('storm')
   })
 })
+
+describe('MeshBuilder surface attribute (v0.4)', () => {
+  it('surfaces: true writes a per-vertex surface id from the colour key', () => {
+    const b = new MeshBuilder(new ColorRegistry(), { lit: true, surfaces: true })
+    b.flat([[0, 0], [2, 0], [2, 2], [0, 2]], 0, 'walkway')
+    b.vquad([0, 0], [2, 0], 0, 3, 'side:#C2410C', [0, -1])
+    const g = b.build('real')
+    const s = [...g.getAttribute('surface').array]
+    expect(s.slice(0, 4)).toEqual([1, 1, 1, 1])
+    expect(s.slice(4)).toEqual([2, 2, 2, 2])
+    expect(new MeshBuilder(new ColorRegistry()).build('toy').getAttribute('surface')).toBeUndefined()
+  })
+})
