@@ -7,7 +7,7 @@ import { pick } from './model.js'
  * PROTOTYPE · SIMULATION badge on the second line; then the demo stamp-quest pill (when the offers are loaded) and the
  * round "ع / EN" toggle, labelled in the language it switches to (PLAN.md section 8).
  */
-export function Header({ index, lang, onToggleLang, status = null, stamps = 0, questTotal = 0, onQuest, onInfo, emergency = false }) {
+export function Header({ index, lang, onToggleLang, status = null, stamps = 0, questTotal = 0, onQuest, onInfo, emergency = false, kiosk = false }) {
   const target = lang === 'ar' ? 'en' : 'ar'
   const name = index ? pick(index.venue.meta.name, lang) : t('app.name', lang)
   return (
@@ -30,6 +30,7 @@ export function Header({ index, lang, onToggleLang, status = null, stamps = 0, q
             <span className="venue-name" title={name}>
               {name}
             </span>
+            {kiosk ? <span className="venue-status is-kiosk">{t('kiosk.badge', lang)}</span> : null}
             {status ? (
               <span className={`venue-status ${status.ok ? 'is-open' : 'is-closed'}`} title={status.text}>
                 {status.short}

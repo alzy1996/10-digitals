@@ -15,7 +15,7 @@ import { hoursLine, levelName, pick, viaLine } from './model.js'
  */
 addStrings(MORE)
 
-export const PlaceScreen = forwardRef(function PlaceScreen({ index, lang, info, route, you, stepFree, hoursPreview = null, deal = null, isNew = false, onToggleStepFree, onGo, onBack }, ref) {
+export const PlaceScreen = forwardRef(function PlaceScreen({ index, lang, info, route, you, stepFree, hoursPreview = null, deal = null, isNew = false, handoff = null, onToggleStepFree, onGo, onBack }, ref) {
   if (!info) return null
   // Ramadan / Eid aware; the Mall info switch previews a special's hours (v0.5)
   const hours = info.hours ? hoursLine(index, info, lang, new Date(), hoursPreview) : null
@@ -104,6 +104,8 @@ export const PlaceScreen = forwardRef(function PlaceScreen({ index, lang, info, 
         <span className="flex-1">{t('place.stepFreeToggle', lang)}</span>
         <span className="switch" aria-hidden="true" />
       </button>
+      {/* v0.5 kiosk: Continue on your phone */}
+      {handoff}
     </Sheet>
   )
 })

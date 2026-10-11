@@ -61,4 +61,11 @@ export const MORE = Object.freeze({
   'emergency.noLifts': { en: 'Lifts are not safe in an emergency.', ar: 'المصاعد غير آمنة في حالات الطوارئ.' },
   'emergency.routingOff': { en: 'Directions are off until the mall ends the emergency.', ar: 'الإرشادات متوقفة حتى ينهي المول حالة الطوارئ.' },
   'emergency.end': { en: 'Demo: end emergency', ar: 'عرض تجريبي: إنهاء الطوارئ' },
+  // kiosk mode (PLAN S21): attract screen, Continue on your phone
+  'kiosk.continue': { en: 'Continue on your phone', ar: 'تابع على هاتفك' },
+  'kiosk.scan': { en: 'Scan with your camera. The route opens in your browser.', ar: 'امسح الرمز بالكاميرا. يفتح المسار في متصفحك.' },
+  'kiosk.qrLabel': { en: 'QR code: this route on your phone', ar: 'رمز الاستجابة السريعة: هذا المسار على هاتفك' },
+  'kiosk.localhost': { en: 'Open the kiosk with the Network URL so phones can follow this code.', ar: 'افتح الكشك عبر عنوان الشبكة حتى تفتح الهواتف هذا الرمز.' },
+  'kiosk.touch': { en: 'Touch to find any shop', ar: 'المس للبحث عن أي متجر' },
+  'kiosk.welcome': { en: 'Welcome to {mall}', ar: 'أهلاً بك في {mall}' },
 })

@@ -435,6 +435,8 @@ export const STRINGS = Object.freeze({
   'info.previewOn': { en: 'Showing {name} hours', ar: 'تعرض الآن ساعات {name}' },
   'info.previewClear': { en: 'Back to today', ar: 'العودة إلى اليوم' },
   'info.openLabel': { en: 'Mall info and opening hours', ar: 'معلومات المول وساعات العمل' },
+  'kiosk.badge': { en: 'Kiosk', ar: 'كشك' },
+  'kiosk.youAreHere': { en: 'You are here: {place}', ar: 'أنت هنا: {place}' },
 })
 
 /** Keys added at run time by lazy chunks (addStrings). */

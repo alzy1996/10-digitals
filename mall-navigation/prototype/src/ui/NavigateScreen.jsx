@@ -21,7 +21,7 @@ const WALK_MPS = 1.2
  * the tag sits on the divider line and the status line folds into the play button's label.
  */
 export const NavigateScreen = forwardRef(function NavigateScreen(
-  { lang, route, stepIndex, sim, onNext, onPrev, onEnd, onPlay, onPause, onSpeed },
+  { lang, route, stepIndex, sim, onNext, onPrev, onEnd, onPlay, onPause, onSpeed, handoff = null },
   ref,
 ) {
   const steps = route?.steps ?? []
@@ -188,6 +188,8 @@ export const NavigateScreen = forwardRef(function NavigateScreen(
     <Sheet ref={ref} label={t('nav.stepCard', lang)} className="nav-sheet" head={head} footer={footer} bodyAfterFooter>
       {tripInfo}
       {simBlock}
+      {/* v0.5 kiosk: Continue on your phone */}
+      {handoff}
     </Sheet>
   )
 })

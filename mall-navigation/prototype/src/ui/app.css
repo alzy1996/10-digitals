@@ -2910,3 +2910,7 @@ button.header:disabled {
 :root[dir="rtl"] .emergency-badge {
   letter-spacing: 0;
 }
+.venue-status.is-kiosk {
+  background: #E0E7FF;
+  color: #3730A3;
+}

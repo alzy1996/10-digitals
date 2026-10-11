@@ -43,6 +43,8 @@ import { defaultSnap } from './ui/sheetModel.js'
 import { lazyScreen } from './ui/lazyScreen.js'
 import { WIDE_QUERY, widePadding } from './ui/layoutModel.js'
 import { DEFAULT_OPS, createOpsBus } from './ops/opsBus.js'
+import { createIdleTimer } from './kiosk/idle.js'
+import { handoffUrl, isLocalHost } from './kiosk/handoff.js'
 
 /** The Walk view HUD loads on demand (it is not part of the first screen: PLAN.md 19.2 load budget). */
 const loadWalkHud = () => import('./ui/WalkHud.jsx')
@@ -64,6 +66,9 @@ const OffersPage = lazyScreen(() => import('./ui/OffersPage.jsx'), 'OffersPage')
 const MallInfoScreen = lazyScreen(() => import('./ui/MallInfoScreen.jsx'), 'MallInfoScreen')
 const FacilitiesScreen = lazyScreen(() => import('./ui/FacilitiesScreen.jsx'), 'FacilitiesScreen')
 const EmergencyScreen = lazyScreen(() => import('./ui/EmergencyScreen.jsx'), 'EmergencyScreen')
+/** v0.5 kiosk (PLAN S21): the attract screen and the Continue-on-your-phone QR (with the QR library) */
+const KioskAttract = lazyScreen(() => import('./kiosk/KioskQr.jsx'), 'KioskAttract')
+const KioskHandoff = lazyScreen(() => import('./kiosk/KioskQr.jsx'), 'KioskHandoff')
 const SCREEN_CHUNKS = { search: SearchScreen, place: PlaceScreen, navigate: NavigateScreen, arrived: ArrivedScreen, car: CarScreen, scan: ScanSheet, offers: OffersPage, info: MallInfoScreen, facilities: FacilitiesScreen, emergency: EmergencyScreen }
 /** The walk simulator and the next-turn model (src/navKit.js): needed on a trip only, loaded with the route screens. */
 let navKit = null
@@ -127,6 +132,9 @@ const INITIAL = {
   stamps: [],
   /** v0.5 mall operations state (emergency mode, hours preview): from the ops channel (dashboard tab) or the demo */
   ops: DEFAULT_OPS,
+  /** v0.5 kiosk mode: the kiosk's plate (fixed you-are-here), or null; the attract screen shows while true */
+  kiosk: null,
+  attract: false,
   /** bottom sheet snap: `snap` applies while the sheet is `key` (sheetKeyOf); otherwise the screen's default */
   sheet: { key: null, snap: null },
 }
@@ -279,10 +287,11 @@ export default function App() {
         const p = readUrlParams()
         // a deep link's screen (and the route screens around it) render in the same commit as the app is ready
         const first = firstScreen(p, { kiosk: Boolean(p.kiosk) })
-        await Promise.all(chunksFor(first.screen).map((c) => c.preload()))
+        await Promise.all([...chunksFor(first.screen), ...(p.kiosk ? [KioskAttract] : [])].map((c) => c.preload()))
         if (cancelled) return
         indexRef.current = idx
-        const startId = p.from && idx.anchorById.has(p.from) ? p.from : idx.venue.meta.defaultStartAnchorId
+        const kioskId = p.kiosk && idx.anchorById.has(p.kiosk) ? p.kiosk : null
+        const startId = kioskId ?? (p.from && idx.anchorById.has(p.from) ? p.from : idx.venue.meta.defaultStartAnchorId)
         const youNow = youFromAnchor(idx, startId)
         const carNow = p.car && idx.bayById.has(p.car) ? { bayId: p.car, savedAt: Date.now(), plateId: null } : null
         const target = p.to ? resolveTarget(idx, p.to) : null
@@ -309,6 +318,9 @@ export default function App() {
           patch: {
             ready: true,
             screen: scr,
+            kiosk: kioskId,
+            attract: Boolean(kioskId),
+            kioskIdleS: p.kioskIdle && p.kioskIdle > 0 ? p.kioskIdle : 60,
             returnTo: 'home',
             you: youNow,
             car: carNow,
@@ -580,6 +592,26 @@ export default function App() {
     setViewState({ mode, levelId })
     engine.setView({ mode, levelId, fit }, opts)
   }, [setViewState])
+
+  // v0.5 kiosk: after kioskIdleS without input everything resets (walk, route, search, sheet) to home at the kiosk's
+  // plate, and the attract screen comes back
+  useEffect(() => {
+    if (!state.kiosk || !index) return undefined
+    const idle = createIdleTimer({
+      ms: state.kioskIdleS * 1000,
+      onIdle: () => {
+        const s = stateRef.current
+        stopSimRef.current?.()
+        engine.setFollow(false)
+        mapModeRef.current = 'stack'
+        patch({ screen: 'home', targetId: null, stepIndex: 0, query: '', tile: null, category: null, homePick: null, sheet: { key: null, snap: null }, attract: true, userView: false, you: youFromAnchor(index, s.kiosk) })
+        goView('stack', index.anchorById.get(s.kiosk)?.levelId ?? s.view.levelId, 'level')
+        idle.reset()
+      },
+    })
+    return () => idle.stop()
+  }, [state.kiosk, state.kioskIdleS, index, patch, goView])
+
 
   /**
    * Arrival framing: face the shop's sign so both lines read (or look into the car's bay from the aisle). The engine
@@ -1392,6 +1424,18 @@ export default function App() {
   const walking = Boolean(index && route && view.mode === 'fpv' && (screen === 'navigate' || screen === 'arrived'))
   const carBay = index && car ? index.bayById.get(car.bayId) : null
 
+  // v0.5 kiosk: the route continues on a phone (QR of this app's URL from the kiosk's plate to the place)
+  const handoffEl =
+    state.kiosk && state.targetId ? (
+      <Suspense fallback={null}>
+        <KioskHandoff
+          url={handoffUrl({ href: location.href, anchorId: state.kiosk, targetId: state.targetId, lang })}
+          lang={lang}
+          local={isLocalHost(location.hostname)}
+        />
+      </Suspense>
+    ) : null
+
   const headerEl = (
     <Header
       index={index}
@@ -1404,6 +1448,7 @@ export default function App() {
       // (Mall info opens from the browsing screens only: never in the middle of a trip, a car flow or an emergency)
       onInfo={INFO_FROM.has(screen) ? () => patch({ screen: 'info', returnTo: screen }) : undefined}
       emergency={state.ops.emergency.on}
+      kiosk={Boolean(state.kiosk)}
     />
   )
 
@@ -1549,6 +1594,7 @@ export default function App() {
           you={you}
           car={car}
           cards={cards}
+          kiosk={Boolean(state.kiosk)}
           stamps={state.stamps.length}
           questTotal={brands.length}
           picked={picked}
@@ -1567,7 +1613,7 @@ export default function App() {
           aside; the bar says where you are) */}
       {index && screen === 'home' && you && !state.toast && !state.homePick ? (
         <div className="here-float-wrap">
-          <button type="button" className="here-float" onClick={() => patch({ screen: 'scan', returnTo: 'home' })} aria-label={`${t('home.youAreHere', lang, { place: pick(you.label, lang) })} · ${t('home.change', lang)}`}>
+          <button type="button" className="here-float" disabled={Boolean(state.kiosk)} onClick={() => patch({ screen: 'scan', returnTo: 'home' })} aria-label={`${t('home.youAreHere', lang, { place: pick(you.label, lang) })} · ${t('home.change', lang)}`}>
             <span className="here-float-dot" aria-hidden="true" />
             <span className="here-float-text">
               {pick(you.label, lang)} · <bdi dir="ltr">{levelButtonLabel(index, you.levelId, lang)}</bdi>
@@ -1641,6 +1687,7 @@ export default function App() {
           hoursPreview={state.hoursPreview}
           deal={dealFor(deals, state.targetId)}
           isNew={brands.some((b) => b.occupantId === state.targetId)}
+          handoff={handoffEl}
           onToggleStepFree={() => patch({ stepFree: !state.stepFree })}
           onGo={() => patch({ screen: 'navigate', stepIndex: 0, userView: false })}
           onBack={() => patch({ screen: state.returnTo, targetId: state.returnTo === 'search' ? state.targetId : null })}
@@ -1660,6 +1707,7 @@ export default function App() {
           onPlay={playSim}
           onPause={pauseSim}
           onSpeed={setSpeed}
+          handoff={handoffEl}
         />
       ) : null}
 
@@ -1717,6 +1765,12 @@ export default function App() {
       ) : null}
       </Suspense>
       </SheetContext.Provider>
+
+      {index && state.kiosk && state.attract ? (
+        <Suspense fallback={null}>
+          <KioskAttract index={index} lang={lang} onStart={() => patch({ attract: false })} />
+        </Suspense>
+      ) : null}
 
       <span className="sr-only" aria-live="polite">
         {index && you ? t('home.youAreHere', lang, { place: pick(you.label, lang) }) : ''}
