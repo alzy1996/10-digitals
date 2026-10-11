@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import { indexVenue } from '../src/data/venue.js'
 import { buildRetailLevel, buildParkingLevel } from '../src/engine/levels.js'
-import { ColorRegistry, THEMES, paletteName, resolveKeyHex } from '../src/engine/palette.js'
+import { ColorRegistry, SURFACE, THEMES, paletteName, resolveKeyHex, surfaceOf } from '../src/engine/palette.js'
 import { arrivalStand, freeRun } from '../src/engine/interior.js'
 import { MeshBuilder } from '../src/engine/geometry.js'
 
@@ -204,5 +204,41 @@ describe('quality rules (review #3, #9)', () => {
     expect(n).toBe(8)
     expect(nextSlowFrames(n, 16)).toBe(0)
     expect(nextSlowFrames(3, 45)).toBe(0)
+  })
+})
+
+describe('real palette + surfaces (v0.4)', () => {
+  it('real tables have every classic key, and every table has the new keys', () => {
+    for (const k of Object.keys(THEMES.sunlight)) {
+      expect(THEMES.real[k], 'real.' + k).toMatch(/^#[0-9A-F]{6}$/i)
+      expect(THEMES.realBasement[k], 'realBasement.' + k).toMatch(/^#[0-9A-F]{6}$/i)
+    }
+    for (const t of Object.keys(THEMES)) for (const k of ['brass', 'fascia', 'garment', 'screen']) expect(THEMES[t][k], t + '.' + k).toMatch(/^#/)
+  })
+
+  it('paletteName maps real', () => {
+    expect(paletteName('real', 'sunlight')).toBe('real')
+    expect(paletteName('real', 'basement')).toBe('realBasement')
+  })
+
+  it('surfaces come from colour keys', () => {
+    expect(surfaceOf('walkway')).toBe(SURFACE.marble)
+    expect(surfaceOf('slab')).toBe(SURFACE.marble)
+    expect(surfaceOf('side:#C2410C')).toBe(SURFACE.plaster)
+    expect(surfaceOf('lit:#C2410C')).toBe(SURFACE.plaster)
+    expect(surfaceOf('floor:#C2410C')).toBe(SURFACE.wood)
+    expect(surfaceOf('stone')).toBe(SURFACE.stone)
+    expect(surfaceOf('metal')).toBe(SURFACE.metal)
+    expect(surfaceOf('brass')).toBe(SURFACE.metal)
+    expect(surfaceOf('water')).toBe(SURFACE.water)
+    expect(surfaceOf('sign:#C2410C')).toBe(SURFACE.plain)
+    expect(surfaceOf('hex:#FFFFFF')).toBe(SURFACE.plain)
+  })
+
+  it('real on a light phone is the toy look', async () => {
+    const { effectiveStyle } = await import('../src/engine/quality-rules.js')
+    expect(effectiveStyle('real', 'light')).toBe('toy')
+    expect(effectiveStyle('real', 'showcase')).toBe('real')
+    expect(effectiveStyle('storm', 'light')).toBe('storm')
   })
 })

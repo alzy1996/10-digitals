@@ -108,6 +108,11 @@ const STORM = {
   // walls taupe-brown; amber stays a light source only: the skylight glow, the panels' warm rim, the SIMULATION tag)
   sheen: '#8FA3B3',
   fog: '#2A3138',
+  // v0.4 real-mall keys (fascias, column rings, props): present in every table
+  brass: '#C9A15A',
+  fascia: '#2B2826',
+  garment: '#8C7B6B',
+  screen: '#1E4E6A',
   ...sky('#121A1F', '#1D262C', '#2B2D2F', '#0A0F12', '#FF9F55', '#FFD2A0', '#2A3238', '#6B737A', '#B47F5F', 0.55),
 }
 
@@ -206,6 +211,11 @@ const SUNLIGHT = {
   bulkhead: '#CDD5DF',
   sheen: '#FFFFFF',
   fog: '#E3E9F0',
+  // v0.4 real-mall keys (fascias, column rings, props): present in every table
+  brass: '#C9A15A',
+  fascia: '#2B2826',
+  garment: '#8C7B6B',
+  screen: '#1E4E6A',
 }
 
 /**
@@ -323,6 +333,44 @@ const TOY_BASEMENT = {
   fog: '#3A4566',
 }
 
+/**
+ * v0.4 "real" retail palette (DESIGN-REAL.md 2): near-white bases so the CC0 photo textures (marble floors, plaster
+ * walls, wood shop floors) show their own colour; category tints stay light on shop walls and floors; meaning colours
+ * (route, markers, labels) are the toy ones.
+ */
+const REAL = {
+  ...TOY,
+  bgTop: '#D9D4CC',
+  bgBottom: '#EFEAE2',
+  slab: '#FFFFFF',
+  walkway: '#FFFFFF',
+  court: '#F4EFE8',
+  seating: '#F4EFE8',
+  paving: '#EDE6DC',
+  lobby: '#FFFFFF',
+  slabSide: '#E6DFD4',
+  slabEdge: '#CFC5B6',
+  roof: '#EDE9E3',
+  roofService: '#E3DED6',
+  wall: '#F3EFE9',
+  wallInner: '#FFFFFF',
+  strip: '#3A3632',
+  metal: '#B9C0C8',
+  glass: '#E8F3F5',
+  stone: '#F1ECE4',
+  stoneDark: '#DDD4C6',
+  planter: '#E8E1D6',
+  wood: '#FFFFFF',
+  seat: '#C9B59A',
+  ceiling: '#F7F6F3',
+  ceilingPanel: '#FFF1DA',
+  bulkhead: '#F3EFE9',
+  fog: '#E9E4DC',
+}
+
+/** v0.4 real parking levels: the toy dusk (no textures on asphalt; zone paint exact). */
+const REAL_BASEMENT = { ...TOY_BASEMENT }
+
 /** Theme tokens. Keys are referenced by name from the scene builders. */
 export const THEMES = Object.freeze({
   sunlight: Object.freeze(SUNLIGHT),
@@ -410,6 +458,10 @@ export const THEMES = Object.freeze({
     bulkhead: '#2A3342',
     sheen: '#6B7686',
     fog: '#0B0F14',
+    brass: '#C9A15A',
+    fascia: '#2B2826',
+    garment: '#8C7B6B',
+    screen: '#1E4E6A',
   }),
   // v0.2 "storm glass" style (DESIGN-GLASS.md 5.3, retail levels)
   storm: Object.freeze(STORM),
@@ -453,18 +505,22 @@ export const THEMES = Object.freeze({
   // v0.3 "toy" style (DESIGN-TOY.md 2): retail and parking levels
   toy: Object.freeze(TOY),
   toyBasement: Object.freeze(TOY_BASEMENT),
+  // v0.4 "real" style (DESIGN-REAL.md 2)
+  real: Object.freeze(REAL),
+  realBasement: Object.freeze(REAL_BASEMENT),
 })
 
-/** @typedef {'sunlight'|'basement'|'storm'|'stormBasement'|'toy'|'toyBasement'} ThemeName  a palette: classic (v0.1), storm (v0.2) or toy (v0.3) */
+/** @typedef {'sunlight'|'basement'|'storm'|'stormBasement'|'toy'|'toyBasement'|'real'|'realBasement'} ThemeName  a palette: classic (v0.1), storm (v0.2), toy (v0.3) or real (v0.4) */
 
 /**
  * Palette for a scene style and a theme: classic = the v0.1 tables, storm = the v0.2 "storm glass" tables, toy = the
- * v0.3 "toy world" tables.
- * @param {'toy'|'storm'|'classic'} style
+ * v0.3 "toy world" tables, real = the v0.4 "real mall" tables.
+ * @param {'real'|'toy'|'storm'|'classic'} style
  * @param {'sunlight'|'basement'} theme
  * @returns {ThemeName}
  */
 export function paletteName(style, theme) {
+  if (style === 'real') return theme === 'basement' ? 'realBasement' : 'real'
   if (style === 'toy') return theme === 'basement' ? 'toyBasement' : 'toy'
   if (style !== 'storm') return theme === 'basement' ? 'basement' : 'sunlight'
   return theme === 'basement' ? 'stormBasement' : 'storm'
@@ -493,6 +549,51 @@ const TINTS = {
   stormBasement: [['#2A3342', 0.45], ['#1B212B', 0.25], ['#333B44', 0.3], 0.35],
   toy: [['#FFFFFF', 0.45], ['#FFFFFF', 0.2], ['#FFFFFF', 0.28], 0.22],
   toyBasement: [['#6A76A0', 0.5], ['#4A5578', 0.3], ['#C9D3F0', 0.35], 0.28],
+  real: [['#FFFFFF', 0.3], ['#FFFFFF', 0.12], ['#FFFFFF', 0.16], 0.22],
+  realBasement: [['#6A76A0', 0.5], ['#4A5578', 0.3], ['#C9D3F0', 0.35], 0.28],
+}
+
+/** Material surface of a colour key (v0.4 real style: src/engine/realMaterials.js picks textures by it). */
+export const SURFACE = Object.freeze({ plain: 0, marble: 1, plaster: 2, wood: 3, stone: 4, metal: 5, water: 6 })
+const SURFACE_BY_KEY = {
+  slab: 1,
+  walkway: 1,
+  court: 1,
+  lobby: 1,
+  paving: 1,
+  seating: 1,
+  wall: 2,
+  wallInner: 2,
+  bulkhead: 2,
+  ceiling: 2,
+  roof: 2,
+  roofService: 2,
+  wood: 3,
+  seat: 3,
+  stone: 4,
+  stoneDark: 4,
+  planter: 4,
+  pillar: 4,
+  concrete: 4,
+  concreteTop: 4,
+  slabSide: 4,
+  metal: 5,
+  escSide: 5,
+  post: 5,
+  brass: 5,
+  water: 6,
+  waterLight: 6,
+}
+const SURFACE_BY_KIND = { side: 2, lit: 2, roof: 2, floor: 3 }
+
+/**
+ * @param {string} key a colour key
+ * @returns {number} a SURFACE id
+ */
+export function surfaceOf(key) {
+  if (key in SURFACE_BY_KEY) return SURFACE_BY_KEY[key]
+  const i = key.indexOf(':')
+  return i > 0 ? (SURFACE_BY_KIND[key.slice(0, i)] ?? 0) : 0
 }
 
 /**

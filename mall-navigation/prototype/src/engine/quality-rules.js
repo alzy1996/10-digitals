@@ -12,6 +12,13 @@
 export const shadowsFor = (mode, style, quality, blend = 0) =>
   style === 'toy' && quality === 'showcase' && mode !== 'stack' && !(blend > 0.001 && blend < 0.999)
 
+/**
+ * The look actually drawn: v0.4 real falls back to the v0.3 toy look at Light quality (no textures, no post-processing).
+ * @param {'real'|'toy'|'storm'|'classic'} style
+ * @param {'showcase'|'light'} quality
+ */
+export const effectiveStyle = (style, quality) => (style === 'real' && quality === 'light' ? 'toy' : style)
+
 /** Consecutive slow frames (each over SLOW_FRAME_MS apart) that drop Showcase to Light for the session. */
 export const SLOW_FRAMES = 8
 export const SLOW_FRAME_MS = 45
