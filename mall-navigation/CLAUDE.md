@@ -15,7 +15,9 @@ Indoor mall navigation and find-my-car product by **10 Digital** (Sam Ubi, Musca
   - `prototype/DESIGN-MALL.md`: v0.5 screens (Find me, bento home, Offers, Mall info, emergency, kiosk, dashboard), tokens, rules, wide layout.
   - `prototype/DESIGN-TOY.md`: the v0.3 toy-world palette, light rig, shadows, quality levels and UI tokens (the Light look).
   - `docs/superpowers/specs/` and `docs/superpowers/plans/`: the v0.3 design spec and its implementation plan.
-- Live demo (Claude artifact): https://claude.ai/artifact/11qH3qSbt8ac3qdzLfUm64.
+- Live demo (Firebase Hosting, project DALLNI `dallni-743cc`, Sam's account): https://dallni-743cc.web.app (v0.5;
+  publish: `npm run build && npx firebase deploy --only hosting` in `prototype/`). Older artifact demo:
+  https://claude.ai/artifact/11qH3qSbt8ac3qdzLfUm64.
 
 ## Commands (run in `prototype/`)
 ```

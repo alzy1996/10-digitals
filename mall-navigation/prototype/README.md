@@ -230,6 +230,10 @@ bevels (CONTRACT.md 3c).
 
 ## Put it online with Firebase Hosting (free Spark plan is enough)
 
+**Already set up (2026-10-11):** Firebase project **DALLNI** (`dallni-743cc`, Sam's Google account); `firebase.json` and
+`.firebaserc` are in this folder. Live: **https://dallni-743cc.web.app** (dashboard: `/?screen=dashboard`).
+To publish a change: `npm run build` then `npx firebase deploy --only hosting`. The steps below are for a new project.
+
 Do this once:
 
 1. Go to <https://console.firebase.google.com>, sign in with your Google account and click **Add project**
