@@ -6,8 +6,20 @@ import './index.css'
 import './ui/app.css'
 import App from './App.jsx'
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+const root = createRoot(document.getElementById('root'))
+// v0.5: ?screen=dashboard is the mall dashboard, its own lazy entry (no 3D, no shopper app)
+if (new URLSearchParams(location.search).get('screen') === 'dashboard') {
+  import('./dashboard/DashboardApp.jsx').then(({ DashboardApp }) =>
+    root.render(
+      <StrictMode>
+        <DashboardApp />
+      </StrictMode>,
+    ),
+  )
+} else {
+  root.render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+}
