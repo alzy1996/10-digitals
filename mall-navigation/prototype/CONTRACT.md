@@ -511,12 +511,14 @@ Materials, light, assets and fascias: [`DESIGN-REAL.md`](./DESIGN-REAL.md). Ever
   - A failure keeps the plain look and logs one warning.
 - **Builders:**
   - `buildInterior` returns `{ solid, glow, lamps, ceilH }`; the light panels moved to `lamps`.
-  - `REAL` flavour = `{ bevel: 0.06, lit: true, real: true }`; a level build gains `build.real`.
-- **`getStats()`** gains `post` (boolean) and `realAssets` (`'none' | 'loading' | 'ready' | 'failed'`).
+  - `REAL` flavour = `{ bevel: 0.06, lit: true, real: true }`; a level build gains `build.real`, `build.props` (its
+    own mesh, hidden at Light), `build.totems` (`{ id, kind, x, y, poly }`) and `build.columns` (`[x, y]`).
+- **`getStats()`** gains `post` (boolean), `realAssets` (`'none' | 'loading' | 'ready' | 'failed'`) and `envBuilds`
+  (HDRI reflection builds; +1 after a context restore).
 - **engineHost default:** `getSceneStyle: () => 'real'`.
 - **URL hooks:** `style=real|toy|storm|classic`.
 - **Budgets:**
-  - `scene3d` <= 60 KB (unchanged, about 57.8 used);
+  - `scene3d` <= 60 KB (unchanged, about 58.4 used);
   - `engine3d` <= 220 KB (about 186 used, with the composer and HDR loader);
   - lazy total <= 260 KB;
   - real assets <= 3072 KB raw (about 1511 used).

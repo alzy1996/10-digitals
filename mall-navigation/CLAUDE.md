@@ -20,7 +20,7 @@ Indoor mall navigation and find-my-car product by **10 Digital** (Sam Ubi, Musca
 ```
 npm install
 npm run dev               # LAN URL works on a phone on the same Wi-Fi
-npm test                  # vitest, 317 tests
+npm test                  # vitest, 322 tests
 npm run validate:venue    # venue data checks
 npm run build             # vite build + load-budget check (fails if over budget)
 npm run gen:venue         # regenerate public/venues/demo-muscat/venue.json
@@ -28,7 +28,7 @@ npm run shots -- <url>    # headless screenshots; locally: npm i --no-save playw
 ```
 - **Budgets are tight:**
   - first screen: 109.5 of 110 KiB;
-  - `scene3d`: about 57.8 of 60 KiB (raised from 52 in v0.3, reported to Sam);
+  - `scene3d`: about 58.4 of 60 KiB (raised from 52 in v0.3, reported to Sam);
   - real assets: about 1511 of 3072 KiB (v0.4).
 - Trim code before adding features. Never raise a budget without telling Sam.
 

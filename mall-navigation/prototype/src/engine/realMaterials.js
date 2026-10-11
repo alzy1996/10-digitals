@@ -29,6 +29,10 @@ export function createRealMaterial() {
     uPlasterN: { value: null },
     uWood: { value: null },
     uHasMaps: { value: 0 },
+    // optional maps: a missing one is skipped (three would bind a black placeholder: dark, wrong normals)
+    uHasMarbleN: { value: 0 },
+    uHasMarbleR: { value: 0 },
+    uHasPlasterN: { value: 0 },
   }
   mat.userData.real = uniforms
   mat.customProgramCacheKey = () => 'dallni-real'
@@ -43,7 +47,7 @@ export function createRealMaterial() {
       )
     sh.fragmentShader =
       `uniform sampler2D uMarble, uMarbleN, uMarbleR, uPlaster, uPlasterN, uWood;
-uniform float uHasMaps;
+uniform float uHasMaps, uHasMarbleN, uHasMarbleR, uHasPlasterN;
 varying float vSurf;
 varying vec3 vWPr;
 varying vec3 vWNr;
@@ -67,13 +71,13 @@ vec3 realSample(int s) {
         .replace('#include <map_fragment>', '#include <map_fragment>\nint rs = int(vSurf + 0.5);\ndiffuseColor.rgb *= realSample(rs);')
         .replace(
           '#include <roughnessmap_fragment>',
-          'float roughnessFactor = SP[rs].x;\nif (rs == 1 && uHasMaps > 0.5) roughnessFactor = mix(0.15, 0.6, texture2D(uMarbleR, realUv(4.0)).g);'
+          'float roughnessFactor = SP[rs].x;\nif (rs == 1 && uHasMaps * uHasMarbleR > 0.5) roughnessFactor = mix(0.15, 0.6, texture2D(uMarbleR, realUv(4.0)).g);'
         )
         .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = SP[rs].y;')
         .replace(
           '#include <normal_fragment_maps>',
           `#include <normal_fragment_maps>
-if (uHasMaps > 0.5 && (rs == 1 || rs == 2)) {
+if (uHasMaps > 0.5 && ((rs == 1 && uHasMarbleN > 0.5) || (rs == 2 && uHasPlasterN > 0.5))) {
   vec3 tn = (rs == 1 ? texture2D(uMarbleN, realUv(4.0)).xyz : texture2D(uPlasterN, realUv(2.5)).xyz) * 2.0 - 1.0;
   vec3 wn = normalize(vWNr);
   vec3 tg = normalize(abs(wn.y) > 0.7 ? vec3(1.0, 0.0, 0.0) : cross(vec3(0.0, 1.0, 0.0), wn));
@@ -101,6 +105,9 @@ export function setRealMaps(mat, maps) {
   u.uPlasterN.value = maps.plasterN
   u.uWood.value = maps.wood
   u.uHasMaps.value = maps.marble && maps.plaster && maps.wood ? 1 : 0
+  u.uHasMarbleN.value = maps.marbleN ? 1 : 0
+  u.uHasMarbleR.value = maps.marbleR ? 1 : 0
+  u.uHasPlasterN.value = maps.plasterN ? 1 : 0
 }
 
 /**

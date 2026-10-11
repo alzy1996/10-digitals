@@ -47,24 +47,33 @@ The default look since v0.4. Sam picked "B · photo-real materials" from two liv
   - They load after the venue, same-origin only, and are cached by the browser.
   - Until they arrive, `real` draws plain vertex colours.
   - A missing file logs one warning; if every file is missing, the plain look stays.
+  - Each normal and roughness map has its own flag: a missing one is skipped, never sampled as a black placeholder.
+  - After a WebGL context loss and restore, the HDRI reflections are rebuilt (`getStats().envBuilds` counts them).
 - **Light quality** fetches none of them.
 
 ## 4. Real-mall details (procedural, from the venue data)
 
 - **Storefronts:** glass around each door opening, with slim dark mullions every 1.5 m.
 - **Fascias:**
-  - a dark neutral box above the storefront, with backlit white letters (troika, HDR 2.2, glowing);
+  - a dark neutral box above the storefront, with backlit white letters (troika; a shader uniform lifts them to 2.2×,
+    so they glow in the bloom; a pixel probe checks it);
   - a 6 cm exact category-colour accent line at its foot;
   - plain text only, no brand colours or logos without a licence.
-- **Furnished shops** (`props.js`), on a 1.6 m grid inside each unit, ≥ 0.9 m from walls and ≥ 1.5 m from doors:
+- **Furnished shops** (`props.js`), on a 1.6 m grid inside each unit, ≥ 0.9 m from walls and ≥ 1.5 m from doors;
+  only the front of the shop (within 6 m of a door, nearest first), at most 12 props per shop. They are their own mesh
+  per level: hidden at Light quality and never in the shadow pass.
   - fashion, beauty, kids: mannequins and clothes racks;
   - food, cafe: tables with stools;
   - electronics, entertainment: display tables with glowing screens;
   - grocery, health: shelf units with products;
   - home: sofas;
   - others: a counter.
-- **Atrium columns:** stone, with brass rings at 0 and 3.2 m, at the void corners, kept clear of walking edges.
-- **Directory totems:** a dark pylon with a glowing screen behind each free-standing QR plate.
+- **Atrium columns:** stone, with brass rings at 0 and 3.2 m: one at each of the void's four corners (the vertex nearest
+  each bounding-box corner), 0.9 m out, kept clear of walking edges and at least 4 m apart.
+- **Directory totems:** a dark pylon with a screen, beside corridor, directory and entrance QR plates only. Tried 1.2 m
+  to either side, then 1.2 m in front; placed only where the whole footprint is outside every shop and 0.7 m clear of
+  walking edges. No room: no totem.
+- **Glass** (storefronts, rails) never casts sun shadows; the shadow map ignores transparency.
 - **Palms** (toy and real): a leaning trunk and two rings of fronds.
 
 ## 5. Light, post-processing, cameras

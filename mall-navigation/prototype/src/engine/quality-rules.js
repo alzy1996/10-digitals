@@ -13,6 +13,13 @@ export const shadowsFor = (mode, style, quality, blend = 0) =>
   style === 'toy' && quality === 'showcase' && mode !== 'stack' && !(blend > 0.001 && blend < 0.999)
 
 /**
+ * Which meshes cast the sun's shadows: opaque lit materials (toy Lambert, real Standard); never transparent ones (glass
+ * would throw solid bands: the shadow map ignores transparency) or unlit ones.
+ * @param {{ isMeshLambertMaterial?: boolean, isMeshStandardMaterial?: boolean, transparent?: boolean }} m
+ */
+export const castsShadow = (m) => Boolean(m.isMeshLambertMaterial || (m.isMeshStandardMaterial && !m.transparent))
+
+/**
  * The look actually drawn: v0.4 real falls back to the v0.3 toy look at Light quality (no textures, no post-processing).
  * @param {'real'|'toy'|'storm'|'classic'} style
  * @param {'showcase'|'light'} quality

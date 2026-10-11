@@ -5,6 +5,10 @@
  */
 import { distToSegment, pointInPolygon, polygonBounds, polygonCentroid } from './geometry.js'
 
+/** Props per shop at most, and only this deep from its doors: the part seen through the glass (phones: geometry). */
+export const MAX_PROPS = 12
+const PROP_DEPTH_M = 6
+
 /**
  * Grid spots inside a unit polygon, at least 0.9 m from its walls and 1.5 m from its doors.
  * @param {[number, number][]} poly
@@ -35,15 +39,20 @@ const SKIN = 'hex:#EDE7DF'
  * Furnish one shop: mannequins and clothes racks (fashion, beauty, kids), café tables and chairs (food, cafe), display
  * tables with glowing devices (electronics, entertainment), shelf units with products (grocery, health), sofas (home),
  * else one counter.
- * @param {{ opaque: import('./geometry.js').MeshBuilder, exact: import('./geometry.js').MeshBuilder }} B level build
+ * @param {{ props: import('./geometry.js').MeshBuilder, exact: import('./geometry.js').MeshBuilder }} B level build
  * @param {[number, number][]} poly CCW unit polygon
  * @param {{ a: [number, number], b: [number, number] }[]} openings
  * @param {string} category occupant category
  */
 export function furnishUnit(B, poly, openings, category) {
+  // the front of the shop (within PROP_DEPTH_M of a door), nearest first, at most MAX_PROPS
+  const doorD = (p) => (openings.length ? Math.min(...openings.map((o) => distToSegment(p, o.a, o.b))) : 0)
   const spots = propSpots(poly, openings)
+    .filter((p) => doorD(p) <= PROP_DEPTH_M)
+    .sort((a, b) => doorD(a) - doorD(b))
+    .slice(0, MAX_PROPS)
   if (!spots.length) return
-  const O = B.opaque
+  const O = B.props
   spots.forEach(([x, y], i) => {
     switch (category) {
       case 'fashion':

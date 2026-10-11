@@ -36,11 +36,12 @@ describe('shop props placement', () => {
     expect(propSpots([[0, 0], [1.5, 0], [1.5, 1.5], [0, 1.5]], [])).toEqual([])
   })
 
-  it('a real build furnishes the demo shops (more geometry than toy, garments and screens present)', () => {
+  it('a real build furnishes the demo shops in their own props mesh', () => {
     const index = indexVenue(JSON.parse(readFileSync(fileURLToPath(new URL('../public/venues/demo-muscat/venue.json', import.meta.url)), 'utf8')))
     const L1 = index.levelById.get('L1')
     const toy = buildRetailLevel(index, L1, new ColorRegistry(), { bevel: 0.06, lit: true })
     const real = buildRetailLevel(index, L1, new ColorRegistry(), { bevel: 0.06, lit: true, real: true })
-    expect(real.opaque.vertexCount).toBeGreaterThan(toy.opaque.vertexCount * 1.2)
+    expect(real.props.vertexCount).toBeGreaterThan(toy.opaque.vertexCount * 0.2)
+    expect(toy.props.vertexCount).toBe(0)
   })
 })

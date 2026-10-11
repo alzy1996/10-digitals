@@ -401,13 +401,7 @@ function buildPlate(B, anchor, mounted) {
       const c = at(s0, t0)
       Q.flat(orientedRect(c[0], c[1], 0.09, 0.09, ang), 0.038, 'qrDark')
     }
-    if (B.real) {
-      // a directory totem behind the plate: dark pylon, glowing map screen facing the same way as the plate
-      const c = add([x, y], mul(f, -0.95))
-      B.opaque.box(c[0], c[1], 0.9, 0.28, ang, 0, 2.1, 'fascia', 'fascia', { ao: true })
-      const face = add(c, mul(f, 0.145))
-      B.opaque.vquad(add(face, mul(side, -0.36)), add(face, mul(side, 0.36)), 0.55, 1.95, 'screen', f, { unlit: true, exact: true })
-    }
+    if (B.real && TOTEM_KINDS.has(anchor.kind)) buildTotem(B, anchor, [x, y], f, side, ang)
     return
   }
   const side = [f[1], -f[0]]
@@ -421,6 +415,27 @@ function buildPlate(B, anchor, mounted) {
   B.opaque.vquad(add(f2, mul(side, -0.16)), add(f2, mul(side, 0.16)), 1.28, 1.6, 'qrDark', f, { unlit: true, exact: true })
   const f3 = add(face, mul(f, 0.004))
   B.opaque.vquad(add(f3, mul(side, -0.1)), add(f3, mul(side, 0.1)), 1.34, 1.54, 'qr', f, { unlit: true, exact: true })
+}
+
+const TOTEM_KINDS = new Set(['corridor', 'directory', 'entrance'])
+
+/**
+ * Real: a directory totem (dark pylon, map screen facing the way the plate faces) beside a free-standing QR plate. Tried
+ * at 1.2 m to either side of the plate, then 1.2 m in front of it; a spot is taken only when the whole footprint is
+ * outside every unit and its centre keeps 0.7 m from the walking edges. No spot: no totem.
+ */
+function buildTotem(B, anchor, p, f, side, ang) {
+  for (const off of [mul(side, 1.2), mul(side, -1.2), mul(f, 1.2)]) {
+    const c = add(p, off)
+    const poly = orientedRect(c[0], c[1], 0.9, 0.28, ang)
+    if (poly.some((q) => (B.unitPolys ?? []).some((u) => pointInPolygon(q, u)))) continue
+    if ((B.edgeSegs ?? []).some(([a, b]) => distToSegment(c, a, b) < 0.7)) continue
+    B.opaque.prism(poly, 0, 2.1, 'fascia', 'fascia', { ao: true })
+    const face = add(c, mul(f, 0.145))
+    B.opaque.vquad(add(face, mul(side, -0.36)), add(face, mul(side, 0.36)), 0.55, 1.95, 'screen', f, { unlit: true, exact: true })
+    B.totems.push({ id: anchor.id, kind: anchor.kind, x: c[0], y: c[1], poly })
+    return
+  }
 }
 
 /** Lift shaft on one level: glass box, metal frame, door, sign. */
@@ -613,6 +628,11 @@ function newBuild(registry, level, flavour = PLAIN) {
     plates: new MeshBuilder(registry, { bevel: flavour.bevel, lit: flavour.lit, surfaces: !!flavour.real }),
     // toy: meaning colours (sign faces, QR plates, zone bands) stay unlit and exact in their own mesh
     exact: new MeshBuilder(registry),
+    // real: furnished shop interiors, their own mesh (hidden at Light quality; no bevels: small parts)
+    props: new MeshBuilder(registry, { lit: flavour.lit, surfaces: !!flavour.real }),
+    /** real: directory totems placed ({ id, kind, x, y, poly }) and atrium columns ([x, y]) */
+    totems: [],
+    columns: [],
     signs: [],
     floorTexts: [],
     bayTexts: [],
@@ -623,7 +643,7 @@ function newBuild(registry, level, flavour = PLAIN) {
     pickPolygons: [],
     bounds: polygonBounds(level.outline),
   }
-  if (flavour.lit) build.opaque.exactSink = build.plates.exactSink = build.exact
+  if (flavour.lit) build.opaque.exactSink = build.plates.exactSink = build.props.exactSink = build.exact
   build.real = !!flavour.real
   return build
 }
@@ -831,17 +851,23 @@ export function buildRetailLevel(index, level, registry, flavour = PLAIN) {
     })
   }
 
-  // real: stone-clad columns with brass rings at the atrium void corners, kept clear of walking edges
+  // real: stone-clad columns with brass rings at the atrium void's four corners (the vertex nearest each corner of its
+  // bounding box: the middle of a rounded corner), kept clear of walking edges and 4 m apart
   if (build.real) {
     for (const v of voids) {
       const p = ensureCCW(v)
-      for (let i = 0; i < p.length; i++) {
+      const bb = polygonBounds(p)
+      for (const corner of [[bb.minX, bb.minY], [bb.maxX, bb.minY], [bb.maxX, bb.maxY], [bb.minX, bb.maxY]]) {
+        let i = 0
+        for (let k = 1; k < p.length; k++) if (len(sub(p[k], corner)) < len(sub(p[i], corner))) i = k
         const a = p[(i - 1 + p.length) % p.length]
         const b = p[i]
         const c = p[(i + 1) % p.length]
         const out = norm(add(norm(sub(b, a)), norm(sub(b, c))))
         const q = add(b, mul(out, 0.9))
         if (pointInPolygon(q, v) || !clearOfEdges(q, 0.8)) continue
+        if (build.columns.some((k) => Math.hypot(k[0] - q[0], k[1] - q[1]) < 4)) continue
+        build.columns.push(q)
         build.opaque.cylinder(q[0], q[1], 0.45, 0, WALL_H + 1.3, 24, 'stone', 'stone')
         for (const h of [0, 3.2]) build.opaque.cylinder(q[0], q[1], 0.5, h, h + 0.12, 24, 'brass', 'brass')
       }
@@ -934,6 +960,8 @@ export function buildRetailLevel(index, level, registry, flavour = PLAIN) {
   }
 
   buildConnectorsOnLevel(build, index, level, D, WALL_H)
+  build.unitPolys = D.units.map((u) => u.polygon)
+  build.edgeSegs = edgeSegs
   buildAnchors(build, level, D, [])
   buildGhost(build, level, D.units)
   build.levelBadge = levelBadge(index, level)

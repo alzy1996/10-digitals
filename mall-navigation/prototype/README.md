@@ -355,7 +355,7 @@ What the shots cover (`.shots/app-<name>.png`):
     chunk fetched when a route opens.
   - The 3D part downloads once the first screen is up:
     - three.js + troika: about 177 KiB, budget 220 KiB;
-    - our own 3D code: about 57.8 KiB, budget 60 KiB since v0.3 (toy light, shadows and bevels).
+    - our own 3D code: about 58.4 KiB, budget 60 KiB since v0.3 (toy light, shadows and bevels).
   - v0.4 adds about 1.5 MB of CC0 textures, loaded only at Showcase quality (raw budget 3 MB). Offline caching (service worker) and the low-end-phone fallbacks from
   PLAN.md 19.2 are not in this spike.
 - While a scan sheet is open, every QR plate shows as a tappable pin on the map (Floor view of your level, or

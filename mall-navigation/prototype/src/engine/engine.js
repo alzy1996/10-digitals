@@ -29,7 +29,7 @@ import { applyPose, boxCenter, easeStandard, fitDistance, lerpPose, readPose } f
 import { SkyLayer } from './sky.js'
 import { TargetRing } from './ring.js'
 import { arrivalStand, buildInterior, levelVoids } from './interior.js'
-import { SLOW_FRAMES, effectiveStyle, nextSlowFrames, shadowsFor } from './quality-rules.js'
+import { SLOW_FRAMES, castsShadow, effectiveStyle, nextSlowFrames, shadowsFor } from './quality-rules.js'
 import { createRealMaterial, loadRealAssets, setRealMaps } from './realMaterials.js'
 import { createPost } from './post.js'
 
@@ -112,6 +112,8 @@ export function createEngine() {
     realAssets: 'none',
     realMaps: null,
     envTex: null,
+    /** how many times the HDRI reflections were built (getStats; a restored context rebuilds them) */
+    envBuilds: 0,
     /** real style at Showcase: the post-processing chain (post.js) */
     post: null,
     /** 3D quality (DESIGN-TOY.md 4): 'showcase' = soft sun shadows, pixel ratio up to 2; 'light' = none, up to 1.5 */
@@ -1625,6 +1627,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     L.faded = faded
     if (L.opaque) L.opaque.material = faded ? S.mats.fadeOpaque : S.mats.opaque
     if (L.plates) L.plates.material = L.opaque?.material ?? S.mats.opaque
+    if (L.props) L.props.material = L.opaque?.material ?? S.mats.opaque
     if (L.exact) L.exact.material = faded ? S.mats.fadeOpaque : S.mats.exact
     if (L.roofs) L.roofs.material = faded ? S.mats.fadeOpaque : S.mats.roofs
     if (L.glass) L.glass.material = faded ? S.mats.fadeGlass : S.mats.glass
@@ -1640,12 +1643,22 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     return S.route.route.points[Math.max(0, step.from ?? 0)]?.levelId ?? null
   }
 
-  /** Real: the shop fascia letters glow (HDR white, caught by the bloom); everywhere else plain sign text. */
+  /**
+   * Real: the shop fascia letters glow (HDR x2.2, caught by the bloom); everywhere else plain sign text. Done in the
+   * shader: troika packs each text's colour clamped to 0..1, so a material colour above 1 does nothing.
+   */
   function applySignGlow(L) {
     if (!L.signs) return
-    const glow = matKind() === 'real' && L.build.signs.some((s) => s.glow)
-    L.signs.material.color.setScalar(glow ? 2.2 : 1)
-    L.signs.material.toneMapped = !glow
+    const m = L.signs.material
+    if (!m.userData.glow) {
+      const u = (m.userData.glow = { value: 1 })
+      m.onBeforeCompile = (sh) => {
+        sh.uniforms.uSignGlow = u
+        sh.fragmentShader = 'uniform float uSignGlow;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', 'outgoingLight *= uSignGlow;\n#include <opaque_fragment>')
+      }
+      m.customProgramCacheKey = () => 'dallni-sign-glow'
+    }
+    m.userData.glow.value = matKind() === 'real' && L.build.signs.some((s) => s.glow) ? 2.2 : 1
   }
 
   /** Real: HDRI reflections, the textures, and a painted sky backdrop (the post chain draws an opaque image). */
@@ -1675,6 +1688,21 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     }
   }
 
+  /**
+   * Real: the HDRI reflections (PMREM). Built when the assets arrive and again after a restored WebGL context (the
+   * PMREM render target comes back empty; the HDRI's pixels stay in memory).
+   */
+  function buildRealEnv() {
+    const env = S.realMaps?.env
+    if (!env || !S.renderer) return
+    S.envTex?.dispose()
+    const pm = new PMREMGenerator(S.renderer)
+    S.envTex = pm.fromEquirectangular(env).texture
+    pm.dispose()
+    env.dispose()
+    S.envBuilds++
+  }
+
   /** Real: fetch the CC0 textures and the HDRI once, from our own origin (DESIGN-REAL.md 3). */
   function ensureRealAssets() {
     if (S.realAssets !== 'none' || !S.renderer || typeof document === 'undefined') return
@@ -1686,12 +1714,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
         return
       }
       S.realMaps = a
-      if (a.env && S.renderer) {
-        const pm = new PMREMGenerator(S.renderer)
-        S.envTex = pm.fromEquirectangular(a.env).texture
-        pm.dispose()
-        a.env.dispose()
-      }
+      buildRealEnv()
       S.realAssets = 'ready'
       applyThemeAll()
       requestRender()
@@ -1755,7 +1778,10 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
       S.sun.intensity = S.theme === 'basement' ? TOY_LIGHT.sunBasement : TOY_LIGHT.sun
     }
     applyRealEnv(T)
-    for (const L of S.levels.values()) applySignGlow(L)
+    for (const L of S.levels.values()) {
+      applySignGlow(L)
+      if (L.props) L.props.visible = kind === 'real'
+    }
     S.overlay.setColors({ text: T.labelText, halo: T.labelHalo, badgeText: T.badgeText, badgeHalo: T.badgeHalo, badgeW: T.badgeW })
     if (S.renderer) S.renderer.domElement.style.background = `linear-gradient(180deg, ${T.bgTop} 0%, ${T.bgBottom} 100%)`
   }
@@ -1819,7 +1845,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     mesh.name = name
     mesh.renderOrder = renderOrder
     // lit (toy) meshes cast and take the sun's soft shadows (fitSun decides when the sun casts)
-    mesh.castShadow = mesh.receiveShadow = Boolean(material.isMeshLambertMaterial || material.isMeshStandardMaterial)
+    mesh.castShadow = mesh.receiveShadow = castsShadow(material)
     parent.add(mesh)
     return mesh
   }
@@ -1841,6 +1867,9 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     L.glass = addThemedMesh(build.glass, S.mats.glass, content, 'glass-' + level.id, 2)
     L.plates = addThemedMesh(build.plates, S.mats.opaque, content, 'plates-' + level.id)
     L.exact = addThemedMesh(build.exact, S.mats.exact, content, 'exact-' + level.id)
+    // real: furnished shops, their own mesh: hidden at Light quality, never in the shadow pass (applyThemeAll)
+    L.props = addThemedMesh(build.props, S.mats.opaque, content, 'props-' + level.id)
+    if (L.props) L.props.castShadow = false
     L.ghostMesh = addThemedMesh(build.ghost, S.mats.ghost, ghostGroup, 'ghost-' + level.id, 1)
     if (build.bays.length) {
       L.bays = buildBaysMesh(build.bays, pal())
@@ -2303,6 +2332,10 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
         el.addEventListener('webglcontextrestored', () => {
           S.sky.invalidate()
           S.shadowSig = ''
+          if (S.realMaps) {
+            buildRealEnv()
+            applyThemeAll()
+          }
           requestRender()
         })
         // the chevron flow pauses on a hidden page and resumes when it shows again
@@ -2962,6 +2995,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
         // real style: the post chain is on, and the CC0 assets' state (DESIGN-REAL.md)
         post: Boolean(S.post),
         realAssets: S.realAssets,
+        envBuilds: S.envBuilds,
       }
     },
 

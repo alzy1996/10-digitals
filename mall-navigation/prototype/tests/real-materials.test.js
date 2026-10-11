@@ -39,4 +39,17 @@ describe('real material (v0.4)', () => {
     const r = await loadRealAssets('http://127.0.0.1:9/nope/', { timeoutMs: 1500 })
     expect(r).toBeNull()
   })
+
+  it('a missing normal or roughness map is skipped (no black placeholder texture sampled)', () => {
+    const m = createRealMaterial()
+    setRealMaps(m, { marble: {}, marbleN: null, marbleR: null, plaster: {}, plasterN: {}, wood: {} })
+    const u = m.userData.real
+    expect(u.uHasMaps.value).toBe(1)
+    expect(u.uHasMarbleN.value).toBe(0)
+    expect(u.uHasMarbleR.value).toBe(0)
+    expect(u.uHasPlasterN.value).toBe(1)
+    const sh = { uniforms: {}, vertexShader: ShaderLib.standard.vertexShader, fragmentShader: ShaderLib.standard.fragmentShader }
+    m.onBeforeCompile(sh)
+    for (const k of ['uHasMarbleN', 'uHasMarbleR', 'uHasPlasterN']) expect(sh.fragmentShader, k).toContain(k)
+  })
 })

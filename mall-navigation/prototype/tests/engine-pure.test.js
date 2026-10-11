@@ -9,7 +9,8 @@ import { indexVenue } from '../src/data/venue.js'
 import { buildRetailLevel, buildParkingLevel } from '../src/engine/levels.js'
 import { ColorRegistry, SURFACE, THEMES, paletteName, resolveKeyHex, surfaceOf } from '../src/engine/palette.js'
 import { arrivalStand, buildInterior, freeRun } from '../src/engine/interior.js'
-import { MeshBuilder } from '../src/engine/geometry.js'
+import { MeshBuilder, pointInPolygon } from '../src/engine/geometry.js'
+import { MeshBasicMaterial, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial } from 'three'
 
 const VENUE_PATH = fileURLToPath(new URL('../public/venues/demo-muscat/venue.json', import.meta.url))
 const index = indexVenue(JSON.parse(readFileSync(VENUE_PATH, 'utf8')))
@@ -288,5 +289,51 @@ describe('Walk view lamps (v0.4)', () => {
     const b = buildInterior(index, index.levelById.get('G'), new ColorRegistry(), [])
     expect(b.lamps.vertexCount).toBeGreaterThan(0)
     expect(b.solid.keys.map((k) => b.solid.registry.keys[k]).includes('ceilingPanel')).toBe(false)
+  })
+})
+
+describe('v0.4 review fixes', () => {
+  const REALF = { bevel: 0.06, lit: true, real: true }
+  const TOYF = { bevel: 0.06, lit: true }
+
+  it('only opaque lit materials cast sun shadows (glass does not)', async () => {
+    const { castsShadow } = await import('../src/engine/quality-rules.js')
+    expect(castsShadow(new MeshLambertMaterial())).toBe(true)
+    expect(castsShadow(new MeshStandardMaterial())).toBe(true)
+    expect(castsShadow(new MeshPhysicalMaterial({ transparent: true, opacity: 0.2 }))).toBe(false)
+    expect(castsShadow(new MeshBasicMaterial())).toBe(false)
+  })
+
+  it('directory totems stand outside every shop, only at corridor / directory / entrance plates with room', () => {
+    // the demo's corridor plates sit on the centre line of 3 m corridors: no room there (a totem would block the way)
+    expect(buildRetailLevel(index, index.levelById.get('G'), new ColorRegistry(), REALF).totems.length).toBeGreaterThan(0)
+    for (const id of ['G', 'L1']) {
+      const r = buildRetailLevel(index, index.levelById.get(id), new ColorRegistry(), REALF)
+      const units = index.venue.units.filter((u) => u.levelId === id)
+      for (const t of r.totems) {
+        expect(['corridor', 'directory', 'entrance'], t.id).toContain(t.kind)
+        for (const c of t.poly) expect(units.some((u) => pointInPolygon(c, u.polygon)), t.id).toBe(false)
+      }
+    }
+    expect(buildParkingLevel(index, index.levelById.get('B1'), new ColorRegistry(), REALF).totems).toEqual([])
+  })
+
+  it('atrium columns are few and well spaced', () => {
+    const r = buildRetailLevel(index, L1, new ColorRegistry(), REALF)
+    expect(r.columns.length).toBeGreaterThan(0)
+    expect(r.columns.length).toBeLessThanOrEqual(8)
+    for (let i = 0; i < r.columns.length; i++)
+      for (let j = i + 1; j < r.columns.length; j++) expect(Math.hypot(r.columns[i][0] - r.columns[j][0], r.columns[i][1] - r.columns[j][1])).toBeGreaterThanOrEqual(4)
+  })
+
+  it('shop props live in their own mesh and stay a modest share of the level', () => {
+    const v = (b) => b.opaque.vertexCount + b.exact.vertexCount + b.roofs.vertexCount + b.plates.vertexCount
+    for (const id of ['G', 'L1']) {
+      const toy = buildRetailLevel(index, index.levelById.get(id), new ColorRegistry(), TOYF)
+      const real = buildRetailLevel(index, index.levelById.get(id), new ColorRegistry(), REALF)
+      expect(real.props.vertexCount, id).toBeGreaterThan(0)
+      expect(v(real) / v(toy), id + ' structure').toBeLessThan(1.6)
+      expect((v(real) + real.props.vertexCount) / v(toy), id + ' with props').toBeLessThan(3)
+    }
   })
 })
