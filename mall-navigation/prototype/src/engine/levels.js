@@ -28,6 +28,7 @@ import {
   wallShade,
 } from './geometry.js'
 import { iconForAmenity, zonePinId } from './icons.js'
+import { furnishUnit } from './props.js'
 
 export const WALL_H = 3.5
 export const ANCHOR_H = 4.4
@@ -780,6 +781,8 @@ export function buildRetailLevel(index, level, registry, flavour = PLAIN) {
     buildUnitRoof(build, poly, style)
     const refId = occ?.id ?? amen?.id ?? null
     buildUnitWalls(build, poly, style, openingsByUnit.get(unit.id) ?? [], (s) => build.signs.push({ ...s, refId }))
+    // real: furnished interiors, seen through the glass and from above (DESIGN-REAL.md 4)
+    if (build.real && occ) furnishUnit(build, poly, openingsByUnit.get(unit.id) ?? [], occ.category)
 
     if (occ) {
       const lp = labelPoint(poly)
