@@ -19,7 +19,7 @@
 
 const SCREENS = ['home', 'search', 'place', 'navigate', 'arrived', 'car', 'scan']
 const VIEWS = ['stack', 'floor', 'top', 'fpv']
-const STYLES = ['toy', 'storm', 'classic']
+const STYLES = ['real', 'toy', 'storm', 'classic']
 const SHEET_SNAPS = ['peek', 'half', 'full']
 
 /**

@@ -55,7 +55,8 @@ vec2 realUv(float rep) {
 }
 vec3 realSample(int s) {
   if (uHasMaps < 0.5) return vec3(1.0);
-  if (s == 1) return texture2D(uMarble, realUv(4.0)).rgb;
+  // the CC0 marble is a grey stone: warmed toward cream (Gulf-mall stone), a little brighter
+  if (s == 1) return mix(texture2D(uMarble, realUv(4.0)).rgb, vec3(0.96, 0.93, 0.88), 0.35) * 1.08;
   if (s == 2) return texture2D(uPlaster, realUv(2.5)).rgb * 1.08;
   if (s == 3) return texture2D(uWood, realUv(3.0)).rgb * 1.15;
   if (s == 4) { vec3 c = texture2D(uPlaster, realUv(0.6)).rgb; return mix(vec3(dot(c, vec3(0.333))), c, 0.4) * 1.1; }

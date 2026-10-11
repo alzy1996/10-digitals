@@ -26,7 +26,7 @@ const QUERY_DEFAULTS = {
   isFailed: () => false,
   // v0.2 (CONTRACT 3b)
   getAnchors: () => ({ frame: 0, mode: 'stack', camera: { headingDeg: 0, pitchDeg: -32, fovDeg: 30 }, nextTurn: null, destination: null, walker: null }),
-  getSceneStyle: () => 'toy',
+  getSceneStyle: () => 'real',
   getQuality: () => 'showcase',
   getFpvOptions: () => ({ eyeHeightM: 1.6, fovDeg: 70, pitchDeg: -5 }),
 }

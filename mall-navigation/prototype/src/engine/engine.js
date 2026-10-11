@@ -6,18 +6,19 @@
  * Render-on-demand: a frame is drawn only when the controls move (incl. damping), a camera flight
  * or follow animation runs, text finishes typesetting, or requestRender() is called. Idle = 0 frames.
  *
- * Art direction: v0.3 "toy world" by default (DESIGN-TOY.md): lit vertex-coloured pastel blocks with bevelled edges, a
- * hemisphere + sun light rig and soft sun shadows (Showcase quality); meaning colours (route, markers, signs) stay unlit
- * and exact. The v0.2 "storm" and v0.1 "classic" styles keep PLAN.md §19.2's unlit "architect's model".
+ * Art direction: v0.4 "real mall" by default (DESIGN-REAL.md): CC0 photo textures per surface, reflections from an
+ * indoor HDRI, furnished shops, backlit fascias, soft sun shadows and a soft bloom (Showcase); at Light quality it is
+ * the v0.3 "toy world" (DESIGN-TOY.md). Meaning colours (route, markers, sign accents) stay unlit and exact. The v0.2
+ * "storm" and v0.1 "classic" styles keep PLAN.md §19.2's unlit "architect's model".
  */
-import { Color, DirectionalLight, DoubleSide, Fog, Group, HemisphereLight, MOUSE, MathUtils, Mesh, MeshBasicMaterial, MeshLambertMaterial, PCFShadowMap, PerspectiveCamera, Scene, TOUCH, Vector3, WebGLRenderer } from 'three'
+import { CanvasTexture, Color, DirectionalLight, DoubleSide, Fog, Group, HemisphereLight, MOUSE, MathUtils, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhysicalMaterial, PCFShadowMap, PMREMGenerator, PerspectiveCamera, SRGBColorSpace, Scene, TOUCH, Vector3, WebGLRenderer } from 'three'
 // OrbitControls set up exactly like three's MapControls (one-finger pan, two-finger pinch-zoom + rotate, panning on
 // the ground plane), without MapControls' mouse ray-casting: one class (and Raycaster) fewer in the engine chunk
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { configureFonts } from './fonts.js'
 import { ColorRegistry, THEMES, paletteName } from './palette.js'
 import { applyTheme, distToSegment, pointInPolygon, polygonCentroid, setRise } from './geometry.js'
-import { PLAIN, buildEscalator, buildLiftColumn, buildParkingLevel, buildRetailLevel } from './levels.js'
+import { PLAIN, REAL, buildEscalator, buildLiftColumn, buildParkingLevel, buildRetailLevel } from './levels.js'
 import { buildBaysMesh } from './bays.js'
 import { createIconAtlas } from './icons.js'
 import { OverlayLayer, buildPinMesh } from './overlay.js'
@@ -28,7 +29,9 @@ import { applyPose, boxCenter, easeStandard, fitDistance, lerpPose, readPose } f
 import { SkyLayer } from './sky.js'
 import { TargetRing } from './ring.js'
 import { arrivalStand, buildInterior, levelVoids } from './interior.js'
-import { SLOW_FRAMES, nextSlowFrames, shadowsFor } from './quality-rules.js'
+import { SLOW_FRAMES, effectiveStyle, nextSlowFrames, shadowsFor } from './quality-rules.js'
+import { createRealMaterial, loadRealAssets, setRealMaps } from './realMaterials.js'
+import { createPost } from './post.js'
 
 /** Vertical distance between levels in stack view (metres). */
 export const STACK_GAP_M = 18
@@ -67,6 +70,8 @@ const EYE_TARGET_M = 6.1
  * facing the sun ~0.84, one facing away ~0.44 (Lambert: (hemi + sun * cos) / pi).
  */
 const TOY_LIGHT = Object.freeze({ hemi: 1.6, sun: 2.1, hemiBasement: 1.25, sunBasement: 1.2 })
+/** Real light rig (Standard + an HDRI): a weaker fill once the HDRI lights the scene (DESIGN-REAL.md 5). */
+const REAL_LIGHT = Object.freeze({ hemi: 0.6, hemiNoEnv: 1.5, sun: 2.2 })
 const bearingDeg = (ax, ay, bx, by) => MathUtils.radToDeg(Math.atan2(bx - ax, by - ay))
 const angDelta = (a, b) => ((((b - a) % 360) + 540) % 360) - 180
 const norm360 = (a) => ((a % 360) + 360) % 360
@@ -99,8 +104,16 @@ export function createEngine() {
     registry: new ColorRegistry(),
     atlas: null,
     theme: /** @type {'sunlight'|'basement'} */ ('sunlight'),
-    /** scene style (CONTRACT 3c): 'toy' (v0.3 default), 'storm' (v0.2) or 'classic' (v0.1) */
-    style: /** @type {'toy'|'storm'|'classic'} */ ('toy'),
+    /** scene style (CONTRACT 3d): 'real' (v0.4 default), 'toy' (v0.3), 'storm' (v0.2) or 'classic' (v0.1) */
+    style: /** @type {'real'|'toy'|'storm'|'classic'} */ ('real'),
+    /** which material set is in use: 'real', 'toy' or 'plain' (storm / classic); see matKind() */
+    matKind: 'real',
+    /** real-mall assets: 'none' | 'loading' | 'ready' | 'failed' (DESIGN-REAL.md 3) */
+    realAssets: 'none',
+    realMaps: null,
+    envTex: null,
+    /** real style at Showcase: the post-processing chain (post.js) */
+    post: null,
     /** 3D quality (DESIGN-TOY.md 4): 'showcase' = soft sun shadows, pixel ratio up to 2; 'light' = none, up to 1.5 */
     quality: /** @type {'showcase'|'light'} */ ('showcase'),
     /** bumped on every setVenue (the shadow map is redrawn) */
@@ -218,8 +231,24 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     return mat
   }
 
-  // toy: the opaque and roof meshes are lit (Lambert, normals from MeshBuilder); everything else stays unlit
-  const makeMaterials = (lit) => ({
+  /**
+   * Material sets: 'real' = the textured MeshStandardMaterial (realMaterials.js) for the opaque, roof and plate meshes,
+   * physical glass, glowing Walk view lamps; 'toy' = lit Lambert (normals from MeshBuilder); 'plain' = unlit (storm,
+   * classic). Everything else stays unlit in every set.
+   */
+  const makeMaterials = (kind) => {
+    const lit = kind !== 'plain'
+    const real = kind === 'real' ? createRealMaterial() : null
+    const physGlass = (side) =>
+      new MeshPhysicalMaterial({ vertexColors: true, roughness: 0.03, metalness: 0, transparent: true, opacity: 0.2, envMapIntensity: 1.5, depthWrite: false, ...(side ? { side } : {}) })
+    const m = baseMaterials(lit)
+    if (real) {
+      Object.assign(m, { opaque: real, roofs: real, glass: physGlass(DoubleSide), escGlass: physGlass(null) })
+      m.lamps = new MeshBasicMaterial({ color: new Color(3, 2.8, 2.5), toneMapped: false })
+    } else m.lamps = m.interior
+    return m
+  }
+  const baseMaterials = (lit) => ({
     opaque: finish(lit ? new MeshLambertMaterial({ vertexColors: true }) : new MeshBasicMaterial({ vertexColors: true }), false),
     roofs: lit ? new MeshLambertMaterial({ vertexColors: true }) : new MeshBasicMaterial({ vertexColors: true }),
     // toy: sign faces, QR plates and zone bands, unlit so their colours stay exact (levels.js exact faces)
@@ -240,7 +269,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     fadeGlass: new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.12, depthWrite: false, side: DoubleSide }),
     fadeDecals: new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.1, depthWrite: false }),
   })
-  S.mats = makeMaterials(true)
+  S.mats = makeMaterials('real')
 
   // toy light rig (DESIGN-TOY.md 3): sky / ground fill + a sun from the south-east, ~55 degrees high. With NoToneMapping
   // a white roof facing the sun renders at about 1.0. Basic (unlit) materials ignore it, so storm and classic are unchanged.
@@ -254,8 +283,14 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
   S.sun.shadow.normalBias = 0.04
   S.scene.add(S.hemi, S.sun, S.sun.target)
 
-  /** Geometry flavour of the current style (toy: bevelled edges + normals for the lit materials). */
-  const flavour = () => (S.style === 'toy' ? { bevel: 0.06, lit: true } : PLAIN)
+  /** Geometry of the current style: real (surfaces, furnished shops, fascias), toy (bevels + normals) or plain. */
+  const geomKind = () => (S.style === 'real' || S.style === 'toy' ? S.style : 'plain')
+  const flavour = () => (S.style === 'real' ? REAL : S.style === 'toy' ? { bevel: 0.06, lit: true } : PLAIN)
+  /** The material set actually drawn: real at Showcase, toy for real at Light quality (quality-rules.effectiveStyle). */
+  const matKind = () => {
+    const e = effectiveStyle(S.style, S.quality)
+    return e === 'real' || e === 'toy' ? e : 'plain'
+  }
 
   // text batches still typesetting (a Set, so batches of a replaced venue cannot skew the count)
   const pendingSync = new Set()
@@ -347,7 +382,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
 
   /** Palette of the current style and theme (classic: the v0.1 tables). */
   function pal() {
-    return paletteName(S.style, S.theme)
+    return paletteName(effectiveStyle(S.style, S.quality), S.theme)
   }
 
   let reducedMq = null
@@ -782,12 +817,26 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     fitSun()
     if (S.sky.mesh.visible) S.sky.update(r, cam, MathUtils.degToRad(pose.headingDeg), width / height, walk)
     r.info.reset()
-    r.render(S.scene, cam)
-    // second pass: markers on top of everything (own depth buffer, so a marker still shades itself)
-    r.autoClear = false
-    r.clearDepth()
-    r.render(S.markerScene, cam)
-    r.autoClear = true
+    if (matKind() === 'real') {
+      // real at Showcase: scene + marker pass, soft bloom, Neutral tone mapping (post.js)
+      ensureRealAssets()
+      if (!S.post) {
+        S.post = createPost(r)
+        S.post.setSize(width, height, pixelRatio())
+      }
+      S.post.render(S.scene, S.markerScene, cam)
+    } else {
+      if (S.post) {
+        S.post.dispose()
+        S.post = null
+      }
+      r.render(S.scene, cam)
+      // second pass: markers on top of everything (own depth buffer, so a marker still shades itself)
+      r.autoClear = false
+      r.clearDepth()
+      r.render(S.markerScene, cam)
+      r.autoClear = true
+    }
     S.frames++
     S.frameMs = performance.now() - t0
     // callbacks: commands they send run after the frame (DEFERRED), a requestRender is coalesced; anchors are pure
@@ -829,7 +878,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
    * the shadow box are refitted and the shadow map redrawn once; a pure camera move redraws nothing.
    */
   function fitSun() {
-    const on = shadowsFor(S.mode, S.style, S.quality, S.blend)
+    const on = shadowsFor(S.mode, matKind() === 'plain' ? S.style : 'toy', S.quality, S.blend)
     const shown = [...S.levels.values()].filter((L) => isVisible(L.id))
     const eyeLevel = S.mode === 'fpv' ? (S.fpv?.levelId ?? S.focusId) : null
     const sig = `${on}|${S.mode}|${S.blend.toFixed(3)}|${shown.map((L) => L.id).join()}|${eyeLevel}|${S.venueGen}`
@@ -1242,8 +1291,12 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     const b = buildInterior(S.index, L.level, S.registry, levelVoids(S.index, above ? above.id : L.id))
     const grp = new Group()
     grp.name = 'interior-' + L.id
-    addThemedMesh(b.solid, S.mats.interior, grp, 'ceiling-' + L.id)
-    addThemedMesh(b.glow, S.mats.interiorGlow, grp, 'lights-' + L.id, 4)
+    L.interiorMeshes = {
+      solid: addThemedMesh(b.solid, S.mats.interior, grp, 'ceiling-' + L.id),
+      glow: addThemedMesh(b.glow, S.mats.interiorGlow, grp, 'lights-' + L.id, 4),
+      // the light panels: glowing in real (bloom), the ceiling material elsewhere
+      lamps: addThemedMesh(b.lamps, S.mats.lamps, grp, 'lamps-' + L.id, 4),
+    }
     grp.visible = S.mode === 'fpv'
     L.content.add(grp)
     L.interior = grp
@@ -1587,6 +1640,89 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     return S.route.route.points[Math.max(0, step.from ?? 0)]?.levelId ?? null
   }
 
+  /** Real: the shop fascia letters glow (HDR white, caught by the bloom); everywhere else plain sign text. */
+  function applySignGlow(L) {
+    if (!L.signs) return
+    const glow = matKind() === 'real' && L.build.signs.some((s) => s.glow)
+    L.signs.material.color.setScalar(glow ? 2.2 : 1)
+    L.signs.material.toneMapped = !glow
+  }
+
+  /** Real: HDRI reflections, the textures, and a painted sky backdrop (the post chain draws an opaque image). */
+  function applyRealEnv(T) {
+    const real = matKind() === 'real'
+    S.scene.environment = real ? S.envTex : null
+    S.scene.environmentIntensity = 1.0
+    if (real && S.realMaps && S.mats.opaque.userData.real) setRealMaps(S.mats.opaque, S.realMaps)
+    if (S.bgTex) S.bgTex.dispose()
+    S.bgTex = null
+    S.scene.background = null
+    if (real && typeof document !== 'undefined') {
+      const c = document.createElement('canvas')
+      c.width = 4
+      c.height = 256
+      const g = c.getContext('2d')
+      if (g) {
+        const gr = g.createLinearGradient(0, 0, 0, 256)
+        gr.addColorStop(0, T.bgTop)
+        gr.addColorStop(1, T.bgBottom)
+        g.fillStyle = gr
+        g.fillRect(0, 0, 4, 256)
+        S.bgTex = new CanvasTexture(c)
+        S.bgTex.colorSpace = SRGBColorSpace
+        S.scene.background = S.bgTex
+      }
+    }
+  }
+
+  /** Real: fetch the CC0 textures and the HDRI once, from our own origin (DESIGN-REAL.md 3). */
+  function ensureRealAssets() {
+    if (S.realAssets !== 'none' || !S.renderer || typeof document === 'undefined') return
+    S.realAssets = 'loading'
+    loadRealAssets(new URL('assets/real/', document.baseURI).href).then((a) => {
+      if (S.disposed) return
+      if (!a) {
+        S.realAssets = 'failed'
+        return
+      }
+      S.realMaps = a
+      if (a.env && S.renderer) {
+        const pm = new PMREMGenerator(S.renderer)
+        S.envTex = pm.fromEquirectangular(a.env).texture
+        pm.dispose()
+        a.env.dispose()
+      }
+      S.realAssets = 'ready'
+      applyThemeAll()
+      requestRender()
+    })
+  }
+
+  /** Swap the material set in place (real <-> toy when the quality changes): same geometry, no rebuild. */
+  function setMaterialKind(kind) {
+    if (S.matKind === kind) return
+    const old = S.mats
+    S.mats = makeMaterials(kind)
+    S.matKind = kind
+    for (const L of S.levels.values()) {
+      const faded = L.faded
+      L.faded = null
+      setFaded(L, faded)
+      if (L.ghostMesh) L.ghostMesh.material = S.mats.ghost
+      const im = L.interiorMeshes
+      if (im) {
+        if (im.solid) im.solid.material = S.mats.interior
+        if (im.glow) im.glow.material = S.mats.interiorGlow
+        if (im.lamps) im.lamps.material = S.mats.lamps
+      }
+    }
+    for (const c of S.connectors) {
+      c.mesh.material = c.kind === 'lift' ? S.mats.glass : S.mats.opaque
+      if (c.arrows) c.arrows.material = S.mats.opaque
+    }
+    for (const m of new Set(Object.values(old))) m.dispose()
+  }
+
   function applyThemeAll() {
     const P = pal()
     const T = THEMES[P]
@@ -1599,7 +1735,8 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     S.markers.setTheme(P)
     S.ring.setPalette(P)
     S.sky.setPalette(P)
-    const toy = S.style === 'toy'
+    const kind = matKind()
+    const toy = kind !== 'plain'
     S.sky.mesh.visible = S.style === 'storm'
     S.sheenColor.value.set(T.sheen)
     // toy keeps the Walk view's floor tiles and wall gradient, with a faint white sheen
@@ -1608,10 +1745,17 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     S.scene.fog.color.set(T.fog)
     // zone colours stay the paint's; on the dark storm asphalt a lighter wash keeps them from flooding the floor
     S.mats.decals.opacity = S.style === 'storm' || toy ? 0.2 : 0.3
-    // toy light rig: a softer light on the parking levels (dusk palette)
+    // toy light rig: a softer light on the parking levels (dusk palette); real: the HDRI does the fill once loaded
     S.hemi.visible = S.sun.visible = toy
-    S.hemi.intensity = S.theme === 'basement' ? TOY_LIGHT.hemiBasement : TOY_LIGHT.hemi
-    S.sun.intensity = S.theme === 'basement' ? TOY_LIGHT.sunBasement : TOY_LIGHT.sun
+    if (kind === 'real') {
+      S.hemi.intensity = S.theme === 'basement' ? TOY_LIGHT.hemiBasement : S.envTex ? REAL_LIGHT.hemi : REAL_LIGHT.hemiNoEnv
+      S.sun.intensity = S.theme === 'basement' ? TOY_LIGHT.sunBasement : REAL_LIGHT.sun
+    } else {
+      S.hemi.intensity = S.theme === 'basement' ? TOY_LIGHT.hemiBasement : TOY_LIGHT.hemi
+      S.sun.intensity = S.theme === 'basement' ? TOY_LIGHT.sunBasement : TOY_LIGHT.sun
+    }
+    applyRealEnv(T)
+    for (const L of S.levels.values()) applySignGlow(L)
     S.overlay.setColors({ text: T.labelText, halo: T.labelHalo, badgeText: T.badgeText, badgeHalo: T.badgeHalo, badgeW: T.badgeW })
     if (S.renderer) S.renderer.domElement.style.background = `linear-gradient(180deg, ${T.bgTop} 0%, ${T.bgBottom} 100%)`
   }
@@ -1675,7 +1819,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     mesh.name = name
     mesh.renderOrder = renderOrder
     // lit (toy) meshes cast and take the sun's soft shadows (fitSun decides when the sun casts)
-    mesh.castShadow = mesh.receiveShadow = Boolean(material.isMeshLambertMaterial)
+    mesh.castShadow = mesh.receiveShadow = Boolean(material.isMeshLambertMaterial || material.isMeshStandardMaterial)
     parent.add(mesh)
     return mesh
   }
@@ -1697,7 +1841,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     L.glass = addThemedMesh(build.glass, S.mats.glass, content, 'glass-' + level.id, 2)
     L.plates = addThemedMesh(build.plates, S.mats.opaque, content, 'plates-' + level.id)
     L.exact = addThemedMesh(build.exact, S.mats.exact, content, 'exact-' + level.id)
-    addThemedMesh(build.ghost, S.mats.ghost, ghostGroup, 'ghost-' + level.id, 1)
+    L.ghostMesh = addThemedMesh(build.ghost, S.mats.ghost, ghostGroup, 'ghost-' + level.id, 1)
     if (build.bays.length) {
       L.bays = buildBaysMesh(build.bays, pal())
       L.bays.name = 'bays-' + level.id
@@ -1714,6 +1858,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
       return layer
     }
     L.signs = signLayer(build.signs, {}, 3)
+    applySignGlow(L)
     L.floorTexts = signLayer(build.floorTexts, {}, 3)
     if (L.floorTexts) L.floorTexts.setTextColor(THEMES[pal()].floorPaint)
     L.bayCodes = signLayer(build.bayTexts, {}, 3)
@@ -2176,6 +2321,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
       const resize = () => {
         const { width, height } = viewSize()
         S.renderer.setSize(width, height, false)
+        if (S.post) S.post.setSize(width, height, pixelRatio())
         S.camera.aspect = width / height
         updateClip()
         if (!S.userMoved && S.lastView && S.index && S.mode !== 'fpv') {
@@ -2671,23 +2817,26 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
      * v0.1 look exactly). Storm and classic recolour in place. Switching to or from toy changes the geometry (bevels,
      * normals) and the materials: after setVenue that rebuilds the venue (route and markers must then be sent again), so
      * the App sets the style before the venue.
-     * @param {'toy'|'storm'|'classic'} style
+     * 'real' (v0.4 default, DESIGN-REAL.md) builds the toy geometry plus surfaces, furnished shops and fascias; at Light
+     * quality it draws the toy materials. A geometry change (real / toy / storm-classic) rebuilds the venue.
+     * @param {'real'|'toy'|'storm'|'classic'} style
      */
     setSceneStyle(style) {
-      const next = style === 'classic' || style === 'storm' ? style : 'toy'
-      const wasToy = S.style === 'toy'
+      const next = ['real', 'toy', 'storm', 'classic'].includes(style) ? style : 'real'
+      const oldGeom = geomKind()
       S.style = next
       if (S.failed) return
-      if ((next === 'toy') !== wasToy) {
+      if (geomKind() !== oldGeom) {
         const old = S.mats
-        S.mats = makeMaterials(next === 'toy')
-        for (const m of Object.values(old)) m.dispose()
+        S.mats = makeMaterials(matKind())
+        S.matKind = matKind()
+        for (const m of new Set(Object.values(old))) m.dispose()
         if (S.index) {
           const view = S.lastView
           api.setVenue(S.index)
           if (view) api.setView(view, { durationMs: 0 })
         }
-      }
+      } else setMaterialKind(matKind())
       applyThemeAll()
       requestRender()
     },
@@ -2701,10 +2850,15 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
     setQuality(quality) {
       S.quality = quality === 'light' ? 'light' : 'showcase'
       S.slowFrames = 0
-      if (S.failed || !S.renderer) return
+      if (S.failed) return
+      // real at Light quality draws the toy materials (no textures, no post): swapped in place, no rebuild
+      setMaterialKind(matKind())
+      applyThemeAll()
+      if (!S.renderer) return
       S.renderer.setPixelRatio(pixelRatio())
       const { width, height } = viewSize()
       S.renderer.setSize(width, height, false)
+      if (S.post) S.post.setSize(width, height, pixelRatio())
       requestRender()
     },
 
@@ -2713,7 +2867,7 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
       return S.quality
     },
 
-    /** @returns {'toy'|'storm'|'classic'} */
+    /** @returns {'real'|'toy'|'storm'|'classic'} */
     getSceneStyle() {
       return S.style
     },
@@ -2805,6 +2959,9 @@ else if (abs(sn.y) < 0.2) { float h = mod(vWP.y + 0.02, uLevelH); outgoingLight 
         textures: info?.memory.textures ?? 0,
         // the toy sun: unit direction toward it and shadow map redraws (DESIGN-TOY.md 4)
         sun: { dir: _dir.copy(S.sun.position).sub(S.sun.target.position).normalize().toArray().map((v) => Math.round(v * 100) / 100), shadowDraws: S.shadowDraws },
+        // real style: the post chain is on, and the CC0 assets' state (DESIGN-REAL.md)
+        post: Boolean(S.post),
+        realAssets: S.realAssets,
       }
     },
 

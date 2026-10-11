@@ -71,13 +71,15 @@ export function arrivalStand(index, levelId, sign, want) {
  * @param {object} level
  * @param {import('./palette.js').ColorRegistry} registry
  * @param {Array<Array<[number, number]>>} holes ceiling openings (voids of the level above, or a skylight)
- * @returns {{ solid: MeshBuilder, glow: MeshBuilder, ceilH: number }}
+ * @returns {{ solid: MeshBuilder, glow: MeshBuilder, lamps: MeshBuilder, ceilH: number }} lamps = the light panels
+ *   (their own mesh: drawn glowing in the v0.4 real style, like the ceiling elsewhere)
  */
 export function buildInterior(index, level, registry, holes) {
   const v = index.venue
   const parking = level.kind === 'parking'
   const solid = new MeshBuilder(registry)
   const glow = new MeshBuilder(registry)
+  const lamps = new MeshBuilder(registry)
   const units = (v.units ?? []).filter((u) => u.levelId === level.id)
   const occ = (u) => (u.occupantId ? index.occupantById.get(u.occupantId) : null)
   const amenityUnits = new Set((v.amenities ?? []).filter((a) => a.unitId).map((a) => a.unitId))
@@ -147,9 +149,9 @@ export function buildInterior(index, level, registry, holes) {
   for (const [x, y, ang] of spots) {
     if (blocked([x, y]) || placed.some((q) => Math.hypot(q[0] - x, q[1] - y) < 2.2)) continue
     placed.push([x, y])
-    solid.flat(orientedRect(x, y, pw, pl, ang), ceilH - 0.01, key, { down: true })
+    lamps.flat(orientedRect(x, y, pw, pl, ang), ceilH - 0.01, key, { down: true })
     glow.flat(orientedRect(x, y, pw + 0.8, pl + 0.8, ang), ceilH - 0.005, key, { down: true })
     glow.flat(orientedRect(x, y, pw + 0.1, pl, ang), 0.013, key)
   }
-  return { solid, glow, ceilH }
+  return { solid, glow, lamps, ceilH }
 }

@@ -283,9 +283,9 @@ export default function App() {
   // ------------------------------------------------------------------ engine: venue, language, theme, markers
   useEffect(() => {
     if (!index) return
-    // v0.3 toy world by default; ?style=storm is the v0.2 look, ?style=classic the v0.1 look exactly (classic scene +
-    // v0.1 ribbon). Set before the venue: the toy style builds different geometry (DESIGN-TOY.md)
-    const style = ['classic', 'storm'].includes(pendingRef.current.style) ? pendingRef.current.style : 'toy'
+    // v0.4 real mall by default; ?style=toy is the v0.3 look, ?style=storm v0.2, ?style=classic the v0.1 look exactly
+    // (classic scene + v0.1 ribbon). Set before the venue: each family builds different geometry (DESIGN-REAL.md)
+    const style = ['toy', 'storm', 'classic'].includes(pendingRef.current.style) ? pendingRef.current.style : 'real'
     engine.setSceneStyle(style)
     engine.setPathStyle(style === 'classic' ? 'ribbon' : 'glow')
     // Showcase (soft shadows) on capable phones, Light on weak ones; ?quality=showcase|light overrides (src/quality.js)

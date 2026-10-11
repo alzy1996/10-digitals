@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest'
 import { indexVenue } from '../src/data/venue.js'
 import { buildRetailLevel, buildParkingLevel } from '../src/engine/levels.js'
 import { ColorRegistry, SURFACE, THEMES, paletteName, resolveKeyHex, surfaceOf } from '../src/engine/palette.js'
-import { arrivalStand, freeRun } from '../src/engine/interior.js'
+import { arrivalStand, buildInterior, freeRun } from '../src/engine/interior.js'
 import { MeshBuilder } from '../src/engine/geometry.js'
 
 const VENUE_PATH = fileURLToPath(new URL('../public/venues/demo-muscat/venue.json', import.meta.url))
@@ -280,5 +280,13 @@ describe('real flavour builders (v0.4)', () => {
     expect(keysOf(t.opaque).has('fascia')).toBe(false)
     expect(keysOf(t.opaque).has('brass')).toBe(false)
     expect(t.signs.some((s) => s.glow)).toBe(false)
+  })
+})
+
+describe('Walk view lamps (v0.4)', () => {
+  it('the light panels are their own builder (lamps, glowing in real), not part of the ceiling', () => {
+    const b = buildInterior(index, index.levelById.get('G'), new ColorRegistry(), [])
+    expect(b.lamps.vertexCount).toBeGreaterThan(0)
+    expect(b.solid.keys.map((k) => b.solid.registry.keys[k]).includes('ceilingPanel')).toBe(false)
   })
 })
