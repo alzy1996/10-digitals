@@ -193,6 +193,8 @@ section.dash-card:not(.dash-row > *) {
 }
 .chart {
   margin: 8px 0 0;
+  /* time runs left to right in both languages: the bars and their axis labels stay in the same order */
+  direction: ltr;
 }
 .bars {
   display: block;

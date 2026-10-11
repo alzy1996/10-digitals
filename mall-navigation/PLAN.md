@@ -2165,6 +2165,13 @@ Add these rows to §15.1. Only Q1 (the mall) is answered; everything else is sti
 | 3D realism (v0.4, overrides the toy default; toy stays as the Light look) | "Real mall": CC0 photo textures (Poly Haven) mapped per surface, real indoor HDRI reflections, furnished shops, soft bloom (Showcase only), about 1.5 MB of same-origin assets | **ANSWERED (Sam picked "photo-real materials" from live mocks, 2026-10-11); BUILT** |
 | Sign fascias (changes "name on its category colour" for the real look) | Neutral dark fascia, plain-text backlit letters (AR + EN), a thin exact category-colour accent line; still no brand colours or logos without a written licence | PROPOSED (v0.4 default) |
 | Tone mapping | Khronos PBR Neutral in the post chain: colours under ~0.76 pass unchanged, so meaning colours (route, markers, accents) keep their hues | BUILT (v0.4) |
+| First screen (v0.5) | "Find me": scan the sign or pick the entrance / car-park lift; a plate link skips it; no GPS button | BUILT (prototype v0.5, Sam: "first will show locate my location") |
+| Home layout (v0.5) | Sam's Stitch "bento" mock: Map / Offers tabs, Where to next? cards, pinned Start walking bar; SVG icons, self-hosted fonts, real open/closed chip, demo stamp quest instead of points | BUILT (Sam sent the mock, 2026-10-11) |
+| Offers in the demo | Offers page + offer card on the place screen; pull only, nearest first from the scanned / picked position; fictional shops and four fictional "global" brands | BUILT (prototype); real offers stay PROPOSED (see rows above) |
+| Ramadan / Eid hours | Mall weekly hours + dated specials (expected dates), shop overrides, a preview switch | BUILT (prototype v0.5) |
+| Emergency mode | Ops switch → directions stop, exits shown, no lifts; prototype: same-browser BroadcastChannel; product: `live/{venueId}` emergency field | BUILT (prototype); backend PROPOSED |
+| Kiosk mode (S21) | `?kiosk=<plate>`: fixed position, attract screen, 60 s idle reset, Continue-on-your-phone QR | BUILT (prototype v0.5) |
+| Mall dashboard (D01–D08 subset) | KPIs, journeys, top / not-found searches (CSV), heatmap (<10 hidden), sign health, offers, ops controls, print report; synthetic demo data | BUILT (prototype v0.5); real analytics PROPOSED |
 
 **TIMELINE DELTA (§15.2, Option A)**
 

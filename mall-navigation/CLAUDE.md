@@ -5,13 +5,14 @@ Indoor mall navigation and find-my-car product by **10 Digital** (Sam Ubi, Musca
 
 ## Files
 - `PLAN.md`: the master plan, v1.1. **§19 overrides earlier sections.** It covers the honesty box, positioning, the map, find-my-car, design, architecture, free tier, pricing, go-to-market, PDPL, the roadmap and the Step 0 questions.
-- `prototype/`: a working prototype, version 0.4 "real mall" (built 2026-10-11; v0.3 "toy world" is its Light look; v0.2.1 was approved by Sam).
+- `prototype/`: a working prototype, version 0.5 "Mall Value" (built 2026-10-11: Find me, bento home per Sam's Stitch mock, Offers, Mall info / Ramadan hours, facilities, emergency, kiosk, dashboard, wide layout) on the v0.4 "real mall" 3D (v0.3 "toy world" is its Light look; v0.2.1 was approved by Sam).
   - **What it is:** a 3D mall map and navigation simulator on a FICTIONAL small Muscat mall.
   - **Stack:** React 18.3.1, Vite 8, Tailwind 4, plain three.js 0.186.1 and troika-three-text. No React Three Fiber.
   - `prototype/README.md`: how to run, build and deploy to Firebase Hosting.
   - `prototype/CONTRACT.md`: module boundaries and the engine API, including §3b (Walk view).
   - `prototype/DESIGN-GLASS.md`: the v0.2 frosted-glass design tokens and the Walk view layout.
   - `prototype/DESIGN-REAL.md`: the v0.4 real-mall surfaces, CC0 assets, light, bloom and fascias (the default).
+  - `prototype/DESIGN-MALL.md`: v0.5 screens (Find me, bento home, Offers, Mall info, emergency, kiosk, dashboard), tokens, rules, wide layout.
   - `prototype/DESIGN-TOY.md`: the v0.3 toy-world palette, light rig, shadows, quality levels and UI tokens (the Light look).
   - `docs/superpowers/specs/` and `docs/superpowers/plans/`: the v0.3 design spec and its implementation plan.
 - Live demo (Claude artifact): https://claude.ai/artifact/11qH3qSbt8ac3qdzLfUm64.
@@ -20,14 +21,14 @@ Indoor mall navigation and find-my-car product by **10 Digital** (Sam Ubi, Musca
 ```
 npm install
 npm run dev               # LAN URL works on a phone on the same Wi-Fi
-npm test                  # vitest, 322 tests
+npm test                  # vitest, 395 tests
 npm run validate:venue    # venue data checks
 npm run build             # vite build + load-budget check (fails if over budget)
 npm run gen:venue         # regenerate public/venues/demo-muscat/venue.json
 npm run shots -- <url>    # headless screenshots; locally: npm i --no-save playwright && npx playwright install chromium
 ```
 - **Budgets are tight:**
-  - first screen: 109.5 of 110 KiB;
+  - first screen: 105.8 of 110 KiB (v0.5 lazy screens);
   - `scene3d`: about 58.4 of 60 KiB (raised from 52 in v0.3, reported to Sam);
   - real assets: about 1511 of 3072 KiB (v0.4).
 - Trim code before adding features. Never raise a budget without telling Sam.
@@ -62,8 +63,8 @@ npm run shots -- <url>    # headless screenshots; locally: npm i --no-save playw
 
 - Q1d: Sam knows **nobody** at any mall (answered 2026-10-10; do not ask again).
 - After v0.3, Sam asked for a "realistic game" look plus features that make malls accept the product. That became
-  three projects: A realistic look (done: v0.4 "real mall"), then B Mall Value demo (dashboard, offers, emergency,
-  Ramadan hours, kiosk, facilities), then C pitch kit.
+  three projects: A realistic look (done: v0.4 "real mall"), then B Mall Value demo (done: v0.5, plus Sam's "Find me"
+  first screen, Map | Offers tabs and his Stitch bento home mock), then C pitch kit (next).
 - 3D direction: Sam picked **"Bright Toy Game"** from three live mocks. v0.3 was built on 2026-10-11 under "complete
   it": toy 3D, soft shadows, quality levels and a bright game UI (D3, the UI choice, was made by Claude; Sam can switch).
 

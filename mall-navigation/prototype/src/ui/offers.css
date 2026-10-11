@@ -27,8 +27,10 @@
   padding: calc(env(safe-area-inset-top, 0px) + 8px) var(--gutter) 8px;
   background: linear-gradient(#F4F7FE 70%, rgba(244, 247, 254, 0));
 }
-.page-top .header-row {
+.app .page-top .header-row {
+  width: auto;
   max-width: 1120px;
+  margin-inline: auto;
 }
 .page-body {
   max-width: 1120px;

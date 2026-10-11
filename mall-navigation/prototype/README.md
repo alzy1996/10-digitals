@@ -5,7 +5,24 @@ It shows a game-like 3D model of a mall, finds routes between shops, parking bay
 turn-by-turn steps in Arabic and English, and plays the walk as a **simulation** so you can see the whole
 journey on your own phone, from above or **first person, at eye height inside the 3D model** (Walk view).
 
-**v0.4 ("real mall", the default)**: the mall looks like a real Gulf mall in a game.
+**v0.5 ("Mall Value", the newest)**: what makes a mall say yes.
+- **Find me first:** the app opens by asking where you are: scan the Dallni sign (simulated here), or tap the
+  entrance / car-park lift you came in by. "Found you" flies the map to you. No GPS (indoors it knows neither floor
+  nor shop, and the screen says so).
+- **Home, organised as Sam's Stitch mock:**
+  - a Map | Offers tab;
+  - "Where to next?" cards: today's deals, food nearby, find my car, a new global brand, facilities;
+  - a pinned "Start walking" bar for the card you picked.
+- **Offers:** demo deals nearest first and four new (fictional) global brands, with a "Show me" on each.
+- **Mall info:** Ramadan and Eid hours with a "Preview in the app" switch, services, and a facilities directory.
+- **Emergency mode:** directions stop, exits are shown, no lifts. Turned on from the dashboard or the demo button.
+- **Kiosk mode:** for a mall's touch screen, with a "Continue on your phone" QR code.
+- **Mall dashboard:** KPIs, searches the mall can't answer (for Leasing), a heatmap, sign health, offers, and the mall
+  controls. All of it is demo data, labelled so.
+- **Wide screens:** a side panel plus the map, instead of a narrow phone column.
+- **Docs:** [`DESIGN-MALL.md`](./DESIGN-MALL.md); CONTRACT.md section 3e.
+
+**v0.4 ("real mall", the 3D look)**: the mall looks like a real Gulf mall in a game.
 - **Materials:** photographed CC0 marble floors, plaster walls, wood shop floors.
 - **Reflections** from a real covered shopping arcade.
 - **Shops:** furnished behind glass (mannequins and racks, café tables, glowing screens, shelves), with dark fascias
@@ -139,6 +156,20 @@ browser's developer tools and turn on the phone/device toolbar.
    everything else (search, place, step cards, the simulated walk, the car card) still works. If the 3D part
    cannot be downloaded (flaky network), it says "Couldn't load the 3D map" with a Try again button.
 
+### Demo B in 5 minutes (v0.5)
+
+1. **Phone:** open the Network URL. Find me opens. Tap **East entrance** and watch "Found you".
+2. Tap the **deals banner**, or the **Offers** tab. Open **Show me** on a deal, then press **GO**.
+3. Back on the Map tab, tap the **mall name** at the top (Mall info). Switch on **Preview in the app** under
+   Ramadan, and watch the hours change and the Ramadan offers appear.
+4. **Laptop, two windows:**
+   - left: the app;
+   - right: `?screen=dashboard`.
+   Switch on **Emergency mode** on the dashboard: the app stops directions and shows the exits. Switch it off again.
+   (This works between tabs of the same browser: there is no server yet.)
+5. **Kiosk:** open `?kiosk=A-G-ENT-S` on the laptop through the **Network URL** (not localhost). Search a shop and scan
+   its QR code with your phone: the same route opens on the phone.
+
 ### Handy demo links (URL test hooks)
 
 Add these to the address (they are also used by the screenshot script):
@@ -163,8 +194,15 @@ Add these to the address (they are also used by the screenshot script):
 | `?style=storm` | The v0.2 3D look (storm sky, dark architecture); the UI stays the v0.3 one |
 | `?quality=light` / `?quality=showcase` | Force the 3D quality level (Light = no shadows; default: picked per device) |
 | `?sheet=peek` / `?sheet=full` | The first screen's bottom sheet folded / full (default: half) |
+| (no parameters) | v0.5: Find me, the first screen |
+| `?from=A-B1-LA` | A plate link: skips Find me, "Found you" at Parking B1 · Lift A |
+| `?screen=offers` | The Offers tab |
+| `?screen=info` / `?screen=facilities` | Mall info (hours, Ramadan preview) / Facilities |
+| `?emergency=1` | Start in (demo) emergency mode |
+| `?kiosk=A-G-ENT-S` (`&kioskIdle=20`) | Kiosk mode at the South entrance (idle reset after 20 s; default 60) |
+| `?screen=dashboard` | The mall dashboard (open it in a second window next to the app) |
 
-Full list: `screen=home|search|place|navigate|arrived|car|scan`, `from=<plate id>`,
+Full list: `screen=home|search|place|navigate|arrived|car|scan|welcome|offers|info|facilities|emergency|dashboard`, `kiosk=<plate id>`, `kioskIdle=<s>`, `emergency=1`, `from=<plate id>`,
 `to=<shop | amenity | bay | plate id>`, `view` (`stack|floor|top|fpv`), `style` (`storm|classic`), `level`, `simT=<seconds>`, `step=<n>|connector`,
 `stepFree=1`, `q=<search text>`, `tile=food|restrooms|prayer|pharmacy|kids|exit`, `car=<bay id>`, `play=1`,
 `sheet=peek|half|full`.

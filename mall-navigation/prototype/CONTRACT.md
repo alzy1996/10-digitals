@@ -523,6 +523,41 @@ Materials, light, assets and fascias: [`DESIGN-REAL.md`](./DESIGN-REAL.md). Ever
   - lazy total <= 260 KB;
   - real assets <= 3072 KB raw (about 1511 used).
 
+## 3e. v0.5 additions (Mall Value)
+
+Screens, data and rules: [`DESIGN-MALL.md`](./DESIGN-MALL.md). The 3D engine is unchanged (it reuses `setScanPins`,
+`flyTo`, `setView`, `showRoute`, `setMarker`).
+
+- **Screens** (`state.screen`):
+  - `welcome` (Find me, the first screen);
+  - `offers` (a page, not a sheet);
+  - `info`, `facilities`, `emergency` (sheets).
+  - `dashboard` is a separate entry chosen in `main.jsx` (no App, no 3D).
+- **URL params** (`src/ui/urlState.js`):
+  - `screen` adds `welcome|offers|info|facilities|emergency|dashboard`;
+  - `kiosk=<anchorId>`, `kioskIdle=<s>`, `emergency=1`.
+  - No `screen` and no `from` → Find me. `from` alone → home + "Found you". A kiosk → home.
+- **Lazy screens** (`src/ui/lazyScreen.js`):
+  - `lazyScreen(load, exportName)` returns a forwardRef component with `preload()`; once preloaded it renders
+    synchronously (no Suspense flash).
+  - Search, place, navigate, arrived, car, scan, offers, info, facilities, emergency and the kiosk parts are lazy.
+  - A deep link preloads its screen before `ready`; the rest preload on idle.
+  - The simulator and next-turn model are `src/navKit.js` (lazy, preloaded with the route screens).
+- **Strings:** `addStrings(table)` registers a lazy chunk's strings (`src/i18n/strings-more.js`). `t()` and
+  `hasString()` see them.
+- **Sheets:**
+  - SheetContext gains `docked` (the wide layout: snap full, stretch, no handle, no drag).
+  - Sheet gains `halfRatio` (home: 0.62).
+  - A docked sheet is a plain screen obstacle (no `kind: 'sheet'`).
+- **Ops bus** (`src/ops/opsBus.js`):
+  - `createOpsBus({ onState, Channel })` → `{ state(), publish(patch), hello(), close() }`;
+  - messages: `{ type: 'hello' }` and `{ type: 'state', state: { rev, emergency: { on, message }, hoursPreview } }`;
+  - newer `rev` wins.
+  - The App applies emergency (stop sim, clear route and pick, screen `emergency`, exit pins) and `hoursPreview`.
+- **Test hooks:** `window.__dallni.getState()` adds `offers`, `homePick`, `stamps`, `ops`, `kiosk`, `attract`,
+  `hoursPreview`.
+- **Budgets:** first screen 105.8 of 110 KiB (unchanged budget); scene3d unchanged.
+
 ## 4. Quality bars
 
 - `npm run build` passes (including `tools/check-budgets.mjs`: first screen <= 110 KB, engine3d <= 220 KB,
