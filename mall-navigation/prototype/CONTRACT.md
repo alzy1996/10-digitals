@@ -492,6 +492,35 @@ Look, light, shadows and UI values: [`DESIGN-TOY.md`](./DESIGN-TOY.md). Every AP
 - **Budgets:** `scene3d` <= **60 KB** (raised from 52 KB in v0.3, reported to Sam), `engine3d` <= 220 KB, both <= 260 KB,
   first screen <= 110 KB.
 
+## 3d. v0.4 additions (real mall)
+
+Materials, light, assets and fascias: [`DESIGN-REAL.md`](./DESIGN-REAL.md). Every API above keeps its signature.
+
+- **`setSceneStyle(style)`.**
+  - Accepts `'real' | 'toy' | 'storm' | 'classic'`; the default is **`'real'`**.
+  - Real builds the toy geometry plus:
+    - a per-vertex `surface` id (`palette.surfaceOf`);
+    - furnished shops (`props.js`);
+    - neutral fascias with exact accent lines and glowing letters;
+    - atrium columns and directory totems.
+  - At Showcase it draws the textured `MeshStandardMaterial` (`realMaterials.js`), HDRI reflections and the post chain
+    (`post.js`). At Light quality it draws the toy materials and palette (`quality-rules.effectiveStyle`), swapped in
+    place without a rebuild.
+  - A geometry change (real / toy / storm-classic) rebuilds the venue; the App sets the style before `setVenue`.
+- **Assets:** `public/assets/real/` (CC0, `ASSETS-LICENSES.md`), loaded once from the same origin at Showcase.
+  - A failure keeps the plain look and logs one warning.
+- **Builders:**
+  - `buildInterior` returns `{ solid, glow, lamps, ceilH }`; the light panels moved to `lamps`.
+  - `REAL` flavour = `{ bevel: 0.06, lit: true, real: true }`; a level build gains `build.real`.
+- **`getStats()`** gains `post` (boolean) and `realAssets` (`'none' | 'loading' | 'ready' | 'failed'`).
+- **engineHost default:** `getSceneStyle: () => 'real'`.
+- **URL hooks:** `style=real|toy|storm|classic`.
+- **Budgets:**
+  - `scene3d` <= 60 KB (unchanged, about 57.8 used);
+  - `engine3d` <= 220 KB (about 186 used, with the composer and HDR loader);
+  - lazy total <= 260 KB;
+  - real assets <= 3072 KB raw (about 1511 used).
+
 ## 4. Quality bars
 
 - `npm run build` passes (including `tools/check-budgets.mjs`: first screen <= 110 KB, engine3d <= 220 KB,

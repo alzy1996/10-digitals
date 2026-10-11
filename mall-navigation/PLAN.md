@@ -2162,6 +2162,9 @@ Add these rows to §15.1. Only Q1 (the mall) is answered; everything else is sti
 | Contacts at malls (Q1d) | Sam knows nobody at Muscat Grand Mall, Mall of Muscat or any mall: the pilot needs a cold introduction | **ANSWERED (Q1d, 2026-10-10)** |
 | 3D art direction (overrides §19.2 "unlit architect's model, no realtime shadows" for the default look) | v0.3 "toy world": lit pastel blocks, bevels, a sun with soft shadows (Showcase quality only, never in the stacked Overview), white chunky game UI. Meaning colours (route, markers, sign faces, zone bands) stay unlit and exact. Storm (v0.2) and classic (v0.1) stay available | **ANSWERED (Sam picked "Bright Toy Game" from live mocks, 2026-10-10; built 2026-10-11)** |
 | 3D quality levels | Showcase (shadows, pixel ratio 2) vs Light (no shadows, 1.5), picked per device, `?quality=` override, auto-drop after 8 slow frames. Prototype `scene3d` budget 52 → 60 KiB (reported) | BUILT in the prototype (v0.3) |
+| 3D realism (v0.4, overrides the toy default; toy stays as the Light look) | "Real mall": CC0 photo textures (Poly Haven) mapped per surface, real indoor HDRI reflections, furnished shops, soft bloom (Showcase only), about 1.5 MB of same-origin assets | **ANSWERED (Sam picked "photo-real materials" from live mocks, 2026-10-11); BUILT** |
+| Sign fascias (changes "name on its category colour" for the real look) | Neutral dark fascia, plain-text backlit letters (AR + EN), a thin exact category-colour accent line; still no brand colours or logos without a written licence | PROPOSED (v0.4 default) |
+| Tone mapping | Khronos PBR Neutral in the post chain: colours under ~0.76 pass unchanged, so meaning colours (route, markers, accents) keep their hues | BUILT (v0.4) |
 
 **TIMELINE DELTA (§15.2, Option A)**
 

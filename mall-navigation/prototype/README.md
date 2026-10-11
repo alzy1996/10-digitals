@@ -5,7 +5,19 @@ It shows a game-like 3D model of a mall, finds routes between shops, parking bay
 turn-by-turn steps in Arabic and English, and plays the walk as a **simulation** so you can see the whole
 journey on your own phone, from above or **first person, at eye height inside the 3D model** (Walk view).
 
-**v0.3 ("toy world", the default)**: the mall looks like a friendly mobile game.
+**v0.4 ("real mall", the default)**: the mall looks like a real Gulf mall in a game.
+- **Materials:** photographed CC0 marble floors, plaster walls, wood shop floors.
+- **Reflections** from a real covered shopping arcade.
+- **Shops:** furnished behind glass (mannequins and racks, café tables, glowing screens, shelves), with dark fascias
+  carrying backlit Arabic and English letters and a thin category-colour line.
+- **Atrium:** stone columns with brass rings, and directory totems.
+- **Walk view:** a ceiling with glowing lamps.
+- **Glow:** a soft glow on lamps and signs.
+- **Download:** about 1.5 MB of textures, our own files, cached. Weak phones (and `?quality=light`) get the v0.3 toy
+  look below, with no download.
+- **Docs:** [`DESIGN-REAL.md`](./DESIGN-REAL.md); CONTRACT.md section 3d.
+
+**v0.3 ("toy world", `?style=toy`; also what Light quality shows)**: the mall looks like a friendly mobile game.
 - **The 3D:**
   - pastel shop blocks with soft bevelled edges;
   - a real sun with soft shadows on capable phones;
@@ -147,6 +159,7 @@ Add these to the address (they are also used by the screenshot script):
 | `?screen=navigate&to=occ-muttrah-kitchen&view=fpv&step=6` | Walk view on the last step (the bar's Arrived) |
 | `?screen=arrived&to=occ-abaya-atelier&view=fpv` | Walk view arrival at a shop facing the atrium void |
 | `?style=classic` | The v0.1 look (light classic scene, blue ribbon) |
+| `?style=toy` | The v0.3 toy-world 3D look (what Light quality shows) |
 | `?style=storm` | The v0.2 3D look (storm sky, dark architecture); the UI stays the v0.3 one |
 | `?quality=light` / `?quality=showcase` | Force the 3D quality level (Light = no shadows; default: picked per device) |
 | `?sheet=peek` / `?sheet=full` | The first screen's bottom sheet folded / full (default: half) |
@@ -342,7 +355,8 @@ What the shots cover (`.shots/app-<name>.png`):
     chunk fetched when a route opens.
   - The 3D part downloads once the first screen is up:
     - three.js + troika: about 177 KiB, budget 220 KiB;
-    - our own 3D code: about 53.5 KiB, budget 60 KiB since v0.3 (toy light, shadows and bevels). Offline caching (service worker) and the low-end-phone fallbacks from
+    - our own 3D code: about 57.8 KiB, budget 60 KiB since v0.3 (toy light, shadows and bevels).
+  - v0.4 adds about 1.5 MB of CC0 textures, loaded only at Showcase quality (raw budget 3 MB). Offline caching (service worker) and the low-end-phone fallbacks from
   PLAN.md 19.2 are not in this spike.
 - While a scan sheet is open, every QR plate shows as a tappable pin on the map (Floor view of your level, or
   the parking level when saving the car).
