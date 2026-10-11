@@ -43,8 +43,9 @@ function showActiveLevel(el) {
  *   PLAN.md section 9). Levels are listed top floor first, labelled like the lift buttons; the App caps its
  *   height to the space above the bottom sheet, and it scrolls inside that space.
  * `walkAvailable` (v0.2) adds a 4th menu row, "Walk view" (`onView('fpv')`), while a route is shown.
+ * `lead` (v0.5, Sam's Stitch mock): a node placed first in the row (the home's search pill).
  */
-export function MapControls({ index, lang, view, onView, onLevel, routeLevelIds, showViews = true, showLevels = true, walkAvailable = false }) {
+export function MapControls({ index, lang, view, onView, onLevel, routeLevelIds, showViews = true, showLevels = true, walkAvailable = false, lead = null }) {
   const [open, setOpen] = useState(false)
   const [more, setMore] = useState({ above: false, below: false })
   const boxRef = useRef(null)
@@ -103,7 +104,9 @@ export function MapControls({ index, lang, view, onView, onLevel, routeLevelIds,
   const modes = walkAvailable ? [...MODES, WALK_MODE] : MODES
   const current = modes.find((m) => m.mode === view.mode) ?? MODES[0]
   return (
-    <div className="map-ctrls">
+    // v0.5 home: `lead` (the search pill) opens the row before the View control; the level picker drops below it
+    <div className={`map-ctrls${lead ? ' has-lead' : ''}`}>
+      {lead}
       {showViews ? (
         <div className="view-box" ref={boxRef}>
           <button

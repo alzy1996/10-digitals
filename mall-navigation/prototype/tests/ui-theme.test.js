@@ -51,3 +51,40 @@ describe('browser bar colour (review #10)', () => {
     expect(app).toBe(meta)
   })
 })
+
+describe('v0.5 bento home (Sam Stitch mock): text contrast', async () => {
+  const { contrastRatio } = await import('../src/ui/model.js')
+  // [what, text, background, minimum]: 4.5:1 for normal text (WCAG AA)
+  const PAIRS = [
+    ['eyebrow on white', '#BE123C', '#FFFFFF', 4.5],
+    ['quest pill', '#78350F', '#FDE68A', 4.5],
+    ['spots pill', '#3730A3', '#E8EAFF', 4.5],
+    ['banner text on rose-700', '#FFFFFF', '#BE123C', 4.5],
+    ['banner text on pink-700', '#FFFFFF', '#BE185D', 4.5],
+    ['banner text on orange-700', '#FFFFFF', '#C2410C', 4.5],
+    ['banner eyebrow', '#9F1239', '#FFFFFF', 4.5],
+    ['go button end (blue-700)', '#FFFFFF', '#1D4ED8', 4.5],
+    ['food chip', '#713F12', '#FDE68A', 4.5],
+    ['food foot', '#92400E', '#FFEDD5', 4.5],
+    ['car chip', '#1E3A8A', '#BFDBFE', 4.5],
+    ['car foot', '#1E40AF', '#E0E7FF', 4.5],
+    ['new-brand chip', '#9F1239', '#FCE7F3', 4.5],
+    ['facilities chip', '#166534', '#D1FAE5', 4.5],
+    ['card sub line', '#475569', '#D1FAE5', 4.5],
+    ['bar eyebrow', '#64748B', '#FFFFFF', 4.5],
+    ['status open', '#166534', '#DCFCE7', 4.5],
+    ['status closed', '#475569', '#F1F5F9', 4.5],
+    ['tab label', '#3730A3', '#E8EAFF', 4.5],
+    ['quest button', '#78350F', '#FEF3C7', 4.5],
+    ['active level', '#FFFFFF', '#2F6FEB', 4.5],
+    ['entry level chip', '#4B5568', '#FFFFFF', 4.5],
+  ]
+  it.each(PAIRS)('%s', (_, fg, bg, min) => {
+    expect(contrastRatio(fg, bg)).toBeGreaterThanOrEqual(min)
+  })
+  it('the bento CSS uses these colours (no drift between the test and the stylesheet)', () => {
+    for (const [, fg, bg] of PAIRS) {
+      for (const c of [fg, bg]) if (c !== '#FFFFFF') expect(css.toUpperCase()).toContain(c)
+    }
+  })
+})

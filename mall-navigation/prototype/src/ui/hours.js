@@ -79,3 +79,12 @@ export function weekTable(index, date = new Date()) {
   const weekly = index?.venue?.meta?.hours?.weekly ?? {}
   return WEEK_ORDER.map((dow) => ({ dow, intervals: weekly[dow] ?? [], isToday: dow === today }))
 }
+
+/** The mall's status chip: { ok, short: "Open" | "Closed", text: "Open now · until 22:00" | "Closed now · opens 20:00" }. */
+export function mallStatus(index, lang, date = new Date(), previewId = null) {
+  const st = openNow(mallIntervals(index, date, previewId), venueDate(index, date).clock)
+  if (!st) return null
+  return st.isOpen
+    ? { ok: true, short: t('mall.open', lang), text: t('mall.openNowUntil', lang, { time: fmt(st.until, lang) }) }
+    : { ok: false, short: t('mall.closed', lang), text: t('mall.closedOpens', lang, { time: fmt(st.opensAt, lang) }) }
+}

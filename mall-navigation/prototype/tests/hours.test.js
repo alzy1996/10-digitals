@@ -93,3 +93,14 @@ describe('place screen hours line (model.hoursLine)', () => {
     expect(hoursLine(index, { hours: null }, 'en', at16)).toBeNull()
   })
 })
+
+describe('mall status chip', () => {
+  it('says open until the close, or closed and when it opens (Ramadan preview aware)', async () => {
+    const { mallStatus } = await import('../src/ui/hours.js')
+    const at16 = new Date('2026-10-11T12:00:00Z')
+    expect(mallStatus(index, 'en', at16)).toEqual({ ok: true, short: 'Open', text: 'Open now · until 22:00' })
+    expect(mallStatus(index, 'en', at16, 'ramadan-2027')).toEqual({ ok: false, short: 'Closed', text: 'Closed now · opens 20:00' })
+    expect(mallStatus(index, 'ar', at16).text).toContain('٢٢:٠٠')
+    expect(mallStatus({ venue: { meta: {} } }, 'en', at16)).toBeNull()
+  })
+})

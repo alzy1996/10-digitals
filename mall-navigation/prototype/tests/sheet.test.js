@@ -227,6 +227,10 @@ describe('sheet defaults, motion, parsing', () => {
     for (const s of ['home', 'place', 'navigate', 'arrived', 'car', 'scan']) expect(defaultSnap(s)).toBe('half')
     expect(defaultSnap('search')).toBe('full')
     expect(defaultSnap('search', { filtered: true })).toBe('half')
+    // v0.5: Find me and emergency open whole (their whole content is the task); the Mall info sheets at half
+    expect(defaultSnap('welcome')).toBe('full')
+    expect(defaultSnap('emergency')).toBe('full')
+    for (const s of ['info', 'facilities']) expect(defaultSnap(s)).toBe('half')
   })
 
   it('snap animation: 240-300 ms, instant under reduced motion', () => {

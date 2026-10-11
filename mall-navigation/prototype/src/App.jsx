@@ -29,6 +29,12 @@ import { Header } from './ui/Header.jsx'
 import { MapControls, WalkViewButton } from './ui/MapControls.jsx'
 import { MapView } from './ui/MapView.jsx'
 import { HomeScreen } from './ui/HomeScreen.jsx'
+import { WelcomeScreen } from './ui/WelcomeScreen.jsx'
+import { Icon } from './ui/icons.jsx'
+import { firstScreen } from './ui/firstScreen.js'
+import { mallStatus } from './ui/hours.js'
+import { homeCards } from './ui/homeModel.js'
+import { liveDeals, loadOffers, newBrands } from './offers/offers.js'
 import { bayForPlate, entityInfo, isParkingLevel, levelButtonLabel, levelName, pick } from './ui/model.js'
 import { plateLabel } from './routing/names.js'
 import { initialLang, readUrlParams, rememberLang } from './ui/urlState.js'
@@ -98,6 +104,12 @@ const INITIAL = {
   undo: null,
   /** v0.5: a special's id (e.g. 'ramadan-2027') whose hours every hours line shows; null = today's real hours */
   hoursPreview: null,
+  /** v0.5: offers.json once loaded ({ deals, newBrands }); null until then */
+  offers: null,
+  /** v0.5 home: the place a bento card picked (route preview + Start walking); null = none */
+  homePick: null,
+  /** v0.5 demo stamp quest: new brands the shopper arrived at (memory only) */
+  stamps: [],
   /** bottom sheet snap: `snap` applies while the sheet is `key` (sheetKeyOf); otherwise the screen's default */
   sheet: { key: null, snap: null },
 }
@@ -214,6 +226,8 @@ export default function App() {
   /** The Walk view HUD's measured layout (padding + obstacles), merged with the Arrived sheet on arrival. */
   const walkLayoutRef = useRef(null)
   const layoutRef = useRef(null)
+  /** v0.5: the next home framing is a "Found you" (after Find me, or a plate link): floor view, fly to you, toast */
+  const foundRef = useRef(false)
 
   const patch = useCallback((p) => dispatch({ type: 'patch', patch: p }), [])
   /** v0.5 wide layout (900 x 560 px and up): the sheets dock in a side panel, the map takes the rest (DESIGN-MALL.md) */
@@ -243,15 +257,18 @@ export default function App() {
         if (cancelled) return
         const p = readUrlParams()
         // a deep link's screen (and the route screens around it) render in the same commit as the app is ready
-        await Promise.all(chunksFor(p.screen ?? 'home').map((c) => c.preload()))
+        const first = firstScreen(p, { kiosk: Boolean(p.kiosk) })
+        await Promise.all(chunksFor(first.screen).map((c) => c.preload()))
         if (cancelled) return
         indexRef.current = idx
         const startId = p.from && idx.anchorById.has(p.from) ? p.from : idx.venue.meta.defaultStartAnchorId
         const youNow = youFromAnchor(idx, startId)
         const carNow = p.car && idx.bayById.has(p.car) ? { bayId: p.car, savedAt: Date.now(), plateId: null } : null
         const target = p.to ? resolveTarget(idx, p.to) : null
-        let scr = p.screen ?? 'home'
+        // v0.5: Find me ("welcome") first, unless the URL says where you are (a plate link: "Found you") or names a screen
+        let scr = first.screen
         if (ROUTE_SCREENS.has(scr) && !target) scr = 'home'
+        foundRef.current = first.found
         const carLevel = carNow ? idx.bayById.get(carNow.bayId).levelId : null
         const parkingTop = [...idx.levels].filter((l) => l.kind === 'parking').sort((a, b) => b.ordinal - a.ordinal)[0]?.id
         let levelId = youNow?.levelId ?? idx.levels[0].id
@@ -301,6 +318,10 @@ export default function App() {
       })
       // the other screens' chunks, so the shopper's next tap opens its sheet at once
       preloadAllScreens()
+      // v0.5 offers (deals + new brands): small, same origin; no offers file means no offer surfaces
+      loadOffers()
+        .then((d) => patch({ offers: d }))
+        .catch(() => patch({ offers: { deals: [], newBrands: [] } }))
     }
     if (typeof window.requestIdleCallback === 'function') {
       handle = window.requestIdleCallback(go, { timeout: 600 })
@@ -319,6 +340,25 @@ export default function App() {
   routeRef.current = route
 
   const info = useMemo(() => (index && state.targetId ? entityInfo(index, state.targetId) : null), [index, state.targetId])
+
+  // v0.5 offers and the bento home's numbers (walk times from the you-are-here the shopper set; never GPS)
+  const deals = useMemo(() => (index && state.offers ? liveDeals(index, state.offers, { previewId: state.hoursPreview }) : []), [index, state.offers, state.hoursPreview])
+  const brands = useMemo(() => (index && state.offers ? newBrands(index, state.offers) : []), [index, state.offers])
+  const homeTimes = useMemo(() => (index && you && (screen === 'home' || screen === 'offers' || screen === 'facilities') ? travelTimesFrom(index, you.nodeId, { stepFree: state.stepFree }) : null), [index, you, screen, state.stepFree])
+  const cards = useMemo(() => (index ? homeCards(index, { times: homeTimes, deals, brands, stamps: state.stamps }) : null), [index, homeTimes, deals, brands, state.stamps])
+  // a bento card's pick: its route shows on the map, the bar offers Start walking
+  const pickRoute = useMemo(() => {
+    if (!index || !you || !state.homePick || screen !== 'home') return null
+    return findRouteToTarget(index, you.nodeId, state.homePick, { stepFree: state.stepFree })
+  }, [index, you, state.homePick, screen, state.stepFree])
+  const picked = useMemo(() => {
+    if (!index || !state.homePick) return null
+    const pi = entityInfo(index, state.homePick)
+    const to = state.homePick === car?.bayId ? t('home.findMyCar', lang) : pi ? pick(pi.name, lang) : ''
+    const from = you ? pick(you.label, lang) : ''
+    const min = pickRoute ? t('home.minutes', lang, { n: Math.max(1, Math.round(pickRoute.etaS / 60)) }) : null
+    return { id: state.homePick, line: `${from} → ${to}${min ? ` · ${min}` : ''}` }
+  }, [index, state.homePick, car, you, lang, pickRoute])
   const focusLevelId = view.levelId
   const theme = index && focusLevelId && isParkingLevel(index, focusLevelId) ? 'basement' : 'sunlight'
 
@@ -367,7 +407,7 @@ export default function App() {
   }, [index, car])
 
   // route + destination marker (only re-sent when the shown route really changes)
-  const shownRoute = index && ROUTE_SCREENS.has(screen) ? route : null
+  const shownRoute = index && ROUTE_SCREENS.has(screen) ? route : index && screen === 'home' ? pickRoute : null
   useEffect(() => {
     if (!index) return
     if (shownRouteRef.current === shownRoute) return
@@ -377,7 +417,7 @@ export default function App() {
 
   // destination marker: none when the destination is the saved car (the car marker is the destination);
   // on arrival only its green ring, on the floor in front of the door (PLAN.md 19.2)
-  const destIsCar = Boolean(car && state.targetId && car.bayId === state.targetId)
+  const destIsCar = Boolean(car && ((ROUTE_SCREENS.has(screen) && state.targetId === car.bayId) || (screen === 'home' && state.homePick === car.bayId)))
   useEffect(() => {
     if (!index) return
     const last = shownRoute?.points[shownRoute.points.length - 1]
@@ -417,6 +457,36 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, scanKey])
 
+  // v0.5 home pick: frame the route like the place screen (the destination's floor, the whole route), back to the
+  // home framing when the pick is cleared; the pick ends when home does
+  const pickKeyRef = useRef(null)
+  useEffect(() => {
+    if (!index) return
+    const key = screen === 'home' ? state.homePick : null
+    if (pickKeyRef.current === key) return
+    const had = pickKeyRef.current
+    pickKeyRef.current = key
+    const s = stateRef.current
+    if (key && pickRoute) {
+      const destLevel = pickRoute.points[pickRoute.points.length - 1].levelId
+      goView(s.view.mode === 'top' ? 'top' : 'floor', destLevel, 'route')
+    } else if (had && screen === 'home' && s.you) goView(s.view.mode, s.you.levelId, 'level')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, screen, state.homePick, pickRoute])
+  useEffect(() => {
+    if (screen !== 'home' && stateRef.current.homePick) patch({ homePick: null })
+  }, [screen, patch])
+
+  // v0.5 demo stamp quest: arriving at one of the new brands collects its stamp (memory only)
+  useEffect(() => {
+    if (screen !== 'arrived' || !state.targetId || !brands.some((b) => b.occupantId === state.targetId)) return
+    if (stateRef.current.stamps.includes(state.targetId)) return
+    const stamps = [...stateRef.current.stamps, state.targetId]
+    patch({ stamps })
+    showNote('stamp', t('quest.stamp', stateRef.current.lang, { n: stamps.length }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, state.targetId, brands])
+
   // ------------------------------------------------------------------ toasts ("Now on Level 1")
   const showToast = useCallback((levelId, ms = TOAST_MS) => {
     const idx = indexRef.current
@@ -425,6 +495,13 @@ export default function App() {
     patch({ toast: { levelId, key: Date.now() } })
     toastTimer.current = setTimeout(() => patch({ toast: null }), ms)
   }, [patch])
+  /** v0.5 message toasts: "Found you · …", "Stamp collected · 2/4" */
+  const showNote = useCallback((kind, text, ms = TOAST_MS) => {
+    clearTimeout(toastTimer.current)
+    patch({ toast: { kind, text, key: Date.now() } })
+    toastTimer.current = setTimeout(() => patch({ toast: null }), ms)
+  }, [patch])
+  const openSearch = useCallback(() => patch({ screen: 'search', tile: null, category: null }), [patch])
   useEffect(
     () => () => {
       clearTimeout(toastTimer.current)
@@ -730,7 +807,7 @@ export default function App() {
   }, [])
   /** Highest top edge of a sheet at full: under the header (in the Walk view: under the HUD's top row). */
   const sheetTopLimit = useCallback(() => {
-    const header = topRef.current?.querySelector('.header')
+    const header = topRef.current?.querySelector('.header-row')
     const r = header?.getBoundingClientRect()
     if (r && r.height > 0) return Math.round(r.bottom + (wideRef.current ? 12 : 8))
     return Math.round(walkLayoutRef.current?.padding?.top ?? 88)
@@ -775,7 +852,7 @@ export default function App() {
         return
       }
       const top = topRef.current
-      const header = top?.querySelector('.header')
+      const header = top?.querySelector('.header-row')
       const appEl = document.querySelector('.app')
       const appH = appEl?.clientHeight ?? window.innerHeight
       // the sheet's settled visible rect (Sheet.jsx onLayout; while it moves its box is taller and slid down)
@@ -801,7 +878,9 @@ export default function App() {
       const shortStrip = !wideNow && Boolean(sheetRect) && sheetRect.top - headerBottom < 300
       const vcR = !fpv && (s.screen === 'arrived' || shortStrip) && !ctrls?.classList.contains('ctrls-covered') ? top?.querySelector('.view-ctrl')?.getBoundingClientRect() : null
       // (Arrived in the Walk view: the HUD's SIMULATION row on top, the Arrived sheet at the bottom)
-      const topPx = fpv ? (wl?.padding.top ?? 0) : header ? Math.max(headerBottom, vcR && vcR.height > 0 ? vcR.bottom : 0) + 8 : 0
+      // (v0.5 home: the search pill's row is under the header too)
+      const leadR = !fpv ? top?.querySelector('.search-pill')?.getBoundingClientRect() : null
+      const topPx = fpv ? (wl?.padding.top ?? 0) : header ? Math.max(headerBottom, vcR && vcR.height > 0 ? vcR.bottom : 0, leadR && leadR.height > 0 ? leadR.bottom : 0) + 8 : 0
       // sheets float 12 px above the bottom edge: everything below the sheet's top is taken
       const bottomPx = sheetRect ? appH - sheetRect.top + 8 : 0
       // the level picker never runs under the sheet (nor the Walk view pill below it): compact buttons, then scrolling,
@@ -838,7 +917,7 @@ export default function App() {
         // the level picker (layoutModel.widePadding)
         const pr = (sheet ?? header)?.getBoundingClientRect()
         const vcr = top?.querySelector('.view-ctrl')?.getBoundingClientRect()
-        const ctrlsBottom = Math.max(vcr && vcr.height > 0 ? vcr.bottom : 0, 16) - host.top
+        const ctrlsBottom = Math.max(vcr && vcr.height > 0 ? vcr.bottom : 0, leadR && leadR.height > 0 ? leadR.bottom : 0, 16) - host.top
         sendPadding(
           widePadding({
             appW: host.right - host.left,
@@ -861,9 +940,11 @@ export default function App() {
       add(header)
       if (!ctrls?.classList.contains('ctrls-covered')) {
         add(top?.querySelector('.view-ctrl'))
+        add(top?.querySelector('.search-pill'))
         if (lr) add(levels)
       }
       add(pill)
+      add(document.querySelector('.here-float'))
       // (a docked sheet is a plain obstacle: kind 'sheet' would cut the map off below its top edge, the whole map here)
       if (sheetRect) rects.push({ x: appRect.left + sheetRect.left - host.left, y: appRect.top + sheetRect.top - host.top - 6, w: sheetRect.width, h: sheetRect.height + 6, ...(wideNow ? {} : { kind: 'sheet' }) })
       sendObstacles(rects)
@@ -907,8 +988,18 @@ export default function App() {
       s = stateRef.current
     }
     switch (screen) {
+      case 'welcome': {
+        goView('stack', s.you?.levelId ?? s.view.levelId, 'level')
+        break
+      }
       case 'home': {
-        if (s.you) goView(s.view.mode, s.you.levelId, 'level')
+        if (s.you && foundRef.current) {
+          // "Found you": the floor you are on, the camera on you, the toast with the place and level
+          foundRef.current = false
+          goView('floor', s.you.levelId, 'none')
+          engine.flyTo({ levelId: s.you.levelId, x: s.you.x, y: s.you.y, distance: 70, tiltDeg: 50, clear: [{ x: s.you.x, y: s.you.y, pin: true }] }, 1200)
+          showNote('found', t('found.toast', s.lang, { place: pick(s.you.label, s.lang), level: levelName(index, s.you.levelId, s.lang) }))
+        } else if (s.you) goView(s.view.mode, s.you.levelId, 'level')
         break
       }
       case 'scan': {
@@ -1256,7 +1347,15 @@ export default function App() {
         </Suspense>
       ) : (
         <div className="top" ref={topRef}>
-          <Header index={index} lang={lang} onToggleLang={toggleLang} />
+          <Header
+            index={index}
+            lang={lang}
+            onToggleLang={toggleLang}
+            status={index ? mallStatus(index, lang, new Date(), state.hoursPreview) : null}
+            stamps={state.stamps.length}
+            questTotal={brands.length}
+            onQuest={() => patch({ screen: 'offers' })}
+          />
           {index && screen !== 'search' && !state.no3d ? (
             <MapControls
               index={index}
@@ -1264,8 +1363,16 @@ export default function App() {
               view={view}
               onView={onViewMode}
               onLevel={onLevel}
-              routeLevelIds={ROUTE_SCREENS.has(screen) ? route?.levelIds : null}
+              routeLevelIds={ROUTE_SCREENS.has(screen) ? route?.levelIds : screen === 'home' ? pickRoute?.levelIds : null}
               walkAvailable={Boolean(route && (screen === 'navigate' || screen === 'arrived'))}
+              lead={
+                screen === 'home' ? (
+                  <button type="button" className="search-pill" onClick={openSearch} aria-label={t('home.searchLabel', lang)}>
+                    <Icon name="search" size={22} />
+                    <span className="search-pill-ph">{t('home.searchPlaceholder', lang)}</span>
+                  </button>
+                ) : null
+              }
             />
           ) : null}
         </div>
@@ -1273,7 +1380,14 @@ export default function App() {
 
       {walkPill ? <WalkViewButton lang={lang} onClick={enterWalk} hidden={Boolean(state.toast)} /> : null}
 
-      {state.toast && index ? (
+      {state.toast?.kind && index ? (
+        <div className={`toast toast-${state.toast.kind}`} role="status" key={state.toast.key}>
+          <span className="toast-icon" aria-hidden="true">
+            <Icon name={state.toast.kind === 'stamp' ? 'star' : 'pin'} size={20} />
+          </span>
+          <span>{state.toast.text}</span>
+        </div>
+      ) : state.toast && index ? (
         <div className="toast" role="status" key={state.toast.key}>
           <span className="level-chip" aria-hidden="true">
             <bdi dir="ltr">{levelButtonLabel(index, state.toast.levelId, lang)}</bdi>
@@ -1296,6 +1410,21 @@ export default function App() {
       {/* a screen tapped before its chunk arrived (rare: they preload on idle) shows the loading sheet meanwhile */}
       <Suspense fallback={<LoadingSheet lang={lang} />}>
 
+      {index && screen === 'welcome' ? (
+        <WelcomeScreen
+          ref={sheetRef}
+          index={index}
+          lang={lang}
+          hoursPreview={state.hoursPreview}
+          onScan={() => patch({ screen: 'scan', returnTo: 'welcome' })}
+          onPick={(id) => {
+            foundRef.current = true
+            patch({ you: youFromAnchor(index, id), screen: 'home' })
+          }}
+          onBrowse={() => patch({ screen: 'home' })}
+        />
+      ) : null}
+
       {index && screen === 'home' ? (
         <HomeScreen
           ref={sheetRef}
@@ -1303,11 +1432,32 @@ export default function App() {
           lang={lang}
           you={you}
           car={car}
-          onScan={() => patch({ screen: 'scan', returnTo: 'home' })}
-          onSearchFocus={() => patch({ screen: 'search', tile: null, category: null })}
+          cards={cards}
+          stamps={state.stamps.length}
+          questTotal={brands.length}
+          picked={picked}
+          onTab={(tab) => tab === 'offers' && patch({ screen: 'offers' })}
+          onSearch={openSearch}
           onTile={(id) => patch({ screen: 'search', tile: id, category: null, query: '' })}
           onCar={() => patch({ screen: 'car', carStage: car ? 'card' : 'scan', plateId: null })}
+          onSelect={(id) => patch({ homePick: state.homePick === id ? null : id })}
+          onStart={() => patch({ targetId: state.homePick, homePick: null, screen: 'navigate', stepIndex: 0, userView: false })}
+          onFacilities={() => patch({ screen: 'facilities' })}
+          onOffers={() => patch({ screen: 'offers' })}
         />
+      ) : null}
+
+      {/* (a toast uses the same row above the sheet for a moment, and a picked route starts under it: the pill steps
+          aside; the bar says where you are) */}
+      {index && screen === 'home' && you && !state.toast && !state.homePick ? (
+        <div className="here-float-wrap">
+          <button type="button" className="here-float" onClick={() => patch({ screen: 'scan', returnTo: 'home' })} aria-label={`${t('home.youAreHere', lang, { place: pick(you.label, lang) })} · ${t('home.change', lang)}`}>
+            <span className="here-float-dot" aria-hidden="true" />
+            <span className="here-float-text">
+              {pick(you.label, lang)} · <bdi dir="ltr">{levelButtonLabel(index, you.levelId, lang)}</bdi>
+            </span>
+          </button>
+        </div>
       ) : null}
 
       {index && screen === 'search' ? (
@@ -1409,7 +1559,11 @@ export default function App() {
           index={index}
           lang={lang}
           you={you}
-          onPick={(id) => patch({ you: youFromAnchor(index, id), screen: state.returnTo === 'scan' ? 'home' : state.returnTo })}
+          onPick={(id) => {
+            // from Find me: the scan is how the shopper is found ("Found you" on the map)
+            if (state.returnTo === 'welcome') foundRef.current = true
+            patch({ you: youFromAnchor(index, id), screen: state.returnTo === 'scan' || state.returnTo === 'welcome' ? 'home' : state.returnTo })
+          }}
           onBack={() => patch({ screen: state.returnTo === 'scan' ? 'home' : state.returnTo })}
         />
       ) : null}

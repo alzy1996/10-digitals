@@ -172,6 +172,7 @@ export function snapDuration(reducedMotion) {
  */
 export function defaultSnap(screen, { filtered = false } = {}) {
   if (screen === 'search' && !filtered) return 'full'
+  if (screen === 'welcome' || screen === 'emergency') return 'full'
   return 'half'
 }
 

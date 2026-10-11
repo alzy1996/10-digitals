@@ -67,7 +67,7 @@ function collectRows(body, inner) {
  * After each settle the sheet reports its visible rect (`onLayout`) so the App frames the map in the free area.
  */
 export const Sheet = forwardRef(function Sheet(
-  { children, head = null, footer = null, label, className = '', bodyAfterFooter = false, stretch = false, expandOnType = false, lang: langProp },
+  { children, head = null, footer = null, label, className = '', bodyAfterFooter = false, stretch = false, expandOnType = false, halfRatio = 0.5, lang: langProp },
   ref,
 ) {
   const ctx = useContext(SheetContext)
@@ -107,6 +107,9 @@ export const Sheet = forwardRef(function Sheet(
   const [more, setMore] = useState(false)
   const bodyId = useId()
   const stretchRef = useRef(stretch)
+  /** the half snap's share of the viewport (v0.5 home: a little taller, so the bento's first cards show at half) */
+  const halfRatioRef = useRef(halfRatio)
+  halfRatioRef.current = halfRatio
   stretchRef.current = stretch || docked
   const afterRef = useRef(bodyAfterFooter)
   afterRef.current = bodyAfterFooter
@@ -234,7 +237,7 @@ export const Sheet = forwardRef(function Sheet(
     const bodyH = body.scrollHeight
     const rows = collectRows(body, inner)
     const topLimit = ctxRef.current?.topLimit?.() ?? 88
-    const h = computeSnapHeights({ viewportH: vh, topLimit, bottomGap: gap, chrome, bodyH, rows, stretch: stretchRef.current })
+    const h = computeSnapHeights({ viewportH: vh, topLimit, bottomGap: gap, chrome, bodyH, rows, stretch: stretchRef.current, halfRatio: halfRatioRef.current })
     metricsRef.current = { vh, gap, chrome, bodyH, rows, topLimit }
     const prev = heightsRef.current
     heightsRef.current = h

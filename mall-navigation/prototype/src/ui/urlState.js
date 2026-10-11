@@ -15,9 +15,14 @@
  *   &car=<bayId>                           a saved car
  *   &play=1                                navigate: start the simulated walk
  *   &sheet=peek|half|full                  the first screen's bottom sheet snap (default: half; search: full)
+ *
+ * v0.5 (DESIGN-MALL.md):
+ *   &screen=welcome|offers|info|facilities|emergency|dashboard   (no screen and no from: Find me, "welcome")
+ *   &kiosk=<anchorId>                      kiosk mode at that plate (&kioskIdle=<s>: idle reset, default 60)
+ *   &emergency=1                           start in emergency mode (demo)
  */
 
-const SCREENS = ['home', 'search', 'place', 'navigate', 'arrived', 'car', 'scan']
+const SCREENS = ['home', 'search', 'place', 'navigate', 'arrived', 'car', 'scan', 'welcome', 'offers', 'info', 'facilities', 'emergency', 'dashboard']
 const VIEWS = ['stack', 'floor', 'top', 'fpv']
 const STYLES = ['real', 'toy', 'storm', 'classic']
 const SHEET_SNAPS = ['peek', 'half', 'full']
@@ -55,6 +60,9 @@ export function readUrlParams(search = typeof location !== 'undefined' ? locatio
     style: STYLES.includes(str('style')) ? str('style') : null,
     quality: str('quality') === 'showcase' || str('quality') === 'light' ? str('quality') : null,
     sheet: SHEET_SNAPS.includes(str('sheet')) ? str('sheet') : null,
+    kiosk: str('kiosk'),
+    kioskIdle: num('kioskIdle'),
+    emergency: str('emergency') === '1',
   }
 }
 

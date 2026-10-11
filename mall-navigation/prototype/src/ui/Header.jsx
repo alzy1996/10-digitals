@@ -3,23 +3,43 @@ import { Icon } from './icons.jsx'
 import { pick } from './model.js'
 
 /**
- * Header card: brand mark, venue name, the PROTOTYPE · SIMULATION badge and the 56 px "ع / EN" toggle.
- * The toggle is labelled in the language it switches to (PLAN.md section 8).
+ * Header (v0.5, Sam's Stitch mock): one white pill with the brand mark, the venue name and its open / closed chip, the
+ * PROTOTYPE · SIMULATION badge on the second line; then the demo stamp-quest pill (when the offers are loaded) and the
+ * round "ع / EN" toggle, labelled in the language it switches to (PLAN.md section 8).
  */
-export function Header({ index, lang, onToggleLang }) {
+export function Header({ index, lang, onToggleLang, status = null, stamps = 0, questTotal = 0, onQuest }) {
   const target = lang === 'ar' ? 'en' : 'ar'
   const name = index ? pick(index.venue.meta.name, lang) : t('app.name', lang)
   return (
-    <header className="header">
-      <div className="brand-mark" aria-hidden="true">
-        <Icon name="pin" size={24} />
-      </div>
-      <div className="header-text">
-        <div className="venue-name" title={name}>
-          {name}
+    <header className="header-row">
+      <div className="header">
+        <div className="brand-mark" aria-hidden="true">
+          <Icon name="pin" size={22} />
         </div>
-        <span className="badge-sim">{t('app.badge', lang)}</span>
+        <div className="header-text">
+          <div className="venue-line">
+            <span className="venue-name" title={name}>
+              {name}
+            </span>
+            {status ? (
+              <span className={`venue-status ${status.ok ? 'is-open' : 'is-closed'}`} title={status.text}>
+                {status.short}
+              </span>
+            ) : null}
+          </div>
+          <span className="badge-sim">{t('app.badge', lang)}</span>
+        </div>
       </div>
+      {questTotal ? (
+        <button type="button" className="quest-btn" onClick={onQuest} aria-label={`${t('home.questLabel', lang)} · ${t('home.questPill', lang, { n: stamps })}`}>
+          <Icon name="star" size={18} />
+          <span>
+            <bdi dir="ltr">
+              {lang === 'ar' ? `${stamps.toLocaleString('ar-EG')}/٤` : `${stamps}/${questTotal}`}
+            </bdi>
+          </span>
+        </button>
+      ) : null}
       <button
         type="button"
         className="lang-btn"
