@@ -15,9 +15,10 @@
  * - the two lazy 3D chunks together                                                <= 260 KB
  * - 3D sign fonts (readex-latin-600 + readex-arabic-600 .woff) in total             <= 50 KB
  * - any single font file                                                            <= 50 KB
+ * - real-mall assets (public/assets/real: WebP textures + HDRI, already compressed: raw bytes) <= 3072 KB (v0.4)
  * Prints a table and exits with code 1 when anything is over (or a budgeted file is missing).
  */
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
@@ -33,6 +34,7 @@ export const BUDGETS = Object.freeze({
   lazy3dTotalKB: 260,
   signFontsKB: 50,
   fontKB: 50,
+  realAssetsKB: 3072,
 })
 
 const gz = (file) => gzipSync(readFileSync(file), { level: 9 }).length
@@ -62,6 +64,11 @@ export function checkBudgets(dist = DIST) {
   rows.push({ item: 'lazy 3D total (engine3d + scene3d)', files: [...libs, ...scene], kb: libsKB + sceneKB, budget: BUDGETS.lazy3dTotalKB, ok: libs.length > 0 && scene.length > 0 && libsKB + sceneKB <= BUDGETS.lazy3dTotalKB })
   row('3D sign fonts (.woff subsets)', files.filter((f) => /^readex-(latin|arabic)-600-.*\.woff$/.test(f)), BUDGETS.signFontsKB)
   for (const f of files.filter((x) => /\.(woff2?|ttf|otf)$/.test(x))) row(`font ${f}`, [f], BUDGETS.fontKB)
+  // real-mall assets are WebP / RGBE already: counted raw, not gzipped
+  const realDir = join(assets, 'real')
+  const real = existsSync(realDir) ? readdirSync(realDir) : []
+  const realKB = real.reduce((s, f) => s + statSync(join(realDir, f)).size, 0) / KB
+  rows.push({ item: 'real assets (public/assets/real, raw)', files: real, kb: realKB, budget: BUDGETS.realAssetsKB, ok: real.length > 0 && realKB <= BUDGETS.realAssetsKB })
   return { rows, ok: rows.every((r) => r.ok) }
 }
 
