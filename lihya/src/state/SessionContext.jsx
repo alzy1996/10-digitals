@@ -23,7 +23,7 @@ export const ANSWER_KEYS = Object.freeze(['workRule', 'visitFrequency', 'groomin
 export const SAFETY_KEYS = Object.freeze(['patchTest48h', 'metallicSaltProducts', 'pureHenna', 'irritationToday']);
 export const ZONE_CONFIRM_LABELS = Object.freeze(['dense', 'medium', 'patchy', 'none']);
 export const CAPTURE_MODES = Object.freeze(['full', 'quick']);
-export const WIPE_REASONS = Object.freeze(['next', 'idle', 'manual']);
+export const WIPE_REASONS = Object.freeze(['next', 'idle', 'manual', 'newCustomer', 'lookCode']);
 
 /** Same values as ZONE_CONFIRM_DENSITY in src/ai/analysis/profile.js (barber's zone confirmation). */
 const ZONE_CONFIRM_DENSITY = Object.freeze({ dense: 85, medium: 60, patchy: 30, none: 0 });
@@ -53,6 +53,8 @@ export function initialSessionState() {
     aiResult: null,
     cutCard: null,
     keepPhotos: false,
+    // Customer's answer on the profile screen: save the coarse labels to his record (null = not asked).
+    keepProfileConsent: null,
     safety: { patchTest48h: null, metallicSaltProducts: null, pureHenna: null, irritationToday: null },
   };
 }
@@ -198,6 +200,8 @@ export function sessionReducer(state, action) {
       return { ...s, cutCard: a.cutCard || null };
     case 'setKeepPhotos':
       return { ...s, keepPhotos: Boolean(a.value) };
+    case 'setKeepProfileConsent':
+      return { ...s, keepProfileConsent: a.value === null || a.value === undefined ? null : Boolean(a.value) };
     case 'setSafety':
       if (!SAFETY_KEYS.includes(a.key)) return s;
       return { ...s, safety: { ...s.safety, [a.key]: a.value === undefined ? null : a.value } };
@@ -276,6 +280,7 @@ export function snapshotOf(s) {
     consultationId: s.consultationId,
     cutCard: s.cutCard,
     keepPhotos: s.keepPhotos,
+    keepProfileConsent: s.keepProfileConsent,
     safety: s.safety,
   };
 }
@@ -303,6 +308,7 @@ export function restoreSnapshot(state, snap) {
     consultationId: snap.consultationId || null,
     cutCard: snap.cutCard || null,
     keepPhotos: Boolean(snap.keepPhotos),
+    keepProfileConsent: snap.keepProfileConsent === true || snap.keepProfileConsent === false ? snap.keepProfileConsent : null,
     safety: { ...base.safety, ...pickObj(snap.safety, {}) },
   };
 }
@@ -625,6 +631,7 @@ export function SessionProvider({ mode = 'chair', shopId, children }) {
       },
       setCutCard: (c) => dispatch({ type: 'setCutCard', cutCard: c }),
       setKeepPhotos: (b) => dispatch({ type: 'setKeepPhotos', value: b }),
+      setKeepProfileConsent: (b) => dispatch({ type: 'setKeepProfileConsent', value: b }),
       setSafety: (key, value) => dispatch({ type: 'setSafety', key, value }),
       wipe,
       touch,

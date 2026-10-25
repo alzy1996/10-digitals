@@ -229,6 +229,8 @@ export async function getIdToken(force = false) {
 }
 
 const ERROR_KEYS = {
+  // The Google popup helper could not load (no or filtered internet).
+  'auth/internal-error': 'auth.error.network',
   'auth/invalid-email': 'auth.error.invalidEmail',
   'auth/missing-email': 'auth.error.missingEmail',
   'auth/invalid-action-code': 'auth.error.linkInvalid',

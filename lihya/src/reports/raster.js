@@ -116,6 +116,8 @@ export async function rasterize(node, { background = '#FFFFFF', scale = RASTER_S
   const rect = node.getBoundingClientRect();
   return html2canvas(node, {
     scale,
+    // Never clone the dev-server error overlay into a PDF.
+    ignoreElements: (el) => el.tagName === 'VITE-ERROR-OVERLAY',
     backgroundColor: background,
     useCORS: true,
     logging: false,

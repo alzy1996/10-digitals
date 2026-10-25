@@ -7,13 +7,13 @@ import { watchStatsRange } from '../services/stats.js';
 import { watchStaff } from '../services/staff.js';
 import { watchProducts } from '../services/products.js';
 import { watchStyles } from '../services/styles.js';
-import { watchRecentClients } from '../services/clients.js';
+import { listClients } from '../services/clients.js';
 import { summarizeConsultations } from '../reports/summary.js';
 import { downloadBlob, exportClientsCsv, exportConsultationsCsv, exportStatsCsv } from '../reports/csv.js';
 import { dailyReportFilename, dailyReportPdf } from '../reports/dailyReportPdf.js';
 import { shareFile } from '../reports/share.js';
 import { printElement } from '../reports/raster.js';
-import { addDaysToKey, dayKeysBetween, formatDayKey } from '../lib/time.js';
+import { addDaysToKey, dayKeysBetween } from '../lib/time.js';
 import { formatOmr, formatPercent } from '../lib/format.js';
 import BottomAction from '../components/BottomAction.jsx';
 import Button from '../components/Button.jsx';
@@ -29,11 +29,10 @@ import ConsultationTable, { rowView } from './owner/ConsultationTable.jsx';
 import RangePrint, { PRINT_WIDTH } from './owner/RangePrint.jsx';
 import { Section } from './owner/ui.jsx';
 import { useToday } from './owner/hooks.js';
-import { firstValue, formatDecision, isNum, oneDecimal, rangeError, rangeFor, shortDay } from './owner/util.js';
+import { formatDecision, isNum, mediumDay, oneDecimal, rangeError, rangeFor, shortDay } from './owner/util.js';
 
 const EMPTY = Object.freeze([]);
 const PRESETS = ['today', 'yesterday', 'week', 'month', 'custom'];
-const CLIENT_EXPORT_MAX = 50;
 
 function NoValue({ label }) {
   return (
@@ -118,8 +117,8 @@ export default function S20Reports() {
   const rangeText = !valid
     ? ''
     : singleDay
-      ? formatDayKey(start, lang)
-      : t('owner.rep.range.text', { from: formatDayKey(start, lang), to: formatDayKey(end, lang), n: days.length });
+      ? mediumDay(start, lang)
+      : t('owner.rep.range.text', { from: mediumDay(start, lang), to: mediumDay(end, lang), n: days.length });
 
   const presetOptions = PRESETS.map((p) => ({ value: p, label: t(`owner.rep.preset.${p}`), icon: p === 'custom' ? 'calendar' : undefined }));
 
@@ -142,7 +141,7 @@ export default function S20Reports() {
         includeDemo,
       });
       const name = dailyReportFilename(pdfDay);
-      const res = await shareFile(blob, name, t('owner.rep.pdf.shareText', { date: formatDayKey(pdfDay, lang) }));
+      const res = await shareFile(blob, name, t('owner.rep.pdf.shareText', { date: mediumDay(pdfDay, lang) }));
       if (res === 'downloaded') show({ message: t('owner.rep.saved', { file: name }) });
       else if (res === 'failed') show({ message: t('owner.rep.pdf.failed') });
     } catch (err) {
@@ -158,7 +157,8 @@ export default function S20Reports() {
     else show({ message: t('owner.rep.csv.failed') });
   };
 
-  const recentClients = () => firstValue((cb, onError) => watchRecentClients(shopId, CLIENT_EXPORT_MAX, cb, onError));
+  // Every client (labels only); demo clients are filtered by the export itself.
+  const recentClients = () => listClients(shopId, { includeDemo: true });
 
   const exportConsultations = async () => {
     if (busy) return;
@@ -226,8 +226,14 @@ export default function S20Reports() {
   // ---------------------------------------------------------------- view
 
   const footer = (
-    <BottomAction>
-      <Button icon="download" onClick={makePdf} loading={busy === 'pdf'} disabled={!valid || loading || Boolean(failed)}>
+    <BottomAction className="lg:items-end">
+      <Button
+        icon="download"
+        onClick={makePdf}
+        loading={busy === 'pdf'}
+        disabled={!valid || loading || Boolean(failed)}
+        className="lg:w-auto lg:min-w-[360px]"
+      >
         {busy === 'pdf' ? t('owner.rep.pdf.making') : t('owner.rep.pdf.button', { date: shortDay(pdfDay, lang) })}
       </Button>
     </BottomAction>
@@ -333,25 +339,27 @@ export default function S20Reports() {
                 </div>
               </section>
 
-              <div className="grid items-start gap-4 lg:grid-cols-3">
+              <div className="grid items-start gap-4 xl:grid-cols-3">
                 <Section
                   title={t('owner.rep.export.title')}
                   description={t('owner.rep.export.sub')}
                   icon="download"
-                  className="lg:col-start-3 lg:row-start-1"
+                  className="xl:col-start-3 xl:row-start-1"
                 >
                   <ExportRow title={t('owner.rep.pdf.title')} description={t('owner.rep.pdf.sub')}>
                     {singleDay ? (
-                      <p className="text-sm text-text">{t('owner.rep.pdf.forDay', { date: formatDayKey(pdfDay, lang) })}</p>
+                      <p className="text-sm text-text">{t('owner.rep.pdf.forDay', { date: mediumDay(pdfDay, lang) })}</p>
                     ) : (
-                      <ChipRow
-                        label={t('owner.rep.pdf.pickDay')}
-                        options={days.map((k) => ({ value: k, label: shortDay(k, lang) }))}
-                        value={pdfDay}
-                        onChange={setPdfPick}
-                        wrap={false}
-                        className="w-full min-w-0"
-                      />
+                      // The scrolling chip row bleeds by the page gutter; inside this card it must match the card padding.
+                      <div className="w-full min-w-0" style={{ '--gutter': '16px' }}>
+                        <ChipRow
+                          label={t('owner.rep.pdf.pickDay')}
+                          options={days.map((k) => ({ value: k, label: shortDay(k, lang) }))}
+                          value={pdfDay}
+                          onChange={setPdfPick}
+                          wrap={false}
+                        />
+                      </div>
                     )}
                   </ExportRow>
                   <ExportRow title={t('owner.rep.csv.consultations')} description={t('owner.rep.csv.consultationsSub')}>
@@ -359,7 +367,7 @@ export default function S20Reports() {
                       {t('owner.rep.csv.button')}
                     </Button>
                   </ExportRow>
-                  <ExportRow title={t('owner.rep.csv.clients')} description={t('owner.rep.csv.clientsSub', { n: CLIENT_EXPORT_MAX })}>
+                  <ExportRow title={t('owner.rep.csv.clients')} description={t('owner.rep.csv.clientsSub')}>
                     <Button variant="secondary" icon="download" onClick={exportClients} loading={busy === 'clients'}>
                       {t('owner.rep.csv.button')}
                     </Button>
@@ -380,7 +388,7 @@ export default function S20Reports() {
                   title={t('owner.rep.table.title')}
                   description={t('owner.rep.table.sub', { n: list.length })}
                   icon="list"
-                  className="lg:col-span-2 lg:col-start-1 lg:row-start-1"
+                  className="xl:col-span-2 xl:col-start-1 xl:row-start-1"
                 >
                   <ConsultationTable consultations={list} staff={staff} styles={styles} loading={loading} />
                 </Section>

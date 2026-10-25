@@ -81,8 +81,8 @@ export default function ConsultationTable({ consultations, staff, styles, loadin
               <th scope="col" className="px-3 py-2 text-start font-medium">
                 {t('report.csv.col.status')}
               </th>
-              <th scope="col" className="px-3 py-2 text-end font-medium">
-                {t('owner.rep.table.decision')}
+              <th scope="col" className="whitespace-nowrap px-3 py-2 text-end font-medium">
+                {t('owner.rep.table.decisionShort')}
               </th>
               <th scope="col" className="ps-3 py-2 text-end font-medium">
                 {t('report.csv.col.rating')}
@@ -91,7 +91,7 @@ export default function ConsultationTable({ consultations, staff, styles, loadin
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className="border-b border-line/60 last:border-b-0">
+              <tr key={r.id} className="border-b border-line/60 last:border-b-0 [&>td]:align-top">
                 <td className="num whitespace-nowrap py-2.5 pe-3 text-text-2">
                   <span className="text-text">{r.day}</span> <bdi>{r.time}</bdi>
                 </td>
@@ -99,8 +99,8 @@ export default function ConsultationTable({ consultations, staff, styles, loadin
                   <bdi>{r.barber}</bdi>
                 </td>
                 <td className="max-w-[14rem] px-3 py-2.5">
-                  <span className="flex items-center gap-2">
-                    <span className="truncate">
+                  <span className="flex flex-col items-start gap-1">
+                    <span className="max-w-full truncate">
                       <bdi>{r.style}</bdi>
                     </span>
                     {r.demo ? (

@@ -360,12 +360,12 @@ export default function S15OwnerDashboard() {
                 </Section>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-3">
+              <div className="grid gap-4 xl:grid-cols-3">
                 <Section
                   title={t('owner.dash.barbers.title')}
                   description={t('owner.dash.barbers.sub')}
                   icon="users"
-                  className="lg:col-span-2"
+                  className="xl:col-span-2"
                 >
                   <BarberTable rows={summary.perBarber} loading={loading || staffLive.loading} caption={t('owner.dash.barbers.title')} />
                 </Section>

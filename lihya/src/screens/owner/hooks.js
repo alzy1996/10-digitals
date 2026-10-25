@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { dayKey } from '../../lib/time.js';
 import { getIdToken } from '../../services/auth.js';
-import { watchRecentClients } from '../../services/clients.js';
+import { watchDemoPresence } from '../../services/clients.js';
 import { useLive } from '../../hooks/useLive.js';
 import { workerUrl } from './util.js';
 
@@ -78,16 +78,13 @@ export function useAiQuota({ shopId, enabled, online, refreshKey }) {
 }
 
 /**
- * Whether demo records are still around: a demo client among the 20 most recent clients
- * (demo clients are seeded with visits in the last 7 days), or a demo consultation in
- * `extra`. Cheap: one small live query.
+ * Whether any demo client or consultation is left (two one-document live queries),
+ * or a demo consultation in `extra`.
  */
 export function useDemoPresence(shopId, extra = []) {
-  const recent = useLive((cb, onError) => (shopId ? watchRecentClients(shopId, 20, cb, onError) : null), [shopId]);
-  const list = Array.isArray(recent.data) ? recent.data : [];
-  const demoClients = list.filter((c) => c && c.demo === true).length;
-  const demoExtra = (Array.isArray(extra) ? extra : []).filter((c) => c && c.demo === true).length;
-  return { loading: recent.loading, present: demoClients + demoExtra > 0, demoClients };
+  const live = useLive((cb, onError) => (shopId ? watchDemoPresence(shopId, cb, onError) : null), [shopId]);
+  const demoExtra = (Array.isArray(extra) ? extra : []).some((c) => c && c.demo === true);
+  return { loading: live.loading, present: live.data === true || demoExtra };
 }
 
 /**

@@ -231,7 +231,7 @@ export default function S19Settings() {
   return (
     <OwnerShell>
       <ScreenFrame title={t('ui.owner.settings')} wide footer={footer}>
-        <div className="grid items-start gap-4 lg:grid-cols-2">
+        <div className="grid items-start gap-4 xl:grid-cols-2">
           <div className="flex min-w-0 flex-col gap-4">
             <Section title={t('owner.set.shop.title')} description={t('owner.set.shop.sub')} icon="home">
               <Field
@@ -348,7 +348,7 @@ export default function S19Settings() {
                   labelledBy="growth-label"
                   decLabel={t('owner.set.growth.less')}
                   incLabel={t('owner.set.growth.more')}
-                  valueClassName="min-w-[108px] px-2"
+                  valueClassName="min-w-[108px] px-2 text-base"
                 />
               </SettingRow>
               <Note

@@ -62,7 +62,7 @@ export default function ScreenFrame({
     <div className={cx('flex flex-col bg-bg text-text', shell ? 'min-h-0 flex-1' : 'h-[100dvh]', className)}>
       {topBar ? <TopBar title={title} back={back} onBack={onBack} actions={actions} /> : null}
       {shell && shell.nav ? <div className="shrink-0 lg:hidden">{shell.nav}</div> : null}
-      <main className={cx('min-h-0 flex-1 overflow-y-auto overscroll-contain', bodyClassName)}>
+      <main className={cx('relative min-h-0 flex-1 overflow-y-auto overscroll-contain', bodyClassName)}>
         <div className={cx('mx-auto w-full', column, padded && 'gutter py-4')}>{children}</div>
       </main>
       {hasFooter ? (

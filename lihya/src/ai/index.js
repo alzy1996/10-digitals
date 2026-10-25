@@ -28,3 +28,4 @@ export { TIMELINE_STOPS, growthAt } from './render/timeline.js';
 export { renderFinalLook, finalLookAvailable } from './render/provider.js';
 export { needsOutline } from './render/inpaint.js';
 export { clearRenderCaches } from './render/photoStudio.js';
+export { MST_SWATCHES } from './analysis/skinTone.js';

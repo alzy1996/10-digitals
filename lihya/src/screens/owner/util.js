@@ -49,6 +49,12 @@ export function longDay(key, lang) {
   return formatMuscat(start, lang, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+/** Date for summaries ("25 October 2026" / "25 أكتوبر 2026"). */
+export function mediumDay(key, lang) {
+  const { start } = muscatDayRange(key);
+  return formatMuscat(start, lang, { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 /** Muscat time of a timestamp ("09:45"). */
 export function clockTime(value, lang) {
   try {
@@ -96,7 +102,7 @@ export function lastDays(n, today) {
 // ------------------------------------------------------------------ per-device markers
 
 // Housekeeping marker next to the other per-device preferences (not business data).
-const PURGE_PREFIX = 'lihya.pref.purgeDay.';
+const PURGE_PREFIX = `${PREF_KEYS.purgeDay}.`;
 
 /** True when this device has not run the retention purge for this shop today (Muscat). */
 export function purgeDue(shopId, today = dayKey()) {

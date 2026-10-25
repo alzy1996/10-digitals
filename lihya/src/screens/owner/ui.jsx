@@ -198,9 +198,9 @@ export function Stepper({
         aria-disabled={disabled || undefined}
         onKeyDown={onKeyDown}
         className={cx(
-          'num flex h-11 items-center justify-center rounded-ctl border bg-surface-2 text-center text-base font-semibold',
+          'num flex h-11 items-center justify-center whitespace-nowrap rounded-ctl border bg-surface-2 text-center font-semibold',
           invalid ? 'border-cut text-cut' : 'border-line text-text',
-          valueClassName || 'min-w-[76px] px-2',
+          valueClassName || 'min-w-[76px] px-2 text-base',
         )}
       >
         <bdi>{text}</bdi>

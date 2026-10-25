@@ -432,8 +432,9 @@ export function exportConsultationsCsv({ consultations, startKey, endKey, lang =
     col(L, 'time', (c) => timeOf(c.startedAt)),
     col(L, 'barber', (c) => staffNameOf(c.barberUid, staff)),
     col(L, 'client', (c) => {
-      const cl = c.clientId ? clientMap.get(c.clientId) : null;
-      return cl && cl.displayName ? cl.displayName : translate(L, 'common.walkIn');
+      if (!c.clientId) return translate(L, 'common.walkIn');
+      const cl = clientMap.get(c.clientId);
+      return cl && cl.displayName ? cl.displayName : '';
     }),
     col(L, 'style', (c) => (c.styleId ? pickLang(L, styleNameOf(c.styleId, styles)) : '')),
     col(L, 'status', (c) => translate(L, `report.status.${c.status || 'draft'}`)),

@@ -434,3 +434,14 @@ toggle + pending-sync badge), `TopBar`, `LangToggle`, `SyncBadge`, `OwnerShell({
 - `POST /render` (multipart `source`, `guide`, `seed`, `shopId`; Bearer Firebase ID token; optional
   `X-Firebase-AppCheck`) -> image bytes + `X-Lihya-Used`, `X-Lihya-Cap`; 429 `{ error: 'cap', scope, resetsAt }`.
 - `GET /quota?shopId=` -> `{ usedToday, cap, accountUsed, accountCap, enabled, day, resetsAt }` for the owner dashboard.
+
+### Integration additions
+- `clients.listClients(shopId, { includeDemo })` (one-time read of every client, labels only, for exports) and
+  `clients.watchDemoPresence(shopId, cb)` (true while any demo client or consultation is left).
+- `invites.joinUrl(shopId)` (full join link via `appUrl`), `csv.parsePriceOmr(raw) -> { value, reason }`.
+- `useSession().keepProfileConsent` (null = not asked) + `setKeepProfileConsent(b)`: the customer's answer on the
+  profile screen; S12 saves the coarse labels with `saveClientProfile` only when it is true.
+- `src/state/ErrorBoundary.jsx` wraps every route; `src/state/WriteErrorWatcher.jsx` shows a snackbar when the server
+  refuses a queued write; `src/state/IdleWipeWatcher.jsx` returns to the mode's start screen after an idle wipe.
+- `PREF_KEYS.purgeDay` (per-device marker so the retention purge runs at most once a day).
+- AI facade also exports `MST_SWATCHES`, `clearRenderCaches`.

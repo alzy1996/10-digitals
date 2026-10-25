@@ -197,7 +197,7 @@ export default function GuardChartEditor({ draft, onChange, rowErrors = {}, gene
                   decLabel={t('owner.set.guards.shorter', { n })}
                   incLabel={t('owner.set.guards.longer', { n })}
                   invalid={err === 'owner.set.guards.err.mm' || err === 'owner.set.guards.err.order'}
-                  valueClassName="w-[68px] px-0.5 sm:w-[84px]"
+                  valueClassName="w-[68px] px-0.5 text-sm sm:w-[84px] sm:text-base"
                 />
                 <IconButton
                   icon="trash"

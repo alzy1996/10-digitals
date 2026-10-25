@@ -183,7 +183,7 @@ export default function DailyReportDocument({ report, shop = null, lang = 'ar', 
           <div style={{ fontSize: 13, color: PAL.brass, fontWeight: 600 }}>
             <Bidi text={shopName} />
           </div>
-          <h1 style={{ margin: 0, fontFamily: FONT_DISPLAY[L], fontSize: 30, fontWeight: 600, lineHeight: 1.15 }}>{t('report.daily.title')}</h1>
+          <h1 style={{ margin: '0 0 4px', fontFamily: FONT_DISPLAY[L], fontSize: 30, fontWeight: 600, lineHeight: 1.35 }}>{t('report.daily.title')}</h1>
           <div style={{ fontSize: 13, color: PAL.ink }}>{t('report.daily.day', { date: formatDayKey(r.dayKey, L) })}</div>
         </div>
         <div style={{ fontSize: 11, color: PAL.ink2, textAlign: 'end' }}>

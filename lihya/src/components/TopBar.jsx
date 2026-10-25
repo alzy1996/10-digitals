@@ -32,7 +32,13 @@ export default function TopBar({ title, back, onBack, actions, showSync = true, 
     >
       <div className="gutter flex h-14 w-full items-center gap-1">
         {hasBack ? <IconButton icon="arrow-left" label={t('common.back')} onClick={goBack} className="-ms-2" /> : null}
-        <h1 className={cx('min-w-0 flex-1 truncate text-lg sm:text-xl', hasBack ? 'ms-1' : '')}>{title}</h1>
+        {typeof title === 'string' && title.trim() ? (
+          <h1 className={cx('min-w-0 flex-1 truncate text-lg sm:text-xl', hasBack ? 'ms-1' : '')}>{title}</h1>
+        ) : title ? (
+          <div className={cx('min-w-0 flex-1 truncate text-lg sm:text-xl', hasBack ? 'ms-1' : '')}>{title}</div>
+        ) : (
+          <div className="min-w-0 flex-1" />
+        )}
         {actions ? <div className="flex shrink-0 items-center gap-1">{actions}</div> : null}
         {showSync ? <SyncBadge /> : null}
         {showLang ? <LangToggle className="-me-2" /> : null}

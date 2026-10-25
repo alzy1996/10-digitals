@@ -5,6 +5,7 @@
 
 import { Timestamp, limit, orderBy, query, serverTimestamp, where } from 'firebase/firestore';
 import {
+  RANGE_LIMIT,
   RECENT_CLIENTS_DEFAULT,
   SEARCH_LIMIT,
   autoId,
@@ -47,6 +48,41 @@ export function watchRecentClients(shopId, n, cb, onError) {
   const size = Math.min(50, Math.max(1, Number(n) || RECENT_CLIENTS_DEFAULT));
   const q = query(colRef(`shops/${shopId}/clients`), orderBy('lastVisitAt', 'desc'), limit(size));
   return listenQuery(q, cb, onError, { label: 'recentClients' });
+}
+
+/** Every client of the shop (labels only), by name, for exports. Demo clients only when asked. */
+export async function listClients(shopId, { includeDemo = false } = {}) {
+  requireShopId(shopId);
+  const q = query(colRef(`shops/${shopId}/clients`), orderBy('displayNameLower'), limit(RANGE_LIMIT));
+  const list = await readQuery(q);
+  return includeDemo ? list : list.filter((c) => !c.demo);
+}
+
+/** cb(true|false): whether any demo client or consultation is left (one cheap read each). */
+export function watchDemoPresence(shopId, cb, onError) {
+  requireShopId(shopId);
+  const state = { clients: false, consultations: false, seen: 0 };
+  const report = () => {
+    if (state.seen >= 2) cb(state.clients || state.consultations);
+  };
+  const watch = (col) => {
+    let first = true;
+    return listenQuery(
+      query(colRef(`shops/${shopId}/${col}`), where('demo', '==', true), limit(1)),
+      (list) => {
+        state[col] = list.length > 0;
+        if (first) {
+          first = false;
+          state.seen += 1;
+        }
+        report();
+      },
+      onError,
+      { label: `demoPresence.${col}` },
+    );
+  };
+  const unsubs = [watch('clients'), watch('consultations')];
+  return () => unsubs.forEach((u) => u && u());
 }
 
 /**

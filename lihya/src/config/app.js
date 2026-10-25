@@ -47,5 +47,6 @@ export const PREF_KEYS = {
   theme: 'lihya.pref.theme',
   mirror: 'lihya.pref.mirror',
   lastShop: 'lihya.pref.lastShop',
+  purgeDay: 'lihya.pref.purgeDay',
   emailForSignIn: 'lihya.auth.emailForSignIn',
 };

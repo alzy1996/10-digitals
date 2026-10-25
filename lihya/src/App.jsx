@@ -7,6 +7,7 @@ import ScreenFallback from './components/ScreenFallback.jsx';
 import ShopRoute from './state/ShopRoute.jsx';
 import HomeRoute from './state/HomeRoute.jsx';
 import WriteErrorWatcher from './state/WriteErrorWatcher.jsx';
+import ErrorBoundary from './state/ErrorBoundary.jsx';
 import { RequireRole } from './state/ShopContext.jsx';
 import { ROUTER_BASENAME } from './lib/paths.js';
 
@@ -45,6 +46,7 @@ export default function App() {
         <AuthProvider>
           <WriteErrorWatcher />
           <BrowserRouter basename={ROUTER_BASENAME}>
+            <ErrorBoundary>
             <Suspense fallback={<ScreenFallback />}>
               <Routes>
                 <Route path="/" element={<S01ShopPicker />} />
@@ -86,6 +88,7 @@ export default function App() {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
+            </ErrorBoundary>
           </BrowserRouter>
         </AuthProvider>
       </SnackbarProvider>
