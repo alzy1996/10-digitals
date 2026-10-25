@@ -5,7 +5,7 @@ import { useT } from '../lib/i18n/useT.js';
 export default function LightPill({ value, onChange }) {
   const { name } = useT();
   return (
-    <div role="radiogroup" className="inline-flex rounded-full border border-line bg-surface/95 p-1 shadow-sheet">
+    <div role="radiogroup" className="inline-flex rounded-full border border-line bg-surface p-1 shadow-sheet">
       {lights.map((l) => (
         <button
           key={l.id}

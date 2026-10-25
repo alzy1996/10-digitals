@@ -88,7 +88,7 @@ export default function S11Compare() {
       </div>
       {open ? (
         <div
-          className="fixed inset-0 z-50 flex flex-col bg-ink/95"
+          className="fixed inset-0 z-50 flex flex-col bg-ink"
           onPointerDown={(e) => { startX.current = e.clientX; }}
           onPointerUp={(e) => {
             if (startX.current === null) return;

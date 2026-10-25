@@ -9,6 +9,7 @@ import LightPill from '../components/LightPill.jsx';
 import LevelLadder from '../components/LevelLadder.jsx';
 import HairStage from '../components/HairStage.jsx';
 import LiveMirror from '../components/LiveMirror.jsx';
+import GreyJourney from '../components/GreyJourney.jsx';
 import Icon from '../components/Icon.jsx';
 import { useT } from '../lib/i18n/useT.js';
 import { useApp } from '../hooks/useApp.jsx';
@@ -17,7 +18,7 @@ import { useCatalog } from '../hooks/useCatalog.js';
 import { useStageData } from '../hooks/useStage.js';
 import { useConsultation } from '../hooks/useConsultation.js';
 import { renderThumb } from '../hooks/useThumbs.js';
-import { lookDrawParams, lowMaintenanceScore, shaylaPath, shadeLab, labToHex, levelLabOf } from '../ai/index.js';
+import { lookDrawParams, lowMaintenanceScore, shaylaPath, shadeLab, labToHex, levelLabOf, effectiveRootL } from '../ai/index.js';
 import finishes from '../data/finishes.json';
 
 const FAMILIES = ['natural', 'brunette', 'cool', 'neutral', 'warm', 'red', 'metallic', 'pastel', 'vivid'];
@@ -88,10 +89,10 @@ export default function S09ColorLab() {
 
   const lowMaint = useMemo(() => {
     if (!params?.target || !data) return null;
-    const naturalL = data.renderData.zones.rootL;
+    const naturalL = effectiveRootL(data.renderData.zones.rootL, session.profile.hair.greyPct);
     const atRootL = ['root', 'shadow'].includes(technique?.mask) ? params.target2?.[0] ?? naturalL : ['balayage', 'foilyage', 'ombre', 'sombre', 'money', 'peekaboo', 'chroma', 'melt'].includes(technique?.mask) ? naturalL : params.target[0];
     return lowMaintenanceScore({ mask: technique?.mask, naturalL, colorL: atRootL });
-  }, [params, data, technique]);
+  }, [params, data, technique, session.profile.hair.greyPct]);
 
   if (!data || !params) return null;
 
@@ -111,7 +112,7 @@ export default function S09ColorLab() {
   const controls = (
     <div>
       <div className="no-scrollbar mb-4 flex gap-2 overflow-x-auto pb-1" role="tablist">
-        {['shade', 'technique', 'lift', 'regrowth'].map((k) => (
+        {['shade', 'technique', 'lift', 'regrowth', ...(session.profile.hair.greyPct >= 20 ? ['grey'] : [])].map((k) => (
           <Chip key={k} selected={panel === k} onClick={() => setPanel(k)} role="tab" aria-selected={panel === k}>
             {t(`color.panel.${k}`)}
           </Chip>
@@ -234,6 +235,22 @@ export default function S09ColorLab() {
           </div>
           <p className="mt-3 text-xs text-ink2">{t('lift.disclaimer')}</p>
         </section>
+      ) : null}
+
+      {panel === 'grey' ? (
+        <GreyJourney
+          data={data}
+          catalog={catalog}
+          profile={session.profile}
+          ctx={ctx}
+          swatchesById={app.swatchesById}
+          scannedLevels={app.scannedLevels}
+          onChoose={(c) => {
+            session.setLook({ shadeId: c.shadeId, technique: c.technique, finish: c.finish, techniqueParams: c.techniqueParams || null });
+            setWeeks(8);
+            setPanel('regrowth');
+          }}
+        />
       ) : null}
 
       {panel === 'regrowth' ? (

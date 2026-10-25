@@ -137,14 +137,29 @@ export function pushPullFill(img, hole) {
     const fine = levels[l];
     const coarse = levels[l + 1];
     for (let y = 0; y < fine.h; y += 1) {
+      // bilinear sample of the coarser level (smooth, no blocks)
+      const fy = Math.min(coarse.h - 1, Math.max(0, (y + 0.5) / 2 - 0.5));
+      const y0 = Math.floor(fy);
+      const y1 = Math.min(coarse.h - 1, y0 + 1);
+      const ty = fy - y0;
       for (let x = 0; x < fine.w; x += 1) {
         const i = y * fine.w + x;
         const a = fine.wt[i];
         if (a >= 1) continue;
-        const cx = Math.min(coarse.w - 1, x >> 1);
-        const cy = Math.min(coarse.h - 1, y >> 1);
-        const j = cy * coarse.w + cx;
-        for (let ch = 0; ch < 3; ch += 1) fine.c[i * 3 + ch] = fine.c[i * 3 + ch] * a + coarse.c[j * 3 + ch] * (1 - a);
+        const fx = Math.min(coarse.w - 1, Math.max(0, (x + 0.5) / 2 - 0.5));
+        const x0 = Math.floor(fx);
+        const x1 = Math.min(coarse.w - 1, x0 + 1);
+        const tx = fx - x0;
+        const j00 = y0 * coarse.w + x0;
+        const j01 = y0 * coarse.w + x1;
+        const j10 = y1 * coarse.w + x0;
+        const j11 = y1 * coarse.w + x1;
+        for (let ch = 0; ch < 3; ch += 1) {
+          const top = coarse.c[j00 * 3 + ch] * (1 - tx) + coarse.c[j01 * 3 + ch] * tx;
+          const bot = coarse.c[j10 * 3 + ch] * (1 - tx) + coarse.c[j11 * 3 + ch] * tx;
+          const v = top * (1 - ty) + bot * ty;
+          fine.c[i * 3 + ch] = fine.c[i * 3 + ch] * a + v * (1 - a);
+        }
         fine.wt[i] = 1;
       }
     }

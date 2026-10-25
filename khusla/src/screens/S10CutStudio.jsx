@@ -87,6 +87,8 @@ export default function S10CutStudio() {
   const W = rd.width;
   const H = rd.height;
   const big = currentCm - newCm > 15;
+  // Quick shorten only removes hair hanging below the chin; shorter cuts reveal face and ears
+  const belowChin = lineY > rd.pts[152][1];
 
   const shorten = async () => {
     setBusy(true);
@@ -192,11 +194,11 @@ export default function S10CutStudio() {
               {t('cut.undoShorten')}
             </Button>
           ) : (
-            <Button variant="secondary" icon="scissors" busy={busy} onClick={shorten} disabled={newCm >= currentCm}>
+            <Button variant="secondary" icon="scissors" busy={busy} onClick={shorten} disabled={newCm >= currentCm || !belowChin}>
               {t('cut.quickShorten')}
             </Button>
           )}
-          <p className="mt-2 text-xs text-ink2">{t('cut.quickNote')}</p>
+          <p className="mt-2 text-xs text-ink2">{belowChin ? t('cut.quickNote') : t('cut.quickAboveChin')}</p>
           <div className="mt-5 grid grid-cols-2 gap-2">
             <Button variant="secondary" icon="drop" onClick={() => navigate('/color')}>{t('cut.toColor')}</Button>
             {app.settings?.aiPreview && session.mode === 'chair' ? (

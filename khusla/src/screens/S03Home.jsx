@@ -21,7 +21,7 @@ export default function S03Home() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
-  const [clients] = useLive((cb) => watchClients(app.salonId, cb), [app.salonId], []);
+  const [clients, clientsLoading] = useLive((cb) => watchClients(app.salonId, cb), [app.salonId], []);
   const [today] = useLive((cb) => watchConsultationsDay(app.salonId, dayKey(), cb), [app.salonId], []);
   const results = useMemo(() => searchClients(clients || [], q), [clients, q]);
   const mine = (today || []).filter((c) => c.stylistUid === app.me?.uid && !c.demo);
@@ -88,6 +88,8 @@ export default function S03Home() {
               </li>
             ))}
           </ul>
+        ) : clientsLoading ? (
+          <div className="h-32 rounded-card bg-surface2" style={{ animation: 'pulse-soft 1.2s infinite' }} aria-busy />
         ) : (
           <Empty icon="users" title={t('home.noClients')} body={t('home.noClientsBody')} />
         )}

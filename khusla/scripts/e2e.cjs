@@ -114,6 +114,7 @@ async function oobLink(email) {
     fs.writeFileSync(path.join(OUT, 'profile.txt'), await page.locator('main').innerText());
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     check('no horizontal overflow on profile', overflow <= 1, `${overflow}px`);
+    await page.getByLabel('الشيب').fill('60'); // one-tap override: grey 60% opens the Grey Journey
     await btn(/^صحيح$/).click();
     await page.waitForURL('**/history');
     await page.getByRole('button', { name: 'لست متأكدة' }).first().click(); // henna not sure -> metallic flag
@@ -160,6 +161,14 @@ async function oobLink(email) {
     await page.getByRole('tab', { name: 'نمو الجذور' }).click();
     await page.waitForTimeout(400);
     await shot(page, '11-regrowth');
+    await page.setViewportSize({ width: 1180, height: 820 });
+    await page.waitForTimeout(700);
+    await shot(page, '09c-mirror-mode-tablet');
+    await page.setViewportSize({ width: 430, height: 932 });
+    await page.getByRole('tab', { name: 'رحلة الشيب' }).click();
+    await page.waitForFunction(() => document.querySelectorAll('main section button.card img').length >= 3, null, { timeout: 30000 });
+    await shot(page, '11a-grey-journey');
+    check('Grey Journey: 3 paths with 8-week grow-out', true);
     await page.getByRole('tab', { name: 'التقنية' }).click();
     await page.getByRole('button', { name: 'بالياج' }).first().click();
     await page.waitForTimeout(500);
@@ -336,6 +345,14 @@ async function oobLink(email) {
     await page.getByText('تم تحميل كود الإطلالة').waitFor();
     check('stylist loads the Look Code', true);
   }
+
+  // 6b. dark theme (per-device preference)
+  await page.goto(`${BASE}/home`);
+  await page.evaluate(() => { localStorage.setItem('khusla.theme', 'dark'); });
+  await page.reload();
+  await page.getByText('أهلاً').waitFor();
+  await shot(page, '24b-home-dark');
+  await page.evaluate(() => { localStorage.setItem('khusla.theme', 'light'); });
 
   // 7. English toggle
   await page.goto(`${BASE}/home`);

@@ -10,7 +10,7 @@ export default function TopBar({ title, back = true, onBack, right, step, pendin
   const navigate = useNavigate();
   const online = useOnline();
   return (
-    <header className="no-print sticky top-0 z-30 -mx-[var(--gutter)] mb-4 flex min-h-[64px] items-center gap-2 border-b border-line bg-bg/95 px-[var(--gutter)] pt-[env(safe-area-inset-top)] backdrop-blur-0">
+    <header className="no-print sticky top-0 z-30 -mx-[var(--gutter)] mb-4 flex min-h-[64px] items-center gap-2 border-b border-line bg-bg px-[var(--gutter)] pt-[env(safe-area-inset-top)] backdrop-blur-0">
       {back ? (
         <button
           type="button"

@@ -145,6 +145,19 @@ export default function S08Looks() {
         ) : null}
       </div>
 
+      {catalog.looks.length && tab === 'looks' ? (
+        <section className="mb-5">
+          <h2 className="mb-2 text-lg">{t('looks.signature')}</h2>
+          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+            {catalog.looks.map((lk) => (
+              <Chip key={lk.id} icon="wand" onClick={() => choose({ cut: catalog.cuts.find((c) => c.id === lk.params?.cutId), fringe: catalog.fringes.find((f) => f.id === lk.params?.fringeId), shadeId: lk.params?.shadeId, technique: lk.params?.technique })}>
+                {name(lk.name)}
+              </Chip>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {showStyles && tab === 'looks' ? (
         <section className="mb-6">
           <h2 className="mb-2 text-lg">{t('looks.styles')}</h2>
@@ -186,7 +199,7 @@ export default function S08Looks() {
                   const entry = { key: it.key, cutId: it.cut?.id || null, fringeId: it.fringe?.id || 'none', shadeId: it.shadeId, technique: it.technique, title: titleOf(it) };
                   session.patch({ compare: session.compare.some((c) => c.key === it.key) ? session.compare.filter((c) => c.key !== it.key) : [...session.compare, entry].slice(-4) });
                 }}
-                className={`press absolute top-2 grid min-h-tap min-w-tap place-items-center rounded-full ltr:right-2 rtl:left-2 ${session.compare.some((c) => c.key === it.key) ? 'bg-plum text-onplum' : 'bg-surface/90 text-ink'}`}
+                className={`press absolute top-2 grid min-h-tap min-w-tap place-items-center rounded-full ltr:right-2 rtl:left-2 ${session.compare.some((c) => c.key === it.key) ? 'bg-plum text-onplum' : 'bg-surface text-ink'}`}
               >
                 <Icon name={session.compare.some((c) => c.key === it.key) ? 'check' : 'compare'} />
               </button>
@@ -197,7 +210,7 @@ export default function S08Looks() {
         <Empty icon="wand" title={t('looks.empty')} body={t('looks.emptyBody')} />
       )}
 
-      <div className="sticky bottom-0 mt-6 grid grid-cols-2 gap-3 bg-bg/95 py-3">
+      <div className="sticky bottom-0 mt-6 grid grid-cols-2 gap-3 bg-bg py-3">
         <Button variant="secondary" icon="compare" disabled={session.compare.length < 2} onClick={() => navigate('/compare')}>
           {t('looks.compare')}
         </Button>

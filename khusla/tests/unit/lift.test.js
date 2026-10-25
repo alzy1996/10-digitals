@@ -71,3 +71,15 @@ describe('Curl shrinkage (PRD 4.11)', () => {
     expect(dryLength(42, 0)).toBe(42);
   });
 });
+
+import { lowMaintenanceScore, effectiveRootL } from '../../src/ai/color/regrowth.js';
+
+describe('Regrowth low-maintenance score (PRD 7.5)', () => {
+  it('global color over 60% grey shows a hard root line (low score)', () => {
+    const naturalL = effectiveRootL(17, 60);
+    expect(lowMaintenanceScore({ mask: 'global', naturalL, colorL: 22 })).toBeLessThan(40);
+  });
+  it('balayage grows out softly (high score)', () => {
+    expect(lowMaintenanceScore({ mask: 'balayage', naturalL: 20, colorL: 20 })).toBeGreaterThan(90);
+  });
+});

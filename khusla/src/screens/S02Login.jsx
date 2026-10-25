@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import Button from '../components/Button.jsx';
@@ -25,8 +25,10 @@ export default function S02Login() {
     if (app.staffUser && !linkMode) navigate(from, { replace: true });
   }, [app.staffUser, linkMode, from, navigate]);
 
+  const completing = useRef(false);
   useEffect(() => {
-    if (!linkMode || !storedEmail()) return;
+    if (!linkMode || !storedEmail() || completing.current) return;
+    completing.current = true; // a sign-in link works once
     setState('completing');
     completeEmailLink(storedEmail())
       .then(() => navigate(sessionStorageNext() || '/', { replace: true }))

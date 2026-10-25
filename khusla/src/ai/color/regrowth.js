@@ -33,6 +33,12 @@ export function lineSoftness(mask) {
   return 1 - (HARDNESS[mask] ?? 0.8);
 }
 
+/** L* of what grows back: her pigmented root mixed with grey/white strands (grey reads about L* 75). */
+export function effectiveRootL(naturalL, greyPct = 0) {
+  const g = Math.max(0, Math.min(1, greyPct / 100));
+  return naturalL * (1 - g) + 75 * g;
+}
+
 /**
  * Low-maintenance score 0..100 from the visible root-line contrast at 8 weeks.
  * naturalL: L* of her natural root; colorL: L* of the colored hair next to the root.

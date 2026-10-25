@@ -230,6 +230,7 @@ export default function S04Capture() {
             <Icon name="lock" size={32} className="text-clay" />
             <h2 className="mt-3 text-xl">{t('capture.noteTitle')}</h2>
             <p className="mt-2 text-ink2">{t('capture.note')}</p>
+            <p className="mt-2 text-sm text-ink2">{t('capture.hairDown')}</p>
             {privateMode ? (
               <p className="mt-3 flex items-center gap-2 text-sm text-ok">
                 <Icon name="eye-off" size={18} />

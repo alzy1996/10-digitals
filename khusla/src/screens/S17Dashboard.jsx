@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import OwnerLayout from '../components/OwnerLayout.jsx';
 import { Stat, Section, Empty } from '../components/States.jsx';
 import Chip, { Tag } from '../components/Chip.jsx';
@@ -11,6 +11,7 @@ import { useSnackbar } from '../components/Snackbar.jsx';
 import { watchConsultationsRange } from '../services/consultations.js';
 import { watchStaff } from '../services/staff.js';
 import { deleteDemo } from '../services/demo.js';
+import { sweepRetention } from '../services/retention.js';
 import { computeKpis } from '../reports/kpis.js';
 import { dayKey, lastNDayKeys } from '../lib/time.js';
 import { formatDuration, formatPct } from '../lib/format.js';
@@ -26,6 +27,10 @@ export default function S17Dashboard() {
   const [all, , pending] = useLive((cb) => watchConsultationsRange(app.salonId, days[0], days[6], cb), [app.salonId, days[0]], []);
   const [staff] = useLive((cb) => watchStaff(app.salonId, cb), [app.salonId], []);
   const list = all || [];
+  const retentionDays = app.settings?.retentionDays;
+  useEffect(() => {
+    if (retentionDays && navigator.onLine) sweepRetention(app.salonId, retentionDays).catch(() => {});
+  }, [app.salonId, retentionDays]);
   const todays = list.filter((c) => c.dayKey === today);
   const k = computeKpis(todays, { includeDemo, staff: staff || [] });
   const hasDemo = list.some((c) => c.demo);

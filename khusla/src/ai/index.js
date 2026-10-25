@@ -25,7 +25,7 @@ export { shaylaPath } from './render/hijabZone.js';
 export { quickShorten } from './render/quickShorten.js';
 export { dryLength, shrinkageFor, newLengthFromY, yFromNewLength, clampTapeY } from './render/lengthTape.js';
 export { getProvider, cropForAi } from './render/provider.js';
-export { rootBandCm, lowMaintenanceScore, lineSoftness, learnGrowthRate } from './color/regrowth.js';
+export { rootBandCm, lowMaintenanceScore, lineSoftness, learnGrowthRate, effectiveRootL } from './color/regrowth.js';
 export { hennaStageLab, hennaLightenedStages } from './color/henna.js';
 export { gainsFromWhite, measureRegion, repeatability } from './color/swatchScan.js';
 export { cardGains, sampleSquare } from './capture/whiteCard.js';
