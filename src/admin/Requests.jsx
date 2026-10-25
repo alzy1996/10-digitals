@@ -6,6 +6,7 @@ import { useI18n } from '../i18n/I18nProvider'
 import { useData } from '../store/DataProvider'
 import { Empty, useToast } from '../components/ui'
 import { QrCard } from '../components/QrCard'
+import { appUrl } from '../lib/base'
 import { RecordsBoard, useStudioButtonLabel } from './RecordDetail'
 
 export default function Requests() {
@@ -13,7 +14,7 @@ export default function Requests() {
   const { staff } = useData()
   const toast = useToast()
   const { sendToSalon } = useStudioButtonLabel()
-  const link = `${window.location.origin}/try`
+  const link = appUrl('try')
 
   const copyLink = async () => {
     try {

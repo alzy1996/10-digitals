@@ -6,8 +6,10 @@
 //   3. Set VITE_NAIL_SEGMENTER_URL=/models/nail_segmenter.tflite in .env.local and rebuild.
 // When enabled, each landmark nail is snapped to the model's mask (center, angle, width, length).
 import { FilesetResolver, ImageSegmenter } from '@mediapipe/tasks-vision'
+import { withBase } from '../../lib/base'
 
-const URL_ = import.meta.env.VITE_NAIL_SEGMENTER_URL || ''
+const RAW_URL = import.meta.env.VITE_NAIL_SEGMENTER_URL || ''
+const URL_ = !RAW_URL ? '' : /^https?:\/\//.test(RAW_URL) ? RAW_URL : withBase(RAW_URL)
 let segPromise = null
 
 export function segmenterEnabled() {
@@ -19,7 +21,7 @@ export function loadNailSegmenter() {
   if (!segPromise) {
     segPromise = (async () => {
       const fileset = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm').catch(() =>
-        FilesetResolver.forVisionTasks('/mediapipe/wasm'),
+        FilesetResolver.forVisionTasks(withBase('mediapipe/wasm')),
       )
       return ImageSegmenter.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: URL_, delegate: 'GPU' },

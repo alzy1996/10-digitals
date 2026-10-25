@@ -6,6 +6,7 @@ import { useI18n } from '../i18n/I18nProvider'
 import { useData } from '../store/DataProvider'
 import { PageHeader, AuditLine } from './common'
 import { Field, Badge, Confirm, Spinner, useToast } from '../components/ui'
+import { appUrl } from '../lib/base'
 import { waLink, dateOnly } from '../lib/format'
 
 const ROLES = ['tech', 'owner']
@@ -38,7 +39,7 @@ function StaffAdmin() {
   const [memberToRemove, setMemberToRemove] = useState(null)
   const [inviteToRemove, setInviteToRemove] = useState(null)
 
-  const loginUrl = `${window.location.origin}/login`
+  const loginUrl = appUrl('login')
   const salonName = pick(staff.salon || {}) || t('app_name')
 
   const memberEmails = useMemo(() => new Set(staff.members.map((m) => lower(m.email)).filter(Boolean)), [staff.members])

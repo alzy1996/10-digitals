@@ -2,7 +2,9 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// VITE_BASE=/nail-mirror/ for GitHub Pages; default '/' for Firebase Hosting / custom domain
 export default defineConfig({
+  base: process.env.VITE_BASE || '/',
   plugins: [
     react(),
     VitePWA({
@@ -12,14 +14,13 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,woff2,webmanifest}'],
         globIgnores: ['mediapipe/**', 'models/**'],
-        navigateFallback: '/index.html',
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [
           {
             // AI runtime + hand model: download once, then instant + offline
             urlPattern: ({ url }) =>
-              url.pathname.startsWith('/mediapipe/') ||
-              url.pathname.startsWith('/models/') ||
+              url.pathname.includes('/mediapipe/wasm/') ||
+              url.pathname.includes('/models/') ||
               (url.origin === 'https://cdn.jsdelivr.net' && url.pathname.startsWith('/npm/@mediapipe/')) ||
               (url.origin === 'https://storage.googleapis.com' && url.pathname.startsWith('/mediapipe-models/')),
             handler: 'CacheFirst',

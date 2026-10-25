@@ -4,6 +4,7 @@
 // Asset delivery: Firebase Hosting's free plan has a daily bandwidth cap, and the AI files are ~19 MB,
 // so they load from Google's / jsDelivr's free CDNs first and fall back to our self-hosted copies.
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision'
+import { withBase } from '../lib/base'
 
 const MP_VERSION = '0.10.35' // must match package.json
 const SOURCES = [
@@ -11,7 +12,7 @@ const SOURCES = [
     wasm: `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/wasm`,
     model: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
   },
-  { wasm: '/mediapipe/wasm', model: '/models/hand_landmarker.task' },
+  { wasm: withBase('mediapipe/wasm'), model: withBase('models/hand_landmarker.task') },
 ]
 
 let landmarkerPromise = null

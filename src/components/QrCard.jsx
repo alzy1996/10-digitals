@@ -3,11 +3,12 @@ import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import { Printer, Download, QrCode } from 'lucide-react'
 import { useI18n } from '../i18n/I18nProvider'
+import { appUrl } from '../lib/base'
 
 export function QrCard({ salonName }) {
   const { t } = useI18n()
   const [url, setUrl] = useState('')
-  const target = `${window.location.origin}/try`
+  const target = appUrl('try')
 
   useEffect(() => {
     QRCode.toDataURL(target, { width: 640, margin: 1, color: { dark: '#1D1A18', light: '#FFFFFF' }, errorCorrectionLevel: 'M' })

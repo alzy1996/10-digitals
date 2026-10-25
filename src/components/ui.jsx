@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { X, Loader2, CheckCircle2, AlertTriangle, Info } from 'lucide-react'
 import { useI18n } from '../i18n/I18nProvider'
+import { withBase } from '../lib/base'
 
 // ------------------------------------------------------------------ Toasts (instant feedback)
 const ToastCtx = createContext(() => {})
@@ -180,7 +181,7 @@ export function Logo({ className = '', compact = false }) {
   const { t } = useI18n()
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
-      <img src="/icon.svg" alt="" className="h-9 w-9 rounded-xl" />
+      <img src={withBase('icon.svg')} alt="" className="h-9 w-9 rounded-xl" />
       {!compact && <span className="font-display text-[22px] font-bold leading-none tracking-tight">{t('app_name')}</span>}
     </span>
   )

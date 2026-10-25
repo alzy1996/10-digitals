@@ -92,6 +92,17 @@ Every later update: `npm run deploy`.
 
 ---
 
+## 3b. Free live link on GitHub Pages (instant demo)
+
+Every push to `main` builds the app and publishes it (`.github/workflows/deploy-pages.yml`):
+**https://YOUR-GITHUB-USER.github.io/nail-mirror/**
+
+- One time: repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+- Free GitHub accounts need the repo to be **public** for Pages (private works with GitHub Pro).
+- Without Firebase secrets it runs in **demo mode** (perfect for showing salons). To connect your data: repo **Settings → Secrets and variables → Actions → New repository secret** → add the 6 `VITE_FIREBASE_…` values from `.env.local` → **Actions → Deploy to GitHub Pages → Run workflow**.
+- Then Firebase Console → Authentication → Settings → **Authorized domains → Add domain** → `YOUR-GITHUB-USER.github.io`.
+- The camera works there (https). Firebase Hosting (step 3) stays the recommended home for the real salon.
+
 ## 4. Replace your old Excel sheet (CSV import)
 
 **Inventory → Import CSV → Download template**. Columns:

@@ -6,6 +6,7 @@ import { useI18n } from '../i18n/I18nProvider'
 import { useData } from '../store/DataProvider'
 import { Logo, LangToggle } from '../components/ui'
 import { waLink } from '../lib/format'
+import { withBase } from '../lib/base'
 
 export function PublicNav() {
   const { t } = useI18n()
@@ -24,7 +25,7 @@ export function PublicNav() {
         </Link>
         <nav className="hidden items-center gap-1 md:flex">
           {links.map((l) => (
-            <a key={l.to} href={l.to} className="rounded-full px-4 py-2 text-[15px] font-semibold text-ink-700 hover:bg-ink/5">
+            <a key={l.to} href={withBase(l.to)} className="rounded-full px-4 py-2 text-[15px] font-semibold text-ink-700 hover:bg-ink/5">
               {l.label}
             </a>
           ))}
@@ -46,7 +47,7 @@ export function PublicNav() {
       {open && (
         <div className="animate-rise border-t border-ink/5 bg-porcelain-50 px-4 pb-4 md:hidden">
           {links.map((l) => (
-            <a key={l.to} href={l.to} onClick={() => setOpen(false)} className="flex min-h-[52px] items-center border-b border-ink/5 text-[17px] font-semibold">
+            <a key={l.to} href={withBase(l.to)} onClick={() => setOpen(false)} className="flex min-h-[52px] items-center border-b border-ink/5 text-[17px] font-semibold">
               {l.label}
             </a>
           ))}
