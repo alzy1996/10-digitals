@@ -344,7 +344,7 @@ function shiftedCheekRing(P, side, offset) {
  *   lowers the upper edge of K_L / K_R by that fraction of the eye-to-jaw
  *   distance (outer eye corner to gonion, per side; about 9 cm on an adult).
  *   The line is blended toward CHEEK_LINE_HIGH_* / CHEEK_LINE_LOW_* and
- *   saturates there (around +0.2 / -0.25 on a typical face); the sideburn
+ *   saturates there (around +0.27 / -0.21 on a typical face); the sideburn
  *   end stays put and the mustache end slides along MUSTACHE_EDGE_*. K stays
  *   a simple polygon that shares its edges with B, J, C and M.
  * @param {number} [opts.neckDepthPx] depth of the neck zone N below the chin;

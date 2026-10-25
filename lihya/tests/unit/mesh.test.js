@@ -13,6 +13,10 @@ import {
   LIPS_OUTER,
   CHEEK_LINE_NATURAL_L,
   CHEEK_LINE_NATURAL_R,
+  CHEEK_LINE_HIGH_L,
+  CHEEK_LINE_HIGH_R,
+  CHEEK_LINE_LOW_L,
+  CHEEK_LINE_LOW_R,
   MUSTACHE_EDGE_L,
   MUSTACHE_EDGE_R,
   MOUTH_CORNERS,
@@ -165,6 +169,10 @@ describe('zone definitions', () => {
     LIPS_OUTER,
     CHEEK_LINE_NATURAL_L,
     CHEEK_LINE_NATURAL_R,
+    CHEEK_LINE_HIGH_L,
+    CHEEK_LINE_HIGH_R,
+    CHEEK_LINE_LOW_L,
+    CHEEK_LINE_LOW_R,
     MUSTACHE_EDGE_L,
     MUSTACHE_EDGE_R,
     Object.values(MOUTH_CORNERS),
@@ -250,13 +258,16 @@ describe('zone definitions', () => {
     }
     expect(CHEEK_LINE_NATURAL_L.map((i) => mirror[i])).toEqual([...CHEEK_LINE_NATURAL_R]);
     expect(MUSTACHE_EDGE_L.map((i) => mirror[i])).toEqual([...MUSTACHE_EDGE_R]);
+    expect(CHEEK_LINE_HIGH_L.map((i) => mirror[i])).toEqual([...CHEEK_LINE_HIGH_R]);
+    expect(CHEEK_LINE_LOW_L.map((i) => mirror[i])).toEqual([...CHEEK_LINE_LOW_R]);
     for (const id of ['M', 'S', 'C']) {
       expect(new Set(ZONE_POLYGONS[id].map((i) => mirror[i]))).toEqual(new Set(ZONE_POLYGONS[id]));
     }
   });
 
   it('keeps lips, inner mouth, nostrils and eyes out of every zone interior', () => {
-    const forbidden = [0, 17, 61, 291, 33, 133, 263, 362, 13, 14, 78, 308, 1, 4, 99, 328, 468 - 1];
+    // lip ring + mouth corners, eye corners and lids, inner lips, nose tip and nostrils
+    const forbidden = [0, 17, 61, 291, 33, 133, 263, 362, 159, 145, 386, 374, 13, 14, 78, 308, 1, 4, 99, 328, 60, 290];
     const mouthCentre = polygonCentroid(LIPS_OUTER.map(front));
     for (const id of MESH_ZONE_IDS) {
       const ring = ZONE_POLYGONS[id];
@@ -362,22 +373,35 @@ describe('zonePolygonsPx', () => {
   it('moves the K upper edge with cheekLineOffset and keeps K simple', () => {
     const base = zonePolygonsPx(lm, W, H);
     const area = (p) => Math.abs(polygonArea(p));
-    const raised = zonePolygonsPx(lm, W, H, { cheekLineOffset: 0.15 });
-    const lowered = zonePolygonsPx(lm, W, H, { cheekLineOffset: -0.15 });
-    for (const id of ['K_L', 'K_R']) {
-      expect(area(raised[id])).toBeGreaterThan(area(base[id]));
-      expect(area(lowered[id])).toBeLessThan(area(base[id]));
-    }
-    for (const off of [-1, -0.5, -0.2, 0.2, 0.5, 1]) {
+    // zero offset is exactly the static ring
+    expect(zonePolygonsPx(lm, W, H, { cheekLineOffset: 0 }).K_L).toEqual(base.K_L);
+    const prev = { K_L: -Infinity, K_R: -Infinity };
+    for (let k = -20; k <= 20; k++) {
+      const off = k / 20;
       const z = zonePolygonsPx(lm, W, H, { cheekLineOffset: off });
       for (const id of ['K_L', 'K_R']) {
         expect(isSimplePolygon(z[id]), `${id} @ ${off}`).toBe(true);
         expect(Math.sign(polygonArea(z[id]))).toBe(Math.sign(polygonArea(base[id])));
         for (const [x, y] of z[id]) expect(Number.isFinite(x) && Number.isFinite(y)).toBe(true);
+        // raising never shrinks K, lowering never grows it
+        expect(area(z[id])).toBeGreaterThanOrEqual(prev[id] - 1e-6);
+        prev[id] = area(z[id]);
       }
     }
-    // zero offset is exactly the static ring
-    expect(zonePolygonsPx(lm, W, H, { cheekLineOffset: 0 }).K_L).toEqual(base.K_L);
+    for (const id of ['K_L', 'K_R']) {
+      expect(area(zonePolygonsPx(lm, W, H, { cheekLineOffset: 0.1 })[id])).toBeGreaterThan(area(base[id]));
+      expect(area(zonePolygonsPx(lm, W, H, { cheekLineOffset: -0.1 })[id])).toBeLessThan(area(base[id]));
+    }
+    // a small raise moves the middle of the line up by about offset * eye-to-jaw
+    const eyeToJaw = Math.hypot((lm[33].x - lm[172].x) * W, (lm[33].y - lm[172].y) * H);
+    const topY = (ring) => Math.min(...ring.map((p) => p[1]));
+    const raised = zonePolygonsPx(lm, W, H, { cheekLineOffset: 0.05 }).K_R;
+    const lift = topY(base.K_R) - topY(raised);
+    expect(lift).toBeGreaterThan(0);
+    expect(lift).toBeLessThanOrEqual(0.05 * eyeToJaw + 1e-6);
+    // other zones do not move
+    const moved = zonePolygonsPx(lm, W, H, { cheekLineOffset: 0.2 });
+    for (const id of ['M', 'S', 'C', 'J_L', 'J_R', 'B_L', 'B_R', 'N']) expect(moved[id]).toEqual(base[id]);
   });
 });
 
@@ -390,7 +414,7 @@ describe('zone UV helpers', () => {
     expect(px.M[0][1]).toBeCloseTo((1 - uv.M[0][1]) * 1024, 3);
     const c = zoneCentroidsUV();
     for (const id of MESH_ZONE_IDS) {
-      expect(pointInPolygon(c[id], uv[id]) || id.startsWith('C')).toBe(true);
+      expect(pointInPolygon(c[id], uv[id])).toBe(true);
       for (const v of c[id]) expect(v).toBeGreaterThan(0);
     }
     expect(c.K_L[0]).toBeGreaterThan(0.5);
