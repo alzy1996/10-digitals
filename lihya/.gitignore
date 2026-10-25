@@ -1,0 +1,25 @@
+# deps and builds
+node_modules/
+dist/
+dev-dist/
+coverage/
+worker/node_modules/
+worker/.wrangler/
+
+# secrets: every env file except the empty example
+.env*
+!.env.example
+worker/.dev.vars*
+
+# firebase local state
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+emulator-data/
+
+# os / editor
+.DS_Store
+*.log
+.vscode/
+.idea/

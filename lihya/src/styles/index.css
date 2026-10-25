@@ -1,0 +1,131 @@
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans Arabic', system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Arabic glyphs read smaller: body 17px in Arabic (PRD 9.2) */
+  html[lang='ar'] body {
+    font-size: 17px;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: 'Barlow Condensed', 'Reem Kufi', 'IBM Plex Sans Arabic', sans-serif;
+    line-height: 1.15;
+    font-weight: 600;
+  }
+  html[lang='ar'] h1,
+  html[lang='ar'] h2,
+  html[lang='ar'] h3 {
+    font-family: 'Reem Kufi', 'IBM Plex Sans Arabic', sans-serif;
+  }
+  button,
+  [role='button'] {
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  :focus-visible {
+    outline: 2px solid var(--brass);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: rgb(var(--brass-rgb) / 0.35);
+  }
+}
+
+@layer components {
+  /* Brass hairline rule between sections, like shop signage (PRD 9.5) */
+  .rule-brass {
+    border: 0;
+    border-top: 1px solid var(--brass);
+    opacity: 0.6;
+    margin: 0;
+  }
+  .num {
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: 'tnum' 1, 'lnum' 1;
+  }
+  .display {
+    font-family: 'Barlow Condensed', 'Reem Kufi', sans-serif;
+  }
+  html[lang='ar'] .display {
+    font-family: 'Reem Kufi', 'IBM Plex Sans Arabic', sans-serif;
+  }
+  .gutter {
+    padding-inline: var(--gutter);
+  }
+  .pb-safe {
+    padding-bottom: calc(16px + var(--safe-bottom));
+  }
+  .pt-safe {
+    padding-top: calc(8px + var(--safe-top));
+  }
+  .press {
+    transition:
+      transform var(--dur-press) var(--ease-out),
+      background-color var(--dur-press) var(--ease-out),
+      opacity var(--dur-press) var(--ease-out);
+  }
+  .press:active {
+    transform: scale(0.98);
+  }
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--surface-2);
+  }
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgb(var(--text-rgb) / 0.06), transparent);
+    animation: lihya-shimmer 1.2s infinite;
+  }
+  html[dir='rtl'] .skeleton::after {
+    animation-direction: reverse;
+  }
+}
+
+@keyframes lihya-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+  .press:active {
+    transform: none;
+  }
+}
+
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
