@@ -12,7 +12,20 @@
 import { mmToGuard, DEFAULT_GUARD_CHART } from './guards.js';
 import { LIMITS } from '../config/app.js';
 import { addDaysToKey, dayKey as muscatDayKey, toDate } from './time.js';
-import { zonePolygonsPx, JAW_CONTOUR, MOUTH_CORNERS, CHEEK_LINE_NATURAL_L, CHEEK_LINE_NATURAL_R } from '../ai/mesh/zones.js';
+import {
+  JAW_CONTOUR,
+  MOUTH_CORNERS,
+  CHIN_BOTTOM,
+  FOREHEAD_TOP,
+  CHEEK_LINE_NATURAL_L,
+  CHEEK_LINE_NATURAL_R,
+  CHEEK_LINE_HIGH_L,
+  CHEEK_LINE_HIGH_R,
+  CHEEK_LINE_LOW_L,
+  CHEEK_LINE_LOW_R,
+  MUSTACHE_EDGE_L,
+  MUSTACHE_EDGE_R,
+} from '../ai/mesh/zones.js';
 import COLORS from '../data/colors.json';
 import LINES from '../data/lines.json';
 import REASONS from '../data/reasons.json';
@@ -31,16 +44,14 @@ export const FINGER_MM = 15;
 export const NECKLINE_OFFSET_MM = 10;
 
 /**
- * Cheek-line height above the jaw at mid-cheek when no front shot is available.
- * Measured on a frontal adult portrait with the mesh lines of src/ai/mesh/zones.js:
- * the LOW limit line sits about 17 mm above the jaw, the natural line about 34 mm
- * and the HIGH limit line about 50 mm. Typed lines (lines.json "level") sit between
- * LOW (0) and HIGH (1).
+ * Cheek-line height above the jaw at mid-cheek (mm) per cheek-line type when no front
+ * shot is available: measured with cheekLineHeight on the MediaPipe canonical face
+ * model (metric, adult) seen from the front. tests/unit/cutcard.test.js re-measures
+ * them, so they stay in step with the mesh lines and lines.json.
  */
-export const CHEEK_DEFAULT_MM = Object.freeze({ low: 17, natural: 34, high: 50 });
-/** cheekOffset -1..1 as a fraction of the LOW..HIGH range for typed lines (natural saturates near +-0.27 too). */
-export const CHEEK_OFFSET_GAIN = 1.7;
-const CHEEK_LEVEL_FALLBACK = Object.freeze({ low: 0.25, medium: 0.5, high: 0.85, curved: 0.6, straight: 0.6 });
+export const CHEEK_DEFAULT_MM = Object.freeze({ natural: 30, low: 20, medium: 28, high: 40, curved: 35, straight: 30 });
+/** Height of the LOW (cheekOffset -1) and HIGH (cheekOffset +1) limit lines on the canonical face (mm). */
+export const CHEEK_LIMIT_MM = Object.freeze({ low: 14, high: 44 });
 
 /** Next visit suggestion bounds (days). */
 export const NEXT_VISIT_MIN_DAYS = 7;
@@ -49,6 +60,9 @@ export const NEXT_VISIT_MAX_DAYS = 42;
 /** Growth learning bounds (PRD 4.7), same as the client service. */
 export const GROWTH_MIN = 0.1;
 export const GROWTH_MAX = 1.5;
+/** Growth rate range the owner can set in Settings (same as the shop settings limits). */
+export const SHOP_GROWTH_MIN = 0.05;
+export const SHOP_GROWTH_MAX = 2;
 const LEARN_MIN_DAYS = 3;
 const LEARN_MAX_DAYS = 120;
 
@@ -81,55 +95,139 @@ function median(values) {
 
 /* ------------------------------------------------------------------ cheek line */
 
-function landmarkSource(front) {
-  if (!front) return null;
-  const landmarks = front.landmarks;
-  const width = front.width || (front.canvas && front.canvas.width);
-  const height = front.height || (front.canvas && front.canvas.height);
-  if (!Array.isArray(landmarks) || landmarks.length < 468 || !width || !height) return null;
-  return { landmarks, width, height };
+// The cheek line is built exactly as the renderer draws it (src/ai/render/layout.js
+// cheekLine, in face-texture space), here in image pixels of the front shot, so the
+// height on the card is the line the customer approved on screen:
+//   natural            the natural mesh line
+//   jaw-curve types    LOW..HIGH limit lines mixed by lines.json "level" (low, medium)
+//   natural-curve      NATURAL..HIGH (level >= 0.5) or LOW..NATURAL (level < 0.5) (high)
+//   straight / curved  from the sideburn bottom to the mustache edge at "level"
+//                      between the LOW and HIGH line ends; curved bulges toward the eye
+// then cheekOffset blends the whole line toward HIGH (+1) or LOW (-1), and the end is
+// snapped onto the mustache edge.
+
+const CHEEK_SIDES = Object.freeze({
+  L: { natural: CHEEK_LINE_NATURAL_L, high: CHEEK_LINE_HIGH_L, low: CHEEK_LINE_LOW_L, edge: MUSTACHE_EDGE_L, mouth: MOUTH_CORNERS.L },
+  R: { natural: CHEEK_LINE_NATURAL_R, high: CHEEK_LINE_HIGH_R, low: CHEEK_LINE_LOW_R, edge: MUSTACHE_EDGE_R, mouth: MOUTH_CORNERS.R },
+});
+const LINE_SAMPLES = 25;
+/** Bulge of the curved line: the control point sits this fraction of the chord away from its middle. */
+const CURVE_BULGE = 0.22;
+
+const vSub = (a, b) => [a[0] - b[0], a[1] - b[1]];
+const vAdd = (a, b) => [a[0] + b[0], a[1] + b[1]];
+const vScale = (a, s) => [a[0] * s, a[1] * s];
+const vLen = (a) => Math.hypot(a[0], a[1]);
+const vMix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+
+function arcLengths(poly) {
+  const out = [0];
+  for (let k = 1; k < poly.length; k++) out.push(out[k - 1] + vLen(vSub(poly[k], poly[k - 1])));
+  return out;
 }
 
-function cheekMeasureAt(src, offset, mmPerPx) {
-  const { landmarks, width, height } = src;
-  const P = (i) => {
-    const l = landmarks[i];
-    return [(l.x !== undefined ? l.x : l[0]) * width, (l.y !== undefined ? l.y : l[1]) * height];
-  };
-  const top = P(10);
-  const chin = P(152);
-  const dl = Math.hypot(top[0] - chin[0], top[1] - chin[1]);
-  if (!(dl > 0)) return null;
-  const up = [(top[0] - chin[0]) / dl, (top[1] - chin[1]) / dl];
-  const across = [-up[1], up[0]];
-  const U = (p) => p[0] * across[0] + p[1] * across[1];
-  const V = (p) => p[0] * up[0] + p[1] * up[1];
-  const polys = zonePolygonsPx(landmarks, width, height, { cheekLineOffset: clamp(offset, -1, 1) });
-  const jaw = JAW_CONTOUR.map(P);
-  const out = [];
-  for (const side of ['L', 'R']) {
-    const start = P(side === 'L' ? CHEEK_LINE_NATURAL_L[0] : CHEEK_LINE_NATURAL_R[0]);
-    const mouth = P(MOUTH_CORNERS[side]);
-    const u = (U(start) + U(mouth)) / 2;
-    const ring = polys[`K_${side}`];
-    if (!ring || ring.length < 3) continue;
-    const topHits = crossings(ring, u, true, U, V);
-    const jawHits = crossings(jaw, u, false, U, V);
-    if (!topHits.length || !jawHits.length) continue;
-    const px = Math.max(...topHits) - Math.min(...jawHits);
-    if (px > 0) out.push(px * mmPerPx);
+function pointAtArc(poly, cum, s) {
+  if (s <= 0) return poly[0].slice();
+  for (let k = 1; k < poly.length; k++) {
+    if (s <= cum[k]) {
+      const seg = cum[k] - cum[k - 1];
+      return vMix(poly[k - 1], poly[k], seg > 1e-12 ? (s - cum[k - 1]) / seg : 0);
+    }
   }
-  return out.length ? out.reduce((s, x) => s + x, 0) / out.length : null;
+  return poly[poly.length - 1].slice();
 }
 
-/** V values where a polyline (or ring) crosses the face-vertical line U = u. */
-function crossings(points, u, closed, U, V) {
+/** n points evenly spaced by arc length. */
+function resample(poly, n) {
+  const cum = arcLengths(poly);
+  const total = cum[cum.length - 1];
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(pointAtArc(poly, cum, (total * i) / (n - 1)));
+  return out;
+}
+
+/** Closest point of a polyline to p. */
+function projectOnPolyline(poly, p) {
+  let best = poly[0];
+  let bestD = Infinity;
+  for (let k = 1; k < poly.length; k++) {
+    const a = poly[k - 1];
+    const ab = vSub(poly[k], a);
+    const l2 = ab[0] * ab[0] + ab[1] * ab[1];
+    const t = l2 > 1e-12 ? clamp(((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / l2, 0, 1) : 0;
+    const q = vAdd(a, vScale(ab, t));
+    const d = vLen(vSub(p, q));
+    if (d < bestD) {
+      bestD = d;
+      best = q;
+    }
+  }
+  return best;
+}
+
+function bezier2(a, c, b, n) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    const u = 1 - t;
+    out.push([u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1]]);
+  }
+  return out;
+}
+
+/** { level, curve } of a cheek line type (lines.json), natural when unknown. */
+function cheekOption(type) {
+  const o = lineOption('cheek', type);
+  if (!o) return { level: null, curve: 'natural' };
+  return { level: isNum(o.level) ? clamp(o.level, 0, 1) : null, curve: o.curve || 'natural' };
+}
+
+/**
+ * One side's cheek line in image pixels (same construction as the renderer).
+ * `up` is the face-up unit vector in the image (chin toward forehead).
+ */
+function cheekLinePx(P, up, side, type, offset) {
+  const def = CHEEK_SIDES[side];
+  const N = resample(def.natural.map(P), LINE_SAMPLES);
+  const H = resample(def.high.map(P), LINE_SAMPLES);
+  const Lo = resample(def.low.map(P), LINE_SAMPLES);
+  const { level, curve } = cheekOption(type);
+  const mixLines = (A, B, t) => A.map((p, i) => vMix(p, B[i], t));
+  let line;
+  if (curve === 'straight' || curve === 'curved') {
+    const start = N[0];
+    const end = vMix(Lo[Lo.length - 1], H[H.length - 1], level === null ? 0.5 : level);
+    if (curve === 'straight') {
+      line = resample([start, end], LINE_SAMPLES);
+    } else {
+      const d = vSub(end, start);
+      let nrm = [-d[1], d[0]];
+      if (nrm[0] * up[0] + nrm[1] * up[1] < 0) nrm = vScale(nrm, -1);
+      line = bezier2(start, vAdd(vMix(start, end, 0.5), vScale(nrm, CURVE_BULGE)), end, LINE_SAMPLES);
+    }
+  } else if (curve === 'jaw') {
+    line = mixLines(Lo, H, level === null ? 0.25 : level);
+  } else if (level === null) {
+    line = N;
+  } else if (level >= 0.5) {
+    line = mixLines(N, H, (level - 0.5) / 0.5);
+  } else {
+    line = mixLines(Lo, N, level / 0.5);
+  }
+  const off = clamp(offset, -1, 1);
+  if (off > 0) line = mixLines(line, H, off);
+  else if (off < 0) line = mixLines(line, Lo, -off);
+  line = line.slice();
+  line[line.length - 1] = projectOnPolyline(def.edge.map(P), line[line.length - 1]);
+  return line;
+}
+
+/** V values where a polyline crosses the face-vertical line U = u. */
+function crossings(points, u, U, V) {
   const hits = [];
-  const n = points.length;
-  const last = closed ? n : n - 1;
-  for (let k = 0; k < last; k++) {
+  for (let k = 0; k < points.length - 1; k++) {
     const a = points[k];
-    const b = points[(k + 1) % n];
+    const b = points[k + 1];
     const ua = U(a);
     const ub = U(b);
     if (ua === ub || (ua - u) * (ub - u) > 0) continue;
@@ -139,44 +237,73 @@ function crossings(points, u, closed, U, V) {
   return hits;
 }
 
+function landmarkSource(front) {
+  if (!front) return null;
+  const landmarks = front.landmarks;
+  const width = front.width || (front.canvas && front.canvas.width);
+  const height = front.height || (front.canvas && front.canvas.height);
+  if (!Array.isArray(landmarks) || landmarks.length < 468 || !width || !height) return null;
+  return { landmarks, width, height };
+}
+
 /**
- * Cheek-line height above the jaw at mid-cheek (mm), averaged over both sides.
- * Mid-cheek = halfway (across the face) between the sideburn end of the natural cheek
- * line and the mouth corner. With a front shot and a metric scale it is measured on
- * the customer's own face: the natural line moved by cheekOffset exactly as
- * zonePolygonsPx does; typed lines sit at their lines.json level between the LOW and
- * HIGH limit lines. Without landmarks the documented defaults are used.
+ * Cheek-line height above the jaw at mid-cheek, in pixels, averaged over both sides
+ * (null when it cannot be measured). Mid-cheek is halfway across the face between the
+ * sideburn end of the cheek line and the mouth corner; the height is measured along
+ * the face's own vertical (head roll does not matter).
+ */
+function cheekHeightPx(src, type, offset) {
+  const { landmarks, width, height } = src;
+  const P = (i) => {
+    const l = landmarks[i];
+    return [(l.x !== undefined ? l.x : l[0]) * width, (l.y !== undefined ? l.y : l[1]) * height];
+  };
+  const top = P(FOREHEAD_TOP);
+  const chin = P(CHIN_BOTTOM);
+  const dl = vLen(vSub(top, chin));
+  if (!(dl > 0)) return null;
+  const up = [(top[0] - chin[0]) / dl, (top[1] - chin[1]) / dl];
+  const across = [-up[1], up[0]];
+  const U = (p) => p[0] * across[0] + p[1] * across[1];
+  const V = (p) => p[0] * up[0] + p[1] * up[1];
+  const jaw = JAW_CONTOUR.map(P);
+  const out = [];
+  for (const side of ['L', 'R']) {
+    const def = CHEEK_SIDES[side];
+    const u = (U(P(def.natural[0])) + U(P(def.mouth))) / 2;
+    const lineHits = crossings(cheekLinePx(P, up, side, type, offset), u, U, V);
+    const jawHits = crossings(jaw, u, U, V);
+    if (!lineHits.length || !jawHits.length) continue;
+    const px = Math.max(...lineHits) - Math.min(...jawHits);
+    if (px > 0) out.push(px);
+  }
+  return out.length ? out.reduce((s, x) => s + x, 0) / out.length : null;
+}
+
+/**
+ * Cheek-line height above the jaw at mid-cheek (mm). With a front shot and the iris
+ * scale it is measured on the customer's own face; otherwise the documented defaults
+ * (CHEEK_DEFAULT_MM, measured the same way on the metric canonical face) are used,
+ * with cheekOffset moving the height toward CHEEK_LIMIT_MM.high (+1) or .low (-1)
+ * just as the renderer blends the line toward the HIGH or LOW limit line.
  * @returns {{ mm: number, source: 'measured'|'default' }}
  */
 export function cheekLineHeight({ type = 'natural', offset = 0, front = null, mmPerPx = null } = {}) {
   const off = clamp(numOr(offset, 0), -1, 1);
-  const opt = lineOption('cheek', type);
-  const level = type === 'natural' ? null : isNum(opt && opt.level) ? opt.level : CHEEK_LEVEL_FALLBACK[type] ?? null;
+  const id = lineOption('cheek', type) ? type : 'natural';
   const src = landmarkSource(front);
   const scale = numOr(mmPerPx, NaN);
   if (src && scale > 0) {
     try {
-      if (level === null) {
-        const mm = cheekMeasureAt(src, off, scale);
-        if (mm !== null) return { mm: Math.round(mm), source: 'measured' };
-      } else {
-        const low = cheekMeasureAt(src, -1, scale);
-        const high = cheekMeasureAt(src, 1, scale);
-        if (low !== null && high !== null && high > low) {
-          const f = clamp(level + off * CHEEK_OFFSET_GAIN, 0, 1);
-          return { mm: Math.round(low + f * (high - low)), source: 'measured' };
-        }
-      }
+      const px = cheekHeightPx(src, id, off);
+      if (px !== null) return { mm: Math.round(px * scale), source: 'measured' };
     } catch (err) {
       console.warn('cutcard: cheek line could not be measured, using defaults', err);
     }
   }
-  const { low, natural, high } = CHEEK_DEFAULT_MM;
-  if (level === null) {
-    return { mm: Math.round(clamp(natural + off * CHEEK_OFFSET_GAIN * (high - low), low, high)), source: 'default' };
-  }
-  const f = clamp(level + off * CHEEK_OFFSET_GAIN, 0, 1);
-  return { mm: Math.round(low + f * (high - low)), source: 'default' };
+  const base = CHEEK_DEFAULT_MM[id] ?? CHEEK_DEFAULT_MM.natural;
+  const target = off > 0 ? CHEEK_LIMIT_MM.high : CHEEK_LIMIT_MM.low;
+  return { mm: Math.round(base + (target - base) * Math.abs(off)), source: 'default' };
 }
 
 /* ------------------------------------------------------------------ neckline */
@@ -285,10 +412,13 @@ export function growthRateFromVisits(prev, curr) {
   return m === null ? null : round2(clamp(m, GROWTH_MIN, GROWTH_MAX));
 }
 
-/** Growth rate to use: the learned/edited value when valid, else the PRD default 0.4 mm/day. */
+/**
+ * Growth rate to use: the client's learned rate or the shop's default (Settings,
+ * 0.05..2 mm/day) when valid, else the PRD default 0.4 mm/day.
+ */
 export function effectiveGrowth(growthMmPerDay) {
   const g = numOr(growthMmPerDay, NaN);
-  return Number.isFinite(g) && g > 0 ? clamp(g, GROWTH_MIN, GROWTH_MAX) : LIMITS.growthMmPerDayDefault;
+  return Number.isFinite(g) && g > 0 ? clamp(g, SHOP_GROWTH_MIN, SHOP_GROWTH_MAX) : LIMITS.growthMmPerDayDefault;
 }
 
 /**
