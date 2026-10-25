@@ -1,0 +1,11 @@
+[
+  { "id": "none", "name": { "en": "No fringe", "ar": "بدون غرة" }, "faces": ["oval", "round", "square", "oblong", "heart", "diamond", "triangle"], "best": [], "textures": ["straight", "wavy", "curly", "coily"], "trend2026": false, "shape": "none" },
+  { "id": "curtain", "name": { "en": "Curtain bangs", "ar": "غرة ستارة" }, "faces": ["oval", "round", "square", "oblong", "heart", "diamond", "triangle"], "best": ["square", "heart", "oblong"], "textures": ["straight", "wavy", "curly", "coily"], "trend2026": false, "shape": "curtain" },
+  { "id": "birkin", "name": { "en": "Birkin bangs (long, wispy)", "ar": "غرة بيركن" }, "faces": ["oval", "oblong", "heart"], "best": ["oval", "oblong", "heart"], "textures": ["straight", "wavy"], "trend2026": true, "shape": "wispy" },
+  { "id": "airy", "name": { "en": "Airy face-framing bangs", "ar": "غرة هوائية خفيفة" }, "faces": ["oval", "round", "square", "oblong", "heart", "diamond", "triangle"], "best": [], "textures": ["straight", "wavy", "curly"], "trend2026": true, "shape": "airy" },
+  { "id": "blunt", "name": { "en": "Blunt bangs", "ar": "غرة مستقيمة كثيفة" }, "faces": ["oval", "oblong", "heart"], "best": ["oval", "oblong", "heart"], "textures": ["straight"], "trend2026": false, "shape": "blunt" },
+  { "id": "micro", "name": { "en": "Micro (baby) bangs", "ar": "غرة قصيرة جداً" }, "faces": ["oval", "heart"], "best": ["oval", "heart"], "textures": ["straight", "wavy"], "trend2026": false, "shape": "micro" },
+  { "id": "side-swept", "name": { "en": "Side-swept", "ar": "غرة جانبية" }, "faces": ["round", "square", "heart", "diamond"], "best": ["round", "square", "heart", "diamond"], "textures": ["straight", "wavy", "curly"], "trend2026": false, "shape": "side" },
+  { "id": "bottleneck", "name": { "en": "Bottleneck bangs", "ar": "غرة عنق الزجاجة" }, "faces": ["oval", "heart", "oblong"], "best": ["oval", "heart", "oblong"], "textures": ["straight", "wavy"], "trend2026": false, "shape": "bottleneck" },
+  { "id": "curly-fringe", "name": { "en": "Curly fringe", "ar": "غرة كيرلي" }, "faces": ["oval", "heart"], "best": ["oval", "heart"], "textures": ["curly", "coily"], "trend2026": false, "shape": "curly" }
+]

@@ -1,0 +1,16 @@
+{
+  "sulfate_free": { "en": "Use a sulfate-free shampoo for color-treated hair", "ar": "استخدمي شامبو خالياً من الكبريتات للشعر المصبوغ" },
+  "wait_48h": { "en": "Wait 48 hours before the first wash", "ar": "انتظري 48 ساعة قبل أول غسلة" },
+  "cool_water": { "en": "Rinse with cool water to keep the shine", "ar": "اشطفي بماء فاتر لتحافظي على اللمعان" },
+  "heat_protect": { "en": "Use a heat protector before every blow-dry or iron", "ar": "استخدمي واقي الحرارة قبل كل سشوار أو مكواة" },
+  "purple_shampoo": { "en": "Purple shampoo once a week to control yellow", "ar": "شامبو بنفسجي مرة في الأسبوع للتحكم في الاصفرار" },
+  "blue_shampoo": { "en": "Blue shampoo once a week to control orange", "ar": "شامبو أزرق مرة في الأسبوع للتحكم في البرتقالي" },
+  "gloss_6w": { "en": "Gloss refresh in about 6 weeks", "ar": "تجديد اللمعان بعد حوالي 6 أسابيع" },
+  "toner_6w": { "en": "Toner refresh in 6 to 8 weeks", "ar": "تجديد التونر بعد 6 إلى 8 أسابيع" },
+  "roots_5w": { "en": "Root touch-up every 4 to 6 weeks", "ar": "صبغ الجذور كل 4 إلى 6 أسابيع" },
+  "bond_mask": { "en": "Bond-repair mask once a week", "ar": "ماسك ترميم الروابط مرة في الأسبوع" },
+  "pastel_fade": { "en": "Pastels and vivids fade fast: wash less, cold rinse", "ar": "الألوان الباستيل والزاهية تبهت بسرعة: قللي الغسل واشطفي بماء بارد" },
+  "curl_care": { "en": "Diffuse dry and avoid brushing curls when dry", "ar": "جففي بالمشتت وتجنبي تمشيط الكيرلي وهو جاف" },
+  "trim_ends": { "en": "Trim the ends at the suggested next visit", "ar": "قصي الأطراف في الموعد القادم المقترح" },
+  "sun_scarf": { "en": "Protect color from strong sun with a light scarf or UV spray", "ar": "احمي اللون من الشمس القوية بوشاح خفيف أو بخاخ واقٍ" }
+}

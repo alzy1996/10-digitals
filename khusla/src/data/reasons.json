@@ -1,0 +1,16 @@
+{
+  "face_soften_square": { "en": "Softens a square jaw", "ar": "يُنعّم زوايا الفك المربع" },
+  "face_lengthen_round": { "en": "Adds length to a round face", "ar": "يُطيل مظهر الوجه الدائري" },
+  "face_widen_oblong": { "en": "Adds width to a long face", "ar": "يضيف عرضاً للوجه الطويل" },
+  "face_balance_heart": { "en": "Balances a wider forehead", "ar": "يوازن الجبهة العريضة" },
+  "texture_fit": { "en": "Works with your natural texture", "ar": "يناسب طبيعة شعرك" },
+  "warm_harmony": { "en": "Warm tones flatter your warm undertone", "ar": "الدرجات الدافئة تليق ببشرتك الدافئة" },
+  "cool_harmony": { "en": "Cool tones flatter your cool undertone", "ar": "الدرجات الباردة تليق ببشرتك الباردة" },
+  "eyes_pop": { "en": "Makes your eye color stand out", "ar": "يُبرز لون عينيك" },
+  "one_session": { "en": "Reachable in one session", "ar": "ممكن في جلسة واحدة" },
+  "two_sessions": { "en": "Needs 2 sessions for this result", "ar": "يحتاج جلستين للوصول" },
+  "low_upkeep": { "en": "Grows out softly, low upkeep", "ar": "ينمو بنعومة وعناية أقل" },
+  "front_visible": { "en": "Color shows around the face", "ar": "اللون يظهر حول الوجه" },
+  "grey_blend": { "en": "Blends grey softly", "ar": "يدمج الشيب بنعومة" },
+  "trend_2026": { "en": "2026 trend", "ar": "صيحة 2026" }
+}

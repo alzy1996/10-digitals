@@ -1,0 +1,19 @@
+{
+  "name": "khusla-ai",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "KHUSLA optional AI Final Look: Cloudflare Worker (Workers Free + Workers AI + KV)",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "jose": "^6.2.13"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.5",
+    "wrangler": "^4.152.0"
+  }
+}
