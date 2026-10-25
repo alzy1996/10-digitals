@@ -43,3 +43,13 @@ Format: decision — reason. Newest sections at the bottom.
   0 mm (under 0.25 mm) means shave; longer than the longest guard means "scissor, keep X mm" (X rounded to whole mm).
 - Firebase web config ends up inside the built JavaScript. That is normal: it is a public identifier, protected by
   App Check and the security rules. It is not a leaked secret.
+- Hosting: Sam chose GitHub Pages (Oct 25 2026). The repo is public, so Pages is free. The app is built with
+  `LIHYA_BASE=/10-digitals/` and served at `https://alzy1996.github.io/10-digitals/`; `.github/workflows/lihya-pages.yml`
+  lints, tests, builds, runs the size gate and deploys on every push to main that touches `lihya/`.
+  Firebase Hosting still works unchanged (`npm run build` with the default base `/`, `firebase deploy`).
+  Sub-path support: Vite `base`, router `basename`, PWA scope/start_url, `src/lib/paths.js` (`appUrl`, `assetUrl`)
+  for every absolute link (email sign-in links, invite links, Try-at-home QR). Pages has no SPA rewrite, so the
+  build copies `index.html` to `404.html`; deep links like `/10-digitals/try/<shopId>` load the app (with a 404
+  status on the first hit, which browsers ignore for rendering) and the service worker serves them offline after.
+- Firestore rules and indexes are not hosting: they still deploy with `firebase deploy --only firestore:rules,firestore:indexes`
+  from Sam's machine (manual step), whatever the hosting.

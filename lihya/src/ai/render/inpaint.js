@@ -113,22 +113,17 @@ export function buildOutlineTextures(params, profile, { size = 1024, zones = nul
     for (let i = 0; i < area.data.length; i++) area.data[i] = clamp(area.data[i] * 3, 0, 1);
   }
 
-  // Target edge: where the target mask crosses one half, about 0.6 mm wide.
+  // Target edge: where the target mask crosses one half, about 1.4 mm wide (a few
+  // pixels on the phone), never around the lips or the nose (those are not cut lines).
   const edge = createField(R, R);
   for (let i = 0; i < edge.data.length; i++) edge.data[i] = Mt.data[i] >= 0.5 ? 1 : 0;
-  blurField(edge, 0.35 * tf.cellsPerMm);
-
-  // Zones that stay but get shorter: diagonal hatching.
-  const cur = currentLengths(profile);
-  const shorter = createField(R, R);
-  for (const id of ZONES) {
-    if (id === 'N' || !only.has(id) || !(P.zones[id] > 0) || !(cur[id] > P.zones[id] + LENGTH_TOLERANCE_MM)) continue;
-    fillPolygon(shorter, tf.layout.zones[id].map((p) => [p[0] * R, p[1] * R]), 1);
-  }
+  blurField(edge, 0.6 * tf.cellsPerMm);
+  const noLine = createField(R, R);
+  for (let i = 0; i < noLine.data.length; i++) noLine.data[i] = Math.max(tf.exclude.data[i], cf.exclude.data[i]) > 0.05 ? 1 : 0;
+  blurField(noLine, 1.2 * tf.cellsPerMm);
 
   const color = new Uint8ClampedArray(S * S * 4);
   const k = R / S;
-  const hatchPeriod = 2.2 * 0.0048 * S;
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
       const fx = (x + 0.5) * k;
@@ -137,14 +132,12 @@ export function buildOutlineTextures(params, profile, { size = 1024, zones = nul
       const mc = sampleField(Mc, fx, fy);
       const ar = area ? sampleField(area, fx, fy) : 1;
       const o = (y * S + x) * 4;
-      if (!partial && mt > 0.01) put(color, o, KEEP, 0.26 * mt);
+      if (!partial && mt > 0.01) put(color, o, KEEP, 0.17 * mt);
       const remove = mc * (1 - mt) * ar;
-      if (remove > 0.01) put(color, o, CUT, 0.4 * remove);
-      const sh = sampleField(shorter, fx, fy) * mt;
-      if (sh > 0.05 && ((x + y) % hatchPeriod) < hatchPeriod * 0.28) put(color, o, CUT, 0.32 * sh);
+      if (remove > 0.01) put(color, o, CUT, 0.5 * remove);
       const e = sampleField(edge, fx, fy);
-      const line = smoothstep(0.18, 0.42, Math.min(e, 1 - e)) * ar;
-      if (line > 0.01 && (mc > 0.05 || !partial)) put(color, o, LINE, 0.95 * line);
+      const line = smoothstep(0.1, 0.3, Math.min(e, 1 - e)) * ar * (1 - clamp(sampleField(noLine, fx, fy) * 2.5, 0, 1));
+      if (line > 0.01 && (mc > 0.05 || !partial)) put(color, o, LINE, line);
     }
   }
 
@@ -161,17 +154,17 @@ export function buildOutlineTextures(params, profile, { size = 1024, zones = nul
     const lengthMm = maxMm + 4;
     const SH = clamp(Math.ceil(lengthMm * tpm), 8, 1024);
     const sc = new Uint8ClampedArray(SW * SH * 4);
-    const lineW = 0.7;
+    const lineW = 0.9;
     for (let x = 0; x < SW; x++) {
       const keepTo = Math.max(tc.neck[x], tc.hang[x]);
       const curTo = Math.max(cc.neck[x], cc.hang[x]);
       for (let y = 0; y < SH; y++) {
         const mm = y / tpm;
         const o = (y * SW + x) * 4;
-        if (!partial && mm < keepTo) put(sc, o, KEEP, 0.26);
-        if (mm >= keepTo && mm < curTo) put(sc, o, CUT, 0.4);
+        if (!partial && mm < keepTo) put(sc, o, KEEP, 0.17);
+        if (mm >= keepTo && mm < curTo) put(sc, o, CUT, 0.5);
         const atLine = Math.abs(mm - keepTo) < lineW && keepTo > 0.5 && (curTo > keepTo + 0.5 || !partial);
-        if (atLine) put(sc, o, LINE, 0.95);
+        if (atLine) put(sc, o, LINE, 1);
       }
     }
     shell = { width: SW, height: SH, color: sc, lengthMm: SH / tpm };
@@ -182,9 +175,14 @@ export function buildOutlineTextures(params, profile, { size = 1024, zones = nul
 
 const cache = new Map();
 
+/** Cache key of an Outline texture request. */
+export function outlineKey(params, profile, opts = {}) {
+  return stableKey({ params: normalizeLook(params), cur: currentLengths(profile), size: opts.size || 1024, zones: opts.zones || null, p: !!(profile && profile.beard && profile.beard.zones) });
+}
+
 /** buildOutlineTextures with a small cache keyed by the look, profile and zones. */
 export function getOutlineTextures(params, profile, opts = {}) {
-  const key = stableKey({ params: normalizeLook(params), cur: currentLengths(profile), size: opts.size || 1024, zones: opts.zones || null, p: !!profile });
+  const key = outlineKey(params, profile, opts);
   const hit = cache.get(key);
   if (hit) return hit;
   const tex = buildOutlineTextures(params, profile, opts);

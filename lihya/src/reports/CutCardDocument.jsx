@@ -70,6 +70,13 @@ function lineName(L, type, id) {
 
 const sep = (L) => (L === 'ar' ? '، ' : ', ');
 
+/** A catalog name used inside an English sentence starts lower case ("At the lip line" -> "at the lip line"). */
+function midSentence(L, s) {
+  const text = String(s || '');
+  if (L !== 'en' || text.length < 2 || text[1] !== text[1].toLowerCase()) return text;
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
 function answerText(t, answer) {
   if (answer === true || answer === 'yes') return t('report.safety.answer.yes');
   if (answer === false || answer === 'no') return t('report.safety.answer.no');
@@ -271,9 +278,13 @@ function lineValues(card, L, t) {
   }
 
   const mustName = must.id && MUSTACHE_MAP.get(must.id) ? pickLang(L, MUSTACHE_MAP.get(must.id).name) : t('zone.M');
-  const mustValue = !(must.mm > 0)
-    ? t('report.cut.mustacheShaved')
-    : t('report.cut.mustacheValue', { name: mustName, edge: lineName(L, 'mustacheEdge', must.edge || card.mustacheEdge), mm: formatMm(must.mm, L) });
+  const edgeName = midSentence(L, lineName(L, 'mustacheEdge', must.edge || card.mustacheEdge));
+  // "Trimmed short" already says "very short": the edge is not repeated ("شنب محفوف، محفوف").
+  const edgeSaid = !edgeName || mustName.toLowerCase().includes(edgeName.toLowerCase());
+  let mustValue;
+  if (!(must.mm > 0)) mustValue = t('report.cut.mustacheShaved');
+  else if (edgeSaid) mustValue = t('report.cut.mustacheNoEdge', { name: mustName, mm: formatMm(must.mm, L) });
+  else mustValue = t('report.cut.mustacheValue', { name: mustName, edge: edgeName, mm: formatMm(must.mm, L) });
 
   let sbSub = '';
   if (Number.isFinite(sb.fadeStartMm) && Number.isFinite(sb.fadeEndMm) && sb.fadeEndMm > sb.fadeStartMm) {
@@ -332,13 +343,15 @@ function ColorBlock({ card, colors, L, t, pal, fs, compact = false }) {
           {compact ? null : <div style={{ fontSize: fs.small, color: pal.ink2, marginBottom: 2 }}>{t('report.cut.safety')}</div>}
           {shown.map((q) => {
             const def = SAFETY_MAP.get(q.id);
-            const text = def ? pickLang(L, compact ? def.flag : def.text) : q.id;
+            // The short flag states the risk, so it is shown only when the answer is a risk;
+            // a question nobody has answered yet is shown as the question.
+            const text = def ? pickLang(L, compact && q.risk ? def.flag : def.text) : q.id;
             return (
               <div key={q.id} style={{ display: 'flex', alignItems: 'baseline', marginBottom: 2 }}>
                 <Dot color={tone[q.level] || pal.ink2} round />
                 <div style={{ minWidth: 0, fontSize: fs.small, color: pal.ink, lineHeight: 1.35 }}>
                   <span>{text}</span>
-                  {compact ? null : <span style={{ color: pal.ink2 }}>{`${sep(L)}${answerText(t, q.answer)}`}</span>}
+                  {compact ? null : <span style={{ color: pal.ink2 }}>{` ${t('report.safety.answerIs', { answer: answerText(t, q.answer) })}`}</span>}
                   <span style={{ fontWeight: 600, color: tone[q.level] || pal.ink }}>{` · ${levelText[q.level] || ''}`}</span>
                 </div>
               </div>

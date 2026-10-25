@@ -393,3 +393,9 @@ toggle + pending-sync badge), `TopBar`, `LangToggle`, `SyncBadge`, `OwnerShell({
   irritationToday).
 - Offsets: `lines.cheekOffset` / `lines.necklineOffset` positive = the line moves UP (cheek line higher on the face,
   neckline higher toward the jaw).
+
+### Base path (GitHub Pages sub-path)
+- The app may be served under a sub-path (`/10-digitals/` on GitHub Pages). Router links and `navigate('/s/...')` are fine
+  (the router has a `basename`). Any URL that leaves the app (email links, QR codes, WhatsApp text, share text) must use
+  `appUrl(routePath)` from `src/lib/paths.js`, and files in `public/` must use `assetUrl('templates/products-template.csv')`.
+  Never build URLs from `window.location.origin` directly and never hard-code `'/icons/...'` or `'/templates/...'`.

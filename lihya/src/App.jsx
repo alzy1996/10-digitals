@@ -7,6 +7,7 @@ import ScreenFallback from './components/ScreenFallback.jsx';
 import ShopRoute from './state/ShopRoute.jsx';
 import HomeRoute from './state/HomeRoute.jsx';
 import { RequireRole } from './state/ShopContext.jsx';
+import { ROUTER_BASENAME } from './lib/paths.js';
 
 const S01ShopPicker = lazy(() => import('./screens/S01ShopPicker.jsx'));
 const S02Login = lazy(() => import('./screens/S02Login.jsx'));
@@ -41,7 +42,7 @@ export default function App() {
     <I18nProvider>
       <SnackbarProvider>
         <AuthProvider>
-          <BrowserRouter>
+          <BrowserRouter basename={ROUTER_BASENAME}>
             <Suspense fallback={<ScreenFallback />}>
               <Routes>
                 <Route path="/" element={<S01ShopPicker />} />

@@ -26,8 +26,8 @@ export const STRAND_L_MIN_SWING = 1.4;
 
 /** Lab of a natural grey / white beard hair (slightly warm, never pure white). */
 export const GREY_HAIR_LAB = Object.freeze([74, -0.3, 4.5]);
-/** Natural beard shade used when the profile has no measured colour. */
-export const DEFAULT_NATURAL_LAB = Object.freeze([21, 2.5, 5]);
+/** Natural beard shade used when the profile has no measured colour (a soft black). */
+export const DEFAULT_NATURAL_LAB = Object.freeze([17, 1.6, 3]);
 
 const BY_ID = new Map((Array.isArray(COLORS) ? COLORS : []).map((c) => [c.id, c]));
 

@@ -413,11 +413,20 @@ export function beardLayout(params) {
   let clipC = shape.chin === 'strip' ? [[0.5 - 7 * MM, -1], [0.5 + 7 * MM, -1], [0.5 + 7 * MM, 2], [0.5 - 7 * MM, 2]] : null;
   // A chin-only beard (goatee, Van Dyke) takes its chin shape on the face too.
   const chinOnly = ['K_L', 'K_R', 'J_L', 'J_R'].every((id) => !((zl[id] || 0) > 0.2));
+  // The top is narrower than the lips at mouth-corner height, so the lip cut-out
+  // gives the goatee a top edge that follows the lower lip, with no corner tufts
+  // beside it; the sides round off into the chin.
   if (!clipC && chinOnly && shape.chin === 'round') {
-    // Rounded goatee: narrower than the mouth under the lip, a full round chin.
-    clipC = [[0.415, 0.69], [0.585, 0.69], [0.603, 0.78], [0.614, 0.86], [0.602, 0.93], [0.565, 0.99], [0.5, 1.01], [0.435, 0.99], [0.398, 0.93], [0.386, 0.86], [0.397, 0.78]];
+    clipC = [
+      [0.462, 0.7], [0.538, 0.7], [0.566, 0.75], [0.592, 0.776], [0.606, 0.82], [0.611, 0.87], [0.601, 0.92],
+      [0.576, 0.965], [0.5, 1.0], [0.424, 0.965], [0.399, 0.92], [0.389, 0.87], [0.394, 0.82], [0.408, 0.776],
+      [0.434, 0.75],
+    ];
   } else if (!clipC && chinOnly && shape.chin === 'pointed') {
-    clipC = [[0.405, 0.69], [0.595, 0.69], [0.61, 0.8], [0.585, 0.9], [0.5, 1.03], [0.415, 0.9], [0.39, 0.8]];
+    clipC = [
+      [0.462, 0.7], [0.538, 0.7], [0.568, 0.752], [0.596, 0.785], [0.604, 0.84], [0.592, 0.9], [0.56, 0.955],
+      [0.5, 1.03], [0.44, 0.955], [0.408, 0.9], [0.396, 0.84], [0.404, 0.785], [0.432, 0.752],
+    ];
   }
 
   // Disconnected sideburns: a skin gap along the bottom of the sideburn.

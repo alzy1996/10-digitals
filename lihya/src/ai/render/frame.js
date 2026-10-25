@@ -110,27 +110,34 @@ export function faceBeardCrop(landmarks, w, h, beardBelowMm = 40) {
 
 let lightCanvas = null;
 
-function luminanceAt(data, sw, sh, cx, cy, r) {
-  let sum = 0;
+/** Mean linear RGB of a disc of an RGBA buffer ([NaN x 3] when empty). */
+function linearAt(data, sw, sh, cx, cy, r) {
+  let R = 0;
+  let G = 0;
+  let B = 0;
   let n = 0;
   const x0 = Math.max(0, Math.floor(cx - r));
   const x1 = Math.min(sw - 1, Math.ceil(cx + r));
   const y0 = Math.max(0, Math.floor(cy - r));
   const y1 = Math.min(sh - 1, Math.ceil(cy + r));
+  const lin = (c) => {
+    const v = c / 255;
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
   for (let y = y0; y <= y1; y++) {
     for (let x = x0; x <= x1; x++) {
       if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
       const o = (y * sw + x) * 4;
-      const lin = (c) => {
-        const v = c / 255;
-        return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-      };
-      sum += 0.2126 * lin(data[o]) + 0.7152 * lin(data[o + 1]) + 0.0722 * lin(data[o + 2]);
+      R += lin(data[o]);
+      G += lin(data[o + 1]);
+      B += lin(data[o + 2]);
       n += 1;
     }
   }
-  return n ? sum / n : NaN;
+  return n ? [R / n, G / n, B / n] : [NaN, NaN, NaN];
 }
+
+const lumOf = (rgb) => 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
 
 const yToL = (Y) => (Y > 216 / 24389 ? 116 * Math.cbrt(Y) - 16 : (24389 / 27) * Y);
 
@@ -139,11 +146,12 @@ const yToL = (Y) => (Y > 216 / 24389 ? 116 * Math.cbrt(Y) - 16 : (24389 / 27) * 
  * left / right cheek brightness, a fixed slight top light, the ambient share (lower
  * when one side is much brighter) and the exposure relative to the capture-time skin
  * L* (refSkinL, optional; 1 without it).
- * Returns { dir: [x, y, z] (scene space, un-mirrored), ambient, exposure, meanL } or a
- * neutral light when the frame cannot be read.
+ * Returns { dir: [x, y, z] (scene space, un-mirrored), ambient, exposure, meanL,
+ * skinRgb (mean linear RGB of the cheeks) } or a neutral light when the frame cannot
+ * be read.
  */
 export function estimateLight(source, landmarks, w, h, { refSkinL = null } = {}) {
-  const neutral = { dir: [0, 0.3, 0.954], ambient: 0.45, exposure: 1, meanL: null };
+  const neutral = { dir: [0, 0.3, 0.954], ambient: 0.45, exposure: 1, meanL: null, skinRgb: null };
   if (!source || !landmarks || landmarks.length < 468) return neutral;
   try {
     const sw = 96;
@@ -161,10 +169,12 @@ export function estimateLight(source, landmarks, w, h, { refSkinL = null } = {})
     const faceW = dist(P(MEASURE.cheekL), P(MEASURE.cheekR));
     const r = Math.max(1.5, faceW * 0.07);
     // Customer's right cheek is on the image left (un-mirrored frame).
-    const imgLeft = (luminanceAt(data, sw, sh, ...P(50), r) + luminanceAt(data, sw, sh, ...P(205), r)) / 2;
-    const imgRight = (luminanceAt(data, sw, sh, ...P(280), r) + luminanceAt(data, sw, sh, ...P(425), r)) / 2;
-    const fore = luminanceAt(data, sw, sh, ...P(151), r);
+    const cheeks = [50, 205, 280, 425].map((i) => linearAt(data, sw, sh, ...P(i), r));
+    const imgLeft = (lumOf(cheeks[0]) + lumOf(cheeks[1])) / 2;
+    const imgRight = (lumOf(cheeks[2]) + lumOf(cheeks[3])) / 2;
+    const fore = lumOf(linearAt(data, sw, sh, ...P(151), r));
     if (![imgLeft, imgRight].every(Number.isFinite) || imgLeft + imgRight <= 1e-4) return neutral;
+    const skinRgb = [0, 1, 2].map((c) => cheeks.reduce((sum, rgb) => sum + rgb[c], 0) / cheeks.length);
     const lx = clamp((2.4 * (imgRight - imgLeft)) / (imgRight + imgLeft), -0.75, 0.75);
     const ly = 0.3;
     const lz = Math.sqrt(Math.max(0.05, 1 - lx * lx - ly * ly));
@@ -175,7 +185,7 @@ export function estimateLight(source, landmarks, w, h, { refSkinL = null } = {})
       const refY = ((refSkinL + 16) / 116) ** 3;
       exposure = clamp((meanY / refY) ** 0.8, 0.6, 1.5);
     }
-    return { dir: [lx, ly, lz], ambient: clamp(0.6 - 0.5 * Math.abs(lx), 0.3, 0.6), exposure, meanL };
+    return { dir: [lx, ly, lz], ambient: clamp(0.6 - 0.5 * Math.abs(lx), 0.3, 0.6), exposure, meanL, skinRgb };
   } catch (err) {
     console.warn('Light estimate failed', err);
     return neutral;

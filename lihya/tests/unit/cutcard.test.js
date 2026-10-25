@@ -10,6 +10,7 @@ import {
   effectiveGrowth,
   cutCardZonesMm,
   CHEEK_DEFAULT_MM,
+  CHEEK_LIMIT_MM,
 } from '../../src/lib/cutcard.js';
 import { CANONICAL_VERTICES } from '../../src/ai/mesh/tessellation.js';
 import { DEFAULT_GUARD_CHART } from '../../src/lib/guards.js';
@@ -122,46 +123,90 @@ describe('rows and guards', () => {
 });
 
 describe('cheek line', () => {
+  const TYPES = ['natural', 'low', 'medium', 'high', 'curved', 'straight'];
+  const measure = (type, offset = 0, front = SYNTH, mmPerPx = SYNTH_MM_PER_PX) => cheekLineHeight({ type, offset, front, mmPerPx });
+
   it('uses the documented defaults without a front shot', () => {
-    expect(cheekLineHeight({ type: 'natural' })).toEqual({ mm: CHEEK_DEFAULT_MM.natural, source: 'default' });
-    expect(cheekLineHeight({ type: 'low' }).mm).toBe(25);
-    expect(cheekLineHeight({ type: 'medium' }).mm).toBe(34);
-    expect(cheekLineHeight({ type: 'high' }).mm).toBe(45);
-    expect(cheekLineHeight({ type: 'straight' }).mm).toBe(37);
+    for (const type of TYPES) expect(cheekLineHeight({ type })).toEqual({ mm: CHEEK_DEFAULT_MM[type], source: 'default' });
+    expect(cheekLineHeight({ type: 'unknown-line' }).mm).toBe(CHEEK_DEFAULT_MM.natural);
+    expect(CHEEK_DEFAULT_MM.low).toBeLessThan(CHEEK_DEFAULT_MM.natural);
+    expect(CHEEK_DEFAULT_MM.high).toBeGreaterThan(CHEEK_DEFAULT_MM.natural);
   });
 
-  it('moves with the cheek offset and stays between the low and high lines', () => {
-    const up = cheekLineHeight({ type: 'natural', offset: 0.1 }).mm;
-    const down = cheekLineHeight({ type: 'natural', offset: -0.1 }).mm;
-    expect(up).toBeGreaterThan(CHEEK_DEFAULT_MM.natural);
-    expect(down).toBeLessThan(CHEEK_DEFAULT_MM.natural);
-    expect(cheekLineHeight({ type: 'natural', offset: 1 }).mm).toBe(CHEEK_DEFAULT_MM.high);
-    expect(cheekLineHeight({ type: 'natural', offset: -1 }).mm).toBe(CHEEK_DEFAULT_MM.low);
-    expect(cheekLineHeight({ type: 'high', offset: 1 }).mm).toBe(CHEEK_DEFAULT_MM.high);
+  it('moves the default toward the HIGH (+1) or LOW (-1) limit line like the renderer', () => {
+    for (const type of TYPES) {
+      expect(cheekLineHeight({ type, offset: 1 }).mm).toBe(CHEEK_LIMIT_MM.high);
+      expect(cheekLineHeight({ type, offset: -1 }).mm).toBe(CHEEK_LIMIT_MM.low);
+      expect(cheekLineHeight({ type, offset: 5 }).mm).toBe(CHEEK_LIMIT_MM.high);
+    }
+    const n = CHEEK_DEFAULT_MM.natural;
+    expect(cheekLineHeight({ type: 'natural', offset: 0.5 }).mm).toBe(Math.round(n + 0.5 * (CHEEK_LIMIT_MM.high - n)));
+    expect(cheekLineHeight({ type: 'natural', offset: -0.5 }).mm).toBe(Math.round(n - 0.5 * (n - CHEEK_LIMIT_MM.low)));
   });
 
   it('measures on the face from the front shot landmarks and the iris scale', () => {
-    const nat = cheekLineHeight({ type: 'natural', front: SYNTH, mmPerPx: SYNTH_MM_PER_PX });
-    const low = cheekLineHeight({ type: 'natural', offset: -1, front: SYNTH, mmPerPx: SYNTH_MM_PER_PX });
-    const high = cheekLineHeight({ type: 'natural', offset: 1, front: SYNTH, mmPerPx: SYNTH_MM_PER_PX });
+    const nat = measure('natural');
     expect(nat.source).toBe('measured');
-    expect(nat.mm).toBeGreaterThan(15);
-    expect(nat.mm).toBeLessThan(60);
-    expect(low.mm).toBeLessThan(nat.mm);
-    expect(high.mm).toBeGreaterThan(nat.mm);
-    const typedLow = cheekLineHeight({ type: 'low', front: SYNTH, mmPerPx: SYNTH_MM_PER_PX });
-    const typedHigh = cheekLineHeight({ type: 'high', front: SYNTH, mmPerPx: SYNTH_MM_PER_PX });
-    expect(typedLow.source).toBe('measured');
-    expect(typedLow.mm).toBeGreaterThanOrEqual(low.mm);
-    expect(typedHigh.mm).toBeLessThanOrEqual(high.mm);
-    expect(typedHigh.mm).toBeGreaterThan(typedLow.mm);
+    expect(nat.mm).toBeGreaterThan(20);
+    expect(nat.mm).toBeLessThan(80);
+    const low = measure('natural', -1).mm;
+    const high = measure('natural', 1).mm;
+    for (const type of TYPES) {
+      // every type blends into the same LOW / HIGH limit lines at the ends of the offset
+      expect(Math.abs(measure(type, -1).mm - low)).toBeLessThanOrEqual(1);
+      expect(Math.abs(measure(type, 1).mm - high)).toBeLessThanOrEqual(1);
+      const steps = [-1, -0.5, 0, 0.5, 1].map((o) => measure(type, o).mm);
+      for (let i = 1; i < steps.length; i++) expect(steps[i]).toBeGreaterThanOrEqual(steps[i - 1]);
+      expect(measure(type).mm).toBeGreaterThan(low);
+      expect(measure(type).mm).toBeLessThan(high);
+    }
+    expect(measure('low').mm).toBeLessThan(measure('medium').mm);
+    expect(measure('medium').mm).toBeLessThan(measure('high').mm);
+    expect(measure('curved').mm).toBeGreaterThan(measure('straight').mm);
     // twice the scale, twice the millimetres
-    const doubled = cheekLineHeight({ type: 'natural', front: SYNTH, mmPerPx: SYNTH_MM_PER_PX * 2 });
-    expect(Math.abs(doubled.mm - nat.mm * 2)).toBeLessThanOrEqual(1);
+    expect(Math.abs(measure('natural', 0, SYNTH, SYNTH_MM_PER_PX * 2).mm - nat.mm * 2)).toBeLessThanOrEqual(1);
   });
 
-  it('falls back to defaults when the scale is missing', () => {
+  it('follows the renderer offset: +0.3 moves the line 30 % of the way to the HIGH line', () => {
+    const nat = measure('natural').mm;
+    const high = measure('natural', 1).mm;
+    const low = measure('natural', -1).mm;
+    expect(Math.abs(measure('natural', 0.3).mm - (nat + 0.3 * (high - nat)))).toBeLessThanOrEqual(1);
+    expect(Math.abs(measure('natural', -0.4).mm - (nat - 0.4 * (nat - low)))).toBeLessThanOrEqual(1);
+  });
+
+  it('keeps the documented defaults in step with the line construction', () => {
+    // each type sits at the same relative height between the LOW and HIGH lines on the
+    // canonical face as its default does between CHEEK_LIMIT_MM.low and .high
+    const low = measure('natural', -1).mm;
+    const high = measure('natural', 1).mm;
+    for (const type of TYPES) {
+      const rel = (measure(type).mm - low) / (high - low);
+      const relDefault = (CHEEK_DEFAULT_MM[type] - CHEEK_LIMIT_MM.low) / (CHEEK_LIMIT_MM.high - CHEEK_LIMIT_MM.low);
+      expect(Math.abs(rel - relDefault)).toBeLessThan(0.06);
+    }
+  });
+
+  it('measures along the face, so a tilted head reads the same', () => {
+    const a = (15 * Math.PI) / 180;
+    const cx = 0.5;
+    const cy = 0.5;
+    const tilted = {
+      ...SYNTH,
+      landmarks: SYNTH.landmarks.map((l) => ({
+        x: cx + (l.x - cx) * Math.cos(a) - (l.y - cy) * Math.sin(a),
+        y: cy + (l.x - cx) * Math.sin(a) + (l.y - cy) * Math.cos(a),
+        z: 0,
+      })),
+    };
+    for (const type of ['natural', 'curved']) {
+      expect(Math.abs(measure(type, 0, tilted).mm - measure(type).mm)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('falls back to defaults when the scale or the landmarks are missing', () => {
     expect(cheekLineHeight({ type: 'natural', front: SYNTH, mmPerPx: null }).source).toBe('default');
+    expect(cheekLineHeight({ type: 'natural', front: { width: 10, height: 10, landmarks: [] }, mmPerPx: 0.5 }).source).toBe('default');
   });
 
   it('is part of the card, measured when the front shot and profile scale are given', () => {
@@ -169,7 +214,9 @@ describe('cheek line', () => {
     const card = buildCutCard({ params: paramsOf(s), style: s, profile: { scale: { mmPerPx: SYNTH_MM_PER_PX } }, front: SYNTH });
     expect(card.cheekLine.type).toBe('natural');
     expect(card.cheekLine.source).toBe('measured');
-    expect(card.cheekLine.mmAboveJaw).toBe(cheekLineHeight({ type: 'natural', front: SYNTH, mmPerPx: SYNTH_MM_PER_PX }).mm);
+    expect(card.cheekLine.mmAboveJaw).toBe(measure('natural').mm);
+    const raised = buildCutCard({ params: paramsOf(s, { lines: { ...s.lines, cheekOffset: 0.5 } }), style: s });
+    expect(raised.cheekLine).toMatchObject({ source: 'default', offset: 0.5, mmAboveJaw: cheekLineHeight({ type: 'natural', offset: 0.5 }).mm });
   });
 });
 
@@ -275,7 +322,9 @@ describe('growth and next visit', () => {
     expect(suggestNextVisitDays(style('clean-shave').zones, 0.4)).toBe(7);
     expect(suggestNextVisitDays(style('bandholz').zones, 0.4)).toBe(42);
     expect(effectiveGrowth(null)).toBe(0.4);
-    expect(effectiveGrowth(9)).toBe(1.5);
+    expect(effectiveGrowth(9)).toBe(2);
+    expect(effectiveGrowth(0.05)).toBe(0.05);
+    expect(effectiveGrowth(-1)).toBe(0.4);
   });
 
   it('dates the next visit on the Muscat calendar', () => {

@@ -46,6 +46,8 @@ import { clamp, lerp, smoothstep, isNum, mulberry32, hash32, stableKey, valueNoi
 const DEG = Math.PI / 180;
 export const FACE_TEX_SIZE = 1024;
 export const THUMB_TEX_SIZE = 512;
+/** Texture size of the fast path used for style-card thumbnails. */
+export const FAST_TEX_SIZE = 384;
 
 const LINE_DEFAULTS = Object.freeze({
   cheek: 'natural',
@@ -102,10 +104,10 @@ export function visibleLengthMm(L) {
 const OD_TABLE = [
   [0, 0],
   [0.5, 0.3],
-  [1, 0.5],
-  [2, 0.68],
-  [4, 1.05],
-  [7, 1.6],
+  [1, 0.55],
+  [2, 0.8],
+  [4, 1.3],
+  [7, 1.8],
   [10, 2.2],
   [20, 3.0],
   [40, 3.4],
@@ -319,7 +321,7 @@ export function faceFields(P, R, coverage) {
     clip.data[k] = clamp((clip.data[k] - 0.12) / 0.5, 0, 1) * (1 - ex.data[k]);
     spawn.data[k] *= 1 - ex.data[k];
   }
-  return { R, len, cov, spawn, clip, mW, layout, edgeSigmaMm: sigmaMm, cellsPerMm: cpm };
+  return { R, len, cov, spawn, clip, mW, layout, exclude: ex, edgeSigmaMm: sigmaMm, cellsPerMm: cpm };
 }
 
 /** Upsamples an R x R field to S x S (bilinear) into a Float32Array. */
@@ -342,8 +344,35 @@ const toSrgb8 = (lin) => SRGB_LUT[lin <= 0 ? 0 : lin >= 1 ? 4095 : Math.round(li
 /** Occlusion is stored as occ / OCC_RANGE so lighter locks can exceed 1. */
 export const OCC_RANGE = 1.5;
 
+/**
+ * Scale that puts the median occlusion of the well-covered texels at 1, so the
+ * locks vary around the chosen colour instead of darkening it (PRD 7.6: the
+ * rendered mid-tone must match the swatch).
+ */
+function occlusionScale(cv) {
+  const hist = new Uint32Array(256);
+  let n = 0;
+  for (let i = 0; i < cv.a.length; i++) {
+    const a = cv.a[i];
+    if (a < 0.9) continue;
+    const occ = cv.occ[i] / a;
+    hist[Math.min(255, Math.max(0, Math.round((occ / OCC_RANGE) * 255)))] += 1;
+    n += 1;
+  }
+  if (n < 50) return 1;
+  let acc = 0;
+  for (let b = 0; b < 256; b++) {
+    acc += hist[b];
+    if (acc >= n / 2) {
+      const med = ((b + 0.5) / 255) * OCC_RANGE;
+      return med > 0.2 ? clamp(1 / med, 0.8, 1.6) : 1;
+    }
+  }
+  return 1;
+}
+
 /** Packs a strand canvas into colour + light RGBA rasters. */
-function packCanvas(cv, bleedLin) {
+function packCanvas(cv, bleedLin, occScale = 1) {
   const n = cv.w * cv.h;
   const color = new Uint8ClampedArray(n * 4);
   const light = new Uint8ClampedArray(n * 4);
@@ -359,7 +388,7 @@ function packCanvas(cv, bleedLin) {
       color[o + 1] = toSrgb8(cv.rgb[3 * i + 1] * inv);
       color[o + 2] = toSrgb8(cv.rgb[3 * i + 2] * inv);
       color[o + 3] = Math.round(a * 255);
-      light[o] = Math.round(clamp((cv.occ[i] * inv) / OCC_RANGE, 0, 1) * 255);
+      light[o] = Math.round(clamp((cv.occ[i] * inv * occScale) / OCC_RANGE, 0, 1) * 255);
       light[o + 1] = Math.round(clamp(cv.sheen[i] * inv, 0, 1) * 255);
       const tx = cv.tan[2 * i];
       const ty = cv.tan[2 * i + 1];
@@ -436,13 +465,12 @@ function paintFace(P, fields, S, treatment, gains, rnd, finish) {
   const lockAt = (x, y) =>
     0.6 + 0.55 * smoothstep(0.28, 0.72, fbm2(lockN, x / (1.7 * tpm), y / (5 * tpm))) + 0.3 * (fine(x / (0.7 * tpm), y / (2.2 * tpm)) - 0.5);
 
-  // Natural growth thins toward a soft (scissor) edge over a few millimetres; a
-  // trimmer or razor line keeps full density up to the line.
-  let wide = null;
-  if (fields.edgeSigmaMm > 1.5) {
-    wide = { w: R, h: R, data: new Float32Array(spawn.data) };
-    blurField(wide, 4 * fields.cellsPerMm);
-  }
+  // Natural growth thins toward the beard's edges over a few millimetres: a lot
+  // toward a soft (scissor) edge, a little toward a trimmer line, hardly at all
+  // toward a razor line (khatt), so even a sharp line-up never reads as a stencil.
+  const wide = { w: R, h: R, data: new Float32Array(spawn.data) };
+  blurField(wide, 4 * fields.cellsPerMm);
+  const thinMin = fields.edgeSigmaMm > 1.5 ? 0.55 : fields.edgeSigmaMm > 0.5 ? 0.74 : 0.86;
 
   // Presence per cell: the soft shape x the patch map (hair on about `coverage` of a
   // weak zone, in natural-looking patches) x a little density noise.
@@ -461,8 +489,11 @@ function paintFace(P, fields, S, treatment, gains, rnd, finish) {
         const t = patchThreshold(c);
         patch = 1 - smoothstep(t - 0.035, t + 0.035, n);
       }
-      const thin = wide ? lerp(0.55, 1, smoothstep(0.45, 0.85, wide.data[ci])) : 1;
-      presence[ci] = sp * patch * thin * (0.75 + 0.5 * fine(tx * 60, ty * 60));
+      const thin = lerp(thinMin, 1, smoothstep(0.45, 0.85, wide.data[ci]));
+      // A little density grain (finer and weaker on stubble, where coarse blotches read
+      // as paint rather than hair).
+      const grain = len.data[ci] < 6 ? 0.88 + 0.24 * fine(tx * 130, ty * 130) : 0.78 + 0.44 * fine(tx * 70, ty * 70);
+      presence[ci] = sp * patch * thin * grain;
     }
   }
   const presenceAt = (x, y) => {
@@ -529,7 +560,7 @@ function paintFace(P, fields, S, treatment, gains, rnd, finish) {
         if (clump === 1) {
           const look = strandLook(treatment, rnd, gains, 1);
           const stubble = L < 5;
-          const alpha = stubble ? 0.55 + 0.3 * rnd() : 0.75 + 0.2 * rnd();
+          const alpha = stubble ? 0.62 + 0.28 * rnd() : 0.75 + 0.2 * rnd();
           strands.push({
             depth,
             pts: strandPath(x, y, Math.max(1.2, lengthPx), angleAt, rnd, {
@@ -539,7 +570,7 @@ function paintFace(P, fields, S, treatment, gains, rnd, finish) {
             }),
             width,
             alpha,
-            tipAlpha: alpha * (stubble ? 0.8 : 0.45),
+            tipAlpha: alpha * (stubble ? 0.8 : 0.6),
             rgb: look.rgb,
             occ: stubble ? 0.92 + 0.08 * rnd() : (0.74 + 0.26 * depth) * lockAt(x, y) * (rnd() < 0.06 ? 1.35 : 1),
             sheen: look.sheen,
@@ -579,7 +610,7 @@ function paintFace(P, fields, S, treatment, gains, rnd, finish) {
               pts,
               width,
               alpha,
-              tipAlpha: alpha * 0.35,
+              tipAlpha: alpha * 0.6,
               rgb: look.rgb,
               occ: (0.68 + 0.16 * depth + 0.16 * centre) * lockAt(x, y) * (rnd() < 0.06 ? 1.35 : 1),
               sheen: look.sheen,
@@ -867,8 +898,10 @@ function paintShell(P, cols, SW, treatment, gains, rnd) {
         }
       }
       if (h >= 1.2) {
-        // Opaque at the jaw (it continues the beard on the face), thinning to the tips.
-        const a = 0.94 * c * smoothstep(1, 4, hang[x]) * (1 - smoothstep(h * 0.62, h * 0.98, mm));
+        // Opaque at the jaw (it continues the beard on the face), thinning to the tips;
+        // like the face, only beards long enough to hide the skin get this layer.
+        const body = smoothstep(4, 13, cols.zoneLen[x]);
+        const a = 0.94 * c * body * smoothstep(1, 4, hang[x]) * (1 - smoothstep(h * 0.62, h * 0.86, mm));
         if (a > 0.003) compositeTexel(cv, i, deep, a, 0.58 * lockAt(x, y), 0.3, 1);
       }
     }
@@ -916,15 +949,20 @@ function paintShell(P, cols, SW, treatment, gains, rnd) {
     }
   }
 
-  // Hanging beard: long strands from the jaw to ragged tips, in loose clumps.
+  // Hanging beard: long strands from the jaw to ragged tips, in loose clumps. Short
+  // beards only stick out a little past the jaw, at the face's own (thin) density,
+  // so the seam never reads as a dark line.
   const flare = P.shape.flare;
   const crisp = edgeSigmaMm(P.lines.edge) < 1;
   for (let x = 0; x < SW; x++) {
     const h = hang[x];
     if (h < 0.6) continue;
+    const L = cols.zoneLen[x];
+    const stubble = L < 5;
+    const dens = clamp(overdraw(L) / 3, 0.25, 1);
     const hPx = h * tpm * tipAt(x);
     const clump = h > 14 ? 5 : h > 6 ? 3 : 1;
-    const lambda = (cov[x] * 4.2) / (0.85 * width) / (clump === 1 ? 1 : clump * 0.65);
+    const lambda = (cov[x] * 4.2 * dens) / (0.85 * width) / (clump === 1 ? 1 : clump * 0.65);
     let count = Math.floor(lambda);
     if (rnd() < lambda - count) count += 1;
     for (let s = 0; s < count; s++) {
@@ -940,7 +978,7 @@ function paintShell(P, cols, SW, treatment, gains, rnd) {
       const lock = lockAt(x0, 0.5 * (y0 + tip));
       for (let f = 0; f < clump; f++) {
         const off = clump > 1 ? (rnd() * 2 - 1) * radius : 0;
-        const tipF = tip * (clump > 1 ? 0.86 + 0.22 * rnd() : 1);
+        const tipF = tip * (clump > 1 ? 0.8 + 0.3 * rnd() : 1);
         const segs = clamp(Math.ceil((tipF - y0) / 6), 2, 24);
         const pts = [];
         for (let i = 0; i <= segs; i++) {
@@ -951,13 +989,13 @@ function paintShell(P, cols, SW, treatment, gains, rnd) {
         }
         const look = strandLook(treatment, rnd, gains, 1);
         const centre = clump > 1 ? 1 - Math.min(1, Math.abs(off) / radius) : 0.5;
-        const alpha = 0.8 + 0.16 * rnd();
+        const alpha = stubble ? 0.55 + 0.3 * rnd() : 0.8 + 0.16 * rnd();
         strands.push({
           depth: 0.5 + 0.5 * depth + 0.001 * centre,
           pts,
           width,
           alpha,
-          tipAlpha: alpha * 0.3,
+          tipAlpha: alpha * (stubble ? 0.8 : 0.7),
           rgb: look.rgb,
           occ: (0.7 + 0.16 * depth + 0.14 * centre) * lock * (rnd() < 0.06 ? 1.35 : 1),
           sheen: look.sheen,
@@ -1001,6 +1039,21 @@ export function finishSheen(finish, finishes) {
   return SHEEN[finish] !== undefined ? SHEEN[finish] : SHEEN.matte;
 }
 
+/** True when any zone has hair to draw. */
+export function hasBeard(params) {
+  const P = params && params.zones && typeof params.lines === 'object' && params.shape ? params : normalizeLook(params);
+  return ZONES.some((z) => P.zones[z] > 0.2);
+}
+
+/** True when the shell (below the jaw) has anything to draw for these columns. */
+function shellNeeded(P, cols) {
+  if (cols.tailCols.length && P.zones.M > 0.2) return true;
+  for (let x = 0; x < cols.hang.length; x++) {
+    if (cols.hang[x] >= 0.6 || cols.neck[x] > 0.5) return true;
+  }
+  return false;
+}
+
 /** Cache key of a texture request. */
 export function textureKey(params, profile, opts = {}) {
   const P = normalizeLook(params);
@@ -1013,6 +1066,7 @@ export function textureKey(params, profile, opts = {}) {
     gains: opts.gains || (profile && profile.calibration ? profile.calibration.gains : null),
     beard: beard ? { zones: beard.zones, greyRatio: beard.greyRatio, colorLab: beard.colorLab, colorId: beard.colorId } : null,
     seed: opts.seed || 0,
+    quality: opts.quality === 'fast' ? 'fast' : 'full',
   });
 }
 
@@ -1027,6 +1081,8 @@ export function textureKey(params, profile, opts = {}) {
  * @param {number} [opts.day=1] henna day
  * @param {number[]} [opts.gains] white-card gains (default: the profile's)
  * @param {number} [opts.seed] PRNG seed (default: derived from the params)
+ * @param {'full'|'fast'} [opts.quality='full'] 'fast': density fields at a third of
+ *   the texture size instead of half (style-card thumbnails)
  * @returns {{ key, face: { width, height, color, light }, shell: { width, height, color,
  *   light, lengthMm, texPerMm, hangMm: Float32Array, neckMm: Float32Array } | null,
  *   treatment, sheen, ms }}
@@ -1035,11 +1091,28 @@ export function generateBeardTextures(params, profile, opts = {}) {
   const t0 = nowMs();
   const P = normalizeLook(params);
   const S = opts.size || FACE_TEX_SIZE;
-  const R = Math.max(64, Math.round(S / 2));
+  const fast = opts.quality === 'fast';
+  // Density fields at half the texture size (a third on the fast path).
+  const R = Math.max(64, Math.round(S / (fast ? 3 : 2)));
   const coverage = opts.coverage || zoneCoverage(P.zones, profile);
   const gains = opts.gains || (profile && profile.calibration && Array.isArray(profile.calibration.gains) ? profile.calibration.gains : null);
   const treatment = colorForTreatment(P.colorId, { profile, greyTarget: P.greyTarget, day: opts.day || 1 });
   const key = textureKey(params, profile, opts);
+  if (!hasBeard(P)) {
+    // Clean shave: nothing to draw (a tiny transparent texture, no shell).
+    const n = 4 * 4 * 4;
+    return {
+      key,
+      face: { width: 4, height: 4, color: new Uint8ClampedArray(n), light: new Uint8ClampedArray(n) },
+      shell: null,
+      treatment,
+      sheen: finishSheen(P.finish),
+      strands: 0,
+      timings: {},
+      ms: Math.round(nowMs() - t0),
+      empty: true,
+    };
+  }
   const seed = isNum(opts.seed) ? opts.seed : hash32(key);
   const rnd = mulberry32(seed);
 
@@ -1054,15 +1127,16 @@ export function generateBeardTextures(params, profile, opts = {}) {
   lap('fields');
   const face = paintFace(P, fields, S, treatment, gains, rnd, P.finish);
   lap('face');
-  const packedFace = packCanvas(face.cv, face.mean);
+  const occScale = occlusionScale(face.cv);
+  const packedFace = packCanvas(face.cv, face.mean, occScale);
   lap('pack');
 
   const SW = S;
   const cols = shellColumns(P, coverage, SW, fields.layout, fields);
   let shell = null;
-  if (cols.lengthMm > 2.5) {
+  if (shellNeeded(P, cols)) {
     const painted = paintShell(P, cols, SW, treatment, gains, rnd);
-    const packed = packCanvas(painted.cv, painted.mean);
+    const packed = packCanvas(painted.cv, painted.mean, occScale);
     shell = {
       width: SW,
       height: painted.SH,

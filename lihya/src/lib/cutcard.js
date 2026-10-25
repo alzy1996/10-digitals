@@ -44,14 +44,14 @@ export const FINGER_MM = 15;
 export const NECKLINE_OFFSET_MM = 10;
 
 /**
- * Cheek-line height above the jaw at mid-cheek (mm) per cheek-line type when no front
- * shot is available: measured with cheekLineHeight on the MediaPipe canonical face
- * model (metric, adult) seen from the front. tests/unit/cutcard.test.js re-measures
- * them, so they stay in step with the mesh lines and lines.json.
+ * Cheek-line height above the jaw at mid-cheek (mm) per cheek-line type, used when the
+ * card has no front shot with an iris scale. Measured with cheekLineHeight on a
+ * frontal adult portrait run through the app's own pipeline (MediaPipe landmarks,
+ * iris scale 11.7 mm); the card marks them "typical face, check by eye".
  */
-export const CHEEK_DEFAULT_MM = Object.freeze({ natural: 30, low: 20, medium: 28, high: 40, curved: 35, straight: 30 });
-/** Height of the LOW (cheekOffset -1) and HIGH (cheekOffset +1) limit lines on the canonical face (mm). */
-export const CHEEK_LIMIT_MM = Object.freeze({ low: 14, high: 44 });
+export const CHEEK_DEFAULT_MM = Object.freeze({ natural: 34, low: 25, medium: 33, high: 45, curved: 38, straight: 34 });
+/** Height of the LOW (cheekOffset -1) and HIGH (cheekOffset +1) limit lines on that portrait (mm). */
+export const CHEEK_LIMIT_MM = Object.freeze({ low: 17, high: 50 });
 
 /** Next visit suggestion bounds (days). */
 export const NEXT_VISIT_MIN_DAYS = 7;

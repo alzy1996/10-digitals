@@ -1,6 +1,27 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { copyFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+// '/' for Firebase Hosting (default). GitHub Pages serves the repo under a sub-path:
+// LIHYA_BASE=/10-digitals/ npm run build (the Pages workflow sets it).
+const BASE = (() => {
+  const b = process.env.LIHYA_BASE || '/';
+  return `/${b.replace(/^\/+|\/+$/g, '')}/`.replace(/^\/\/$/, '/');
+})();
+
+// GitHub Pages has no SPA rewrite: serve the app for every unknown path through 404.html.
+const spaFallback = () => ({
+  name: 'lihya-spa-404',
+  apply: 'build',
+  closeBundle() {
+    const dist = resolve(process.cwd(), 'dist');
+    if (BASE !== '/' && existsSync(resolve(dist, 'index.html'))) {
+      copyFileSync(resolve(dist, 'index.html'), resolve(dist, '404.html'));
+    }
+  },
+});
 
 // Model files are never bundled or served from Firebase Hosting (Spark allows
 // about 360 MB of transfer a day). They load from their official CDNs with
@@ -18,8 +39,10 @@ const cdnCache = (urlPattern, cacheName, maxEntries) => ({
 });
 
 export default defineConfig({
+  base: BASE,
   plugins: [
     react(),
+    spaFallback(),
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
@@ -30,16 +53,16 @@ export default defineConfig({
         description: 'Beard simulator and barber Cut Card',
         lang: 'ar',
         dir: 'rtl',
-        start_url: '/',
-        scope: '/',
+        start_url: BASE,
+        scope: BASE,
         display: 'standalone',
         orientation: 'any',
         background_color: '#0F1012',
         theme_color: '#0F1012',
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: `${BASE}icons/icon-192.png`, sizes: '192x192', type: 'image/png' },
+          { src: `${BASE}icons/icon-512.png`, sizes: '512x512', type: 'image/png' },
+          { src: `${BASE}icons/icon-maskable-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
@@ -48,7 +71,7 @@ export default defineConfig({
         // keep it out of the install-time precache.
         globIgnores: ['**/age-runtime-*.js', '**/*.wasm', '**/*.onnx', '**/*.tflite', '**/*.task'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        navigateFallback: '/index.html',
+        navigateFallback: `${BASE}index.html`,
         navigateFallbackDenylist: [/^\/__/],
         cleanupOutdatedCaches: true,
         runtimeCaching: [

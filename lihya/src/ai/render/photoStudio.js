@@ -9,8 +9,9 @@
 
 import * as THREE from 'three';
 import { createBeardScene } from './glScene.js';
-import { getBeardTextures, FACE_TEX_SIZE, THUMB_TEX_SIZE } from './beardTextures.js';
-import { getOutlineTextures, needsOutline } from './inpaint.js';
+import { FACE_TEX_SIZE, FAST_TEX_SIZE } from './beardTextures.js';
+import { needsOutline } from './inpaint.js';
+import { textureJob } from './textureJobs.js';
 import { growthAt, DEFAULT_GROWTH_MM_PER_DAY } from './timeline.js';
 import { frameMmPerPx, estimateLight, lowerFaceCrop } from './frame.js';
 import { makeCanvas, isNum } from './util.js';
@@ -39,8 +40,25 @@ function getShared() {
     disposeShared();
   };
   if (canvas.addEventListener) canvas.addEventListener('webglcontextlost', onLost, false);
-  shared = { canvas, renderer, beard, onLost };
+  shared = { canvas, renderer, beard, onLost, photo: null, photoSource: null };
   return shared;
+}
+
+/** Mipmapped texture of the shot photo for the shading transfer (one kept at a time). */
+function photoTexture(s, source) {
+  if (s.photoSource === source && s.photo) return s.photo;
+  if (s.photo) s.photo.dispose();
+  const tex = new THREE.CanvasTexture(source);
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.needsUpdate = true;
+  s.photo = tex;
+  s.photoSource = source;
+  return tex;
 }
 
 /** Frees the shared offscreen renderer (it is created again on the next render). */
@@ -50,6 +68,7 @@ export function disposeShared() {
   shared = null;
   try {
     if (s.canvas.removeEventListener) s.canvas.removeEventListener('webglcontextlost', s.onLost, false);
+    if (s.photo) s.photo.dispose();
     s.beard.dispose();
     s.renderer.dispose();
   } catch (err) {
@@ -93,9 +112,10 @@ function lookFor(params, profile, { timelineDays, timeline, growthMmPerDay }) {
   return { params: g.params, coverage: g.coverage };
 }
 
-function drawPass(s, { landmarks, frameW, frameH, view, outW, outH, tex, overlay, light, mode, seg }) {
+function drawPass(s, { landmarks, frameW, frameH, view, outW, outH, tex, overlay, light, mode, seg, photo }) {
   const { renderer, beard } = s;
   renderer.setSize(outW, outH, false);
+  beard.setPhoto(photo ? photoTexture(s, photo) : null);
   beard.setBeard(tex);
   beard.setOverlay(overlay);
   beard.setSegmentation(seg);
@@ -144,13 +164,17 @@ export async function renderStudio({
   const W = Math.max(1, Math.round(W0 * k));
   const H = Math.max(1, Math.round(H0 * k));
   const look = lookFor(params, profile, { timelineDays, timeline, growthMmPerDay });
-  const tex = outline ? null : getBeardTextures(look.params, profile, { size: FACE_TEX_SIZE, coverage: look.coverage, day });
-  let overlay = null;
-  if (outline) overlay = getOutlineTextures(params, profile, { size: FACE_TEX_SIZE });
+  let overlayJob = null;
+  if (outline) overlayJob = textureJob('outline', params, profile, { size: FACE_TEX_SIZE });
   else {
+    // Going shorter on some zones: the new beard plus red where hair comes off.
     const no = needsOutline(look.params, profile);
-    if (no.needed) overlay = getOutlineTextures(look.params, profile, { size: FACE_TEX_SIZE, zones: no.zones });
+    if (no.needed) overlayJob = textureJob('outline', look.params, profile, { size: FACE_TEX_SIZE, zones: no.zones });
   }
+  const [tex, overlay] = await Promise.all([
+    outline ? null : textureJob('beard', look.params, profile, { size: FACE_TEX_SIZE, coverage: look.coverage, day }),
+    overlayJob,
+  ]);
   // The segmenter keeps neck hair off the collar and hides the far side of a long
   // beard behind the neck (only when its model is already loaded).
   const seg = (tex && tex.shell) || (overlay && overlay.shell) ? await segmentationFor(shot) : null;
@@ -167,6 +191,7 @@ export async function renderStudio({
     light: lightFor(shot),
     mode: outline ? 'outline' : 'beard',
     seg,
+    photo: shot.canvas,
   });
   const out = makeCanvas(W, H);
   const ctx = out.getContext('2d');
@@ -177,7 +202,8 @@ export async function renderStudio({
 
 /**
  * Style-card thumbnail: the look on a 4:5 crop of the lower face, as a JPEG data URL.
- * Fast path: 512 px texture, render only the crop.
+ * Fast path: a 384 px texture with fewer, wider strands (single strands are below a
+ * pixel at card size), rendered only on the crop.
  * @param {object} shot front Shot
  * @param {object} params LookParams
  * @param {object|null} profile
@@ -191,7 +217,9 @@ export async function renderThumbnail(shot, params, profile, { width = 320, qual
   const outW = Math.max(16, Math.round(width));
   const outH = Math.round((outW * 5) / 4);
   const k = outW / crop.w;
-  const tex = getBeardTextures(params, profile, { size: THUMB_TEX_SIZE });
+  const tex = await textureJob('beard', params, profile, { size: FAST_TEX_SIZE, quality: 'fast' });
+  // Same occlusion as the Studio (cached per shot, so only the first card pays for it).
+  const seg = tex.shell ? await segmentationFor(shot) : null;
   const s = getShared();
   const gl = drawPass(s, {
     landmarks: shot.landmarks,
@@ -204,7 +232,8 @@ export async function renderThumbnail(shot, params, profile, { width = 320, qual
     overlay: null,
     light: lightFor(shot),
     mode: 'beard',
-    seg: null,
+    seg,
+    photo: shot.canvas,
   });
   const out = makeCanvas(outW, outH);
   const ctx = out.getContext('2d');

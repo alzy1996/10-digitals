@@ -1,0 +1,36 @@
+# LIHYA AI Final Look Worker (PRD 7.5). Workers Free plan, no API keys:
+# the Workers AI binding needs none and Wrangler signs in with `npx wrangler login`.
+name = "lihya-render"
+main = "src/index.js"
+# Pinned. Change only after re-running the tests and a dry run.
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+# Workers AI binding (model @cf/black-forest-labs/flux-2-klein-4b only).
+[ai]
+binding = "AI"
+
+# Daily caps (counters keyed by UTC date).
+# Sam: in this folder run `npx wrangler kv namespace create LIHYA_CAPS`
+# and paste the id it prints in place of PASTE_KV_ID_HERE.
+[[kv_namespaces]]
+binding = "LIHYA_CAPS"
+id = "PASTE_KV_ID_HERE"
+
+[vars]
+# Firebase project id: tokens must have aud = this and iss = https://securetoken.google.com/<this>.
+FIREBASE_PROJECT_ID = "lihya"
+# The app's Hosting domains, comma separated (exact scheme://host[:port]).
+# Replace with the real web.app / firebaseapp.com / custom domains; drop localhost after testing.
+ALLOWED_ORIGINS = "https://lihya.web.app,https://lihya.firebaseapp.com,http://localhost:5173"
+# Renders per UTC day for the whole Cloudflare account (0..80; the Worker never goes above 80).
+ACCOUNT_DAILY_CAP = "80"
+
+# Logs: no invocation logs (they carry request details); the Worker writes one
+# line per request with the route, status, error code and timings only.
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = false

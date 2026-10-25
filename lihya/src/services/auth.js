@@ -22,6 +22,7 @@ import { auth } from '../lib/firebase.js';
 import { PREF_KEYS } from '../config/app.js';
 import { isValidEmail, normalizeEmail } from './model.js';
 import { codedError } from './db.js';
+import { appUrl } from '../lib/paths.js';
 
 function requireAuth() {
   if (!auth) throw codedError('app/not-configured', 'Firebase is not configured');
@@ -60,7 +61,7 @@ export function safeNextPath(next, fallback = '/') {
 /** The URL an email link continues to: <origin>/login?next=<path>. */
 export function emailLinkUrl(next) {
   const path = safeNextPath(next, '');
-  return `${window.location.origin}/login${path ? `?next=${encodeURIComponent(path)}` : ''}`;
+  return `${appUrl('/login')}${path ? `?next=${encodeURIComponent(path)}` : ''}`;
 }
 
 export function watchAuth(cb) {

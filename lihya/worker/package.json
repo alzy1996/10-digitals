@@ -1,0 +1,19 @@
+{
+  "name": "lihya-render",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "LIHYA AI Final Look: Cloudflare Worker (Workers AI FLUX.2 [klein] 4B, Firebase ID-token auth, KV daily caps).",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "jose": "6.2.13"
+  },
+  "devDependencies": {
+    "vitest": "3.2.7",
+    "wrangler": "4.152.0"
+  }
+}

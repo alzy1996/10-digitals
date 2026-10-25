@@ -9,6 +9,7 @@ import { INVITE_ROLES, isValidEmail, normalizeEmail, cleanText } from './model.j
 import { auditOp, createdStamp } from './ops.js';
 import { codedError, colRef, commitOps, listenQuery, readDoc, recall, requireShopId, requireUser } from './db.js';
 import { sendLinkTo } from './auth.js';
+import { appUrl } from '../lib/paths.js';
 
 export function joinPath(shopId) {
   return `/join/${shopId}`;
@@ -16,7 +17,7 @@ export function joinPath(shopId) {
 
 /** Link the owner can also share by hand (WhatsApp) if the email does not arrive. */
 export function joinUrl(shopId) {
-  return `${window.location.origin}${joinPath(shopId)}`;
+  return appUrl(joinPath(shopId));
 }
 
 /**

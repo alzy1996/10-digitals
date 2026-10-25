@@ -10,6 +10,12 @@
 //   4. face         the face mesh with the beard texture (alpha blended)
 //   5. overlay      Outline mode tints and target lines (face and shell)
 //
+// Shading transfer: when the photo (Studio) or the video frame (AR) is bound with
+// setPhoto, the hair takes the photo's own local shading (smile creases, the chin
+// highlight, the shadow under the jaw) as the ratio of a lightly blurred to a
+// heavily blurred luminance. Only local contrast transfers, so the darker albedo of
+// a beard the customer already has does not darken the new one.
+//
 // Lighting (layer 4 of PRD 7.1): diffuse = face normal . light direction (estimated
 // from left/right cheek brightness), an ambient term, the per-texel occlusion from
 // the texture, and an anisotropic sheen along the strand tangent for oiled / balm /
@@ -20,8 +26,11 @@ import * as THREE from 'three';
 import { buildFaceGeometry, updateFaceGeometry, jawContourFromGeometry, jawNormals2D, extrudeBelowJaw } from '../mesh/faceMesh.js';
 import { JAW_CONTOUR, FOREHEAD_TOP, CHIN_BOTTOM } from '../mesh/zones.js';
 import { OCC_RANGE } from './beardTextures.js';
+import { JAW_U } from './layout.js';
 
 const SHELL_ROWS = 12;
+/** Shell columns per jaw segment: narrow quads keep the strand texture free of seams. */
+const SHELL_SUB = 3;
 
 const VERT = /* glsl */ `
   uniform float uMirror;
@@ -55,11 +64,18 @@ const FRAG = /* glsl */ `
   uniform float uMirror;
   uniform float uFlat;
   uniform float uSkinOnly;
+  uniform sampler2D uPhoto;
+  uniform float uPhotoOn;
+  uniform vec3 uSkinChroma;
+  uniform float uSkinTest;
   varying vec2 vUv;
   varying vec3 vNormal;
   varying vec2 vImg;
   varying float vFar;
 
+  float luma(vec3 c) {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+  }
   vec3 toLinear(vec3 c) {
     return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
   }
@@ -73,6 +89,15 @@ const FRAG = /* glsl */ `
     vec4 c = texture2D(uColor, vUv);
     vec4 l = texture2D(uLight, vUv);
     float a = c.a * uOpacity;
+    vec2 pu = vec2(vImg.x, 1.0 - vImg.y);
+    if (uSegOn < 0.5 && uSkinTest > 0.5 && uPhotoOn > 0.5 && uSkinChroma.x > 0.0) {
+      // No segmentation: hair lying on the neck stays where the photo looks like the
+      // customer's skin (never on a white collar or a dark suit).
+      vec3 p = toLinear(texture2D(uPhoto, pu, 1.0).rgb);
+      vec3 ch = p / max(p.r + p.g + p.b, 0.0001);
+      float notSkin = smoothstep(0.05, 0.11, length(ch - uSkinChroma));
+      a *= 1.0 - notSkin * max(1.0 - l.a, uSkinOnly);
+    }
     if (uSegOn > 0.5) {
       // Segmenter classes: 0 background, 1 hair, 2 body skin, 3 face skin, 4 clothes.
       float cls = floor(texture2D(uSeg, vImg).r * 255.0 + 0.5);
@@ -94,6 +119,13 @@ const FRAG = /* glsl */ `
     float lamRef = max(uLightDir.z, 0.25);
     float shade = (uAmbient + (1.0 - uAmbient) * lam) / (uAmbient + (1.0 - uAmbient) * lamRef);
     shade = clamp(shade, 0.5, 1.2);
+    if (uPhotoOn > 0.5) {
+      vec3 near = texture2D(uPhoto, pu, 1.5).rgb;
+      vec3 far = texture2D(uPhoto, pu, 5.0).rgb;
+      float ratio = clamp(luma(toLinear(near)) / max(luma(toLinear(far)), 0.002), 0.45, 1.6);
+      // Hair lying on the skin follows the skin's shading closely; hanging hair less.
+      shade *= pow(ratio, mix(0.85, 0.4, l.a));
+    }
     vec3 col = toLinear(c.rgb) * (l.r * ${OCC_RANGE.toFixed(3)}) * shade * uExposure;
     float ang = (l.b - 0.5) * 3.14159265;
     vec3 t = normalize(vec3(sin(ang) * (uMirror > 0.5 ? -1.0 : 1.0), -cos(ang), 0.2));
@@ -117,10 +149,15 @@ const BG_VERT = /* glsl */ `
 const BG_FRAG = /* glsl */ `
   uniform sampler2D uMap;
   uniform float uMirror;
+  uniform vec4 uCrop;
   varying vec2 vUv;
   void main() {
-    vec2 uv = vec2(uMirror > 0.5 ? 1.0 - vUv.x : vUv.x, vUv.y);
-    gl_FragColor = vec4(texture2D(uMap, uv).rgb, 1.0);
+    // uCrop: the shown part of the frame in display coordinates (normalized, top-left
+    // origin, mirrored when uMirror is on); the texture has flipY (v up).
+    float xd = uCrop.x + vUv.x * uCrop.z;
+    float yd = uCrop.y + (1.0 - vUv.y) * uCrop.w;
+    float xi = uMirror > 0.5 ? 1.0 - xd : xd;
+    gl_FragColor = vec4(texture2D(uMap, vec2(xi, 1.0 - yd)).rgb, 1.0);
   }
 `;
 
@@ -161,6 +198,10 @@ function beardMaterial(extra = {}) {
       uFrame: { value: new THREE.Vector2(1, 1) },
       uVScale: { value: 1 },
       uSkinOnly: { value: 0 },
+      uPhoto: { value: null },
+      uPhotoOn: { value: 0 },
+      uSkinChroma: { value: new THREE.Vector3(0, 0, 0) },
+      uSkinTest: { value: 0 },
     },
     transparent: true,
     depthWrite: false,
@@ -206,6 +247,8 @@ export function createBeardScene({ background = false } = {}) {
 
   const shellMat = beardMaterial({ depthTest: true });
   const shellOverlayMat = beardMaterial({ depthTest: true });
+  shellMat.uniforms.uSkinTest.value = 1;
+  shellOverlayMat.uniforms.uSkinTest.value = 1;
   shellOverlayMat.uniforms.uFlat.value = 1;
   // Outline tints on the neck stay on the skin (never on the collar).
   shellOverlayMat.uniforms.uSkinOnly.value = 1;
@@ -225,7 +268,7 @@ export function createBeardScene({ background = false } = {}) {
     const bgMat = new THREE.ShaderMaterial({
       vertexShader: BG_VERT,
       fragmentShader: BG_FRAG,
-      uniforms: { uMap: { value: null }, uMirror: { value: 1 } },
+      uniforms: { uMap: { value: null }, uMirror: { value: 1 }, uCrop: { value: new THREE.Vector4(0, 0, 1, 1) } },
       depthTest: false,
       depthWrite: false,
     });
@@ -309,6 +352,17 @@ export function createBeardScene({ background = false } = {}) {
     }
   }
 
+  /**
+   * Photo or video texture of the frame (flipY = true, mipmapped) for the shading
+   * transfer; null turns it off.
+   */
+  function setPhoto(texture) {
+    for (const m of [faceMat, shellMat, shellOverlayMat]) {
+      m.uniforms.uPhoto.value = texture || null;
+      m.uniforms.uPhotoOn.value = texture ? 1 : 0;
+    }
+  }
+
   function setBackground(texture, mirror) {
     if (!bgMesh) return;
     if (bgTex && bgTex !== texture) bgTex.dispose();
@@ -332,7 +386,6 @@ export function createBeardScene({ background = false } = {}) {
    */
   function update(f) {
     const { landmarks, width: W, height: H, mirror = false, mmPerPx, light, view, mode = 'beard' } = f;
-    updateFaceGeometry(faceGeo, landmarks, W, H, { mirror });
     const v = view || { x: 0, y: 0, w: W, h: H };
     camera.left = v.x;
     camera.right = v.x + v.w;
@@ -341,12 +394,28 @@ export function createBeardScene({ background = false } = {}) {
     camera.near = -10 * Math.max(W, H);
     camera.far = 10 * Math.max(W, H);
     camera.updateProjectionMatrix();
+    if (bgMesh) bgMesh.material.uniforms.uCrop.value.set(v.x / W, v.y / H, v.w / W, v.h / H);
+    const hasFace = !!landmarks && landmarks.length >= 468;
+    depthMesh.visible = hasFace;
+    if (!hasFace) {
+      // No face this frame: only the background is drawn.
+      faceMesh.visible = false;
+      overlayMesh.visible = false;
+      if (shellMesh) shellMesh.visible = false;
+      if (shellOverlayMesh) shellOverlayMesh.visible = false;
+      return;
+    }
+    updateFaceGeometry(faceGeo, landmarks, W, H, { mirror });
 
     const dir = light && light.dir ? light.dir : [0, 0.3, 0.95];
     const lx = mirror ? -dir[0] : dir[0];
     const showBeard = mode !== 'outline' && !!beard;
     const mats = [faceMat, shellMat, overlayMat, shellOverlayMat];
+    const skin = light && Array.isArray(light.skinRgb) && light.skinRgb.every(Number.isFinite) ? light.skinRgb : null;
+    const skinSum = skin ? skin[0] + skin[1] + skin[2] : 0;
     for (const m of mats) {
+      if (skinSum > 1e-4) m.uniforms.uSkinChroma.value.set(skin[0] / skinSum, skin[1] / skinSum, skin[2] / skinSum);
+      else m.uniforms.uSkinChroma.value.set(0, 0, 0);
       m.uniforms.uLightDir.value.set(lx, dir[1], dir[2]).normalize();
       m.uniforms.uAmbient.value = light && Number.isFinite(light.ambient) ? light.ambient : 0.45;
       m.uniforms.uExposure.value = light && Number.isFinite(light.exposure) ? light.exposure : 1;
@@ -365,12 +434,29 @@ export function createBeardScene({ background = false } = {}) {
       if (shellOverlayMesh) shellOverlayMesh.visible = false;
       return;
     }
-    const contour = jawContourFromGeometry(faceGeo, JAW_CONTOUR);
+    const jaw = jawContourFromGeometry(faceGeo, JAW_CONTOUR);
     const pos = faceGeo.getAttribute('position').array;
+    const nrm = faceGeo.getAttribute('normal').array;
     const top = [pos[3 * FOREHEAD_TOP], pos[3 * FOREHEAD_TOP + 1]];
     const chin = [pos[3 * CHIN_BOTTOM], pos[3 * CHIN_BOTTOM + 1]];
     const faceDown = norm2([chin[0] - top[0], chin[1] - top[1]]);
     const down = norm2([faceDown[0] * 0.5, faceDown[1] * 0.5 - 0.5]);
+    // SHELL_SUB columns per jaw segment, interpolated between the landmarks (the
+    // face mesh edge is straight between them, so the seam still matches exactly).
+    const contour = [];
+    const src = [];
+    for (let k = 0; k < jaw.length - 1; k++) {
+      for (let s = 0; s < SHELL_SUB; s++) {
+        const t = s / SHELL_SUB;
+        const a = jaw[k];
+        const b = jaw[k + 1];
+        contour.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]);
+        src.push([k, t]);
+      }
+    }
+    contour.push(jaw[jaw.length - 1].slice());
+    src.push([jaw.length - 1, 0]);
+    const cols = contour.length;
     const normals = jawNormals2D(contour, down).map((n) => norm2([n[0] + down[0], n[1] + down[1]]));
     shellGeo = extrudeBelowJaw(THREE, contour, lengthMm / mmPerPx, normals, {
       rows: SHELL_ROWS,
@@ -382,23 +468,29 @@ export function createBeardScene({ background = false } = {}) {
     if (!shellGeo.getAttribute('aFar')) {
       shellGeo.setAttribute('aFar', new THREE.BufferAttribute(new Float32Array(shellGeo.getAttribute('position').count), 1));
     }
-    // Far side of the head: jaw points whose surface turns away from the camera.
-    const nrm = faceGeo.getAttribute('normal').array;
+    const lerpAt = (values, j) => {
+      const [k, t] = src[j];
+      return k + 1 < values.length ? values[k] + (values[k + 1] - values[k]) * t : values[k];
+    };
+    // u along the jaw by canonical arc length, the layout of the shell textures (the
+    // screen-space arc length drifts when the head is turned).
+    const suv = shellGeo.getAttribute('uv');
+    // Far side of a turned head: jaw points whose surface faces away from the camera
+    // (in a frontal view the sides of the jaw face sideways, nz near 0, and the beard
+    // hanging there is in front of the shoulders, not behind the neck).
+    const farAt = JAW_CONTOUR.map((i) => Math.min(1, Math.max(0, (-0.12 - nrm[3 * i + 2]) / 0.3)));
     const far = shellGeo.getAttribute('aFar');
-    const cols = contour.length;
-    for (let k = 0; k < cols; k++) {
-      const nz = nrm[3 * JAW_CONTOUR[k] + 2];
-      const fv = Math.min(1, Math.max(0, (0.15 - nz) / 0.4));
-      for (let r = 0; r <= SHELL_ROWS; r++) far.array[r * cols + k] = fv;
-    }
-    far.needsUpdate = true;
     // Shell normals: the jaw's own normal at the seam (so the light matches the face
     // texture there), turning to a slightly down-facing normal toward the tips.
     const sn = shellGeo.getAttribute('normal');
-    for (let k = 0; k < cols; k++) {
-      const j = JAW_CONTOUR[k];
-      const n0 = [nrm[3 * j], nrm[3 * j + 1], nrm[3 * j + 2]];
+    for (let j = 0; j < cols; j++) {
+      const u = lerpAt(JAW_U, j);
+      const fv = lerpAt(farAt, j);
+      const n0 = [0, 1, 2].map((c) => lerpAt(JAW_CONTOUR.map((i) => nrm[3 * i + c]), j));
       for (let r = 0; r <= SHELL_ROWS; r++) {
+        const v = r * cols + j;
+        suv.array[2 * v] = u;
+        far.array[v] = fv;
         const t = r / SHELL_ROWS;
         let x = n0[0] * (1 - t) + down[0] * 0.35 * t;
         let y = n0[1] * (1 - t) + down[1] * 0.35 * t;
@@ -407,12 +499,13 @@ export function createBeardScene({ background = false } = {}) {
         x /= l;
         y /= l;
         z /= l;
-        const v = r * cols + k;
         sn.array[3 * v] = x;
         sn.array[3 * v + 1] = y;
         sn.array[3 * v + 2] = z;
       }
     }
+    suv.needsUpdate = true;
+    far.needsUpdate = true;
     sn.needsUpdate = true;
     if (!shellMesh) {
       shellMesh = new THREE.Mesh(shellGeo, shellMat);
@@ -443,5 +536,5 @@ export function createBeardScene({ background = false } = {}) {
     }
   }
 
-  return { scene, camera, setBeard, setOverlay, setSegmentation, setBackground, update, dispose, faceGeo };
+  return { scene, camera, setBeard, setOverlay, setSegmentation, setBackground, setPhoto, update, dispose, faceGeo };
 }
