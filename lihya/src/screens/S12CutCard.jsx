@@ -5,7 +5,7 @@
 // (coarse labels and today's lengths, only with his yes) and keeping the before/after
 // photos on this phone (only with his yes). Primary: Done.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import ScreenFrame from '../components/ScreenFrame.jsx';
 import Button from '../components/Button.jsx';
@@ -109,21 +109,24 @@ export default function S12CutCard() {
   }, [cutCard, approved, style, shop, me, client, settings]);
 
   /** The share PNG for a language, made once per card and language. */
-  const pngFor = (L) => {
-    const cache = pngs.current;
-    if (cache.data !== data) {
-      cache.data = data;
-      cache.byLang = new Map();
-    }
-    if (!cache.byLang.has(L)) {
-      const job = cutCardPng(data, L);
-      cache.byLang.set(L, job);
-      job.catch(() => {
-        if (cache.byLang.get(L) === job) cache.byLang.delete(L);
-      });
-    }
-    return cache.byLang.get(L);
-  };
+  const pngFor = useCallback(
+    (L) => {
+      const cache = pngs.current;
+      if (cache.data !== data) {
+        cache.data = data;
+        cache.byLang = new Map();
+      }
+      if (!cache.byLang.has(L)) {
+        const job = cutCardPng(data, L);
+        cache.byLang.set(L, job);
+        job.catch(() => {
+          if (cache.byLang.get(L) === job) cache.byLang.delete(L);
+        });
+      }
+      return cache.byLang.get(L);
+    },
+    [data],
+  );
 
   // Prepare the share image while the barber reads the card, so Share opens at once
   // (iOS only allows the share sheet right after the tap).
@@ -132,9 +135,7 @@ export default function S12CutCard() {
     return whenIdle(() => {
       pngFor(lang).catch((err) => console.warn('Cut Card image could not be prepared', err));
     }, 1500);
-    // pngFor reads the current data through the ref cache.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, lang]);
+  }, [data, lang, pngFor]);
 
   if (!hydrated) {
     return (

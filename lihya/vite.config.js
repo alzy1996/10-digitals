@@ -11,6 +11,17 @@ const BASE = (() => {
   return `/${b.replace(/^\/+|\/+$/g, '')}/`.replace(/^\/\/$/, '/');
 })();
 
+// onnxruntime-web (inside transformers.js, age model only) references its .wasm next to the
+// bundle; LIHYA points it at the pinned jsDelivr copy instead (src/ai/models/age.js), so the
+// emitted copy is never fetched. Drop it: model and runtime files never ship from our hosting.
+const dropBundledWasm = () => ({
+  name: 'lihya-drop-bundled-wasm',
+  apply: 'build',
+  generateBundle(_options, bundle) {
+    for (const name of Object.keys(bundle)) if (name.endsWith('.wasm')) delete bundle[name];
+  },
+});
+
 // GitHub Pages has no SPA rewrite: serve the app for every unknown path through 404.html.
 const spaFallback = () => ({
   name: 'lihya-spa-404',
@@ -43,6 +54,7 @@ export default defineConfig({
   plugins: [
     react(),
     spaFallback(),
+    dropBundledWasm(),
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
@@ -93,7 +105,6 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('node_modules/three/')) return 'three';
           if (id.includes('node_modules/@huggingface/transformers') || id.includes('node_modules/onnxruntime')) return 'age-runtime';
-          if (id.includes('node_modules/jspdf') || id.includes('node_modules/html2canvas')) return 'pdf';
           if (id.includes('node_modules/@mediapipe/tasks-vision')) return 'mediapipe';
           return undefined;
         },

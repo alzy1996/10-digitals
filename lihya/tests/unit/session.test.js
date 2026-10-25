@@ -36,6 +36,7 @@ describe('session reducer', () => {
         'cutCard',
         'favoriteLookId',
         'keepPhotos',
+        'keepProfileConsent',
         'lookCode',
         'looks',
         'overrides',

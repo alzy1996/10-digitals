@@ -333,7 +333,8 @@ function cellText(v) {
   if (typeof v === 'number') return Number.isFinite(v) ? String(v) : '';
   if (typeof v === 'boolean') return v ? 'true' : 'false';
   if (v instanceof Date) return Number.isNaN(v.getTime()) ? '' : v.toISOString();
-  const s = String(v);
+  // Bidi isolate marks are for on-screen RTL layout only; spreadsheets get plain text.
+  const s = String(v).replace(/[\u2066-\u2069]/g, '');
   return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
 }
 

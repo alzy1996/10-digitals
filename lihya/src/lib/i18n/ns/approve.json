@@ -94,8 +94,7 @@
     "approve.done.photosKept": "Before and after photos will be kept on this phone.",
     "approve.done.photosSaved": "Before and after kept on this phone.",
     "approve.done.photosFailed": "The before and after photos could not be kept on this phone.",
-    "approve.done.finishing": "Finishing the visit",
-    "approve.done.backToCard": "Back to the Cut Card"
+    "approve.done.finishing": "Finishing the visit"
   },
   "ar": {
     "approve.consent.title": "معاينة واقعية",
@@ -192,7 +191,6 @@
     "approve.done.photosKept": "ستُحفظ صور قبل وبعد على هذا الهاتف.",
     "approve.done.photosSaved": "حُفظت صور قبل وبعد على هذا الهاتف.",
     "approve.done.photosFailed": "تعذّر حفظ صور قبل وبعد على هذا الهاتف.",
-    "approve.done.finishing": "جارٍ إنهاء الزيارة",
-    "approve.done.backToCard": "العودة إلى بطاقة القصّة"
+    "approve.done.finishing": "جارٍ إنهاء الزيارة"
   }
 }

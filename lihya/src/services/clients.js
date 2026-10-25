@@ -22,6 +22,7 @@ import {
   codedError,
   colRef,
   commitOps,
+  listenDoc,
   listenQuery,
   readDoc,
   readQuery,
@@ -48,6 +49,13 @@ export function watchRecentClients(shopId, n, cb, onError) {
   const size = Math.min(50, Math.max(1, Number(n) || RECENT_CLIENTS_DEFAULT));
   const q = query(colRef(`shops/${shopId}/clients`), orderBy('lastVisitAt', 'desc'), limit(size));
   return listenQuery(q, cb, onError, { label: 'recentClients' });
+}
+
+/** One client document, live (labels, phone, learned growth rate). cb(client|null, meta). */
+export function watchClient(shopId, id, cb, onError) {
+  requireShopId(shopId);
+  if (!id) throw codedError('invalid-argument', 'clientId');
+  return listenDoc(`shops/${shopId}/clients/${id}`, cb, onError, { label: 'client' });
 }
 
 /** Every client of the shop (labels only), by name, for exports. Demo clients only when asked. */

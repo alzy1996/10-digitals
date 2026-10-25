@@ -462,12 +462,12 @@ export default function CutCardDocument({ data, lang = 'ar', variant = 'print', 
     <header data-pdf-block="" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <Logo shop={shop} L={L} pal={pal} size={share ? 46 : 34} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: fs.shop, fontWeight: 600, lineHeight: 1.25, overflowWrap: 'anywhere' }}>
+        <div style={{ fontSize: fs.shop, fontWeight: 600, lineHeight: 1.25, overflowWrap: 'break-word' }}>
           <Bidi text={shopName} />
         </div>
         <div style={{ fontSize: fs.meta, fontWeight: 600, color: pal.brass, lineHeight: 1.3 }}>{t('report.cut.title')}</div>
       </div>
-      <div style={{ fontSize: fs.meta, color: pal.ink2, textAlign: 'end', lineHeight: 1.4 }}>
+      <div style={{ fontSize: fs.meta, color: pal.ink2, textAlign: 'end', lineHeight: 1.4, maxWidth: '55%', minWidth: 0, overflowWrap: 'anywhere' }}>
         <div style={{ color: pal.ink }}>{formatMuscat(at, L)}</div>
         <div>
           {t('report.cut.barber')}:{' '}

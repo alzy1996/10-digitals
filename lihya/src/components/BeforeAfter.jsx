@@ -48,7 +48,7 @@ export default function BeforeAfter({
   const { t, isRTL: rtl } = useOptionalT();
   const boxRef = useRef(null);
   const press = useRef(null);
-  const [split, setSplit] = useState(clamp(Number(initial) || 50, 0, 100));
+  const [split, setSplit] = useState(clamp(Number.isFinite(Number(initial)) ? Number(initial) : 50, 0, 100));
   const [holding, setHolding] = useState(false);
 
   useEffect(() => {
