@@ -1,0 +1,128 @@
+rules_version = '2';
+// Nail Mirror — Firestore security rules.
+// • Customers (no account, or silent anonymous auth) may only READ the public catalog and CREATE a look request.
+// • Staff = documents in salons/{salonId}/members. Every staff write must carry an honest audit stamp
+//   (updatedBy == the signed-in user, updatedAt == server time); createdBy/createdAt can never be rewritten.
+// • The audit log is append-only: nobody can edit or delete it.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function realUser() { return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous'; }
+    function salonPath(salonId) { return /databases/$(database)/documents/salons/$(salonId); }
+    function memberPath(salonId) { return /databases/$(database)/documents/salons/$(salonId)/members/$(request.auth.uid); }
+    function isMember(salonId) { return realUser() && exists(memberPath(salonId)); }
+    function isOwner(salonId) { return isMember(salonId) && get(memberPath(salonId)).data.role == 'owner'; }
+    function myEmail() { return request.auth.token.email.lower(); }
+    function verified() {
+      return request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+
+    function d() { return request.resource.data; }
+    function stampedCreate() {
+      return d().createdBy == request.auth.uid && d().createdAt == request.time
+          && d().updatedBy == request.auth.uid && d().updatedAt == request.time;
+    }
+    function stampedUpdate() {
+      return d().updatedBy == request.auth.uid && d().updatedAt == request.time
+          && d().get('createdBy', null) == resource.data.get('createdBy', null)
+          && d().get('createdAt', null) == resource.data.get('createdAt', null);
+    }
+    function validPolish() {
+      return d().name is string && d().name.size() > 0 && d().name.size() <= 80
+          && d().hex is string && d().hex.matches('^#[0-9A-Fa-f]{6}$')
+          && (!('price' in d()) || (d().price is number && d().price >= 0))
+          && (!('stock' in d()) || (d().stock is int && d().stock >= 0));
+    }
+
+    match /salons/{salonId} {
+      // `resource == null` lets a signed-in user see that the salon is not claimed yet (first-owner setup).
+      allow get: if isMember(salonId) || (realUser() && resource == null);
+      allow list: if false;
+      allow create: if realUser() && verified() && d().ownerUid == request.auth.uid && stampedCreate();
+      allow update: if isOwner(salonId) && stampedUpdate() && d().ownerUid == resource.data.ownerUid;
+      allow delete: if false;
+
+      // ONE public document = the whole customer-facing catalog (≈1 read per visit, free-tier friendly)
+      match /public/{docId} {
+        allow read: if true;
+        allow write: if isMember(salonId) && docId == 'site' && d().updatedBy == request.auth.uid;
+      }
+
+      match /members/{uid} {
+        allow get: if isMember(salonId) || (realUser() && uid == request.auth.uid);
+        allow list: if isMember(salonId);
+        // a) first owner, in the same batch that creates the salon
+        // b) invited staff accepting their invite (role copied from the invite)
+        // c) the owner managing the team
+        allow create: if realUser() && (
+            (uid == request.auth.uid && d().role == 'owner'
+              && !exists(salonPath(salonId)) && getAfter(salonPath(salonId)).data.ownerUid == request.auth.uid)
+            || (uid == request.auth.uid && verified()
+              && exists(/databases/$(database)/documents/salons/$(salonId)/invites/$(myEmail()))
+              && d().role == get(/databases/$(database)/documents/salons/$(salonId)/invites/$(myEmail())).data.role)
+            || isOwner(salonId));
+        allow update: if isOwner(salonId);
+        allow delete: if isOwner(salonId) && uid != request.auth.uid;
+      }
+
+      match /invites/{email} {
+        allow get: if isOwner(salonId) || (realUser() && myEmail() == email);
+        allow list: if isOwner(salonId);
+        allow create, update: if isOwner(salonId) && email == email.lower() && d().role in ['owner', 'tech'] && d().updatedBy == request.auth.uid;
+        allow delete: if isOwner(salonId)
+          || (realUser() && myEmail() == email && existsAfter(memberPath(salonId)) && !exists(memberPath(salonId)));
+      }
+
+      match /polishes/{id} {
+        allow read: if isMember(salonId);
+        allow create: if isMember(salonId) && stampedCreate() && validPolish();
+        allow update: if isMember(salonId) && stampedUpdate() && validPolish();
+        allow delete: if isMember(salonId);
+      }
+
+      match /services/{id} {
+        allow read: if isMember(salonId);
+        allow create: if isMember(salonId) && stampedCreate() && d().name is string && d().price is number && d().price >= 0;
+        allow update: if isMember(salonId) && stampedUpdate() && d().price is number && d().price >= 0;
+        allow delete: if isMember(salonId);
+      }
+
+      match /looks/{id} {
+        allow read: if isMember(salonId);
+        allow create: if isMember(salonId) && stampedCreate() && d().design is map;
+        allow update: if isMember(salonId) && stampedUpdate();
+        allow delete: if isMember(salonId);
+      }
+
+      // Customer look requests: anyone may create ONE well-formed request; only staff can read / manage.
+      match /requests/{id} {
+        allow create: if d().keys().hasOnly(['customerName', 'customerPhone', 'note', 'preferredDate', 'design', 'analysis', 'thumb',
+                                               'status', 'source', 'lang', 'createdAt', 'createdBy', 'createdByName'])
+          && d().status == 'new' && d().source == 'customer' && d().createdAt == request.time
+          && ((request.auth == null && d().createdBy == 'public') || (request.auth != null && d().createdBy == request.auth.uid))
+          && d().customerName is string && d().customerName.size() <= 60
+          && d().customerPhone is string && d().customerPhone.size() <= 20
+          && d().note is string && d().note.size() <= 300
+          && d().preferredDate is string && d().preferredDate.size() <= 40
+          && d().design is map
+          && d().thumb is string && d().thumb.size() < 200000
+          && (d().customerName.size() > 0 || d().customerPhone.size() > 0);
+        allow read: if isMember(salonId);
+        allow update: if isMember(salonId) && stampedUpdate();
+        allow delete: if isMember(salonId);
+      }
+
+      // Append-only audit trail
+      match /audit/{id} {
+        allow read: if isMember(salonId);
+        allow create: if isMember(salonId) && d().by == request.auth.uid && d().at == request.time;
+        allow update, delete: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

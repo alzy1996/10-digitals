@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
+  }
+  body {
+    font-family: Manrope, 'IBM Plex Sans Arabic', system-ui, sans-serif;
+    background: #f7f3ee;
+    color: #1d1a18;
+    min-height: 100dvh;
+    overscroll-behavior-y: none;
+  }
+  html[dir='rtl'] body {
+    font-family: 'IBM Plex Sans Arabic', Manrope, system-ui, sans-serif;
+  }
+  html[dir='rtl'] .font-display {
+    font-family: 'Noto Naskh Arabic', 'Cormorant Garamond', serif;
+    letter-spacing: 0;
+  }
+  :focus-visible {
+    outline: 3px solid #1d1a18;
+    box-shadow: 0 0 0 5px #ffffff;
+    outline-offset: 2px;
+  }
+  button,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+  input,
+  select,
+  textarea {
+    font-size: 16px; /* prevents iOS zoom on focus */
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex min-h-[48px] select-none items-center justify-center gap-2 rounded-full px-6 text-[15px] font-semibold transition active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply btn bg-ink text-porcelain shadow-soft hover:bg-ink-700;
+  }
+  .btn-mocha {
+    @apply btn bg-mocha text-white shadow-soft hover:bg-mocha-600;
+  }
+  .btn-ghost {
+    @apply btn border border-ink/15 bg-white/70 text-ink hover:bg-white;
+  }
+  .btn-glass {
+    @apply btn border border-white/20 bg-white/10 text-white backdrop-blur-md hover:bg-white/20;
+  }
+  .btn-danger {
+    @apply btn bg-bad text-white;
+  }
+  .icon-btn {
+    @apply inline-flex h-12 w-12 items-center justify-center rounded-full transition active:scale-95;
+  }
+  .glass-dark {
+    @apply border border-white/10 bg-night/75 text-white backdrop-blur-xl;
+  }
+  .glass-light {
+    @apply border border-white/60 bg-white/70 backdrop-blur-xl;
+  }
+  .card {
+    @apply rounded-3xl border border-ink/5 bg-white shadow-soft;
+  }
+  .field {
+    @apply block w-full rounded-2xl border border-ink/15 bg-white px-4 py-3 text-[16px] text-ink placeholder:text-ink-400 focus:border-mocha focus:outline-none focus:ring-2 focus:ring-mocha/20;
+  }
+  .label {
+    @apply mb-1.5 block text-[13px] font-semibold text-ink-500;
+  }
+  .chip {
+    @apply inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 text-[14px] font-semibold transition active:scale-95;
+  }
+  .chip-on {
+    @apply border-ink bg-ink text-porcelain;
+  }
+  .chip-off {
+    @apply border-ink/15 bg-white text-ink hover:border-ink/40;
+  }
+  .chip-dark-on {
+    @apply border-white bg-white text-ink;
+  }
+  .chip-dark-off {
+    @apply border-white/20 bg-white/10 text-white;
+  }
+  .section-title {
+    @apply font-display text-[34px] font-semibold leading-[1.05] text-ink md:text-[48px];
+  }
+  .eyebrow {
+    @apply text-[12px] font-bold uppercase tracking-[0.18em] text-mocha;
+  }
+  html[dir='rtl'] .eyebrow {
+    @apply tracking-normal;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 12px);
+  }
+  .pt-safe {
+    padding-top: max(env(safe-area-inset-top), 10px);
+  }
+  .grain {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+  .mirror-x {
+    transform: scaleX(-1);
+  }
+}
