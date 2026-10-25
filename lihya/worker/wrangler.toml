@@ -22,7 +22,7 @@ id = "PASTE_KV_ID_HERE"
 FIREBASE_PROJECT_ID = "lihya"
 # The app's Hosting domains, comma separated (exact scheme://host[:port]).
 # Replace with the real web.app / firebaseapp.com / custom domains; drop localhost after testing.
-ALLOWED_ORIGINS = "https://lihya.web.app,https://lihya.firebaseapp.com,http://localhost:5173"
+ALLOWED_ORIGINS = "https://lihya.web.app,https://lihya.firebaseapp.com,https://alzy1996.github.io,http://localhost:5173"
 # Renders per UTC day for the whole Cloudflare account (0..80; the Worker never goes above 80).
 ACCOUNT_DAILY_CAP = "80"
 

@@ -41,6 +41,13 @@ export function undertoneFromQuiz(jewelry, veins) {
   return 'neutral';
 }
 
+/** A finite number, or null for null / undefined / '' / NaN (Number(null) would be 0). */
+function num(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** Shapes by measured share, highest first: [{ shape, pct }]. */
 function rankShapes(faceShape) {
   const scores = (faceShape && faceShape.scores) || {};
@@ -158,8 +165,8 @@ export default function S05Profile() {
   };
 
   /* ---- skin */
-  const mst = Number.isFinite(Number(skin.mst)) ? Number(skin.mst) : null;
-  const band = Number.isFinite(Number(skin.ita)) ? itaBand(Number(skin.ita)) : null;
+  const mst = num(skin.mst);
+  const band = num(skin.ita) === null ? null : itaBand(num(skin.ita));
   const setMst = (v) => {
     if (!v) return;
     const measuredMst = profile.skin ? profile.skin.mst : null;
@@ -167,7 +174,7 @@ export default function S05Profile() {
   };
 
   /* ---- undertone */
-  const lowSkin = !skin.undertone || !(Number(skin.confidence) >= UNDERTONE_SURE);
+  const lowSkin = !skin.undertone || !((num(skin.confidence) ?? 0) >= UNDERTONE_SURE);
   const showQuiz = quizOpen || (lowSkin && !overrides.undertone);
   const setUndertone = (v) => {
     if (!v) return;
@@ -177,6 +184,8 @@ export default function S05Profile() {
   const answerQuiz = (key, value) => {
     const next = { ...quiz, [key]: value };
     setQuiz(next);
+    // Keep the quiz on screen once used, so its result line stays visible.
+    setQuizOpen(true);
     const tone = undertoneFromQuiz(next.jewelry, next.veins);
     if (tone) setOverride('undertone', tone);
   };
@@ -285,7 +294,7 @@ export default function S05Profile() {
       <Section>
         <ChipRow
           label={<ChipHeading>{t('capture.profile.age')}</ChipHeading>}
-          options={AGE_BANDS.map((b) => ({ value: b, label: t(`age.${b}`) }))}
+          options={AGE_BANDS.map((b) => ({ value: b, label: `\u2066${t(`age.${b}`)}\u2069` }))}
           value={ageValue}
           onChange={setAge}
         />

@@ -431,6 +431,10 @@ export function SessionProvider({ mode = 'chair', shopId, children }) {
     stateRef.current = initialSessionState();
     setState(stateRef.current);
     lastActivityRef.current = Date.now();
+    // Free GPU textures, the texture worker and the shared renderer that may hold the last photo.
+    import('../ai/index.js')
+      .then((m) => m.clearRenderCaches && m.clearRenderCaches())
+      .catch(() => {});
     const jobs = [idbClearStore(STORES.session)];
     if (!s.keepPhotos) for (const id of savedIds) jobs.push(idbDelete(STORES.saved, id));
     await Promise.all(jobs);

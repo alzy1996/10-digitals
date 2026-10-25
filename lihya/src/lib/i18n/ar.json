@@ -73,5 +73,7 @@
   "error.notFound": "هذه الصفحة غير موجودة.",
   "error.goHome": "الرئيسية",
   "setup.title": "إعداد Firebase غير مكتمل",
-  "setup.body": "أضف إعدادات الويب إلى ملف .env.local، أو اضبط VITE_USE_EMULATORS=true للتشغيل على المحاكي المحلي."
+  "setup.body": "أضف إعدادات الويب إلى ملف .env.local، أو اضبط VITE_USE_EMULATORS=true للتشغيل على المحاكي المحلي.",
+  "common.writeDenied": "لم يُحفظ تغيير: هذا الحساب لم يعد مسموحاً له بذلك.",
+  "common.writeFailed": "تعذّر حفظ تغيير. تحقق من الاتصال وحاول مرة أخرى."
 }

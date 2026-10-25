@@ -13,10 +13,6 @@ export function createField(w, h, fill = 0) {
   return { w, h, data };
 }
 
-export function cloneField(f) {
-  return { w: f.w, h: f.h, data: new Float32Array(f.data) };
-}
-
 const SUB = [0.125, 0.375, 0.625, 0.875];
 
 /**
@@ -245,20 +241,6 @@ export function sampleField(field, x, y) {
   return a + (b - a) * tx + (c - a) * ty + (a - b - c + d) * tx * ty;
 }
 
-/** Multiplies a by b cell-wise (same size). */
-export function multiplyFields(a, b) {
-  const n = a.data.length;
-  for (let i = 0; i < n; i++) a.data[i] *= b.data[i];
-  return a;
-}
-
-/** Clamps every cell to [lo, hi]. */
-export function clampField(f, lo = 0, hi = 1) {
-  const d = f.data;
-  for (let i = 0; i < d.length; i++) d[i] = d[i] < lo ? lo : d[i] > hi ? hi : d[i];
-  return f;
-}
-
 /**
  * Strand canvas: premultiplied linear-RGB colour, coverage, and the light layer
  * (occlusion, sheen weight, tangent, and "kind": 1 for hair that hangs free of the
@@ -296,7 +278,7 @@ export function compositeTexel(cv, i, rgb, a, occ, sheen = 0, kind = 1) {
 
 /**
  * Composites one strand (a polyline in canvas cells) with the "over" operator.
- * s: { pts: [[x, y], ...], width, alpha (root), tipAlpha, rgb: [r, g, b] linear,
+ * s: { pts: [[x, y] per point], width, alpha (root), tipAlpha, rgb: [r, g, b] linear,
  * occ (0..1 brightness from depth), sheen (0..1) }. Lines are rasterised along their
  * major axis with an exact box-filtered cross-section, so a 1-cell strand stays one
  * cell wide at any angle and each cell is touched once per segment.

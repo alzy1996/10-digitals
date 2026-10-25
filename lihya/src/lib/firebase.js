@@ -17,7 +17,7 @@ import {
   persistentMultipleTabManager,
 } from 'firebase/firestore';
 import { connectAuthEmulator, getAuth } from 'firebase/auth';
-import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
+import { getToken, initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 
 const env = import.meta.env || {};
 
@@ -53,10 +53,11 @@ function init() {
   const firstInit = getApps().length === 0;
   const app = firstInit ? initializeApp(resolveConfig()) : getApp();
 
+  let appCheck = null;
   if (firstInit && !usingEmulators) {
     const siteKey = env.VITE_RECAPTCHA_SITE_KEY || '';
     if (siteKey) {
-      initializeAppCheck(app, {
+      appCheck = initializeAppCheck(app, {
         provider: new ReCaptchaV3Provider(siteKey),
         isTokenAutoRefreshEnabled: true,
       });
@@ -80,7 +81,7 @@ function init() {
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
     connectFirestoreEmulator(db, '127.0.0.1', 8080);
   }
-  return { app, db, auth };
+  return { app, db, auth, appCheck };
 }
 
 const instance = init();
@@ -88,3 +89,14 @@ const instance = init();
 export const app = instance.app;
 export const db = instance.db;
 export const auth = instance.auth;
+
+/** Current App Check token for calls outside Firebase (the AI Worker forwards it to Firestore), or null. */
+export async function getAppCheckToken() {
+  if (!instance.appCheck) return null;
+  try {
+    const res = await getToken(instance.appCheck, false);
+    return res && res.token ? res.token : null;
+  } catch {
+    return null;
+  }
+}

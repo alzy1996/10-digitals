@@ -14,6 +14,7 @@
 // anything else -> code 'failed'. A network failure is code 'offline'.
 
 import { getIdToken } from '../../services/auth.js';
+import { getAppCheckToken } from '../../lib/firebase.js';
 
 /** Request timeout (ms). FLUX klein usually answers in a few seconds. */
 export const REQUEST_TIMEOUT_MS = 60000;
@@ -44,10 +45,18 @@ const isOffline = () => typeof navigator !== 'undefined' && navigator && navigat
  * @returns {{ id: 'cloudflareFlux', available: () => boolean,
  *   render: (req: { sourceJpeg: Blob, guideJpeg: Blob, prompt: string, seed: number, shopId: string }) => Promise<Blob> }}
  */
-export function createCloudflareFlux({ url, getToken = getIdToken, fetchImpl, timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
+export function createCloudflareFlux({ url, getToken = getIdToken, getAppCheck = getAppCheckToken, fetchImpl, timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
   // Resolved on every call, so the default instance follows the build's env.
   const baseUrl = () => (url === undefined ? workerBaseUrl() : String(url || '').replace(/\/+$/, ''));
   const doFetch = fetchImpl || (typeof fetch === 'function' ? (...args) => fetch(...args) : null);
+
+  // The App Check token (when App Check is set up) lets the Worker's Firestore reads pass enforcement.
+  async function renderHeaders(token) {
+    const headers = { Authorization: `Bearer ${token}` };
+    const appCheckToken = getAppCheck ? await getAppCheck().catch(() => null) : null;
+    if (appCheckToken) headers['X-Firebase-AppCheck'] = appCheckToken;
+    return headers;
+  }
 
   async function post(base, form, token) {
     const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
@@ -55,7 +64,7 @@ export function createCloudflareFlux({ url, getToken = getIdToken, fetchImpl, ti
     try {
       return await doFetch(`${base}/render`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: await renderHeaders(token),
         body: form,
         cache: 'no-store',
         credentials: 'omit',

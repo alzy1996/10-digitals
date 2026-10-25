@@ -73,5 +73,7 @@
   "error.notFound": "This page does not exist.",
   "error.goHome": "Go home",
   "setup.title": "Firebase is not configured",
-  "setup.body": "Add the web config to .env.local, or set VITE_USE_EMULATORS=true to run against the local emulators."
+  "setup.body": "Add the web config to .env.local, or set VITE_USE_EMULATORS=true to run against the local emulators.",
+  "common.writeDenied": "A change was not saved: this account is no longer allowed to make it.",
+  "common.writeFailed": "A change could not be saved. Check the connection and try again."
 }

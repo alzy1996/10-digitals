@@ -6,6 +6,7 @@ import { SnackbarProvider } from './components/Snackbar.jsx';
 import ScreenFallback from './components/ScreenFallback.jsx';
 import ShopRoute from './state/ShopRoute.jsx';
 import HomeRoute from './state/HomeRoute.jsx';
+import WriteErrorWatcher from './state/WriteErrorWatcher.jsx';
 import { RequireRole } from './state/ShopContext.jsx';
 import { ROUTER_BASENAME } from './lib/paths.js';
 
@@ -42,6 +43,7 @@ export default function App() {
     <I18nProvider>
       <SnackbarProvider>
         <AuthProvider>
+          <WriteErrorWatcher />
           <BrowserRouter basename={ROUTER_BASENAME}>
             <Suspense fallback={<ScreenFallback />}>
               <Routes>

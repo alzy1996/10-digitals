@@ -118,21 +118,5 @@ export function makeCanvas(width, height) {
   return null;
 }
 
-/** A visible (DOM) canvas when possible: callers that hand canvases to screens use this. */
-export function makeDomCanvas(width, height) {
-  return makeCanvas(width, height);
-}
-
-/** Copies an RGBA raster { width, height, data } into a new canvas (null without canvas support). */
-export function rasterToCanvas(raster) {
-  const c = makeCanvas(raster.width, raster.height);
-  if (!c) return null;
-  const ctx = c.getContext('2d');
-  const img = ctx.createImageData(raster.width, raster.height);
-  img.data.set(raster.data);
-  ctx.putImageData(img, 0, 0);
-  return c;
-}
-
 /** Monotonic clock in ms. */
 export const nowMs = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());

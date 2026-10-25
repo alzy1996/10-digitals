@@ -11,10 +11,11 @@
 //   5. overlay      Outline mode tints and target lines (face and shell)
 //
 // Shading transfer: when the photo (Studio) or the video frame (AR) is bound with
-// setPhoto, the hair takes the photo's own local shading (smile creases, the chin
-// highlight, the shadow under the jaw) as the ratio of a lightly blurred to a
-// heavily blurred luminance. Only local contrast transfers, so the darker albedo of
-// a beard the customer already has does not darken the new one.
+// setPhoto, hair lying on the face and neck takes the photo's own local shading
+// (smile creases, the chin highlight, the shadow under the jaw) as the ratio of a
+// lightly blurred to a heavily blurred luminance. Only local contrast transfers, so
+// the darker albedo of a beard the customer already has does not darken the new
+// one; hair hanging below the jaw (over the collar) takes none.
 //
 // Lighting (layer 4 of PRD 7.1): diffuse = face normal . light direction (estimated
 // from left/right cheek brightness), an ambient term, the per-texel occlusion from
@@ -68,6 +69,7 @@ const FRAG = /* glsl */ `
   uniform float uPhotoOn;
   uniform vec3 uSkinChroma;
   uniform float uSkinTest;
+  uniform float uHangTransfer;
   varying vec2 vUv;
   varying vec3 vNormal;
   varying vec2 vImg;
@@ -114,7 +116,9 @@ const FRAG = /* glsl */ `
       gl_FragColor = vec4(c.rgb, a);
       return;
     }
-    vec3 n = normalize(vNormal);
+    // Hair standing off the face (l.a = 1) faces the camera more than the skin under
+    // it, so the underside of the jaw does not turn a long beard dark at the seam.
+    vec3 n = normalize(mix(normalize(vNormal), vec3(0.0, 0.0, 1.0), 0.5 * l.a));
     float lam = max(dot(n, uLightDir), 0.0);
     float lamRef = max(uLightDir.z, 0.25);
     float shade = (uAmbient + (1.0 - uAmbient) * lam) / (uAmbient + (1.0 - uAmbient) * lamRef);
@@ -123,8 +127,10 @@ const FRAG = /* glsl */ `
       vec3 near = texture2D(uPhoto, pu, 1.5).rgb;
       vec3 far = texture2D(uPhoto, pu, 5.0).rgb;
       float ratio = clamp(luma(toLinear(near)) / max(luma(toLinear(far)), 0.002), 0.45, 1.6);
-      // Hair lying on the skin follows the skin's shading closely; hanging hair less.
-      shade *= pow(ratio, mix(0.85, 0.4, l.a));
+      // Hair lying on the skin follows the skin's shading closely; hair standing off
+      // the face less; hair hanging below the jaw not at all (the photo there shows
+      // the collar and the suit, not light on the beard).
+      shade *= pow(ratio, mix(0.85, uHangTransfer, l.a));
     }
     vec3 col = toLinear(c.rgb) * (l.r * ${OCC_RANGE.toFixed(3)}) * shade * uExposure;
     float ang = (l.b - 0.5) * 3.14159265;
@@ -202,6 +208,7 @@ function beardMaterial(extra = {}) {
       uPhotoOn: { value: 0 },
       uSkinChroma: { value: new THREE.Vector3(0, 0, 0) },
       uSkinTest: { value: 0 },
+      uHangTransfer: { value: 0.25 },
     },
     transparent: true,
     depthWrite: false,
@@ -249,6 +256,7 @@ export function createBeardScene({ background = false } = {}) {
   const shellOverlayMat = beardMaterial({ depthTest: true });
   shellMat.uniforms.uSkinTest.value = 1;
   shellOverlayMat.uniforms.uSkinTest.value = 1;
+  shellMat.uniforms.uHangTransfer.value = 0;
   shellOverlayMat.uniforms.uFlat.value = 1;
   // Outline tints on the neck stay on the skin (never on the collar).
   shellOverlayMat.uniforms.uSkinOnly.value = 1;
@@ -440,7 +448,10 @@ export function createBeardScene({ background = false } = {}) {
     const top = [pos[3 * FOREHEAD_TOP], pos[3 * FOREHEAD_TOP + 1]];
     const chin = [pos[3 * CHIN_BOTTOM], pos[3 * CHIN_BOTTOM + 1]];
     const faceDown = norm2([chin[0] - top[0], chin[1] - top[1]]);
-    const down = norm2([faceDown[0] * 0.5, faceDown[1] * 0.5 - 0.5]);
+    // A long beard hangs half toward gravity (screen down, the camera is upright) and
+    // half along the face; for a face far from upright (a rotated photo) along the face.
+    const g = 0.5 * Math.min(1, Math.max(0, (-faceDown[1] - 0.5) / 0.35));
+    const down = norm2([faceDown[0] * (1 - g), faceDown[1] * (1 - g) - g]);
     // SHELL_SUB columns per jaw segment, interpolated between the landmarks (the
     // face mesh edge is straight between them, so the seam still matches exactly).
     const contour = [];

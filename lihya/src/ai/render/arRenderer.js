@@ -322,16 +322,27 @@ export function createArRenderer({ canvas, video, mirror = true, growthMmPerDay 
   };
 
   function meter(now, workMs) {
+    // A long gap (tab hidden, camera paused) restarts the meter instead of reading as
+    // a slow frame.
+    if (frameTimes.length && now - frameTimes[frameTimes.length - 1] > 5000) {
+      frameTimes.length = 0;
+      lowSince = 0;
+    }
     frameTimes.push(now);
-    while (frameTimes.length && now - frameTimes[0] > 1000) frameTimes.shift();
+    if (frameTimes.length > 90) frameTimes.shift();
     frameMs = frameMs ? frameMs * 0.9 + workMs * 0.1 : workMs;
-    if (now - lastReport < 500) return;
-    lastReport = now;
-    const span = frameTimes.length > 1 ? frameTimes[frameTimes.length - 1] - frameTimes[0] : 0;
-    fps = span > 0 ? ((frameTimes.length - 1) * 1000) / span : 0;
-    const low = frameTimes.length > 3 && fps < LOW_FPS;
+    // Frames of the last 1.5 s, and always at least the last interval, so even a
+    // very slow device gets a rate.
+    let i0 = frameTimes.length - 1;
+    while (i0 > 0 && now - frameTimes[i0 - 1] <= 1500) i0 -= 1;
+    if (i0 === frameTimes.length - 1 && i0 > 0) i0 -= 1;
+    const n = frameTimes.length - 1 - i0;
+    const span = now - frameTimes[i0];
+    if (!(n > 0 && span > 0)) return;
+    fps = (n * 1000) / span;
+    const low = fps < LOW_FPS;
     if (low) {
-      if (!lowSince) lowSince = now;
+      if (!lowSince) lowSince = frameTimes[i0];
       if (!lowEmitted && now - lowSince >= LOW_FPS_MS) {
         lowEmitted = true;
         emit('low-fps', { fps, frameMs });
@@ -340,6 +351,8 @@ export function createArRenderer({ canvas, video, mirror = true, growthMmPerDay 
       lowSince = 0;
       if (fps >= RECOVER_FPS) lowEmitted = false;
     }
+    if (now - lastReport < 500) return;
+    lastReport = now;
     emit('fps', Math.round(fps * 10) / 10, { low, frameMs: Math.round(frameMs * 10) / 10 });
   }
 

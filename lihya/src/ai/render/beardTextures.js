@@ -17,7 +17,8 @@
 //                    shadow under the jaw for long beards.
 //
 // Output: two textures, each an RGBA colour raster (sRGB, straight alpha) and an
-// RGBA light raster (R occlusion, G sheen weight, B tangent angle):
+// RGBA light raster (R occlusion, G sheen weight, B tangent angle, A "kind": 0 for
+// hair lying on the skin, 1 for hair standing off it or hanging):
 //   face   size x size in canonical UV space (row 0 = top of the face, v = 1);
 //   shell  the "beard shell" below the jaw: x = arc position along JAW_CONTOUR
 //          (customer's right ear at x = 0), y = millimetres below the jaw at
@@ -41,11 +42,11 @@ import {
 import { colorForTreatment, strandColor, paletteMeanLab } from './henna.js';
 import { zoneCoverage, ZONES } from './timeline.js';
 import { labToLinearRgb, linearToSrgb } from '../analysis/color.js';
+import FINISHES from '../../data/finishes.json';
 import { clamp, lerp, smoothstep, isNum, mulberry32, hash32, stableKey, valueNoise2D, fbm2, randSym, nowMs } from './util.js';
 
 const DEG = Math.PI / 180;
 export const FACE_TEX_SIZE = 1024;
-export const THUMB_TEX_SIZE = 512;
 /** Texture size of the fast path used for style-card thumbnails. */
 export const FAST_TEX_SIZE = 384;
 
@@ -132,9 +133,11 @@ let noiseCdf = null;
 function patchThreshold(cov) {
   if (!noiseCdf) {
     const n = valueNoise2D(7);
+    const f = valueNoise2D(13);
     const rnd = mulberry32(11);
     const vals = [];
-    for (let i = 0; i < 4096; i++) vals.push(fbm2(n, rnd() * 200, rnd() * 200));
+    // Same mix as the patch noise in paintFace.
+    for (let i = 0; i < 4096; i++) vals.push(0.8 * fbm2(n, rnd() * 200, rnd() * 200) + 0.2 * f(rnd() * 200, rnd() * 200));
     noiseCdf = vals.sort((a, b) => a - b);
   }
   const c = clamp(cov, 0, 1);
@@ -456,7 +459,7 @@ function paintFace(P, fields, S, treatment, gains, rnd, finish) {
   const angleAt = (x, y) => beardAngle(x / S, y / S, mW ? sampleField(mW, x * k, y * k) : 0, mCenterX);
   const noise = valueNoise2D(hash32('patch'));
   const fine = valueNoise2D(hash32('fine'));
-  const waxed = finish === 'waxed' || (layout.mustache && layout.mustache.def.waxed);
+  const waxed = finishEntry(finish).waxedMustache === true || !!(layout.mustache && layout.mustache.def.waxed);
   const balm = finish === 'balm';
   const mean = labToLinearRgb(paletteMeanLab(treatment)).map((c, i) => c / (gains ? gains[i] || 1 : 1));
   // Locks: brightness variation stretched along the (mostly downward) growth, so a
@@ -485,9 +488,11 @@ function paintFace(P, fields, S, treatment, gains, rnd, finish) {
       const ty = (cy + 0.5) / R;
       let patch = 1;
       if (c < 0.97) {
-        const n = fbm2(noise, tx / (8 * TEX_PER_MM), ty / (8 * TEX_PER_MM));
+        // Weak growth thins out gradually into sparse areas with a few hairs left,
+        // never into clean bald holes.
+        const n = 0.8 * fbm2(noise, tx / (8 * TEX_PER_MM), ty / (8 * TEX_PER_MM)) + 0.2 * fine(tx / (2.5 * TEX_PER_MM), ty / (2.5 * TEX_PER_MM));
         const t = patchThreshold(c);
-        patch = 1 - smoothstep(t - 0.035, t + 0.035, n);
+        patch = 0.12 + 0.88 * (1 - smoothstep(t - 0.09, t + 0.09, n));
       }
       const thin = lerp(thinMin, 1, smoothstep(0.45, 0.85, wide.data[ci]));
       // A little density grain (finer and weaker on stubble, where coarse blotches read
@@ -530,7 +535,8 @@ function paintFace(P, fields, S, treatment, gains, rnd, finish) {
       const deep = under > shadow;
       const shade = deep ? 0.86 + 0.14 * n : 0.8;
       const occ = deep ? 0.6 * lockAt(x, y) : 0.95;
-      compositeTexel(cv, y * S + x, [mean[0] * shade, mean[1] * shade, mean[2] * shade], a, occ, 0.3, 1);
+      // kind: 0 for hair lying on the skin (stubble), 1 for hair standing off it.
+      compositeTexel(cv, y * S + x, [mean[0] * shade, mean[1] * shade, mean[2] * shade], a, occ, 0.3, smoothstep(4, 16, L));
     }
   }
 
@@ -573,6 +579,7 @@ function paintFace(P, fields, S, treatment, gains, rnd, finish) {
             tipAlpha: alpha * (stubble ? 0.8 : 0.6),
             rgb: look.rgb,
             occ: stubble ? 0.92 + 0.08 * rnd() : (0.74 + 0.26 * depth) * lockAt(x, y) * (rnd() < 0.06 ? 1.35 : 1),
+            kind: smoothstep(4, 16, L),
             sheen: look.sheen,
           });
         } else {
@@ -613,6 +620,7 @@ function paintFace(P, fields, S, treatment, gains, rnd, finish) {
               tipAlpha: alpha * 0.6,
               rgb: look.rgb,
               occ: (0.68 + 0.16 * depth + 0.16 * centre) * lockAt(x, y) * (rnd() < 0.06 ? 1.35 : 1),
+              kind: smoothstep(4, 16, L),
               sheen: look.sheen,
             });
           }
@@ -770,7 +778,7 @@ export function shellColumns(P, coverage, SW, layout, fields = null) {
   const N = P.zones.N;
   const neckType = P.lines.neckline;
   const baseDepth = Math.max(3, (NECK_DEPTH_MM[neckType] || 20) - 10 * (P.lines.necklineOffset || 0));
-  // The chin shape (round, pointed, flat...) is drawn across the beard's own width:
+  // The chin shape (round, pointed, flat and so on) is drawn across the beard's own width:
   // the whole jaw for a full beard, the chin for a goatee.
   let lo = -1;
   let hi = -1;
@@ -1030,13 +1038,28 @@ function paintShell(P, cols, SW, treatment, gains, rnd) {
 /* Public API                                                                */
 /* ------------------------------------------------------------------------ */
 
-const SHEEN = Object.freeze({ matte: 0.05, oiled: 0.45, balm: 0.25, waxed: 0.3 });
+const DEFAULT_FINISHES = Object.freeze({
+  matte: { id: 'matte', sheen: 0.05, waxedMustache: false },
+  oiled: { id: 'oiled', sheen: 0.45, waxedMustache: false },
+  balm: { id: 'balm', sheen: 0.25, waxedMustache: false },
+  waxed: { id: 'waxed', sheen: 0.3, waxedMustache: true },
+});
 
-/** Sheen strength of a finish id (finishes.json values, with defaults). */
-export function finishSheen(finish, finishes) {
-  const f = Array.isArray(finishes) ? finishes.find((x) => x.id === finish) : null;
-  if (f && isNum(f.sheen)) return f.sheen;
-  return SHEEN[finish] !== undefined ? SHEEN[finish] : SHEEN.matte;
+/** Finish by id from finishes.json, with defaults for missing fields or ids. */
+export function finishEntry(id) {
+  const base = DEFAULT_FINISHES[id] || DEFAULT_FINISHES.matte;
+  const f = Array.isArray(FINISHES) ? FINISHES.find((x) => x && x.id === id) : null;
+  if (!f) return base;
+  return {
+    id: f.id,
+    sheen: isNum(f.sheen) ? clamp(f.sheen, 0, 1) : base.sheen,
+    waxedMustache: typeof f.waxedMustache === 'boolean' ? f.waxedMustache : base.waxedMustache,
+  };
+}
+
+/** Sheen strength (0..1) of a finish id. */
+export function finishSheen(finish) {
+  return finishEntry(finish).sheen;
 }
 
 /** True when any zone has hair to draw. */
@@ -1076,7 +1099,7 @@ export function textureKey(params, profile, opts = {}) {
  * @param {object} params LookParams
  * @param {object|null} profile FaceProfile (patch map, natural colour, grey ratio, gains)
  * @param {object} [opts]
- * @param {number} [opts.size=1024] face texture size (512 for thumbnails)
+ * @param {number} [opts.size=1024] face texture size (FAST_TEX_SIZE for thumbnails)
  * @param {Record<string, number>} [opts.coverage] per-zone coverage override (timeline)
  * @param {number} [opts.day=1] henna day
  * @param {number[]} [opts.gains] white-card gains (default: the profile's)
@@ -1182,11 +1205,4 @@ export function getBeardTextures(params, profile, opts = {}) {
 /** Drops every cached texture (for example after the session is wiped). */
 export function clearTextureCache() {
   cache.clear();
-}
-
-/** Jaw zone lengths helper for callers that need the hang without textures (mm). */
-export function hangProfileMm(params, profile, columns = 64) {
-  const P = normalizeLook(params);
-  const coverage = zoneCoverage(P.zones, profile);
-  return shellColumns(P, coverage, columns, beardLayout(P)).hang;
 }

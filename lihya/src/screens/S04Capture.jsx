@@ -119,6 +119,7 @@ export default function S04Capture() {
     clearShots,
     setWhiteCard,
     setProfile,
+    onIdleWipe,
   } = session;
   const chair = mode === 'chair';
 
@@ -551,6 +552,11 @@ export default function S04Capture() {
     goPhase('live');
   };
 
+  // An idle wipe (10 minutes) empties the session under this screen: start the capture over.
+  const restartRef = useRef(restartAll);
+  restartRef.current = restartAll;
+  useEffect(() => onIdleWipe(() => restartRef.current()), [onIdleWipe]);
+
   const toggleQuick = () => {
     const next = captureMode === 'quick' ? 'full' : 'quick';
     modeRef.current = next;
@@ -639,7 +645,8 @@ export default function S04Capture() {
       }
     } catch (err) {
       console.warn('capture: photo could not be read', err);
-      if (mountedRef.current) setUpload({ state: 'noFace' });
+      // No face model (offline first visit) or a file the browser cannot decode.
+      if (mountedRef.current) setUpload({ state: modRef.current ? 'noFace' : 'error' });
     }
   };
 
@@ -679,7 +686,9 @@ export default function S04Capture() {
   let hintText;
   let hintTone = 'default';
   if (camera !== 'on') hintText = t('capture.starting');
-  else if (!landmarkerReady) hintText = modelPct > 0 ? t('ai.model.progress', { pct: modelPct }) : t('ai.model.loading');
+  else if (!landmarkerReady) {
+    hintText = modelPct > 0 && modelPct < 100 ? t('ai.model.progress', { pct: modelPct }) : t('ai.model.loading');
+  }
   else if (manualMsg === 'noFace') {
     hintText = t('capture.manualNoFace');
     hintTone = 'warn';
@@ -689,8 +698,12 @@ export default function S04Capture() {
   } else if (currentId) hintText = t(`ai.shot.${currentId}.help`);
   else hintText = '';
 
+  // "45°" kept in a left-to-right isolate so the degree sign stays after the number in Arabic.
   const shotLine = currentId
-    ? `${t('ai.shot.count', { n: index + 1, total: order.length })} · ${t(`ai.shot.${currentId}`)}`
+    ? `${t('ai.shot.count', { n: index + 1, total: order.length })} · ${t(`ai.shot.${currentId}`)}`.replace(
+        /(\d+°)/g,
+        '\u2066$1\u2069',
+      )
     : '';
 
   const titles = {
@@ -841,11 +854,11 @@ export default function S04Capture() {
         </div>
       );
     }
-    if (upload.state === 'noFace') {
+    if (upload.state === 'noFace' || upload.state === 'error') {
       return (
-        <StagePanel icon="face" title={t('ai.issue.title')}>
+        <StagePanel icon={upload.state === 'error' ? 'warning' : 'face'} title={t('ai.issue.title')}>
           <p role="alert" className="max-w-sm text-text-2">
-            {t('ai.issue.noFace')}
+            {upload.state === 'error' ? t('ai.model.error') : t('ai.issue.noFace')}
           </p>
         </StagePanel>
       );
@@ -990,7 +1003,7 @@ export default function S04Capture() {
         </Button>
       </BottomAction>
     );
-  } else if (phase === 'upload' && upload && upload.state === 'noFace') {
+  } else if (phase === 'upload' && upload && (upload.state === 'noFace' || upload.state === 'error')) {
     footer = (
       <BottomAction>
         <Button variant="primary" icon="upload" onClick={openFilePicker}>

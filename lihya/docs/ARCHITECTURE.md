@@ -399,3 +399,38 @@ toggle + pending-sync badge), `TopBar`, `LangToggle`, `SyncBadge`, `OwnerShell({
   (the router has a `basename`). Any URL that leaves the app (email links, QR codes, WhatsApp text, share text) must use
   `appUrl(routePath)` from `src/lib/paths.js`, and files in `public/` must use `assetUrl('templates/products-template.csv')`.
   Never build URLs from `window.location.origin` directly and never hard-code `'/icons/...'` or `'/templates/...'`.
+
+### Rendering extras (via src/ai/index.js)
+- `createArRenderer({ canvas, video, mirror, growthMmPerDay })` throws `err.code === 'webgl'` when WebGL cannot start.
+  Extras: `setMirror(on)`, `on(event, cb) -> unsub` with events `fps`, `low-fps` (offer Photo Studio with
+  `render.lowFps` / `render.lowFps.action`), `face`, `busy`, `error` (`contextLost`); `getState()`;
+  `setTimelineDays(null)` = the designed look, a number = growth state at that day.
+- `renderStudio` also takes `timeline` (true shows the growth state even at day 0), `day` (henna day 1 or 3) and
+  `growthMmPerDay`. `renderThumbnail(shot, params, profile, { width, quality })`.
+- `TIMELINE_STOPS` items are `{ days, key, labelKey, noteKey? }`; `growthAt` returns `{ params, coverage, labelKey,
+  lengths, complete, days }`.
+- `renderFinalLook` errors carry `err.code`: `cap` -> `render.capReached`, `offline` -> `render.error.offline`,
+  `disabled` -> `render.error.disabled`, else `render.error.failed`. Label the result `render.aiPreview` +
+  `render.aiPreview.note`. `clearRenderCaches()` is called by the session wipe.
+
+### Session, Cut Card and reports extras
+- `useSession()` also returns `hydrated`, `hasData`, `clearApproval()`, `trackObjectUrl(url)`,
+  `keepBeforeAfter({ before, after })`. The session keeps a photo-free snapshot for reload recovery (10 minutes).
+  Idle wipes navigate home automatically (src/state/IdleWipeWatcher.jsx) — screens do not need to.
+- `buildCutCard({ params, profile, style, guardChart, colors, safety, growthMmPerDay, now, front: shots.front })`;
+  the card carries `nextVisitDayKey`, `color.questions`, `color.blocked`, notes as `{ key, vars }` (`report.note.*`).
+- Reports: `<CutCardDocument data lang variant="screen"|"print"|"share" />`, `cutCardPdf(data, lang)`,
+  `cutCardPng(data, lang)`, `printCutCard(data, lang)`, `cutCardFilename(dayKey, ext)`; data = `{ card, params, style,
+  shop: { name, nameAr, logoUrl }, barber, client, approved: { at, decisionSeconds }, colors, guardChart }`.
+  `dailyReportPdf(input)`, `printDailyReport(input)`, `dailyReportFilename(dayKey)`.
+- `csv.js`: parse results carry `preview [{ row, values, ok, reasons }]`; exports take an options object and return
+  `{ blob, text, filename, count }`; `productsTemplateCsv`.
+- `share.js`: `shareFile(blob, filename, text)` -> `'shared'|'downloaded'|'cancelled'|'failed'`, `copyAndOpenWhatsApp(text,
+  phone)` (call inside the tap handler with no await before it), `reminderText({ lang, shop, clientName, dayKey })`,
+  `cutCardShareText({ lang, shop, style, card })`, `copyText`.
+- `idb.js`: `pruneSaved(maxAgeDays)` for the retention setting.
+
+### AI Worker (worker/)
+- `POST /render` (multipart `source`, `guide`, `seed`, `shopId`; Bearer Firebase ID token; optional
+  `X-Firebase-AppCheck`) -> image bytes + `X-Lihya-Used`, `X-Lihya-Cap`; 429 `{ error: 'cap', scope, resetsAt }`.
+- `GET /quota?shopId=` -> `{ usedToday, cap, accountUsed, accountCap, enabled, day, resetsAt }` for the owner dashboard.

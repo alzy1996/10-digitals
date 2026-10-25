@@ -119,8 +119,9 @@ const PX_PER_MM = 1.13;
 const MID_GAIN = 0.75;
 // Cut Card cheek-line heights (mm above the jaw at mid-cheek) drawn between the 'low' and the
 // 'high' line of the drawing: the face is schematic, so the height is placed proportionally.
-const CHEEK_MM_LOW = 25;
-const CHEEK_MM_HIGH = 70;
+// Same limits as the Cut Card (CHEEK_LIMIT_MM in src/lib/cutcard.js), so the brass line sits where the printed height says.
+const CHEEK_MM_LOW = 17;
+const CHEEK_MM_HIGH = 50;
 
 /** Vertical shift that puts the cheek line's midpoint at the height `mm` stands for. */
 function cheekShiftForMm(mm, { y, ctrl }, presets, end, startX) {

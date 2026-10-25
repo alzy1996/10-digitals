@@ -54,7 +54,7 @@ export function finalLookAvailable(settings) {
 
 /** The provider for a shop's settings (none unless AI preview is on and configured). */
 export function getProvider(settings) {
-  return settings && settings.aiPreview === true && cloudflareFlux.available() ? cloudflareFlux : noneProvider;
+  return settings && settings.aiPreview === true && cloudflareFlux.available() ? PROVIDERS.cloudflareFlux : PROVIDERS.none;
 }
 
 /**

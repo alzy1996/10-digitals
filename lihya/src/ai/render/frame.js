@@ -165,6 +165,8 @@ export function estimateLight(source, landmarks, w, h, { refSkinL = null } = {})
     const ctx = lightCanvas.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(source, 0, 0, sw, sh);
     const { data } = ctx.getImageData(0, 0, sw, sh);
+    // No copy of the face stays in the scratch canvas.
+    ctx.clearRect(0, 0, sw, sh);
     const P = (i) => [landmarks[i].x * sw, landmarks[i].y * sh];
     const faceW = dist(P(MEASURE.cheekL), P(MEASURE.cheekR));
     const r = Math.max(1.5, faceW * 0.07);

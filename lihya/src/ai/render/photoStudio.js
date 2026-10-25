@@ -9,9 +9,9 @@
 
 import * as THREE from 'three';
 import { createBeardScene } from './glScene.js';
-import { FACE_TEX_SIZE, FAST_TEX_SIZE } from './beardTextures.js';
-import { needsOutline } from './inpaint.js';
-import { textureJob } from './textureJobs.js';
+import { FACE_TEX_SIZE, FAST_TEX_SIZE, clearTextureCache } from './beardTextures.js';
+import { needsOutline, clearOutlineCache } from './inpaint.js';
+import { textureJob, clearTextureJobs } from './textureJobs.js';
 import { growthAt, DEFAULT_GROWTH_MM_PER_DAY } from './timeline.js';
 import { frameMmPerPx, estimateLight, lowerFaceCrop } from './frame.js';
 import { makeCanvas, isNum } from './util.js';
@@ -40,13 +40,36 @@ function getShared() {
     disposeShared();
   };
   if (canvas.addEventListener) canvas.addEventListener('webglcontextlost', onLost, false);
-  shared = { canvas, renderer, beard, onLost, photo: null, photoSource: null };
+  shared = { canvas, renderer, beard, onLost, photo: null, photoSource: null, releaseTimer: 0 };
   return shared;
 }
 
-/** Mipmapped texture of the shot photo for the shading transfer (one kept at a time). */
+/** How long the shot photo stays on the GPU after the last render (ms). */
+const PHOTO_KEEP_MS = 30000;
+
+const weak = (v) => (typeof WeakRef === 'function' ? new WeakRef(v) : { deref: () => v });
+
+/** Drops the photo texture: the customer's photo is never kept longer than needed. */
+function releasePhoto(s) {
+  if (s.releaseTimer) clearTimeout(s.releaseTimer);
+  s.releaseTimer = 0;
+  if (s.photo) {
+    s.beard.setPhoto(null);
+    s.photo.dispose();
+  }
+  s.photo = null;
+  s.photoSource = null;
+}
+
+/**
+ * Mipmapped texture of the shot photo for the shading transfer. One is kept at a
+ * time (only a weak reference to the shot canvas), released 30 s after the last
+ * render.
+ */
 function photoTexture(s, source) {
-  if (s.photoSource === source && s.photo) return s.photo;
+  if (s.releaseTimer) clearTimeout(s.releaseTimer);
+  s.releaseTimer = setTimeout(() => releasePhoto(s), PHOTO_KEEP_MS);
+  if (s.photo && s.photoSource && s.photoSource.deref() === source) return s.photo;
   if (s.photo) s.photo.dispose();
   const tex = new THREE.CanvasTexture(source);
   tex.colorSpace = THREE.NoColorSpace;
@@ -57,7 +80,7 @@ function photoTexture(s, source) {
   tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.needsUpdate = true;
   s.photo = tex;
-  s.photoSource = source;
+  s.photoSource = weak(source);
   return tex;
 }
 
@@ -68,12 +91,24 @@ export function disposeShared() {
   shared = null;
   try {
     if (s.canvas.removeEventListener) s.canvas.removeEventListener('webglcontextlost', s.onLost, false);
-    if (s.photo) s.photo.dispose();
+    releasePhoto(s);
     s.beard.dispose();
     s.renderer.dispose();
   } catch (err) {
     console.warn('Photo Studio renderer dispose failed', err);
   }
+}
+
+/**
+ * Forgets everything the render engine keeps between calls: cached beard and Outline
+ * textures, the texture worker, and the shared offscreen renderer with the last
+ * photo. Call it when the session is wiped ("Next customer", idle timeout).
+ */
+export function clearRenderCaches() {
+  clearTextureJobs();
+  clearTextureCache();
+  clearOutlineCache();
+  disposeShared();
 }
 
 const shotSize = (shot) => [shot.width || shot.canvas.width, shot.height || shot.canvas.height];
@@ -202,8 +237,8 @@ export async function renderStudio({
 
 /**
  * Style-card thumbnail: the look on a 4:5 crop of the lower face, as a JPEG data URL.
- * Fast path: a 384 px texture with fewer, wider strands (single strands are below a
- * pixel at card size), rendered only on the crop.
+ * Fast path: a 384 px texture with coarser density fields (the card is about 300 px
+ * across the face), rendered only on the crop, generated in the texture worker.
  * @param {object} shot front Shot
  * @param {object} params LookParams
  * @param {object|null} profile

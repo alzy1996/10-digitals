@@ -180,6 +180,11 @@ export function outlineKey(params, profile, opts = {}) {
   return stableKey({ params: normalizeLook(params), cur: currentLengths(profile), size: opts.size || 1024, zones: opts.zones || null, p: !!(profile && profile.beard && profile.beard.zones) });
 }
 
+/** Drops the cached Outline textures. */
+export function clearOutlineCache() {
+  cache.clear();
+}
+
 /** buildOutlineTextures with a small cache keyed by the look, profile and zones. */
 export function getOutlineTextures(params, profile, opts = {}) {
   const key = outlineKey(params, profile, opts);

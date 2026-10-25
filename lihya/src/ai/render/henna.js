@@ -16,7 +16,7 @@
 // the swatch (PRD 7.6).
 
 import COLORS from '../../data/colors.json';
-import { hexToLab, labToLinearRgb, linearRgbToLab } from '../analysis/color.js';
+import { hexToLab, labToLinearRgb } from '../analysis/color.js';
 import { clamp, isNum, lerp } from './util.js';
 
 /** Relative L* variation per strand (PRD 7.1: +-5 to 8 %). */
@@ -183,9 +183,4 @@ export function paletteMeanLab(treatment) {
     b += e.lab[2] * e.weight;
   }
   return [L, a, b];
-}
-
-/** Linear RGB -> Lab passthrough so callers of this module need one import. */
-export function linToLab(lin) {
-  return linearRgbToLab(lin);
 }
