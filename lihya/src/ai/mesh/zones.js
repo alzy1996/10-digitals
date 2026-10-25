@@ -281,48 +281,54 @@ const lmX = (l) => (l.x !== undefined ? l.x : l[0]);
 const lmY = (l) => (l.y !== undefined ? l.y : l[1]);
 
 /**
- * Builds the shifted K ring for one side.
- * offset > 0 raises the cheek line, < 0 lowers it, in units of the
- * eye-to-jaw distance. The sideburn end stays fixed (it is the sideburn
- * bottom); the mustache end slides along the mustache edge; the points in
- * between move along the face-up axis (ramped in from the sideburn end) and
- * are clamped between the cheekbone ceiling and the K floor.
+ * Cheek line for one side after applying the barber's offset, in pixels.
+ *
+ * offset > 0 raises, < 0 lowers the line by offset * eye-to-jaw distance
+ * (outer eye corner to gonion on that side). The line is blended toward the
+ * HIGH or LOW limit line, both resampled at the same normalised arc-length
+ * parameters (the union of both polylines' vertex parameters, so neither
+ * line loses a corner). The blend factor is chosen so the point that moves
+ * furthest moves exactly that distance; it saturates at the limit line. The
+ * sideburn end is shared by all three lines and never moves; the mustache
+ * end slides along the mustache edge.
+ *
+ * @returns {{ line: number[][], sEnd: number, edge: number[][], edgeCum: number[] }}
  */
-function shiftedCheekRing(P, side, offset, up) {
-  const cheekIdx = side === 'L' ? CHEEK_LINE_NATURAL_L : CHEEK_LINE_NATURAL_R;
-  const edgeIdx = side === 'L' ? MUSTACHE_EDGE_L : MUSTACHE_EDGE_R;
-  const lowerIdx = side === 'L' ? K_LOWER_L : K_LOWER_R;
-  const ceilIdx = side === 'L' ? CHEEK_CEILING_L : CHEEK_CEILING_R;
+function cheekLinePx(P, side, offset) {
+  const def = CHEEK[side];
   const eyeToJaw = len(sub(P(EYE_OUTER[side]), P(side === 'L' ? MEASURE.jawL : MEASURE.jawR)));
-  const shift = clamp(offset, -1, 1) * eyeToJaw;
-  const down = [-up[0], -up[1]];
+  const d = clamp(offset, -1, 1) * eyeToJaw;
+  const natural = def.natural.map(P);
+  const limitIdx = d > 0 ? def.high : def.low;
+  const limit = limitIdx.map(P);
 
-  // Mustache-end: slide along the mustache edge (edge runs top -> bottom).
-  const edge = edgeIdx.map(P);
-  const cum = arcLengths(edge);
-  const endK = edgeIdx.indexOf(cheekIdx[cheekIdx.length - 1]);
-  const total = cum[cum.length - 1];
-  const sEnd = clamp(cum[endK] - shift, 0.05 * total, 0.98 * total);
-  const endPt = pointAtArc(edge, cum, sEnd);
+  const cn = arcLengths(natural);
+  const cl = arcLengths(limit);
+  const tn = cn[cn.length - 1] || 1;
+  const tl = cl[cl.length - 1] || 1;
+  const params = [...cn.map((s) => s / tn), ...cl.map((s) => s / tl)].sort((x, y) => x - y);
+  const ts = params.filter((t, k) => k === 0 || t - params[k - 1] > 1e-6);
+  const A = ts.map((t) => pointAtArc(natural, cn, t * tn));
+  const B = ts.map((t) => pointAtArc(limit, cl, t * tl));
+  let gap = 0;
+  for (let k = 0; k < ts.length; k++) gap = Math.max(gap, len(sub(B[k], A[k])));
+  const a = gap > 1e-9 ? clamp(Math.abs(d) / gap, 0, 1) : 0;
+  const line = A.map((p, k) => add(p, scale(sub(B[k], p), a)));
 
-  // Interior points: move along `up`, clamped to the corridor.
-  const floor = [P(cheekIdx[0]), ...lowerIdx.slice().reverse().map(P)];
-  const ceiling = ceilIdx.map(P);
-  const line = [P(cheekIdx[0])];
-  const n = cheekIdx.length;
-  for (let k = 1; k < n - 1; k++) {
-    const p = P(cheekIdx[k]);
-    let s = shift * smoothstep(0, 0.5, k / (n - 1));
-    if (s > 0) s = Math.min(s, 0.9 * rayHitPolyline(p, up, ceiling));
-    else if (s < 0) s = -Math.min(-s, 0.8 * rayHitPolyline(p, down, floor));
-    line.push(add(p, scale(up, s)));
-  }
-  line.push(endPt);
+  const edge = def.edge.map(P);
+  const edgeCum = arcLengths(edge);
+  const sNat = edgeCum[def.edge.indexOf(def.natural[def.natural.length - 1])];
+  const sLim = edgeCum[def.edge.indexOf(limitIdx[limitIdx.length - 1])];
+  const sEnd = sNat + (sLim - sNat) * a;
+  line[line.length - 1] = pointAtArc(edge, edgeCum, sEnd);
+  return { line, sEnd, edge, edgeCum };
+}
 
-  // Remaining mustache edge below the new end, then the K floor chain.
-  const edgeBelow = [];
-  for (let k = 0; k < edge.length; k++) if (cum[k] > sEnd + 1e-6) edgeBelow.push(edge[k]);
-  return [...line, ...edgeBelow, ...lowerIdx.map(P)];
+/** K ring for one side with a moved cheek line: line, rest of the mustache edge, K floor. */
+function shiftedCheekRing(P, side, offset) {
+  const { line, sEnd, edge, edgeCum } = cheekLinePx(P, side, offset);
+  const edgeBelow = edge.filter((_, k) => edgeCum[k] > sEnd + 1e-6);
+  return [...line, ...edgeBelow, ...CHEEK[side].lower.map(P)];
 }
 
 /**
@@ -336,9 +342,11 @@ function shiftedCheekRing(P, side, offset, up) {
  * @param {object} [opts]
  * @param {number} [opts.cheekLineOffset=0] -1..1; positive raises, negative
  *   lowers the upper edge of K_L / K_R by that fraction of the eye-to-jaw
- *   distance (outer eye corner to gonion, per side). The sideburn end of the
- *   line stays put, the mustache end slides along the mustache edge, and the
- *   line is clamped between the cheekbone and the jaw band.
+ *   distance (outer eye corner to gonion, per side; about 9 cm on an adult).
+ *   The line is blended toward CHEEK_LINE_HIGH_* / CHEEK_LINE_LOW_* and
+ *   saturates there (around +0.2 / -0.25 on a typical face); the sideburn
+ *   end stays put and the mustache end slides along MUSTACHE_EDGE_*. K stays
+ *   a simple polygon that shares its edges with B, J, C and M.
  * @param {number} [opts.neckDepthPx] depth of the neck zone N below the chin;
  *   default 0.35 * distance(nose tip 4, chin 152). N is the gonion-to-gonion
  *   part of JAW_CONTOUR (172 .. 397) offset downward along its local normals
@@ -365,7 +373,7 @@ export function zonePolygonsPx(landmarks, width, height, opts = {}) {
   if (cheekLineOffset) {
     for (const side of ['L', 'R']) {
       const id = `K_${side}`;
-      let ring = shiftedCheekRing(P, side, cheekLineOffset, up);
+      let ring = shiftedCheekRing(P, side, cheekLineOffset);
       if (Math.sign(polygonArea(ring)) !== Math.sign(polygonArea(out[id]))) ring = ring.reverse();
       out[id] = ring;
     }
