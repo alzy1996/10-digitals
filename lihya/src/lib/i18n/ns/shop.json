@@ -1,0 +1,40 @@
+{
+  "en": {
+    "shop.pickAnother": "Pick another shop",
+    "shop.signedInAs": "Signed in as {email}",
+    "shop.offline.title": "You are offline",
+    "shop.offline.body": "This phone has not opened this shop before. Connect to the internet once; after that it works offline.",
+    "shop.error.title": "Could not open the shop",
+    "shop.error.body": "Something went wrong while loading the shop. Try again.",
+    "shop.notMember.title": "You are not a member of this shop",
+    "shop.notMember.body": "This account is not on the shop's staff list. If the owner invited you, join with the invite. Otherwise pick another shop or sign in with another account.",
+    "shop.notMember.join": "I have an invite",
+    "shop.deactivated.title": "Your access is paused",
+    "shop.deactivated.body": "The owner has turned off your account for this shop. Ask the owner to turn it back on.",
+    "shop.notFound.title": "Shop not found",
+    "shop.notFound.body": "This link does not match any shop.",
+    "shop.public.inactive.title": "This shop link is not active",
+    "shop.public.inactive.body": "The shop has turned off Try at home, or the link is wrong. Ask the shop for its current link.",
+    "shop.public.offlineBody": "Connect to the internet to open the shop's page. Your photo always stays on your phone.",
+    "shop.public.errorBody": "The shop's page did not load. Try again."
+  },
+  "ar": {
+    "shop.pickAnother": "اختر محلًا آخر",
+    "shop.signedInAs": "أنت مسجّل باسم {email}",
+    "shop.offline.title": "لا يوجد اتصال",
+    "shop.offline.body": "لم يُفتح هذا المحل على هذا الجهاز من قبل. اتصل بالإنترنت مرة واحدة، وبعدها يعمل دون اتصال.",
+    "shop.error.title": "تعذّر فتح المحل",
+    "shop.error.body": "حدث خطأ أثناء تحميل المحل. حاول مرة أخرى.",
+    "shop.notMember.title": "لست ضمن فريق هذا المحل",
+    "shop.notMember.body": "هذا الحساب غير موجود في قائمة فريق المحل. إذا دعاك المالك فانضم عبر الدعوة، وإلا فاختر محلًا آخر أو ادخل بحساب آخر.",
+    "shop.notMember.join": "لديّ دعوة",
+    "shop.deactivated.title": "تم إيقاف صلاحيتك",
+    "shop.deactivated.body": "أوقف المالك حسابك في هذا المحل. اطلب منه إعادة تفعيله.",
+    "shop.notFound.title": "المحل غير موجود",
+    "shop.notFound.body": "هذا الرابط لا يطابق أي محل.",
+    "shop.public.inactive.title": "رابط هذا المحل غير مفعّل",
+    "shop.public.inactive.body": "أوقف المحل خدمة التجربة من البيت، أو أن الرابط غير صحيح. اطلب من المحل رابطه الحالي.",
+    "shop.public.offlineBody": "اتصل بالإنترنت لفتح صفحة المحل. صورتك تبقى على جهازك دائمًا.",
+    "shop.public.errorBody": "لم تُحمَّل صفحة المحل. حاول مرة أخرى."
+  }
+}

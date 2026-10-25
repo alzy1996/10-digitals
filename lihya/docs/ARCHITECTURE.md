@@ -322,3 +322,74 @@ toggle + pending-sync badge), `TopBar`, `LangToggle`, `SyncBadge`, `OwnerShell({
 | Session + Cut Card + reports | `src/state/SessionContext.jsx`, `src/hooks/useSession.js`, `src/lib/idb.js`, `src/lib/cutcard.js`, `src/reports/*` |
 | Worker | `worker/*` |
 | Screens | `src/screens/*` |
+
+## 9. Addenda from the module build (binding, read before writing screens)
+
+### UI kit extras (src/components)
+- `IconButton({ icon, label, onClick, size: 'md'|'lg', tone, mirror })` for icon-only buttons (label = aria-label).
+- `Button` also takes `iconEnd`, `full`, `as` (render as a router `Link`); named export `Spinner`.
+- `ChipRow` also takes `nullable`, `wrap`; options may carry `tone`, `disabled`. `Chip` takes `size: 'md'|'sm'`.
+- `Slider` also takes `onChangeEnd(value)`, `disabled`, `aria-label`; `unit: 'mm'` formats with `formatMm`.
+- `Sheet` also takes `modal` (default true; use `modal={false}` in the Studio so the canvas stays visible) and `footer`; `snap: 'auto'|'half'|'full'`.
+- `useSnackbar()` returns `{ show, dismiss, confirmUndo({ message, onCommit, onUndo, actionLabel, duration }) }` — use
+  `confirmUndo` instead of confirm dialogs (the change commits on timeout unless Undo is tapped).
+- `ZoneDiagram` also takes `side 'L'|'R'`, `guardChart`, `showLabels`, `palette`; use `ZONE_DIAGRAM_PRINT_PALETTE`
+  (hex) inside PDFs/html2canvas. `BarberRuler` takes `color`, `textColor` (hex for PDFs), `lang`, `showValue`.
+- `StyleCard` takes `reasonLabels`, `warningLabels` (or translates `ranked.reasons/warnings` itself).
+- `ScreenFrame` also takes `onBack`, `padded`, `topBar`, `className`, `bodyClassName`; `back` = true | path | fn.
+  Owner screens: `<OwnerShell><ScreenFrame title wide>...</ScreenFrame></OwnerShell>`.
+- Extras: `Toggle({ checked, onChange(bool), label, description })`, `Field({ label, value, onChange(value, event), error,
+  hint, icon, end, type, multiline })`, `Stat({ label, value, sub, icon, tone, loading })`, `Skeleton`, `RatingDots({ value,
+  onChange, max })`, `BeforeAfter({ before, after, beforeLabel, afterLabel, aspect })`, `Flash({ trigger })`,
+  `ShotDots({ done: count|boolean[], current })`, `CodeBoxes({ value, onChange, label, error })` (defaults to the Look Code
+  alphabet, length 6, always LTR).
+
+### Firebase extras (src/services, src/state)
+- `useAuth()` also returns `{ isStaffUser, emailLink: { status: 'none'|'completing'|'needEmail'|'done'|'error', error },
+  completeEmailLink(email), authError, clearAuthError }`. S02: when `emailLink.status === 'needEmail'` ask for the email.
+  Map errors with `authErrorKey(err)` (auth.js) to `ns/auth.json` keys. Read `next` through `safeNextPath()`.
+- `signInGoogle()` resolves `user | null` (null = redirect started). `sendLinkTo(email, { next })` also exists.
+- `useShop()` also returns `hasPendingWrites`. `usePublicShop().styles` is always an array.
+- `useLive` also returns `hasPendingWrites`, `fromCache`; watch callbacks get `(data, { hasPendingWrites, fromCache })`.
+- `createInvite` resolves `{ email, role, joinUrl, sent }` (when `sent` is false, offer to share `joinUrl` on WhatsApp);
+  invites allow only manager/barber. `acceptInvite(shopId)` resolves `{ shopId, role, already }`, rejects
+  `invite/email-not-verified` | `invite/not-found`. `setStaffRole/setStaffActive` throw `staff/own-role` / `staff/own-active`.
+- `products.addProduct/updateProduct` throw `invalid-argument` with `err.fields`; `importProducts` -> `{ imported, updated, skipped }`.
+- `clients.createClient` throws `invalid-argument` for an empty name or bad phone. `saveClientProfile` logs the
+  profile_save consent itself. `recordVisitLengths(shopId, id, { zonesMm, at, measuredMm })`.
+- Stats: consultations.js bumps consultations / approvals / decision seconds / topStyles / addOns itself. Screens only
+  call `bumpAiRender(shopId)` (stats.js) once per AI render. Screens call `logConsent` for 'ai_render' only.
+- `getLookCode` returns `{ code, styleId, params, createdAt, expiresAt, usedAt, usedBy, expired, used } | null`.
+- `shops.purgeExpiredData(shopId)` (owner) applies `settings.retentionDays`; call it when the owner dashboard opens.
+  `deleteDemoData(shopId)` -> Promise. `watchPublicInfo` calls `cb(null, { denied: true })` when Try at home is off.
+- `sync.subscribeWriteErrors(cb(err, label))` for writes the server rejects.
+
+### AI analysis extras (via src/ai/index.js)
+- `loadModels({ onProgress({ fraction, loaded, total, stage }) })`; `subscribeModelStatus(cb)`.
+- Capture `onStatus` also carries `{ arrow: 'left'|'right'|'up'|'down'|null, index, total, taken, error: 'model'? }`;
+  show `t('ai.hint.' + hint)`; shots carry `issues: [hintKey]`. `shotFromImage` -> `{ shot|null, issues }`
+  (`t('ai.issue.title')`, `t('ai.issue.noFace')`).
+- `analyzeShots` `onStep(stepKey, { index, total, i18nKey })` -> show `t(i18nKey)`; `STEP_KEYS` exported.
+- S05: confirm chips (`ai.zone.dense|medium|patchy|none`) for zones with `confidence < CONFIRM_BELOW` via
+  `setOverride('zones.<Z>', value)`; `itaBand(profile.skin.ita)` with `ai.ita.<band>` keys.
+- Call `canLoadAgeModel()` then `loadAgeModel()` early (capture screen on Wi-Fi) so the age band can be pre-selected.
+- `faceShape.measures = { faceLengthMm, foreheadWidthMm, cheekboneWidthMm, jawWidthMm, lengthToCheek, chinAngleDeg,
+  hairlineEstimated, hairlineSource }`.
+
+### Catalog / recommend extras
+- Call `recommend(effectiveProfile, styles, { answers, settings, overrides: session.overrides, chosen })`.
+- Ranked items also carry `rawScore`, `growUnknown`, `trim { key, cardKey, vars }` (card trim label =
+  `t(ranked.trim.cardKey, ranked.trim.vars)`), `parts`; reasons/warnings items are `{ key (full i18n key), id, vars, zones? }`
+  -> `t(item.key, item.vars)`. `growability` may be null (freshly shaved / unknown).
+- S05: show `t('catalog.warn.shaved_confirm')` when `isFreshlyShaved(profile, overrides)`.
+- S07: show `workRuleNotice(hiddenByWorkRule(styles, answers.workRule).length)` (or the count it expects — read reasons.js),
+  `pairingHints(style)` for the PRD 6.4 one-liners; "See all styles" filters with `filterStyles`, `LENGTH_FILTERS`,
+  `MAINTENANCE_FILTERS` from src/lib/look.js.
+- Studio: `jawlineDetail(profile, params)` / `jawlineLabels(delta)` -> `[{ key: 'catalog.jaw.*', vars: { pct } }]`.
+- `src/lib/look.js` extras: `lookSummary(params, lang, style)`, `setColor`, `safetyFor(colorId)`, `safetyFlags(colorId,
+  session.safety)`, `filterStyles`, `getStyle`, `getMustache`, `getColor`, `getFinish`, `getPreset`, `PRESETS`, `ZONE_GROUPS`,
+  `setZoneLength` accepts groups 'J', 'K', 'B'. `LookParams.presetId`. Chin shape enum adds 'strip'.
+- `reasons.json.safetyQuestions` ids equal the session safety keys (patchTest48h, metallicSaltProducts, pureHenna,
+  irritationToday).
+- Offsets: `lines.cheekOffset` / `lines.necklineOffset` positive = the line moves UP (cheek line higher on the face,
+  neckline higher toward the jaw).

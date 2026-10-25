@@ -1,0 +1,26 @@
+{
+  "en": {
+    "session.wiped.idle": "The session was cleared after 10 minutes without activity. The photos were deleted.",
+    "session.wiped.next": "Ready for the next customer. The photos were deleted.",
+    "session.nextCustomer": "Next customer",
+    "session.looks.max": "You can save up to 3 looks. Remove one to save another.",
+    "session.looks.count": "{n} of {max} looks saved",
+    "session.photosLocal": "Photos stay on this phone.",
+    "session.keepPhotos": "Keep before and after photos on this phone",
+    "session.keepPhotosHint": "Only for this client, on this device. They are never uploaded.",
+    "session.decision": "Decided in {duration}",
+    "session.restored": "The consultation was restored. Photos are never kept, so take them again if you need them."
+  },
+  "ar": {
+    "session.wiped.idle": "مُسحت الجلسة بعد 10 دقائق دون نشاط، وحُذفت الصور.",
+    "session.wiped.next": "جاهز للعميل التالي، وحُذفت الصور.",
+    "session.nextCustomer": "العميل التالي",
+    "session.looks.max": "يمكن حفظ 3 أشكال كحد أقصى. احذف واحدًا لتحفظ غيره.",
+    "session.looks.count": "حُفظ {n} من {max}",
+    "session.photosLocal": "الصور تبقى على هذا الجهاز.",
+    "session.keepPhotos": "احتفظ بصور قبل وبعد على هذا الجهاز",
+    "session.keepPhotosHint": "لهذا العميل فقط وعلى هذا الجهاز فقط، ولا تُرفع أبدًا.",
+    "session.decision": "قرّر خلال {duration}",
+    "session.restored": "استُعيدت الاستشارة. الصور لا تُحفظ أبدًا، فالتقطها مرة أخرى إن احتجت."
+  }
+}

@@ -1,0 +1,429 @@
+{
+  "chips": [
+    {
+      "id": "face_elongate",
+      "key": "catalog.reason.face_elongate",
+      "component": "face",
+      "text": {
+        "en": "Makes a round face look longer",
+        "ar": "يُطيل مظهر الوجه الدائري"
+      }
+    },
+    {
+      "id": "face_soften",
+      "key": "catalog.reason.face_soften",
+      "component": "face",
+      "text": {
+        "en": "Softens a square jaw",
+        "ar": "يُنعّم زوايا الفك المربع"
+      }
+    },
+    {
+      "id": "face_widen",
+      "key": "catalog.reason.face_widen",
+      "component": "face",
+      "text": {
+        "en": "Adds width to a long face",
+        "ar": "يضيف عرضاً للوجه الطويل"
+      }
+    },
+    {
+      "id": "face_balance_chin",
+      "key": "catalog.reason.face_balance_chin",
+      "component": "face",
+      "text": {
+        "en": "Balances a narrow chin",
+        "ar": "يوازن الذقن الضيقة"
+      }
+    },
+    {
+      "id": "grow_ok",
+      "key": "catalog.reason.grow_ok",
+      "component": "grow",
+      "text": {
+        "en": "Your beard grows full in these zones",
+        "ar": "لحيتك كثيفة في هذه المناطق"
+      }
+    },
+    {
+      "id": "grow_warn",
+      "key": "catalog.reason.grow_warn",
+      "component": "penalty",
+      "text": {
+        "en": "Cheeks grow light: gaps may show",
+        "ar": "العوارض خفيفة: قد تظهر فراغات"
+      }
+    },
+    {
+      "id": "low_maint",
+      "key": "catalog.reason.low_maint",
+      "component": "life",
+      "text": {
+        "en": "Trim every 2 weeks",
+        "ar": "تشذيب كل أسبوعين"
+      }
+    },
+    {
+      "id": "high_contrast",
+      "key": "catalog.reason.high_contrast",
+      "component": "contrast",
+      "text": {
+        "en": "Dark beard on lighter skin: sharp lines stand out",
+        "ar": "لحية داكنة على بشرة فاتحة: الخطوط الحادة تبرز"
+      }
+    },
+    {
+      "id": "eid_ready",
+      "key": "catalog.reason.eid_ready",
+      "component": "occasion",
+      "text": {
+        "en": "Sharp lines for Eid and weddings",
+        "ar": "خطوط حادة للعيد والأعراس"
+      }
+    }
+  ],
+  "trimTemplates": [
+    {
+      "id": "day",
+      "key": "catalog.reason.low_maint_day",
+      "text": {
+        "en": "Trim every day",
+        "ar": "تشذيب كل يوم"
+      },
+      "card": {
+        "en": "Every day",
+        "ar": "كل يوم"
+      }
+    },
+    {
+      "id": "days2",
+      "key": "catalog.reason.low_maint_2days",
+      "text": {
+        "en": "Trim every 2 days",
+        "ar": "تشذيب كل يومين"
+      },
+      "card": {
+        "en": "Every 2 days",
+        "ar": "كل يومين"
+      }
+    },
+    {
+      "id": "days",
+      "key": "catalog.reason.low_maint_days",
+      "text": {
+        "en": "Trim every {days} days",
+        "ar": "تشذيب كل {days} أيام"
+      },
+      "card": {
+        "en": "Every {days} days",
+        "ar": "كل {days} أيام"
+      }
+    },
+    {
+      "id": "daysMany",
+      "key": "catalog.reason.low_maint_days_many",
+      "text": {
+        "en": "Trim every {days} days",
+        "ar": "تشذيب كل {days} يوماً"
+      },
+      "card": {
+        "en": "Every {days} days",
+        "ar": "كل {days} يوماً"
+      }
+    },
+    {
+      "id": "week",
+      "key": "catalog.reason.low_maint_week",
+      "text": {
+        "en": "Trim every week",
+        "ar": "تشذيب كل أسبوع"
+      },
+      "card": {
+        "en": "Every week",
+        "ar": "كل أسبوع"
+      }
+    },
+    {
+      "id": "weeks2",
+      "key": "catalog.reason.low_maint",
+      "text": {
+        "en": "Trim every 2 weeks",
+        "ar": "تشذيب كل أسبوعين"
+      },
+      "card": {
+        "en": "Every 2 weeks",
+        "ar": "كل أسبوعين"
+      }
+    },
+    {
+      "id": "weeks",
+      "key": "catalog.reason.low_maint_weeks",
+      "text": {
+        "en": "Trim every {weeks} weeks",
+        "ar": "تشذيب كل {weeks} أسابيع"
+      },
+      "card": {
+        "en": "Every {weeks} weeks",
+        "ar": "كل {weeks} أسابيع"
+      }
+    },
+    {
+      "id": "weeksMany",
+      "key": "catalog.reason.low_maint_weeks_many",
+      "text": {
+        "en": "Trim every {weeks} weeks",
+        "ar": "تشذيب كل {weeks} أسبوعاً"
+      },
+      "card": {
+        "en": "Every {weeks} weeks",
+        "ar": "كل {weeks} أسبوعاً"
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "id": "patchy_cheeks",
+      "key": "catalog.reason.grow_warn",
+      "zones": [
+        "K_L",
+        "K_R"
+      ],
+      "text": {
+        "en": "Cheeks grow light: gaps may show",
+        "ar": "العوارض خفيفة: قد تظهر فراغات"
+      }
+    },
+    {
+      "id": "patchy_jaw",
+      "key": "catalog.warn.patchy_jaw",
+      "zones": [
+        "J_L",
+        "J_R"
+      ],
+      "text": {
+        "en": "Jawline grows light: gaps may show",
+        "ar": "خط الفك خفيف: قد تظهر فراغات"
+      }
+    },
+    {
+      "id": "patchy_chin",
+      "key": "catalog.warn.patchy_chin",
+      "zones": [
+        "C"
+      ],
+      "text": {
+        "en": "Chin grows light: gaps may show",
+        "ar": "الذقن خفيفة: قد تظهر فراغات"
+      }
+    },
+    {
+      "id": "patchy_mustache",
+      "key": "catalog.warn.patchy_mustache",
+      "zones": [
+        "M"
+      ],
+      "text": {
+        "en": "Mustache grows light: gaps may show",
+        "ar": "الشنب خفيف: قد تظهر فراغات"
+      }
+    },
+    {
+      "id": "patchy_soul",
+      "key": "catalog.warn.patchy_soul",
+      "zones": [
+        "S"
+      ],
+      "text": {
+        "en": "Soul patch grows light: it may not show",
+        "ar": "شعرة الشفة خفيفة: قد لا تظهر بوضوح"
+      }
+    },
+    {
+      "id": "patchy_sideburns",
+      "key": "catalog.warn.patchy_sideburns",
+      "zones": [
+        "B_L",
+        "B_R"
+      ],
+      "text": {
+        "en": "Sideburns grow light: the join may show gaps",
+        "ar": "السوالف خفيفة: قد تظهر فراغات عند الوصلة"
+      }
+    },
+    {
+      "id": "patchy_neck",
+      "key": "catalog.warn.patchy_neck",
+      "zones": [
+        "N"
+      ],
+      "text": {
+        "en": "Neck grows light: the neckline may look uneven",
+        "ar": "الرقبة خفيفة: قد يبدو خط الرقبة غير متساوٍ"
+      }
+    },
+    {
+      "id": "under40",
+      "key": "catalog.warn.under40",
+      "zones": [],
+      "text": {
+        "en": "{count} zones this style needs are under 40% density",
+        "ar": "{count} من المناطق التي يحتاجها هذا الشكل كثافتها أقل من 40%"
+      }
+    },
+    {
+      "id": "shaved_confirm",
+      "key": "catalog.warn.shaved_confirm",
+      "zones": [],
+      "text": {
+        "en": "Freshly shaved: growth cannot be read. Confirm each zone with one tap.",
+        "ar": "الوجه محلوق حديثاً ولا يمكن قراءة النمو. أكّد كل منطقة بلمسة واحدة."
+      }
+    },
+    {
+      "id": "work_rule",
+      "key": "catalog.warn.work_rule",
+      "zones": [],
+      "text": {
+        "en": "Breaks the work rule",
+        "ar": "لا يناسب قواعد العمل"
+      }
+    },
+    {
+      "id": "work_rule_hidden",
+      "key": "catalog.warn.work_rule_hidden",
+      "zones": [],
+      "text": {
+        "en": "{n} styles hidden by the work rule",
+        "ar": "أُخفي {n} من أشكال اللحية بسبب قواعد العمل"
+      }
+    }
+  ],
+  "pairings": [
+    {
+      "id": "high_fade_full",
+      "key": "catalog.pair.high_fade_full",
+      "haircut": "high-skin-fade",
+      "match": {
+        "fullBeard": true
+      },
+      "suggestStyleId": "beard-fade",
+      "text": {
+        "en": "High skin fade + full beard: use the faded beard for the sideburn transition",
+        "ar": "فيد عالٍ على الجلد مع لحية كاملة: اختر اللحية المتدرجة لانتقال السوالف"
+      }
+    },
+    {
+      "id": "mid_fade_designer",
+      "key": "catalog.pair.mid_fade_designer",
+      "haircut": "mid-fade",
+      "match": {
+        "styleIds": [
+          "designer-stubble"
+        ]
+      },
+      "suggestStyleId": "designer-stubble",
+      "text": {
+        "en": "Mid fade + designer stubble: crisp line-up",
+        "ar": "فيد متوسط مع ستابل مصمم: تحديد حاد ونظيف"
+      }
+    },
+    {
+      "id": "long_top_connected",
+      "key": "catalog.pair.long_top_connected",
+      "haircut": "longer-top",
+      "match": {
+        "lengthClasses": [
+          "long",
+          "xlong"
+        ]
+      },
+      "suggestStyleId": null,
+      "text": {
+        "en": "Long beard + longer top: keep the sideburns connected",
+        "ar": "لحية طويلة مع شعر أطول من الأعلى: اترك السوالف متصلة"
+      }
+    }
+  ],
+  "safetyQuestions": [
+    {
+      "id": "patchTest48h",
+      "key": "catalog.safety.patchTest48h",
+      "answers": [
+        true,
+        false
+      ],
+      "riskWhen": [
+        false,
+        null
+      ],
+      "text": {
+        "en": "Patch test done 48 hours before this oxidative dye?",
+        "ar": "هل أُجري اختبار الحساسية قبل 48 ساعة من هذه الصبغة المؤكسِدة؟"
+      },
+      "flag": {
+        "en": "No 48-hour patch test",
+        "ar": "لم يُجرَ اختبار الحساسية قبل 48 ساعة"
+      }
+    },
+    {
+      "id": "metallicSaltProducts",
+      "key": "catalog.safety.metallicSaltProducts",
+      "answers": [
+        "yes",
+        "no",
+        "unsure"
+      ],
+      "riskWhen": [
+        "yes",
+        "unsure",
+        null
+      ],
+      "text": {
+        "en": "Used 'gradual' grey-reducing products or compound henna? They can carry metallic salts that react violently with peroxide.",
+        "ar": "هل استخدمت منتجات تخفيف الشيب «التدريجية» أو حناء مركّبة؟ قد تحتوي على أملاح معدنية تتفاعل بعنف مع البيروكسيد."
+      },
+      "flag": {
+        "en": "Possible metallic salts: no peroxide",
+        "ar": "احتمال وجود أملاح معدنية: لا بيروكسيد"
+      }
+    },
+    {
+      "id": "pureHenna",
+      "key": "catalog.safety.pureHenna",
+      "answers": [
+        true,
+        false
+      ],
+      "riskWhen": [
+        true
+      ],
+      "text": {
+        "en": "Pure henna on the beard now? It blocks oxidative color.",
+        "ar": "هل على اللحية حناء صافية الآن؟ فهي تمنع ثبات الصبغة المؤكسِدة."
+      },
+      "flag": {
+        "en": "Pure henna on the beard blocks oxidative color",
+        "ar": "الحناء الصافية على اللحية تمنع ثبات الصبغة المؤكسِدة"
+      }
+    },
+    {
+      "id": "irritationToday",
+      "key": "catalog.safety.irritationToday",
+      "answers": [
+        true,
+        false
+      ],
+      "riskWhen": [
+        true
+      ],
+      "text": {
+        "en": "Any skin irritation on the face today?",
+        "ar": "هل يوجد أي تهيّج في جلد الوجه اليوم؟"
+      },
+      "flag": {
+        "en": "Skin irritation today: no dye",
+        "ar": "تهيّج في الجلد اليوم: لا صبغة"
+      }
+    }
+  ]
+}

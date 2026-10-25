@@ -1,0 +1,38 @@
+[
+  {
+    "id": "matte",
+    "name": {
+      "en": "Natural matte",
+      "ar": "مطفي طبيعي"
+    },
+    "sheen": 0.05,
+    "waxedMustache": false
+  },
+  {
+    "id": "oiled",
+    "name": {
+      "en": "Oiled sheen",
+      "ar": "لمعة الزيت"
+    },
+    "sheen": 0.45,
+    "waxedMustache": false
+  },
+  {
+    "id": "balm",
+    "name": {
+      "en": "Balm-shaped",
+      "ar": "مشكّل بالبلسم"
+    },
+    "sheen": 0.25,
+    "waxedMustache": false
+  },
+  {
+    "id": "waxed",
+    "name": {
+      "en": "Waxed mustache",
+      "ar": "شنب بالشمع"
+    },
+    "sheen": 0.3,
+    "waxedMustache": true
+  }
+]
