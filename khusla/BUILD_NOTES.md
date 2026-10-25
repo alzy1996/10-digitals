@@ -34,6 +34,7 @@ build sandbox, it says so.
 | 24 | Quick shorten | Allowed only when the new line is below the chin | Above the chin the cut reveals face and ears; the silhouette and AI Final Look cover that |
 | 25 | Light Switcher strength | Partial adaptation 0.5 (50% toward the preset white) | Full adaptation turned the whole photo orange at 2700 K |
 | 26 | Theme | Light default; dark is a per-device choice in Settings | PRD 9.1 defines both palettes |
+| 27 | Deploy route | GitHub Actions: `khusla-ci.yml` runs lint, unit, rules, build and size checks on every PR; `khusla-deploy.yml` runs the same checks and then `firebase deploy` (Hosting + rules + indexes) on every merge to `main` | Sam asked to deploy from GitHub. Firebase Hosting stays (PRD stack, SPA rewrites and headers that GitHub Pages cannot set). The Worker stays a manual `wrangler deploy` (optional feature, off by default) |
 
 ## 2. Where everything is
 
@@ -99,6 +100,11 @@ daily stats, consent, audit). A 40-client day ≈ 400 writes, 2% of the daily fr
   expressions Firestore allows per write. The services write step by step (draft → params →
   agreement → approvals → done). If a new validated field is added, the three worst-case rules tests
   fail first — keep it that way.
+- GitHub deploy: the web config and the deploy key live only in GitHub repository secrets. The
+  deploy key is a service account with Firebase Hosting Admin, Firebase Rules Admin, Cloud Datastore
+  Index Admin and Service Usage Consumer (no data roles). The workflow refuses to deploy when a secret
+  is missing, the project id starts with `demo-`, the key belongs to another project, or the build
+  does not contain the real project id (a build without keys would point at the emulators).
 - When App Check enforcement is ON for Firestore, the Worker forwards the client's App Check token on
   its Firestore REST membership check, so AI still works.
 

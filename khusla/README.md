@@ -43,6 +43,8 @@ With an empty `.env.local` the app always uses the emulators (project `demo-khus
 
 ### A · Firebase (required)
 
+**A1 · Create the Firebase project (browser clicks, once)**
+
 1. Go to https://console.firebase.google.com → **Add project** → name it `khusla` → turn Google
    Analytics **off** (not needed) → **Create project** → **Continue**. If the console gives the
    project id a suffix (e.g. `khusla-1a2b3`), your links become `khusla-1a2b3.web.app`: use that
@@ -55,24 +57,69 @@ With an empty `.env.local` the app always uses the emulators (project `demo-khus
 3. Left menu **Build → Firestore Database** → **Create database** → location: pick the closest
    available (e.g. `me-central1` Doha or `me-central2` Dammam if offered; it **cannot change later**) →
    **Start in production mode** → **Create**.
-4. Click the gear **⚙ → Project settings → General** → **Your apps** → web icon **`</>`** → nickname
-   `khusla-web` → do **not** tick Hosting here → **Register app**. Copy these 4 values.
-5. In the `khusla` folder copy `.env.example` to `.env.local` and fill:
+4. Left menu **Build → Hosting** → **Get started** → **Next** → **Next** → **Continue to console**
+   (this creates the `khusla.web.app` site; skip the commands it shows).
+5. Click the gear **⚙ → Project settings → General** → **Your apps** → web icon **`</>`** → nickname
+   `khusla-web` → do **not** tick Hosting here → **Register app**. Keep this page open: you need
+   `apiKey`, `authDomain`, `projectId` and `appId`.
+6. App Check: left menu **Build → App Check** → **Apps** tab → your web app → **reCAPTCHA v3** →
+   it links to https://www.google.com/recaptcha/admin/create → label `khusla`, type
+   **Score based (v3)**, domains `khusla.web.app` and `khusla.firebaseapp.com` → **Submit** → keep the
+   **site key** for A2 and paste the **secret key** into the Firebase App Check dialog → **Save**.
+   Do **not** press "Enforce" yet.
+
+**A2 · Deploy from GitHub (recommended, no terminal)**
+
+Every merge to `main` that changes `khusla/` is tested and deployed by GitHub Actions
+(`.github/workflows/khusla-deploy.yml`). Pull requests get the same checks without deploying
+(`khusla-ci.yml`). Your keys live only in GitHub Secrets, never in a file.
+
+1. Deploy key (Google Cloud, clicks):
+   - Firebase console → **⚙ → Project settings** → tab **Service accounts** → link
+     **Manage service account permissions** (opens Google Cloud).
+   - **+ Create service account** → name `github-deploy` → **Create and continue**.
+   - **Select a role** → type and pick `Firebase Hosting Admin` → **+ Add another role** → `Firebase Rules Admin`
+     → **+ Add another role** → `Cloud Datastore Index Admin` → **+ Add another role** → `Service Usage Consumer`
+     → **Continue** → **Done**.
+   - Click the new `github-deploy@...` row → tab **Keys** → **Add key → Create new key** → **JSON** →
+     **Create**. A `.json` file downloads.
+2. GitHub → https://github.com/alzy1996/10-digitals → **Settings** → left menu
+   **Secrets and variables → Actions** → **New repository secret**. Add each one (Name exactly as below →
+   paste the value → **Add secret**):
+
+   | Name | Value |
+   | --- | --- |
+   | `FIREBASE_SERVICE_ACCOUNT_KHUSLA` | open the downloaded `.json` in Notepad / TextEdit → select all → copy → paste |
+   | `VITE_FB_API_KEY` | `apiKey` from A1 step 5 |
+   | `VITE_FB_AUTH_DOMAIN` | `authDomain` (e.g. `khusla.firebaseapp.com`) |
+   | `VITE_FB_PROJECT_ID` | `projectId` (e.g. `khusla`) |
+   | `VITE_FB_APP_ID` | `appId` |
+   | `VITE_RECAPTCHA_SITE_KEY` | reCAPTCHA **site** key from A1 step 6 |
+   | `VITE_AI_WORKER_URL` | only after part B (optional; skip for now) |
+
+   Then delete the `.json` file from Downloads and empty the bin. GitHub keeps the only copy.
+3. Open the KHUSLA pull request → **Ready for review** → **Merge pull request** → **Confirm merge**.
+4. Tab **Actions** → **KHUSLA deploy** → wait for the green tick (about 5 minutes) →
+   open `https://khusla.web.app` (your project id + `.web.app`).
+   - Red cross? Click the run → the red step says exactly what is wrong (missing secret, key from another
+     project, ...) → fix that secret → back on the run → **Re-run jobs → Re-run all jobs**.
+   - "403" / "permission denied" in the deploy step: Google Cloud → **IAM** → pencil on
+     `github-deploy@...` → **+ Add another role** → `Firebase Admin` → **Save** → re-run.
+5. Redeploy any time (e.g. after changing a secret): **Actions → KHUSLA deploy → Run workflow → Run workflow**.
+
+**A3 · Or deploy from your computer (terminal)**
+
+1. In the `khusla` folder copy `.env.example` to `.env.local` and fill:
    ```
    VITE_FB_API_KEY=...        (apiKey)
    VITE_FB_AUTH_DOMAIN=...    (authDomain, e.g. khusla.firebaseapp.com)
    VITE_FB_PROJECT_ID=...     (projectId)
    VITE_FB_APP_ID=...         (appId)
-   VITE_RECAPTCHA_SITE_KEY=   (step 6)
+   VITE_RECAPTCHA_SITE_KEY=   (A1 step 6)
    VITE_AI_WORKER_URL=        (part B, leave empty for now)
    VITE_USE_EMULATORS=
    ```
-6. App Check: left menu **Build → App Check** → **Apps** tab → your web app → **reCAPTCHA v3** →
-   it links to https://www.google.com/recaptcha/admin/create → label `khusla`, type
-   **Score based (v3)**, domains `khusla.web.app` and `khusla.firebaseapp.com` → **Submit** → copy the
-   **site key** into `VITE_RECAPTCHA_SITE_KEY` and the **secret key** into the Firebase App Check
-   dialog → **Save**. Do **not** press "Enforce" yet.
-7. Terminal in the `khusla` folder:
+2. Terminal in the `khusla` folder:
    ```
    npm i -g firebase-tools
    firebase login
@@ -80,15 +127,18 @@ With an empty `.env.local` the app always uses the emulators (project `demo-khus
    npm run build
    firebase deploy --only hosting,firestore:rules,firestore:indexes
    ```
-8. Open the `https://khusla.web.app` link on the salon tablet → **Staff sign in** → open the email
+
+**A4 · First use**
+
+1. Open the `https://khusla.web.app` link on the salon tablet → **Staff sign in** → open the email
    on the same device → **Create your salon** → Settings → set your WhatsApp number →
    **Swatch Scan** your dye swatches → Products & services (add or import CSV) →
    in Safari/Chrome: **Share → Add to Home Screen**.
-9. After one week of normal use: **App Check → APIs → Cloud Firestore → Enforce**.
-10. Staff: Owner screens → **Staff** → type her email → **Create invite** → send her the link
-    (Copy or WhatsApp). She opens it, signs in with that email and joins.
-11. Try at home: Settings → **Try at home** → print the QR code for the salon or put the link in
-    the Instagram bio.
+2. After one week of normal use: **App Check → APIs → Cloud Firestore → Enforce**.
+3. Staff: Owner screens → **Staff** → type her email → **Create invite** → send her the link
+   (Copy or WhatsApp). She opens it, signs in with that email and joins.
+4. Try at home: Settings → **Try at home** → print the QR code for the salon or put the link in
+   the Instagram bio.
 
 ### B · Cloudflare (only if you want the AI Final Look)
 
@@ -103,8 +153,9 @@ With an empty `.env.local` the app always uses the emulators (project `demo-khus
    In the same file set `FIREBASE_PROJECT_ID` to your project id and keep `ALLOWED_ORIGINS`
    (`https://khusla.web.app,https://khusla.firebaseapp.com`).
 3. `npx wrangler deploy` → copy the `https://khusla-ai.<you>.workers.dev` URL.
-4. Put it in `.env.local` as `VITE_AI_WORKER_URL=...` → `npm run build` →
-   `firebase deploy --only hosting`.
+4. GitHub route (A2): add the repository secret `VITE_AI_WORKER_URL` with that URL →
+   **Actions → KHUSLA deploy → Run workflow**. Terminal route (A3): put it in `.env.local` as
+   `VITE_AI_WORKER_URL=...` → `npm run build` → `firebase deploy --only hosting`.
 5. In KHUSLA → Owner → **Settings → AI preview → On** (daily cap 20 per salon by default,
    80 per day for the whole account).
 
@@ -155,6 +206,9 @@ khusla/
    │                         useCatalog, useConsultation
    └─ styles/                tokens.css, index.css
 ```
+
+Repo root: `.github/workflows/khusla-ci.yml` (checks on every pull request) and
+`khusla-deploy.yml` (checks + Firebase deploy on every merge to `main`).
 
 ## Changing things later (MODIFY)
 

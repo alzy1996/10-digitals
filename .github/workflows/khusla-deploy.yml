@@ -1,0 +1,111 @@
+# KHUSLA deploy: builds, tests and deploys khusla/ to Firebase Hosting + Firestore rules/indexes.
+# Runs on every push to main that touches khusla/, or by hand: Actions -> KHUSLA deploy -> Run workflow.
+# Needs the repository secrets listed in khusla/README.md part A (nothing secret lives in code).
+name: KHUSLA deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'khusla/**'
+      - '.github/workflows/khusla-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: khusla-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Test and deploy to Firebase
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: khusla
+    env:
+      VITE_FB_API_KEY: ${{ secrets.VITE_FB_API_KEY }}
+      VITE_FB_AUTH_DOMAIN: ${{ secrets.VITE_FB_AUTH_DOMAIN }}
+      VITE_FB_PROJECT_ID: ${{ secrets.VITE_FB_PROJECT_ID }}
+      VITE_FB_APP_ID: ${{ secrets.VITE_FB_APP_ID }}
+      VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
+      VITE_AI_WORKER_URL: ${{ secrets.VITE_AI_WORKER_URL }}
+    steps:
+      # Fail fast with a clear message: a build without real keys would point at the emulators.
+      - name: Check deploy settings
+        working-directory: .
+        env:
+          FIREBASE_SERVICE_ACCOUNT_KHUSLA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KHUSLA }}
+        run: |
+          missing=""
+          for name in FIREBASE_SERVICE_ACCOUNT_KHUSLA VITE_FB_API_KEY VITE_FB_AUTH_DOMAIN VITE_FB_PROJECT_ID VITE_FB_APP_ID; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing. Add them in Settings -> Secrets and variables -> Actions (khusla/README.md part A), then Actions -> KHUSLA deploy -> Run workflow."
+            exit 1
+          fi
+          case "$VITE_FB_PROJECT_ID" in
+            demo-*) echo "::error::VITE_FB_PROJECT_ID starts with demo- (emulator only). Use your real Firebase project id."; exit 1 ;;
+          esac
+          if ! sa_project=$(printf '%s' "$FIREBASE_SERVICE_ACCOUNT_KHUSLA" | jq -er '.project_id' 2>/dev/null); then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT_KHUSLA is not a service account key. Paste the whole .json file, from { to }."
+            exit 1
+          fi
+          if [ "$sa_project" != "$VITE_FB_PROJECT_ID" ]; then
+            echo "::error::The service account key belongs to a different project than VITE_FB_PROJECT_ID."
+            exit 1
+          fi
+          if [ -z "$VITE_RECAPTCHA_SITE_KEY" ]; then
+            echo "::warning::VITE_RECAPTCHA_SITE_KEY is empty: the app deploys without App Check. Add it before you press Enforce."
+          fi
+          echo "Deploy settings OK"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: khusla/package-lock.json
+
+      # Java 21 for the Firestore emulator (rules tests run before the rules go live)
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:rules
+
+      - name: Build with the real Firebase config
+        run: |
+          npm run build
+          if ! grep -rqF "$VITE_FB_PROJECT_ID" dist/assets; then
+            echo "::error::The build does not contain the Firebase project id. Check the VITE_FB_* secrets."
+            exit 1
+          fi
+
+      - run: npm run check:size
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KHUSLA }}
+
+      - name: Deploy Hosting + Firestore rules + indexes
+        run: npx firebase deploy --only hosting,firestore:rules,firestore:indexes --project "$VITE_FB_PROJECT_ID" --non-interactive
+
+      - name: Summary
+        if: success()
+        run: |
+          {
+            echo "### KHUSLA is live"
+            echo ""
+            echo "Open https://<your-project-id>.web.app (the id is masked here because it is a secret)."
+            echo "Commit: ${GITHUB_SHA::7}"
+          } >> "$GITHUB_STEP_SUMMARY"
