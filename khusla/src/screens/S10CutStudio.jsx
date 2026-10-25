@@ -25,7 +25,9 @@ import {
   cutTargetCm,
   quickShorten,
   roundLengthCm,
+  applyOverride,
 } from '../ai/index.js';
+import Icon from '../components/Icon.jsx';
 import { formatCm } from '../lib/format.js';
 
 export default function S10CutStudio() {
@@ -136,6 +138,21 @@ export default function S10CutStudio() {
         </div>
 
         <div className="mt-5 tablet:mt-0 tablet:w-[30%]">
+          <div className="card mb-4 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="label">{t('cut.currentLength')}</span>
+              <div className="flex items-center gap-2">
+                <button type="button" aria-label="−" className="press grid min-h-tap min-w-tap place-items-center rounded-full border border-line" onClick={() => session.patch({ profile: applyOverride(profile, 'hair.lengthCm', Math.max(2, currentCm - 1)) })}>
+                  <Icon name="minus" />
+                </button>
+                <span className="num min-w-[64px] text-center font-semibold">{formatCm(currentCm, lang)}</span>
+                <button type="button" aria-label="+" className="press grid min-h-tap min-w-tap place-items-center rounded-full border border-line" onClick={() => session.patch({ profile: applyOverride(profile, 'hair.lengthCm', Math.min(120, currentCm + 1)) })}>
+                  <Icon name="plus" />
+                </button>
+              </div>
+            </div>
+            {currentCm < 12 ? <p className="mt-2 text-xs text-warn">{t('cut.tiedBack')}</p> : null}
+          </div>
           <h2 className="mb-2 text-lg">{t('cut.cuts')}</h2>
           <div className="no-scrollbar mb-4 flex max-h-[38vh] flex-wrap gap-2 overflow-y-auto">
             {ranked.slice(0, 16).map((r) => (

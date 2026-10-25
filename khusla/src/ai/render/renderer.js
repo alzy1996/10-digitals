@@ -21,13 +21,19 @@ function compile(gl, type, src) {
   return sh;
 }
 
+let webgl2Cached = null;
+/** One-time WebGL2 check; the probe context is released at once (browsers cap live contexts). */
 export function webgl2Available() {
+  if (webgl2Cached !== null) return webgl2Cached;
   try {
     const c = document.createElement('canvas');
-    return Boolean(c.getContext('webgl2'));
+    const gl = c.getContext('webgl2');
+    webgl2Cached = Boolean(gl);
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
   } catch {
-    return false;
+    webgl2Cached = false;
   }
+  return webgl2Cached;
 }
 
 const IDENTITY3 = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
@@ -38,7 +44,7 @@ const ZERO_AUX = new Uint8Array([0, 0, 0, 0]);
  */
 export function createRenderer(canvas) {
   const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true, premultipliedAlpha: false, antialias: false });
-  if (!gl) throw new Error('webgl2-unavailable');
+  if (!gl || gl.isContextLost()) throw new Error('webgl2-unavailable');
   const prog = gl.createProgram();
   gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, VERT));
   gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, fragSrc));
@@ -159,7 +165,10 @@ export function createRenderer(canvas) {
     Object.values(textures).forEach((t) => gl.deleteTexture(t));
     gl.deleteBuffer(buf);
     gl.deleteProgram(prog);
-    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    // release the context only once the canvas has really left the page (a remount reuses it)
+    setTimeout(() => {
+      if (!canvas.isConnected) gl.getExtension('WEBGL_lose_context')?.loseContext();
+    }, 0);
   }
 
   return { gl, setSource, setAux, setAuxAll, draw, readPixels, dispose, get size() { return size; } };

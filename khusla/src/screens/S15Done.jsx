@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import Button from '../components/Button.jsx';
@@ -39,7 +39,10 @@ export default function S15Done() {
     weeks,
   });
 
+  const doneOnce = useRef(false);
   const finish = () => {
+    if (doneOnce.current) return;
+    doneOnce.current = true;
     if (session.consultationId) markDone(app.salonId, { id: session.consultationId, demo: false }, { rating: rating || null, nextVisitWeeks: weeks });
     if (client?.id) {
       if (saveProfile && session.profile) {
@@ -59,7 +62,7 @@ export default function S15Done() {
   };
 
   const next = async () => {
-    if (!saved) finish();
+    finish();
     disposeThumbs();
     await session.wipe();
     navigate('/home', { replace: true });

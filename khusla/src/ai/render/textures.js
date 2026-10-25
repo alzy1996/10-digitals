@@ -76,31 +76,50 @@ function rankNormalize(values, weight, n) {
   return out;
 }
 
-/** Line-integral convolution of noise along the strand flow -> hair-like streaks. */
-function lic(noise, angle, w, h, steps) {
-  const out = new Float32Array(w * h);
+/**
+ * Line-integral convolution of several noise fields along the strand flow in ONE streamline trace
+ * (each channel stops at its own length). dx/dy are precomputed unit flow vectors.
+ */
+function licMulti(noises, steps, dx, dy, w, h, mask) {
+  const n = w * h;
+  const C = noises.length;
+  const maxSteps = Math.max(...steps);
+  const outs = noises.map(() => new Float32Array(n));
+  const sums = new Float64Array(C);
+  const cnts = new Int32Array(C);
   for (let y = 0; y < h; y += 1) {
     for (let x = 0; x < w; x += 1) {
-      let s = noise[y * w + x];
-      let c = 1;
-      for (const dir of [1, -1]) {
+      const i0 = y * w + x;
+      for (let c = 0; c < C; c += 1) {
+        sums[c] = noises[c][i0];
+        cnts[c] = 1;
+      }
+      for (let dir = -1; dir <= 1; dir += 2) {
         let px = x + 0.5;
         let py = y + 0.5;
-        for (let k = 0; k < steps; k += 1) {
-          const ix = Math.min(w - 1, Math.max(0, px | 0));
-          const iy = Math.min(h - 1, Math.max(0, py | 0));
-          const a = angle[iy * w + ix];
-          px += Math.cos(a) * dir;
-          py += Math.sin(a) * dir;
+        let ix = x;
+        let iy = y;
+        for (let k = 0; k < maxSteps; k += 1) {
+          const j = iy * w + ix;
+          px += dx[j] * dir;
+          py += dy[j] * dir;
           if (px < 0 || py < 0 || px >= w || py >= h) break;
-          s += noise[(py | 0) * w + (px | 0)];
-          c += 1;
+          ix = px | 0;
+          iy = py | 0;
+          const q = iy * w + ix;
+          if (mask && mask[q] < 0.3 && mask[i0] >= 0.3) break; // stay inside the hair
+          for (let c = 0; c < C; c += 1) {
+            if (k < steps[c]) {
+              sums[c] += noises[c][q];
+              cnts[c] += 1;
+            }
+          }
         }
       }
-      out[y * w + x] = s / c;
+      for (let c = 0; c < C; c += 1) outs[c][i0] = sums[c] / cnts[c];
     }
   }
-  return out;
+  return outs;
 }
 
 /** Blocky white noise: one random value per cell of `cell` px (cell 1 = per pixel). */
@@ -223,11 +242,27 @@ export function buildAux(rd, mmPerPx) {
   const flowAngle = rd.flow ? resample(rd.flow, rd.flowW, rd.flowH, hw, hh) : new Float32Array(hw * hh).fill(Math.PI / 2);
   const rng = makeRng(1234567);
   const s = scale / k;
-  const fine = lic(cellNoise(hw, hh, Math.max(1, Math.round(2 * s)), rng), flowAngle, hw, hh, Math.round(14 * scale));
-  const med = lic(cellNoise(hw, hh, Math.max(1, Math.round(4 * s)), rng), flowAngle, hw, hh, Math.round(18 * scale));
-  const chunky = lic(cellNoise(hw, hh, Math.max(2, Math.round(12 * s)), rng), flowAngle, hw, hh, Math.round(24 * scale));
-  const sweep = lic(smoothNoise(hw, hh, Math.round(hw * 0.07), rng), flowAngle, hw, hh, Math.round(20 * scale));
   const aSmall = downscale(alpha, w, h, k);
+  const fdx = new Float32Array(hw * hh);
+  const fdy = new Float32Array(hw * hh);
+  for (let i = 0; i < hw * hh; i += 1) {
+    fdx[i] = Math.cos(flowAngle[i]);
+    fdy[i] = Math.sin(flowAngle[i]);
+  }
+  const [fine, med, chunky, sweep] = licMulti(
+    [
+      cellNoise(hw, hh, Math.max(1, Math.round(2 * s)), rng),
+      cellNoise(hw, hh, Math.max(1, Math.round(4 * s)), rng),
+      cellNoise(hw, hh, Math.max(2, Math.round(12 * s)), rng),
+      smoothNoise(hw, hh, Math.round(hw * 0.07), rng),
+    ],
+    [Math.round(22 * scale), Math.round(18 * scale), Math.round(24 * scale), Math.round(20 * scale)],
+    fdx,
+    fdy,
+    hw,
+    hh,
+    aSmall.data,
+  );
   const up = (m) => resample(rankNormalize(m, aSmall.data, hw * hh), hw, hh, w, h);
   const fineN = up(fine);
   const medN = up(med);

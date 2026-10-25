@@ -1,8 +1,17 @@
 // Small horizontal bar chart drawn on a canvas (prints well and rasterizes in html2canvas).
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-export default function BarChart({ rows, width = 520, rowH = 30, color = '#5B2A4D', label }) {
+/** `width` is the maximum; on phones the chart shrinks to its container. */
+export default function BarChart({ rows, width: maxWidth = 520, rowH = 30, color = '#5B2A4D', label }) {
   const ref = useRef(null);
+  const [width, setWidth] = useState(maxWidth);
+  useEffect(() => {
+    const parent = ref.current?.parentElement;
+    if (!parent || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(([e]) => setWidth(Math.max(200, Math.min(maxWidth, Math.floor(e.contentRect.width)))));
+    ro.observe(parent);
+    return () => ro.disconnect();
+  }, [maxWidth]);
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
@@ -35,5 +44,5 @@ export default function BarChart({ rows, width = 520, rowH = 30, color = '#5B2A4
       ctx.fillText(String(r.value), rtl ? x - 6 : x + barW + 6, y + rowH / 2 - 2);
     });
   }, [rows, width, rowH, color]);
-  return <canvas ref={ref} role="img" aria-label={label} />;
+  return <canvas ref={ref} role="img" aria-label={label} className="block max-w-full" />;
 }

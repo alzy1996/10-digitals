@@ -400,6 +400,8 @@
   "cut.bigChange": "Big change: more than 15 cm shorter. She confirms before the Agreement Card.",
   "cut.noScale": "Iris scale not found: lengths are rough.",
   "cut.cuts": "Cuts for her",
+  "cut.currentLength": "Her current length",
+  "cut.tiedBack": "Hair tied back or behind the shoulders? Set her real length here; the tape uses it.",
   "cut.trim": "Trim every {n} weeks",
   "cut.fringe": "Fringe",
   "cut.shrinkage": "Curl shrinkage when dry",

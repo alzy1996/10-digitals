@@ -70,7 +70,7 @@ export default function S17Dashboard() {
         <Stat label={t('kpi.rating')} value={k.avgRating ? k.avgRating.toFixed(1) : '—'} />
       </div>
 
-      <div className="mt-8 grid gap-6 desk:grid-cols-2">
+      <div className="mt-8 grid grid-cols-1 gap-6 desk:grid-cols-2">
         <Section title={t('dash.topLooks')}>
           {k.topLooks.length ? (
             <div className="card overflow-x-auto p-4">

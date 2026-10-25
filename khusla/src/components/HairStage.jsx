@@ -12,7 +12,7 @@ const HairStage = forwardRef(function HairStage({ data, params, children, classN
   const glRef = useRef(null);
   const underRef = useRef(null);
   const rendererRef = useRef(null);
-  const [failed, setFailed] = useState(!webgl2Available());
+  const [failed, setFailed] = useState(() => !webgl2Available());
   const [fadeKey, setFadeKey] = useState(0);
   const raf = useRef(0);
   const loadedVersion = useRef(null);
@@ -74,13 +74,14 @@ const HairStage = forwardRef(function HairStage({ data, params, children, classN
   const w = data?.display.width || 4;
   const h = data?.display.height || 5;
   return (
-    <div className={`relative mx-auto overflow-hidden rounded-card bg-surface2 ${className}`} style={{ aspectRatio: `${w} / ${h}` }} aria-label={label} role="img">
+    <div className={`relative mx-auto overflow-hidden rounded-card bg-surface2 ${className}`} style={{ aspectRatio: `${w} / ${h}` }}>
       <canvas ref={underRef} className="absolute inset-0 h-full w-full" aria-hidden />
       <canvas
         ref={glRef}
         className="absolute inset-0 h-full w-full"
         style={{ animation: `${fadeKey % 2 ? 'fade-in' : 'fade-in-b'} var(--t-fade) linear` }}
-        aria-hidden
+        role="img"
+        aria-label={label}
       />
       <div className="absolute inset-0">{children}</div>
     </div>

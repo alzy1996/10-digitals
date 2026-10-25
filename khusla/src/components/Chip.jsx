@@ -38,7 +38,7 @@ export function Tag({ children, tone = 'neutral', icon }) {
 /** A labelled row of single-choice chips. */
 export function ChipRow({ label, options, value, onChange, wrap = true }) {
   return (
-    <fieldset className="mb-5">
+    <fieldset className="mb-5 min-w-0">
       {label ? <legend className="label mb-2">{label}</legend> : null}
       <div className={`flex gap-2 ${wrap ? 'flex-wrap' : 'no-scrollbar overflow-x-auto pb-1'}`}>
         {options.map((o) => (

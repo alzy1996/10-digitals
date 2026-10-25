@@ -13,6 +13,7 @@ export function onWriteError(fn) {
 /** Attach error reporting to a write promise without blocking the UI on the server ack. */
 export function fire(promise, label = 'write') {
   promise.catch((err) => {
+    console.warn(`[khusla] write failed: ${label} (${err?.code || 'unknown'})`);
     listeners.forEach((fn) => fn({ label, code: err?.code || 'unknown', message: err?.message }));
   });
   return promise;

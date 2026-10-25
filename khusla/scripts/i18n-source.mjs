@@ -424,6 +424,8 @@ export const T = {
   'cut.bigChange': ['Big change: more than 15 cm shorter. She confirms before the Agreement Card.', 'تغيير كبير: أقصر بأكثر من 15 سم. تؤكد قبل بطاقة الاتفاق.'],
   'cut.noScale': ['Iris scale not found: lengths are rough.', 'لم يُحدد مقياس القزحية: الأطوال تقريبية.'],
   'cut.cuts': ['Cuts for her', 'قصات تناسبها'],
+  'cut.currentLength': ['Her current length', 'طولها الحالي'],
+  'cut.tiedBack': ['Hair tied back or behind the shoulders? Set her real length here; the tape uses it.', 'الشعر مربوط أو خلف الكتفين؟ اضبطي طولها الحقيقي هنا؛ الشريط يعتمد عليه.'],
   'cut.trim': ['Trim every {n} weeks', 'تشذيب كل {n} أسابيع'],
   'cut.fringe': ['Fringe', 'الغرة'],
   'cut.shrinkage': ['Curl shrinkage when dry', 'انكماش التموج بعد التجفيف'],

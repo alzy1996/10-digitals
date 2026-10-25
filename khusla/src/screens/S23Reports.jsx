@@ -204,7 +204,7 @@ export default function S23Reports() {
               <Chip key={n} selected={from === addDaysKey(today, -n)} onClick={() => setFrom(addDaysKey(today, -n))}>{t('reports.lastDays', { n: n + 1 })}</Chip>
             ))}
           </div>
-          <div className="grid gap-2 tablet:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 tablet:grid-cols-3">
             <Button variant="secondary" icon="download" onClick={exportConsultations}>{t('reports.exportConsultations')}</Button>
             <Button variant="secondary" icon="download" onClick={exportClients}>{t('reports.exportClients')}</Button>
             <Button variant="secondary" icon="download" onClick={exportStats}>{t('reports.exportStats')}</Button>

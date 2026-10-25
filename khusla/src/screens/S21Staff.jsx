@@ -33,7 +33,7 @@ export default function S21Staff() {
 
   return (
     <OwnerLayout title={t('staff.title')}>
-      <div className="grid gap-6 desk:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 desk:grid-cols-2">
         <section>
           <h2 className="mb-3 text-lg">{t('staff.team')}</h2>
           <ul className="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface">

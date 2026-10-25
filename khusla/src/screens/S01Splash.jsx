@@ -25,7 +25,11 @@ export default function S01Splash() {
   const [salons, setSalons] = useState(null);
 
   useEffect(() => {
-    if (!app.staffUser || !app.userDoc) return;
+    if (!app.staffUser || app.userDoc === undefined) return;
+    if (app.userDoc === null) {
+      setSalons([]);
+      return;
+    }
     getSalonSummaries(app.userDoc.salonIds || []).then(setSalons);
   }, [app.staffUser, app.userDoc]);
 
@@ -39,7 +43,7 @@ export default function S01Splash() {
       <TopBar back={false} />
       <section className="flex flex-1 flex-col justify-center py-8">
         <p className="eyebrow">{t('splash.eyebrow')}</p>
-        <h1 className="mt-2 font-display text-[48px] leading-[1.05] text-plum">
+        <h1 className="mt-2 pt-3 font-display text-[48px] leading-[1.25] text-plum">
           {lang === 'ar' ? APP.nameAr : APP.name}
           <span className="block text-[28px] text-ink2">{lang === 'ar' ? APP.name : APP.nameAr}</span>
         </h1>

@@ -47,8 +47,17 @@ const yieldUi = () => new Promise((r) => setTimeout(r, 0));
  * @param {object} o { whiteCardPoint?: {x,y} in working px, privateMode, history, scannedLevels, onStep(key) }
  */
 export async function analyzePhoto(blob, o = {}) {
-  const step = o.onStep || (() => {});
   const t0 = performance.now();
+  const timings = {};
+  let last = t0;
+  let lastKey = null;
+  const step = (key) => {
+    const now = performance.now();
+    if (lastKey) timings[lastKey] = Math.round(now - last);
+    last = now;
+    lastKey = key;
+    if (key) (o.onStep || (() => {}))(key);
+  };
   step('face');
   const canvas = await decodeToCanvas(blob);
   const raw = canvasToImg(canvas);
@@ -100,14 +109,16 @@ export async function analyzePhoto(blob, o = {}) {
     const blurred = canvasToImg(blurredCanvas(imgToCanvas(img), img.width, img.height, 26));
     display = compositePrivate(img.data, blurred.data, mask);
   }
-  const aux = buildAux(renderData, profile.scale.mmPerPx);
+  // render textures take a moment; Profile can open first and they are built right after (deferAux)
+  const aux = o.deferAux ? null : buildAux(renderData, profile.scale.mmPerPx);
+  step(null);
   const ms = Math.round(performance.now() - t0);
   return {
     profile,
     renderData,
     aux,
     display: { width: img.width, height: img.height, data: display },
-    diagnostics: { ms, selfTest, calibration: calibration.source, scaleConfidence: profile.scale.confidence },
+    diagnostics: { ms, timings, selfTest, calibration: calibration.source, scaleConfidence: profile.scale.confidence },
   };
 }
 
@@ -123,6 +134,12 @@ function cropFace(canvas, pts) {
   c.height = 224;
   c.getContext('2d').drawImage(canvas, x0, y0, w, h, 0, 0, 224, 224);
   return c;
+}
+
+/** Build the deferred render textures for an analysis result (returns a new result object). */
+export function withRenderAux(result) {
+  if (result.aux) return result;
+  return { ...result, aux: buildAux(result.renderData, result.profile.scale.mmPerPx) };
 }
 
 /** Private-blurred version of an extra shot (left/right/back) for display only. */

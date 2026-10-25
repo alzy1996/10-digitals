@@ -63,8 +63,11 @@ export function scoreCut(cut, profile, goals = {}, fringe = null) {
 
   const targetCm = cutTargetCm(cut, hair.lengthCm);
   const bigChange = hair.lengthCm != null && hair.lengthCm - targetCm > 15;
-  const tooLong = hair.lengthCm != null && targetCm > hair.lengthCm + 4; // a cut cannot add length
-  const penalties = tooLong ? 25 : 0;
+  // a cut cannot add length; a soft penalty only, because tied-back hair under-reads its length
+  const tooLong = hair.lengthCm != null && targetCm > hair.lengthCm + 4;
+  // texture-specific cuts (curl-by-curl, curly shag...) for a texture they do not list
+  const textureSpecific = cut.textures.length <= 2 && !cut.textures.includes(texture);
+  const penalties = (tooLong ? 12 : 0) + (textureSpecific ? 18 : 0);
 
   const score = 100 * (0.35 * face + 0.25 * tex + 0.15 * life + 0.1 * age + 0.15 * trend) - penalties;
   const top = profile.faceShape.top;
@@ -79,7 +82,8 @@ export function scoreCut(cut, profile, goals = {}, fringe = null) {
     score: Math.round(score * 10) / 10,
     parts: { face, texture: tex, life, age, trend },
     reasons,
-    hidden: hidden || tooLong,
+    hidden,
+    tooLong,
     bigChange,
     targetCm,
   };

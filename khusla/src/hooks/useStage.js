@@ -4,7 +4,7 @@ import { useSession } from './useSession.jsx';
 export function useStageData() {
   const session = useSession();
   const a = session.heavy.analysis;
-  if (!a) return null;
+  if (!a || !a.aux) return null;
   const s = session.heavy.shortened;
   return {
     profile: session.profile || a.profile,

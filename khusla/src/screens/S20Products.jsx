@@ -58,7 +58,7 @@ export default function S20Products() {
         <Empty icon="tag" title={t('products.empty')} body={t('products.emptyBody')} />
       )}
 
-      <div className="grid gap-5 desk:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 desk:grid-cols-2">
         <CsvImport
           title={t('products.importTitle')}
           template="/templates/products-template.csv"

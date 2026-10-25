@@ -38,7 +38,7 @@ export default function S22Settings() {
 
   return (
     <OwnerLayout title={t('settings.title')}>
-      <div className="grid gap-6 desk:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 desk:grid-cols-2">
         <Section title={t('settings.privacy')}>
           <div className="card p-5">
             <ChipRow label={t('settings.privateMode')} value={s.privateMode} onChange={(v) => set({ privateMode: v })} options={[{ value: true, label: t('common.on') }, { value: false, label: t('common.off') }]} />

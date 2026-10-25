@@ -135,7 +135,7 @@ export default function S19SwatchScan() {
 
   return (
     <OwnerLayout title={line?.name || t('swatch.title')} actions={<Button full={false} variant="ghost" icon="back" onClick={() => { setLineId(null); setPhoto(null); }}>{t('swatch.lines')}</Button>}>
-      <div className="desk:grid desk:grid-cols-[1.4fr_1fr] desk:gap-6">
+      <div className="desk:grid desk:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] desk:gap-6">
         <section>
           {!photo && !camera ? (
             <div className="card p-5">

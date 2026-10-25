@@ -5,7 +5,7 @@ import { getHairSegmenter } from './models/hairSegmenter.js';
 import { recommendLooks } from './recommend/looks.js';
 import { planLift, session1Lab, safePath, pigmentLab, developerFor } from './color/lift.js';
 
-export { analyzePhoto as analyze, privateDisplay, decodeToCanvas, canvasToImg, imgToCanvas } from './pipeline.js';
+export { analyzePhoto as analyze, privateDisplay, decodeToCanvas, canvasToImg, imgToCanvas, withRenderAux } from './pipeline.js';
 export { createCaptureLoop } from './capture/live.js';
 export { SHOTS, TARGETS } from './capture/poseGate.js';
 export { applyOverride, profileLabels } from './analysis/profile.js';

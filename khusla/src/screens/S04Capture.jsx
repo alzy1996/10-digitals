@@ -9,7 +9,7 @@ import { ErrorBox, Steps } from '../components/States.jsx';
 import { useT } from '../lib/i18n/useT.js';
 import { useApp } from '../hooks/useApp.jsx';
 import { useSession } from '../hooks/useSession.jsx';
-import { analyze, createCaptureLoop, loadModels, privateDisplay, decodeToCanvas } from '../ai/index.js';
+import { analyze, createCaptureLoop, loadModels, privateDisplay, decodeToCanvas, withRenderAux } from '../ai/index.js';
 import { putPhoto } from '../lib/photoStore.js';
 
 const ANALYSIS_STEPS = ['face', 'hair', 'color', 'level', 'age', 'preview'];
@@ -187,6 +187,7 @@ export default function S04Capture() {
         history: session.history,
         scannedLevels: app.scannedLevels,
         onStep: setStep,
+        deferAux: true,
       });
       // store only the display (private-blurred) versions on this device
       const dispCanvas = document.createElement('canvas');
@@ -205,6 +206,8 @@ export default function S04Capture() {
       session.setAnalysis(result);
       session.patch({ profile: result.profile, shots: ['front', ...extraShots], analyzedAt: Date.now() });
       navigate('/profile', { replace: true, state: loc.state });
+      // render textures are built while she checks her profile
+      setTimeout(() => session.setAnalysis(withRenderAux(result)), 60);
     } catch (e) {
       setErr(e.code === 'no-face' ? 'no-face' : 'analysis');
       setPhase('error');

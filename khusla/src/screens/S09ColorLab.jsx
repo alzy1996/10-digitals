@@ -291,7 +291,7 @@ export default function S09ColorLab() {
                 </g>
               </svg>
             ) : null}
-            <div className="absolute inset-x-0 top-3 flex justify-center">
+            <div className="absolute inset-x-0 bottom-12 flex justify-center">
               <LightPill value={look.lightPreset} onChange={(v) => session.setLook({ lightPreset: v })} />
             </div>
             {mode !== 'final' ? (

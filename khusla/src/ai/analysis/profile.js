@@ -78,13 +78,34 @@ export function buildProfile({ img, landmarks, pose = { yaw: 0 }, seg, hair, cal
 
   const zones = hairZones(lab, alpha, r, n, scannedLevels);
   const regrowth = regrowthCm(zones.profileL, maxDistPx, scale.mmPerPx);
-  const grey = greyPercent(lab, alpha, distPx, n, { naturalL: Number.isFinite(zones.rootLowL) ? zones.rootLowL : zones.rootL, mmPerPx: scale.mmPerPx });
+  const grey = greyPercent(lab, alpha, distPx, n, { naturalL: Number.isFinite(zones.rootLowL) ? zones.rootLowL : zones.rootL, mmPerPx: scale.mmPerPx, width: w, height: h });
 
   // texture on a quarter-res L map
   const lq = downscale(lab.L, w, h, 2);
   const aq = downscale(alpha, w, h, 2);
-  const st = structureTensor(lq.data, lq.width, lq.height, 4);
-  const coh = meanOver(st.coherence, aq.data, lq.data.length);
+  const st0 = structureTensor(lq.data, lq.width, lq.height, 4);
+  const coh = meanOver(st0.coherence, aq.data, lq.data.length);
+  // strand flow for the renderer: a wider tensor (smoother orientation) than the texture estimate
+  const st = structureTensor(lq.data, lq.width, lq.height, Math.max(6, Math.round(lq.width / 60)));
+  // strand-flow prior: strands radiate from the crown and hang down below the jaw. Dark hair has weak
+  // gradients, so low-coherence pixels lean on the prior (orientation blend on doubled angles).
+  const faceLenPx = Math.max(1, pts[152][1] - pts[10][1]);
+  const crown = [pts[10][0] / 2, (pts[10][1] - faceLenPx * 0.35) / 2];
+  const jawQ = ((pts[172][1] + pts[397][1]) / 2) / 2;
+  for (let y = 0; y < lq.height; y += 1) {
+    for (let x = 0; x < lq.width; x += 1) {
+      const i = y * lq.width + x;
+      if (aq.data[i] < 0.3) continue;
+      let prior = Math.atan2(y - crown[1], x - crown[0]);
+      const down = Math.max(0, Math.min(1, (y - jawQ) / (faceLenPx * 0.25)));
+      prior = Math.atan2(Math.sin(prior) * (1 - down) + down, Math.cos(prior) * (1 - down));
+      const c = st.coherence[i];
+      const wData = 0.85 * Math.max(0, Math.min(1, (c - 0.2) / 0.45));
+      const cx = wData * Math.cos(2 * st.angle[i]) + (1 - wData) * Math.cos(2 * prior);
+      const sy = wData * Math.sin(2 * st.angle[i]) + (1 - wData) * Math.sin(2 * prior);
+      st.angle[i] = 0.5 * Math.atan2(sy, cx);
+    }
+  }
   const faceW = Math.hypot(pts[234][0] - pts[454][0], pts[234][1] - pts[454][1]);
   const wav = silhouetteWaviness(alpha, w, h, { fromY: pts[152][1], toY: h, faceW });
   const tex = classifyTexture(coh, wav);

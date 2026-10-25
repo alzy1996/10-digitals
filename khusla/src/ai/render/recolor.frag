@@ -80,8 +80,9 @@ float band(float x, float a, float b) { return smoothstep(a, b, x); }
 // streak threshold: density = coverage fraction (streak textures are rank-normalized)
 float streaks(float s, float density, float softness) {
   float t = 1.0 - density;
-  float w = 0.02 + softness * 0.12;
-  return smoothstep(t - w, t + w, s);
+  float w = 0.05 + softness * 0.18;
+  // lightened strands sit among her own hair: never a flat full-strength block
+  return smoothstep(t - w, t + w, s) * mix(0.75, 1.0, smoothstep(t, 1.0, s));
 }
 
 void main() {
@@ -109,13 +110,14 @@ void main() {
   } else if (uTech == 2) {
     m = 1.0 - band(cm, 2.0, 2.0 + 0.3 + soft);
   } else if (uTech == 4) {
-    m = streaks(a3.g, uDensity, soft) * band(r, uStart, uStart + 0.06);
+    m = mix(0.08, 1.0, streaks(a3.g, uDensity, soft)) * band(r, uStart, uStart + 0.06);
   } else if (uTech == 5) {
-    m = streaks(a3.g, uDensity, soft) * band(r, uStart, uStart + 0.06) * a4.g;
+    m = mix(0.06, 1.0, streaks(a3.g, uDensity, soft)) * band(r, uStart, uStart + 0.06) * a4.g;
   } else if (uTech == 6) {
-    m = streaks(a3.r, uDensity, soft) * band(r, uStart, uStart + 0.05);
+    // babylights: very fine and dense, so between the strands her hair still lifts a little
+    m = mix(0.22, 0.92, streaks(a3.r, uDensity, soft + 0.25)) * band(r, uStart, uStart + 0.05);
   } else if (uTech == 7) {
-    m = streaks(a3.g, uDensity, soft) * band(r, uStart, uStart + 0.06);
+    m = mix(0.04, 0.9, streaks(a3.g, uDensity, soft)) * band(r, uStart, uStart + 0.06);
   } else if (uTech == 18) {
     m = streaks(a3.b, uDensity, soft * 0.5) * band(r, uStart, uStart + 0.05);
   } else if (uTech == 8 || uTech == 9 || uTech == 12) {

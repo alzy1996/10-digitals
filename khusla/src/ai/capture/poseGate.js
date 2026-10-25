@@ -5,7 +5,7 @@ export const SHOTS = ['front', 'left', 'right', 'back'];
 export const HOLD_MS = 400;
 
 export const TARGETS = {
-  front: { yaw: [-8, 8], pitch: [-12, 12], roll: [-7, 7] },
+  front: { yaw: [-10, 10], pitch: [-15, 15], roll: [-8, 8] },
   left: { yaw: [30, 60], pitch: [-15, 15], roll: [-12, 12] },
   right: { yaw: [-60, -30], pitch: [-15, 15], roll: [-12, 12] },
 };

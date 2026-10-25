@@ -25,7 +25,7 @@ export function AppProvider({ children }) {
   const { t } = useT();
   const snack = useSnackbar();
   const [user, setUser] = useState(undefined);
-  const [userDoc, setUserDoc] = useState(null);
+  const [userDoc, setUserDoc] = useState(undefined); // undefined = loading, null = none
   const [salonId, setSalonIdState] = useState(readSalonPref);
   const [salon, setSalon] = useState(null);
   const [me, setMe] = useState(undefined);

@@ -7,7 +7,7 @@ const cache = {};
 export function lightUniforms(id = 'daylight') {
   if (!cache[id]) {
     const l = lights.find((x) => x.id === id) || lights[0];
-    cache[id] = { matrix: toGlMat3(lightMatrix(l.kelvin, 0.7)), contrast: l.contrast, spec: l.specular, kelvin: l.kelvin };
+    cache[id] = { matrix: toGlMat3(lightMatrix(l.kelvin, 0.5)), contrast: l.contrast, spec: l.specular, kelvin: l.kelvin };
   }
   return cache[id];
 }
