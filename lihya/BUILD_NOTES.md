@@ -59,6 +59,10 @@ Format: decision — reason. Newest sections at the bottom.
   conversion's own card could not be opened from the build sandbox, so Sam should glance at it once). The onnxruntime
   WASM loads from the pinned jsDelivr copy, never from our hosting. When the model is missing or the confidence is under
   0.5, the age chips ask instead (never a number on screen).
+  Revision: `AGE_MODEL.revision` in `src/ai/models/cdn.js` is `'main'` because the full commit hash could not be read from
+  the build sandbox (latest commit seen in search results: `fd04cdd…`, `onnx/model_q4.onnx` 56.8 MB). Sam: open
+  https://huggingface.co/onnx-community/fairface_age_image_detection-ONNX → **Files and versions** → **History**, copy the
+  full 40-character hash of the latest commit, paste it as `revision`, commit. This pins the model like the MediaPipe files.
 - Going shorter (PRD 7.2): **Outline mode**, no on-device inpainting in v1. MI-GAN is MIT-licensed but its browser ONNX
   pipeline is about 80 MB (third-party figure) and LaMa ONNX is about 200 MB; neither size nor the input format could be
   verified from the build sandbox (Hugging Face blocked), so the PRD fallback applies: green zones keep, red zones come

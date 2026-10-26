@@ -50,6 +50,10 @@ export const AGE_MODEL = Object.freeze({
   id: 'onnx-community/fairface_age_image_detection-ONNX',
   dtype: 'q4',
   license: 'Apache-2.0',
+  // Pin to a full 40-character commit hash from the repo's "Files and versions" > History page
+  // (the build sandbox could not reach Hugging Face; latest commit seen Oct 2026: fd04cdd...,
+  // onnx/model_q4.onnx 56.8 MB). 'main' works until then; see BUILD_NOTES.md.
+  revision: 'main',
 });
 
 /**

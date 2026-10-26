@@ -151,6 +151,7 @@ export function loadAgeModel(opts = {}) {
         : undefined;
     classifier = await pipeline('image-classification', AGE_MODEL.id, {
       dtype: AGE_MODEL.dtype,
+      revision: AGE_MODEL.revision,
       device: 'wasm',
       progress_callback,
     });
