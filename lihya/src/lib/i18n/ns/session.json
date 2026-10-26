@@ -9,7 +9,19 @@
     "session.keepPhotos": "Keep before and after photos on this phone",
     "session.keepPhotosHint": "Only for this client, on this device. They are never uploaded.",
     "session.decision": "Decided in {duration}",
-    "session.restored": "The consultation was restored. Photos are never kept, so take them again if you need them."
+    "session.restored": "The consultation was restored. Photos are never kept, so take them again if you need them.",
+    "session.saved.title": "Photos on this phone",
+    "session.saved.sub": "Before and after photos that customers agreed to keep on this device. They are never uploaded.",
+    "session.saved.loading": "Counting the photos on this phone…",
+    "session.saved.none": "No before and after photos are kept on this phone.",
+    "session.saved.count": "Before and after pairs kept: {n}, for {c} clients",
+    "session.saved.countOne": "Before and after pairs kept: {n}, for one client",
+    "session.saved.retention": "They are deleted automatically after {n} days, the same period as the shop's records.",
+    "session.saved.deleteAll": "Delete all photos on this phone",
+    "session.saved.confirm": "Deleting {n} before and after pairs from this phone",
+    "session.saved.deleted": "Before and after pairs deleted from this phone: {n}",
+    "session.saved.failed": "The photos could not be deleted. Try again.",
+    "session.saved.otherDevices": "This deletes the photos on this phone only. Photos kept on the shop's other phones are deleted on those phones."
   },
   "ar": {
     "session.wiped.idle": "مُسحت الجلسة بعد 10 دقائق دون نشاط، وحُذفت الصور.",
@@ -21,6 +33,18 @@
     "session.keepPhotos": "احتفظ بصور قبل وبعد على هذا الجهاز",
     "session.keepPhotosHint": "لهذا العميل فقط وعلى هذا الجهاز فقط، ولا تُرفع أبدًا.",
     "session.decision": "قرّر خلال {duration}",
-    "session.restored": "استُعيدت الاستشارة. الصور لا تُحفظ أبدًا، فالتقطها مرة أخرى إن احتجت."
+    "session.restored": "استُعيدت الاستشارة. الصور لا تُحفظ أبدًا، فالتقطها مرة أخرى إن احتجت.",
+    "session.saved.title": "الصور على هذا الجهاز",
+    "session.saved.sub": "صور قبل وبعد وافق العملاء على حفظها على هذا الجهاز، ولا تُرفع أبدًا.",
+    "session.saved.loading": "جارٍ عدّ الصور على هذا الجهاز…",
+    "session.saved.none": "لا توجد صور قبل وبعد محفوظة على هذا الجهاز.",
+    "session.saved.count": "أزواج صور قبل وبعد المحفوظة: {n}، لعدد {c} من العملاء",
+    "session.saved.countOne": "أزواج صور قبل وبعد المحفوظة: {n}، لعميل واحد",
+    "session.saved.retention": "تُحذف تلقائيًا بعد {n} يومًا، وهي مدة حفظ سجلات المحل نفسها.",
+    "session.saved.deleteAll": "حذف كل الصور على هذا الجهاز",
+    "session.saved.confirm": "جارٍ حذف {n} من أزواج صور قبل وبعد من هذا الجهاز",
+    "session.saved.deleted": "حُذفت أزواج صور قبل وبعد من هذا الجهاز: {n}",
+    "session.saved.failed": "تعذّر حذف الصور. حاول مرة أخرى.",
+    "session.saved.otherDevices": "يحذف هذا الصور على هذا الجهاز فقط، أما الصور المحفوظة على أجهزة المحل الأخرى فتُحذف من تلك الأجهزة."
   }
 }

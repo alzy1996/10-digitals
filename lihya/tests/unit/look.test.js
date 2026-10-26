@@ -19,6 +19,8 @@ import {
   MAINTENANCE_FILTERS,
   LOOK_ZONES,
   PRESETS,
+  checkLookParams,
+  MAX_ZONE_MM,
 } from '../../src/lib/look.js';
 
 const style = (id) => STYLES.find((s) => s.id === id);
@@ -239,5 +241,61 @@ describe('lookSummary', () => {
     const sig = lookSummary({ ...paramsFromStyle(style('goatee')), styleId: 'sig-1' }, 'en', { name: { en: 'House goatee', ar: 'غوتي المحل' } });
     expect(sig.startsWith('House goatee')).toBe(true);
     expect(lookSummary(applyPreset(paramsFromStyle(style('khatt')), 'wedding-lineup'), 'en')).toContain('Balm-shaped');
+  });
+});
+
+describe('checkLookParams (Look Codes anyone can write: SEC-01, code:F6)', () => {
+  const boxed = () => paramsFromStyle(style('short-boxed'));
+
+  it('passes a look made in the app unchanged', () => {
+    const p = boxed();
+    const { params, errors } = checkLookParams(p);
+    expect(errors).toEqual([]);
+    expect(params).toEqual(clampParams(p));
+  });
+
+  it('clamps lengths and drops unknown keys such as a picture', () => {
+    const raw = { ...boxed(), zones: { ...boxed().zones, C: 1e9, K_L: -4 }, thumb: `data:image/jpeg;base64,${'A'.repeat(5000)}`, evil: { x: 1 } };
+    const { params, errors } = checkLookParams(raw);
+    expect(errors).toEqual([]);
+    expect(params.zones.C).toBe(MAX_ZONE_MM);
+    expect(params.zones.K_L).toBe(0);
+    expect(params).not.toHaveProperty('thumb');
+    expect(params).not.toHaveProperty('evil');
+    expect(JSON.stringify(params).length).toBeLessThan(1000);
+  });
+
+  it('refuses unknown options and wrong types', () => {
+    expect(checkLookParams({ ...boxed(), finish: {} }).errors).toContain('catalog.err.finish');
+    expect(checkLookParams({ ...boxed(), lines: { ...boxed().lines, cheek: 'faded', edge: 'sharp' } }).errors).toEqual(
+      expect.arrayContaining(['catalog.err.cheek', 'catalog.err.edge']),
+    );
+    expect(checkLookParams({ ...boxed(), colorId: 7 }).errors).toContain('catalog.err.color');
+    expect(checkLookParams({ ...boxed(), mustacheId: 'walrus-xxl' }).errors).toContain('catalog.err.mustache');
+    expect(checkLookParams({ ...boxed(), styleId: 'x'.repeat(81) }).errors).toContain('catalog.err.style');
+    expect(checkLookParams({ ...boxed(), styleId: '<b>bold</b>' }).errors).toContain('catalog.err.style');
+  });
+
+  it('a missing or broken lines map falls back to the default lines', () => {
+    const { params, errors } = checkLookParams({ ...boxed(), lines: 'oops' });
+    expect(errors).toEqual([]);
+    expect(params.lines.cheek).toBe('natural');
+  });
+
+  it('takes the style from the code when the params carry none', () => {
+    const { styleId, ...rest } = boxed();
+    expect(styleId).toBe('short-boxed');
+    expect(checkLookParams(rest, 'short-boxed').params.styleId).toBe('short-boxed');
+    expect(checkLookParams(rest, null).errors).toContain('catalog.err.style');
+    expect(checkLookParams(null, 'goatee').errors).toEqual([]);
+    expect(checkLookParams([1, 2], 'goatee').params.styleId).toBe('goatee');
+  });
+
+  it('keeps only known shape values', () => {
+    const raw = { ...boxed(), shape: { chin: 'x'.repeat(5000), lengthAdjustable: 'thumb', fadeB: [5, 'nope'], flare: 'yes' } };
+    const { params } = checkLookParams(raw);
+    expect(params.shape).toEqual({ chin: 'natural', jFront: false, mustacheFloating: false, fadeB: null, flare: false, lengthAdjustable: null });
+    const fade = checkLookParams({ ...boxed(), shape: { chin: 'round', fadeB: [0, 999], lengthAdjustable: 'C' } }).params.shape;
+    expect(fade).toMatchObject({ chin: 'round', fadeB: [0, MAX_ZONE_MM], lengthAdjustable: 'C' });
   });
 });

@@ -41,6 +41,8 @@ export const MUSTACHE_IDS = Object.freeze(MUSTACHES.map((m) => m.id));
 export const COLOR_IDS = Object.freeze(COLORS.map((c) => c.id));
 
 const OFFSET_KEYS = Object.freeze({ cheek: 'cheekOffset', neckline: 'necklineOffset' });
+/** Style ids: catalog slugs and shop signature ids ('sig-<slug>-<6>'), as the services store them. */
+const STYLE_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
 const DEFAULT_LINES = Object.freeze({ cheek: 'natural', neckline: '2f', sideburn: 'blended', edge: 'soft', mustacheEdge: 'at' });
 
 const byId = (list) => new Map(list.map((x) => [x.id, x]));
@@ -83,15 +85,17 @@ export function getLineOption(type, id) {
   return (opts && opts.get(id)) || null;
 }
 
+/** Style shape with known values only: unknown chin shapes read 'natural', a fade needs two lengths. */
 function copyShape(shape) {
   const s = shape && typeof shape === 'object' ? shape : {};
+  const fade = Array.isArray(s.fadeB) && s.fadeB.length === 2 ? s.fadeB.map(toNum) : null;
   return {
-    chin: typeof s.chin === 'string' ? s.chin : 'natural',
+    chin: CHIN_SHAPES.includes(s.chin) ? s.chin : 'natural',
     jFront: s.jFront === true,
     mustacheFloating: s.mustacheFloating === true,
-    fadeB: Array.isArray(s.fadeB) && s.fadeB.length === 2 ? [Number(s.fadeB[0]), Number(s.fadeB[1])] : null,
+    fadeB: fade && fade.every(Number.isFinite) ? fade.map((v) => round1(clamp(v, 0, MAX_ZONE_MM))) : null,
     flare: s.flare === true,
-    lengthAdjustable: typeof s.lengthAdjustable === 'string' ? s.lengthAdjustable : null,
+    lengthAdjustable: LOOK_ZONES.includes(s.lengthAdjustable) ? s.lengthAdjustable : null,
   };
 }
 
@@ -190,7 +194,7 @@ export function clampParams(p) {
 export function validateParams(p) {
   const errors = new Set();
   if (!p || typeof p !== 'object') return ['catalog.err.style'];
-  if (typeof p.styleId !== 'string' || !p.styleId.trim()) errors.add('catalog.err.style');
+  if (typeof p.styleId !== 'string' || !STYLE_ID_RE.test(p.styleId)) errors.add('catalog.err.style');
   if (!p.zones || typeof p.zones !== 'object') {
     errors.add('catalog.err.zones');
   } else {
@@ -222,6 +226,21 @@ export function validateParams(p) {
   }
   if (p.presetId !== null && p.presetId !== undefined && !PRESET_MAP.has(p.presetId)) errors.add('catalog.err.preset');
   return [...errors];
+}
+
+/**
+ * A look from outside the Studio (a Look Code, which anyone with the shop's Try-at-home
+ * link can write): complete and clamped by clampParams (unknown keys such as a picture
+ * dropped), the style from the params or else `fallbackStyleId`, and the problems
+ * validateParams still finds (unknown lines, finish, color, mustache, preset or style
+ * id). Use `params` only when `errors` is empty.
+ */
+export function checkLookParams(raw, fallbackStyleId = null) {
+  const src = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const own = typeof src.styleId === 'string' && src.styleId ? src.styleId : null;
+  const fallback = typeof fallbackStyleId === 'string' && fallbackStyleId ? fallbackStyleId : null;
+  const params = clampParams({ ...src, styleId: own || fallback });
+  return { params, errors: validateParams(params) };
 }
 
 /**

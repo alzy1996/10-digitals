@@ -195,7 +195,8 @@ export default function ZoneDiagram({
                 </text>
                 {line2 ? (
                   <text x={l.x} y={l.y + 8} textAnchor={anchorFor(l.column)} direction={textDir} fontSize={11} fill={pal.text2}>
-                    {line2}
+                    {/* First-strong isolate: a shop guard label such as "#2 Andis" keeps its own order in Arabic. */}
+                    {rtl ? `\u2068${line2}\u2069` : line2}
                   </text>
                 ) : null}
               </g>

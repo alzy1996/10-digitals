@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import worker, { handleRequest } from '../src/index.js';
 import { FIXED_PROMPT, MODEL_ID } from '../src/model.js';
 import { accountCounterKey, shopCounterKey } from '../src/caps.js';
+import { allowlistKey } from '../src/config.js';
 import {
   fakeAi,
   fakeFirestore,
@@ -30,9 +31,10 @@ beforeAll(async () => {
   token = await signToken(keys);
 });
 
+// The test shop is on the AI allowlist (AI_SHOPS) unless a test says otherwise.
 function setup({ firestore, kv, ai, vars } = {}) {
   const fs = fakeFirestore(firestore);
-  const env = makeEnv({ kv: kv || new MemoryKV(), ai: ai || fakeAi(), vars });
+  const env = makeEnv({ kv: kv || new MemoryKV(), ai: ai || fakeAi(), vars: { AI_SHOPS: SHOP_ID, ...vars } });
   const logs = [];
   const deps = {
     jwks: keys.jwks,
@@ -266,13 +268,51 @@ describe('POST /render', () => {
     expect(await res.json()).toEqual({ error: 'cap', scope: 'account', resetsAt: '2026-10-26T00:00:00.000Z' });
   });
 
-  it('uses the owner cap within 80 and 20 when it is not set', async () => {
-    const raised = setup({ firestore: { shop: { settings: { aiPreview: true, aiDailyCap: 50 } } } });
+  it('uses the owner cap within the allowlist number, and 20 when it is not set', async () => {
+    const shop50 = { shop: { settings: { aiPreview: true, aiDailyCap: 50 } } };
+    const raised = setup({ vars: { AI_SHOPS: `${SHOP_ID}:80` }, firestore: shop50 });
     expect((await raised.call(renderRequest({ token }))).headers.get('X-Lihya-Cap')).toBe('50');
     const unset = setup({ firestore: { shop: { settings: { aiPreview: true } } } });
     expect((await unset.call(renderRequest({ token }))).headers.get('X-Lihya-Cap')).toBe('20');
-    const lowered = setup({ vars: { ACCOUNT_DAILY_CAP: '10' }, firestore: { shop: { settings: { aiPreview: true, aiDailyCap: 50 } } } });
+    const lowered = setup({ vars: { ACCOUNT_DAILY_CAP: '10', AI_SHOPS: `${SHOP_ID}:80` }, firestore: shop50 });
     expect((await lowered.call(renderRequest({ token }))).headers.get('X-Lihya-Cap')).toBe('10');
+    // A shop allowlisted without a higher number cannot raise its own cap above 20.
+    const selfRaised = setup({ firestore: shop50 });
+    expect((await selfRaised.call(renderRequest({ token }))).headers.get('X-Lihya-Cap')).toBe('20');
+    const kvForty = setup({ vars: { AI_SHOPS: '' }, kv: new MemoryKV({ [allowlistKey(SHOP_ID)]: '40' }), firestore: shop50 });
+    expect((await kvForty.call(renderRequest({ token }))).headers.get('X-Lihya-Cap')).toBe('40');
+  });
+
+  it('refuses a shop that is not on the allowlist before reserving anything (SEC-08)', async () => {
+    const shop80 = { shop: { settings: { aiPreview: true, aiDailyCap: 80 } } };
+    for (const vars of [{ AI_SHOPS: '' }, { AI_SHOPS: 'otherShop:80' }]) {
+      const { call, ai, kv } = setup({ vars, firestore: shop80 });
+      const res = await call(renderRequest({ token }));
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: 'not_allowed' });
+      expect(ai.calls).toHaveLength(0);
+      expect(kv.puts).toHaveLength(0);
+    }
+    // The KV key is Sam's switch without a redeploy: it allows a shop missing from
+    // AI_SHOPS, and a block word in it wins over AI_SHOPS.
+    const allowed = setup({ vars: { AI_SHOPS: '' }, kv: new MemoryKV({ [allowlistKey(SHOP_ID)]: 'yes' }) });
+    expect((await allowed.call(renderRequest({ token }))).status).toBe(200);
+    const blocked = setup({ kv: new MemoryKV({ [allowlistKey(SHOP_ID)]: 'off' }) });
+    const res = await blocked.call(renderRequest({ token }));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'not_allowed' });
+  });
+
+  it('refuses a token whose email is not verified (password sign-ups through the API)', async () => {
+    const { call, ai, fs } = setup();
+    const unverified = await signToken(keys, { claims: { email_verified: false, firebase: { sign_in_provider: 'password' } } });
+    const res = await call(renderRequest({ token: unverified }));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'email_not_verified' });
+    const missing = await signToken(keys, { claims: { email_verified: null } });
+    expect((await call(renderRequest({ token: missing }))).status).toBe(403);
+    expect(ai.calls).toHaveLength(0);
+    expect(fs.calls).toHaveLength(0);
   });
 
   it('releases the reservation when the model fails', async () => {
@@ -362,7 +402,7 @@ describe('POST /render', () => {
 
 describe('GET /quota', () => {
   it('returns today usage against the caps', async () => {
-    const kv = new MemoryKV({ [shopCounterKey(SHOP_ID, DAY)]: 3, [accountCounterKey(DAY)]: 11 });
+    const kv = new MemoryKV({ [shopCounterKey(SHOP_ID, DAY)]: 3, [accountCounterKey(DAY)]: 11, [allowlistKey(SHOP_ID)]: '40' });
     const { call, fs } = setup({ kv, firestore: { shop: { settings: { aiPreview: true, aiDailyCap: 30 } } } });
     const res = await call(req(`/quota?shopId=${SHOP_ID}`));
     expect(res.status).toBe(200);
@@ -372,6 +412,7 @@ describe('GET /quota', () => {
       accountUsed: 11,
       accountCap: 80,
       enabled: true,
+      allowed: true,
       day: DAY,
       resetsAt: '2026-10-26T00:00:00.000Z',
     });
@@ -388,6 +429,14 @@ describe('GET /quota', () => {
     const off = fakeFirestore({ shop: { settings: { aiPreview: false } } });
     const res = await handleRequest(req(`/quota?shopId=${SHOP_ID}`), env, { jwks: keys.jwks, fetch: off.fetch, now: () => NOW, log: () => {} });
     expect(await res.json()).toMatchObject({ usedToday: 2, enabled: false });
+  });
+
+  it('says when the shop is not on the allowlist, and checks the App Check token it is given', async () => {
+    const { call, fs } = setup({ vars: { AI_SHOPS: '' } });
+    const res = await call(req(`/quota?shopId=${SHOP_ID}`, { headers: { 'X-Firebase-AppCheck': APP_CHECK } }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ usedToday: 0, cap: 0, enabled: false, allowed: false });
+    for (const c of fs.calls) expect(c.appCheck).toBe(APP_CHECK);
   });
 
   it('needs auth, staff membership and a valid shopId', async () => {

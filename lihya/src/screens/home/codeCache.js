@@ -2,7 +2,8 @@
 // nothing in web storage, gone on reload. It keeps one look from getting two codes when
 // the customer comes back to the code screen (Undo after "Start over", the back button,
 // React's development double-mount), and lets the landing show the code again after the
-// session was wiped (idle wipe or "Start over").
+// session was wiped (idle wipe or "Start over"). Across a reload the session snapshot
+// keeps the code (useSession().issuedCode); S22 puts it back here with rememberCode.
 
 import { LIMITS } from '../../config/app.js';
 
@@ -50,6 +51,18 @@ function remember(shopId, entry) {
   list.push(entry);
   byShop.set(shopId, list.slice(-MAX_PER_SHOP));
   return entry;
+}
+
+/**
+ * Put back a code this phone already made for a look (from the session snapshot after a
+ * reload): { key, code, styleId, createdAt, expiresAt }. Expired or incomplete entries are
+ * ignored. Returns the remembered entry or null.
+ */
+export function rememberCode(shopId, entry) {
+  if (!shopId || !entry || typeof entry.key !== 'string' || typeof entry.code !== 'string') return null;
+  if (!Number.isFinite(entry.expiresAt) || !alive(entry)) return null;
+  const createdAt = Number.isFinite(entry.createdAt) ? entry.createdAt : null;
+  return remember(shopId, { key: entry.key, code: entry.code, styleId: entry.styleId || null, createdAt, expiresAt: entry.expiresAt });
 }
 
 /**

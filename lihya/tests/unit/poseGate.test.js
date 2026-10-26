@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { CANONICAL_VERTICES } from '../../src/ai/mesh/tessellation.js';
 import {
   poseFromMatrix,
@@ -10,6 +10,14 @@ import {
   GATES,
   SHOT_ORDER,
 } from '../../src/ai/capture/poseGate.js';
+import { manualShotWarnings, FRONT_WARN_DEG } from '../../src/screens/capture/manualCheck.js';
+import {
+  initialCaptureMode,
+  readCaptureModePref,
+  writeCaptureModePref,
+  whiteCardShown,
+  markWhiteCardShown,
+} from '../../src/screens/capture/capturePrefs.js';
 
 const rad = (d) => (d * Math.PI) / 180;
 
@@ -175,5 +183,82 @@ describe('shot gates (PRD 5.2)', () => {
     expect(shotsForMode('quick')).toEqual(['front']);
     expect(shotsForMode('full')).toEqual(['front', 'left', 'right', 'chinUp']);
     expect(Object.keys(GATES)).toEqual(['front', 'left', 'right', 'chinUp']);
+  });
+});
+
+describe('hand shutter check (chair:F7)', () => {
+  it('warns when a side or chin-up hand shot is in the wrong pose, pose first', () => {
+    const left = checkPose('left', { yaw: 3, pitch: 0 });
+    expect(left.hint).toBe('turnLeft');
+    expect(manualShotWarnings('left', { yaw: 3, pitch: 0 }, ['dark', left.hint])).toEqual(['turnLeft', 'dark']);
+    expect(manualShotWarnings('right', { yaw: 2, pitch: 0 }, [checkPose('right', { yaw: 2, pitch: 0 }).hint])).toEqual(['turnRight']);
+    expect(manualShotWarnings('chinUp', { yaw: 0, pitch: 1 }, [checkPose('chinUp', { yaw: 0, pitch: 1 }).hint])).toEqual(['chinUp']);
+  });
+
+  it('lets a hand shot through when only light or blur is off', () => {
+    expect(manualShotWarnings('left', { yaw: 44, pitch: 0 }, ['blur', 'dark'])).toEqual([]);
+    expect(manualShotWarnings('left', { yaw: 44, pitch: 0 }, [])).toEqual([]);
+    expect(manualShotWarnings('left', null, undefined)).toEqual([]);
+  });
+
+  it('checks the front hand shot only when it is turned well away', () => {
+    expect(FRONT_WARN_DEG).toBe(15);
+    expect(manualShotWarnings('front', { yaw: 8, pitch: 2 }, ['turnRight'])).toEqual([]);
+    expect(manualShotWarnings('front', { yaw: 30, pitch: 0 }, ['turnRight', 'light'])).toEqual(['turnRight', 'light']);
+    expect(manualShotWarnings('front', { yaw: 0, pitch: -22 }, ['chinUp'])).toEqual(['chinUp']);
+  });
+
+  it('never lists noFace or the same issue twice', () => {
+    expect(manualShotWarnings('left', { yaw: 0, pitch: 0 }, ['noFace', 'turnLeft', 'turnLeft'])).toEqual(['turnLeft']);
+  });
+});
+
+describe('capture choices kept for the session (chair:F19)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function fakeSessionStorage() {
+    const data = new Map();
+    return {
+      getItem: (k) => (data.has(k) ? data.get(k) : null),
+      setItem: (k, v) => data.set(k, String(v)),
+      removeItem: (k) => data.delete(k),
+    };
+  }
+
+  it('starts the chair with 4 photos and Try at home with Quick, until a choice is made', () => {
+    vi.stubGlobal('sessionStorage', fakeSessionStorage());
+    expect(initialCaptureMode('chair')).toBe('full');
+    expect(initialCaptureMode('home')).toBe('quick');
+    writeCaptureModePref('chair', 'quick');
+    expect(initialCaptureMode('chair')).toBe('quick');
+    expect(initialCaptureMode('home')).toBe('quick');
+    writeCaptureModePref('home', 'full');
+    expect(readCaptureModePref('home')).toBe('full');
+    writeCaptureModePref('chair', 'bogus');
+    expect(readCaptureModePref('chair')).toBe('quick');
+  });
+
+  it('remembers that the white-card step was shown', () => {
+    vi.stubGlobal('sessionStorage', fakeSessionStorage());
+    expect(whiteCardShown()).toBe(false);
+    markWhiteCardShown();
+    expect(whiteCardShown()).toBe(true);
+  });
+
+  it('works without storage (private window, blocked storage)', () => {
+    vi.stubGlobal('sessionStorage', {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {
+        throw new Error('blocked');
+      },
+    });
+    expect(initialCaptureMode('chair')).toBe('full');
+    expect(() => writeCaptureModePref('chair', 'quick')).not.toThrow();
+    expect(() => markWhiteCardShown()).not.toThrow();
+    expect(whiteCardShown()).toBe(false);
   });
 });

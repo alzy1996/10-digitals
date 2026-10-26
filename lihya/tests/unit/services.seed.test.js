@@ -51,6 +51,8 @@ describe('Create your shop seed', () => {
     expect(staff).toMatchObject({ uid: 'u1', role: 'owner', active: true, email: 'sam@x.com', name: 'Sam' });
     const info = ops.find((o) => o.path === 'shops/sh/public/info').data;
     expect(info).toMatchObject({ name: 'Brass', nameAr: 'نحاس', tryAtHome: true, whatsapp: '+96891234567' });
+    // Try at home opens in the shop's language (PRD-01).
+    expect(info.defaultLanguage).toBe(DEFAULT_SETTINGS.defaultLanguage);
   });
 
   it('seeds every style and never a product', () => {
@@ -97,6 +99,20 @@ describe('demo data', () => {
         expect(c.data.decisionSeconds).toBeLessThanOrEqual(3600);
       }
     }
+  });
+
+  it('marks approved and done demo visits as already counted in dailyStats', () => {
+    for (const c of parts.consultations) {
+      const approved = ['approved', 'done'].includes(c.data.status);
+      expect(c.data.approvalCountedAt !== null).toBe(approved);
+      expect(c.data.addOnsCountedAt !== null).toBe(c.data.status === 'done');
+    }
+  });
+
+  it('gives demo clients search tokens for every word', () => {
+    const salem = parts.clients.find((c) => c.data.displayName.startsWith('أحمد'));
+    expect(salem.data.searchTokens).toContain('سالم');
+    expect(salem.data.phoneTokens).toEqual([]);
   });
 
   it('links consultations to demo clients and keeps their last visit', () => {

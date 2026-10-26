@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useT } from '../lib/i18n/useT.js';
 import { useAuth } from '../state/AuthContext.jsx';
@@ -28,6 +28,10 @@ export default function CreateShop() {
   const [nameError, setNameError] = useState(null);
   const [phoneError, setPhoneError] = useState(null);
   const [formError, setFormError] = useState(null);
+  // One shop per tap: the form stays on screen while the shop route loads, and a
+  // second tap (or Enter) there must not create a second shop.
+  const submittingRef = useRef(false);
+  const [busy, setBusy] = useState(false);
 
   const nameMsgId = `${formId}-name-msg`;
 
@@ -52,11 +56,16 @@ export default function CreateShop() {
       }
     }
     if (!ok) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setBusy(true);
     try {
       const shopId = createShop({ name: en, nameAr: ar, whatsapp: phone || '' });
       rememberLastShop(shopId);
       navigate(`/s/${shopId}`, { replace: true });
     } catch (err) {
+      submittingRef.current = false;
+      setBusy(false);
       console.error('createShop failed', err);
       if (err?.code === 'invalid-argument') setNameError(t('entry.create.nameRequired'));
       else setFormError(t(err?.code === 'app/not-configured' ? 'setup.title' : 'entry.create.failed'));
@@ -107,7 +116,7 @@ export default function CreateShop() {
       title={t('entry.create.title')}
       back="/"
       footer={
-        <Button type="submit" form={formId} icon="check">
+        <Button type="submit" form={formId} icon="check" loading={busy}>
           {t('entry.create.submit')}
         </Button>
       }

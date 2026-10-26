@@ -56,13 +56,14 @@ export function colRef(path) {
 /**
  * Commit ops in batches (each tracked as one pending write). Returns a promise
  * that is already handled: callers may await it, screens never need to.
+ * `opts.quietDenied` is passed to trackWrite (a refusal by the rules is expected).
  */
-export function commitOps(ops, label = 'write') {
+export function commitOps(ops, label = 'write', opts = {}) {
   const store = requireDb();
   const chunks = chunkOps(ops);
-  const all = Promise.all(chunks.map((chunk) => trackWrite(applyOps(writeBatch(store), store, chunk).commit(), label))).then(
-    () => undefined,
-  );
+  const all = Promise.all(
+    chunks.map((chunk) => trackWrite(applyOps(writeBatch(store), store, chunk).commit(), label, opts)),
+  ).then(() => undefined);
   all.catch(() => {});
   return all;
 }
@@ -207,6 +208,16 @@ export function listenQuery(q, cb, onError, opts = {}) {
 
 function offline() {
   return typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
+/** This phone's copy of a document (pending local writes included), or null when it has none. */
+export async function readCachedDoc(path) {
+  try {
+    const s = await getDocFromCache(docRef(path));
+    return s.exists() ? snapData(s) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** One-time read of a document: server when online, local cache as fallback. */

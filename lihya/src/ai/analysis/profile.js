@@ -5,7 +5,8 @@
 // Budget: under 3 s for four shots on a phone. Pixel work runs on a face crop
 // downscaled to about 720 px, the segmenter sees a 384 px copy (its network works
 // at 256 x 256) and the mask is brought back to 720 px with a guided filter. The
-// event loop gets a turn between steps so the progress screen keeps animating.
+// browser gets a frame between steps (paintTurn) so the progress screen shows each
+// step name before the step runs.
 
 import { ZONE_IDS } from '../mesh/zones.js';
 import { CLASSES } from '../models/classes.js';
@@ -27,6 +28,7 @@ import {
 } from './beardDensity.js';
 import { beardColor } from './beardColor.js';
 import { labAt, cropToImageData, makeCanvas, context2d, forEachPixelInPolygon, yieldToEventLoop } from './pixels.js';
+import { ZONE_CONFIRM_DENSITY } from './zoneConfirm.js';
 import { muscatIso } from '../../lib/time.js';
 
 const colorFiles = import.meta.glob('../../data/colors.json', { eager: true, import: 'default' });
@@ -42,10 +44,33 @@ export const STEP_KEYS = Object.freeze(['prepare', 'scale', 'segment', 'faceShap
 /** Share of beard-zone pixels that must read as hair before they set the beard colour. */
 export const BEARD_COLOR_MIN_SHARE = 0.12;
 
-/** One-tap zone confirmations (PRD 5.5) as densities. */
-export const ZONE_CONFIRM_DENSITY = Object.freeze({ dense: 85, medium: 60, patchy: 30, none: 0 });
+/** One-tap zone confirmations (PRD 5.5) as densities (shared with recommend/score.js). */
+export { ZONE_CONFIRM_DENSITY };
+
+/** A side shot turned less than this (degrees of yaw) does not show a profile silhouette. */
+export const SIDE_MIN_YAW = 20;
 
 let lastDebug = null;
+
+/**
+ * Waits until the browser has had a chance to paint (the next animation frame, then
+ * a task), so the step name the screen just set is on screen before the next heavy
+ * step blocks the main thread. scheduler.yield() alone runs ahead of React's render
+ * task and the label never changed. The timer covers hidden tabs (no frames there).
+ */
+export function paintTurn(fallbackMs = 50) {
+  if (typeof requestAnimationFrame !== 'function') return yieldToEventLoop();
+  return new Promise((resolve) => {
+    let done = false;
+    const go = () => {
+      if (done) return;
+      done = true;
+      setTimeout(resolve, 0);
+    };
+    requestAnimationFrame(go);
+    setTimeout(go, fallbackMs);
+  });
+}
 
 /** Geometry and timings of the last analysis, for diagnostics (no pixels). */
 export function analysisDebug() {
@@ -150,6 +175,21 @@ function ageCrop(shot) {
   return canvas;
 }
 
+/**
+ * Pose of a side shot that can be read for the jaw silhouette, or null. A "side"
+ * photo taken facing the camera (hand shutter, wrong pose) shows no silhouette, and
+ * its reading would override the front estimate with a wrong length (it carries
+ * more weight than the front), so it is left out.
+ */
+export function sideShotPose(shot) {
+  if (!shot || !shot.canvas || !shot.landmarks) return null;
+  const w = shot.width || shot.canvas.width;
+  const h = shot.height || shot.canvas.height;
+  const pose = shot.pose || poseOf({ matrix: shot.matrix, landmarks: shot.landmarks, width: w, height: h });
+  if (!pose || !Number.isFinite(pose.yaw) || Math.abs(pose.yaw) < SIDE_MIN_YAW) return null;
+  return pose;
+}
+
 function emptyZones() {
   return Object.fromEntries(ZONE_IDS.map((z) => [z, { density: 0, lengthMm: 0, confidence: 0 }]));
 }
@@ -177,7 +217,7 @@ export async function analyzeShots(shots, { whiteCard = null, onStep } = {}) {
       }
     }
     index++;
-    await yieldToEventLoop();
+    await paintTurn();
   };
   const lap = (key) => {
     const n = now();
@@ -247,11 +287,11 @@ export async function analyzeShots(shots, { whiteCard = null, onStep } = {}) {
   }
   for (const sideId of ['left', 'right']) {
     const shot = shots[sideId];
-    if (!shot || !shot.canvas || !shot.landmarks) continue;
+    const pose = sideShotPose(shot);
+    if (!pose) continue;
     const prep = prepareShot(shot);
     const sw = shot.width || shot.canvas.width;
     const sh = shot.height || shot.canvas.height;
-    const pose = shot.pose || poseOf({ matrix: shot.matrix, landmarks: shot.landmarks, width: sw, height: sh });
     const sc = scaleFromIris(shot.landmarks, sw, sh, pose ? pose.yaw : 0);
     const mm = sc.mmPerPx / prep.s;
     if (!Number.isFinite(mm)) continue;

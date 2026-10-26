@@ -1,4 +1,3 @@
-import Chip from './Chip.jsx';
 import Icon from './Icon.jsx';
 import Skeleton from './Skeleton.jsx';
 import { formatPercent } from '../lib/format.js';
@@ -6,12 +5,32 @@ import { pickLang } from '../lib/i18n/useT.js';
 import { LIMITS } from '../config/app.js';
 import { clamp, cx, useOptionalT } from './kit.js';
 
+// Reason and warning tags wrap onto a second line instead of being cut with an ellipsis
+// (a phone card is narrow and the customer must be able to read why a style is shown).
+// The 14 px radius keeps a one-line tag a pill and gives a two-line tag soft corners.
+const TAG = 'inline-flex max-w-full items-start gap-1 whitespace-normal break-words rounded-[14px] border px-2.5 py-1 text-xs font-medium leading-snug';
+const TAG_TONES = {
+  default: 'border-line bg-surface-2 text-text',
+  warn: 'border-warn/50 bg-warn/10 text-warn',
+};
+
+function Tag({ tone = 'default', icon, children }) {
+  return (
+    <span className={cx(TAG, TAG_TONES[tone] || TAG_TONES.default)}>
+      {icon ? <Icon name={icon} size={14} className="mt-px shrink-0" /> : null}
+      <span className="min-w-0">{children}</span>
+    </span>
+  );
+}
+
 /**
  * Style card (PRD 9.6): 4:5 photo-on-face thumbnail (skeleton while it renders), the style name
  * in both languages (current language first), Grow-ability % with a bar, up to 3 reason chips
  * and the warning chips. Selected = brass border.
  * `reasonLabels` / `warningLabels`: texts already translated by the caller; when missing, the
  * component translates ranked.reasons / ranked.warnings ({ key, vars }) itself.
+ * `omitReasonIds`: reason ids the caller already shows elsewhere on the card (the trim
+ * interval badge on the photo, for the 'low_maint' reason), so nothing is said twice.
  */
 export default function StyleCard({
   ranked,
@@ -20,6 +39,7 @@ export default function StyleCard({
   onClick,
   reasonLabels,
   warningLabels,
+  omitReasonIds,
   disabled = false,
   className,
 }) {
@@ -32,7 +52,8 @@ export default function StyleCard({
     ranked && ranked.growability != null && !ranked.growUnknown && Number.isFinite(Number(ranked.growability))
       ? clamp(Math.round(Number(ranked.growability)), 0, 100)
       : null;
-  const reasons = (reasonLabels || ((ranked && ranked.reasons) || []).map((r) => t(r.key, r.vars)))
+  const omit = new Set(Array.isArray(omitReasonIds) ? omitReasonIds : []);
+  const reasons = (reasonLabels || ((ranked && ranked.reasons) || []).filter((r) => !omit.has(r.id)).map((r) => t(r.key, r.vars)))
     .filter(Boolean)
     .slice(0, LIMITS.maxReasonChips);
   const warnings = (warningLabels || ((ranked && ranked.warnings) || []).map((w) => t(w.key, w.vars))).filter(Boolean);
@@ -95,14 +116,12 @@ export default function StyleCard({
         {reasons.length || warnings.length ? (
           <div className="flex flex-wrap gap-1.5">
             {reasons.map((text, i) => (
-              <Chip key={`r${i}`} size="sm">
-                {text}
-              </Chip>
+              <Tag key={`r${i}`}>{text}</Tag>
             ))}
             {warnings.map((text, i) => (
-              <Chip key={`w${i}`} size="sm" tone="warn" icon="warning">
+              <Tag key={`w${i}`} tone="warn" icon="warning">
                 {text}
-              </Chip>
+              </Tag>
             ))}
           </div>
         ) : null}

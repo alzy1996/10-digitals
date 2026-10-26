@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { formatPercent } from '../../src/lib/format.js';
 
 // Every string the UI shows must exist in Arabic and English (Arabic is the default).
 const ROOT = new URL('../../', import.meta.url).pathname;
@@ -64,6 +65,18 @@ describe('i18n', () => {
     const emoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{1F000}-\u{1F2FF}]/u;
     const bad = [];
     for (const lang of ['ar', 'en']) for (const [k, v] of Object.entries(dict[lang])) if (emoji.test(String(v))) bad.push(`${lang}:${k}`);
+    expect(bad).toEqual([]);
+  });
+
+  it('one percent sign: the Latin %, in Arabic too (digits are Latin)', () => {
+    expect(formatPercent(64, 'ar')).toBe('64%');
+    expect(formatPercent(64, 'en')).toBe('64%');
+    expect(formatPercent(49.6, 'ar')).toBe('50%');
+    // Every string in every file (shared and namespaces), so no screen or report prints '٪'.
+    const bad = [];
+    for (const lang of ['ar', 'en']) {
+      for (const [k, v] of Object.entries(dict[lang])) if (String(v).includes('\u066A')) bad.push(`${lang}:${k}`);
+    }
     expect(bad).toEqual([]);
   });
 

@@ -29,6 +29,19 @@ export default {
         cut: v('cut'),
         warn: v('warn'),
         info: v('info'),
+        // Text versions of the status colors (WCAG AA in both themes, src/styles/tokens.css).
+        'keep-ink': v('keep-ink'),
+        'cut-ink': v('cut-ink'),
+        'warn-ink': v('warn-ink'),
+        'info-ink': v('info-ink'),
+      },
+      // Status text must meet WCAG AA (PRD 9.1): text-keep / text-cut / text-warn / text-info use the
+      // ink tokens, while bg-*, border-* and fills keep the PRD token values.
+      textColor: {
+        keep: v('keep-ink'),
+        cut: v('cut-ink'),
+        warn: v('warn-ink'),
+        info: v('info-ink'),
       },
       fontFamily: {
         sans: ['"IBM Plex Sans Arabic"', 'system-ui', 'sans-serif'],

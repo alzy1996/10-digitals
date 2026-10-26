@@ -5,7 +5,7 @@ import { useAuth } from '../state/AuthContext.jsx';
 import { useLive } from '../hooks/useLive.js';
 import { useOnline } from '../hooks/useOnline.js';
 import { watchMyShops } from '../services/shops.js';
-import { signOutUser } from '../services/auth.js';
+import { signOutAndClear } from '../services/auth.js';
 import { APP } from '../config/app.js';
 import Button from '../components/Button.jsx';
 import Chip from '../components/Chip.jsx';
@@ -165,14 +165,16 @@ function MyShops({ user }) {
     navigate(`/s/${shop.shopId}`);
   };
 
+  // Shared phone: the customer session and this shop's offline copy (client names,
+  // phones) are cleared too; the app then reloads at the start screen.
   const signOut = () => {
+    if (signingOut) return;
     setSigningOut(true);
-    signOutUser()
-      .catch((err) => {
-        console.error('sign out failed', err);
-        show({ message: t('common.error') });
-      })
-      .finally(() => setSigningOut(false));
+    signOutAndClear({ to: '/' }).catch((err) => {
+      console.error('sign out failed', err);
+      setSigningOut(false);
+      show({ message: t('common.error') });
+    });
   };
 
   const loading = live.loading && !live.error;

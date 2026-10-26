@@ -23,16 +23,23 @@ const dropBundledWasm = () => ({
 });
 
 // GitHub Pages has no SPA rewrite: serve the app for every unknown path through 404.html.
-const spaFallback = () => ({
-  name: 'lihya-spa-404',
-  apply: 'build',
-  closeBundle() {
-    const dist = resolve(process.cwd(), 'dist');
-    if (BASE !== '/' && existsSync(resolve(dist, 'index.html'))) {
-      copyFileSync(resolve(dist, 'index.html'), resolve(dist, '404.html'));
-    }
-  },
-});
+// The copy goes into the resolved output folder (root + build.outDir, so --outDir is honoured),
+// never a fixed <cwd>/dist that may hold a stale build.
+const spaFallback = () => {
+  let outDir = null;
+  return {
+    name: 'lihya-spa-404',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    closeBundle() {
+      if (BASE === '/' || !outDir) return;
+      const index = resolve(outDir, 'index.html');
+      if (existsSync(index)) copyFileSync(index, resolve(outDir, '404.html'));
+    },
+  };
+};
 
 // Model files are never bundled or served from Firebase Hosting (Spark allows
 // about 360 MB of transfer a day). They load from their official CDNs with

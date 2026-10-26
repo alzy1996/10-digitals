@@ -7,7 +7,7 @@ import { useLive } from '../hooks/useLive.js';
 import { useOnline } from '../hooks/useOnline.js';
 import { getLookCode, markLookCodeUsed } from '../services/lookCodes.js';
 import { watchStyles } from '../services/styles.js';
-import { getStyle, lookSummary } from '../lib/look.js';
+import { checkLookParams, getStyle, lookSummary } from '../lib/look.js';
 import { formatMuscat, toDate } from '../lib/time.js';
 import { LIMITS } from '../config/app.js';
 import BottomAction from '../components/BottomAction.jsx';
@@ -55,10 +55,22 @@ function LookingUp() {
   );
 }
 
+/**
+ * The look stored under a code, as the Studio may use it: complete and clamped
+ * (lengths 0..200 mm, offsets, grey, fade; unknown keys such as a picture dropped),
+ * with the code's style. Anyone with the Try-at-home link can write a code, so it is
+ * never used as stored: a code whose look still names unknown options (lines,
+ * finish, color, mustache, preset, style id) is refused (`errors` not empty).
+ */
+function checkLookCode(doc) {
+  const out = checkLookParams(doc && doc.params, doc && doc.styleId);
+  if (doc && doc.invalid === true && !out.errors.length) out.errors.push('catalog.err.style');
+  return out;
+}
+
 /** The look behind the code: style name in both languages, summary, zone diagram, dates. */
-function FoundLook({ doc, style, guardChart }) {
+function FoundLook({ doc, params, style, guardChart }) {
   const { t, lang, pick } = useT();
-  const params = doc.params || {};
   const name = style ? pick(style.name) : t('entry.code.savedLook');
   const other = style && style.name && typeof style.name === 'object' ? style.name[lang === 'ar' ? 'en' : 'ar'] || null : null;
   // lookSummary starts with the style name (or the raw id when the style is gone): the heading shows it.
@@ -143,7 +155,9 @@ export default function S14LookCodeEntry() {
         (doc) => {
           if (seq !== seqRef.current) return;
           if (!doc) setResult({ status: 'notFound', code: value, doc: null });
-          else setResult({ status: doc.expired ? 'expired' : 'found', code: value, doc });
+          else if (doc.expired) setResult({ status: 'expired', code: value, doc });
+          else if (checkLookCode(doc).errors.length) setResult({ status: 'invalid', code: value, doc });
+          else setResult({ status: 'found', code: value, doc });
         },
         (err) => {
           if (seq !== seqRef.current) return;
@@ -179,7 +193,8 @@ export default function S14LookCodeEntry() {
       : null;
 
   const doc = result.doc;
-  const styleId = doc ? doc.styleId || (doc.params && doc.params.styleId) || null : null;
+  const checked = doc ? checkLookCode(doc) : null;
+  const styleId = checked ? checked.params.styleId : null;
   const shopStyle =
     styleId && Array.isArray(shopStyles.data) ? shopStyles.data.find((s) => s.id === styleId) || null : null;
   const style = shopStyle || (styleId ? getStyle(styleId) : null);
@@ -187,11 +202,16 @@ export default function S14LookCodeEntry() {
   const clear = () => onCodeChange('');
 
   const loadLook = () => {
-    if (!doc || leavingRef.current) return;
+    if (!doc || !checked || leavingRef.current) return;
+    // Only a valid look reaches the Studio and the Cut Card.
+    if (checked.errors.length) {
+      setResult({ status: 'invalid', code: result.code, doc });
+      return;
+    }
     leavingRef.current = true;
-    const params = { ...(doc.params || {}), styleId: (doc.params && doc.params.styleId) || doc.styleId };
+    const { params } = checked;
     const pending = wipe('lookCode');
-    setLookCode({ code: doc.code, styleId: doc.styleId || params.styleId, params });
+    setLookCode({ code: doc.code, styleId: params.styleId, params });
     setActiveParams(params);
     setClient(chosenClient || { id: null, displayName: null, walkIn: true });
     try {
@@ -214,7 +234,7 @@ export default function S14LookCodeEntry() {
 
   const status = result.status;
   const complete = code.length === LIMITS.lookCodeLength;
-  const showKeypad = status !== 'found' && status !== 'expired' && status !== 'loading';
+  const showKeypad = status !== 'found' && status !== 'expired' && status !== 'invalid' && status !== 'loading';
   let codeError = null;
   if (status === 'notFound') codeError = t('entry.code.notFound');
   else if (status === 'error') codeError = t('entry.code.error');
@@ -226,7 +246,7 @@ export default function S14LookCodeEntry() {
         {doc && doc.used ? t('entry.code.loadAnyway') : t('entry.code.load')}
       </Button>
     );
-  } else if (status === 'expired') {
+  } else if (status === 'expired' || status === 'invalid') {
     footer = (
       <BottomAction>
         <Button variant="secondary" icon="keypad" full onClick={clear}>
@@ -281,11 +301,17 @@ export default function S14LookCodeEntry() {
 
         {status === 'found' && doc ? (
           <>
-            <FoundLook doc={doc} style={style} guardChart={settings.guardChart} />
+            <FoundLook doc={doc} params={checked.params} style={style} guardChart={settings.guardChart} />
             <Button variant="ghost" icon="keypad" className="self-center" onClick={clear}>
               {t('entry.code.another')}
             </Button>
           </>
+        ) : null}
+
+        {status === 'invalid' ? (
+          <Note tone="cut" icon="warning" title={t('entry.code.invalidTitle')}>
+            <p className="mt-1 text-text-2">{t('entry.code.invalidHelp')}</p>
+          </Note>
         ) : null}
 
         {status === 'expired' ? (

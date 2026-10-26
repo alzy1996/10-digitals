@@ -19,13 +19,20 @@ function emitPending() {
   }
 }
 
+function isDenied(err) {
+  return Boolean(err) && (err.code === 'permission-denied' || err.code === 'firestore/permission-denied');
+}
+
 /**
  * Track a write promise. Returns the same promise, already marked as handled,
  * so a write nobody awaits never becomes an unhandled rejection.
+ * `opts.quietDenied`: a refusal by the rules is expected (for example a stats
+ * count the server already has) and is not reported as an error.
  * @param {Promise<unknown>} promise
  * @param {string} [label] short name used in error reports (for example 'consultation.approve')
+ * @param {{ quietDenied?: boolean }} [opts]
  */
-export function trackWrite(promise, label = 'write') {
+export function trackWrite(promise, label = 'write', opts = {}) {
   if (!promise || typeof promise.then !== 'function') return promise;
   const entry = { label, at: Date.now() };
   pending.add(entry);
@@ -36,6 +43,7 @@ export function trackWrite(promise, label = 'write') {
   };
   promise.then(done, (err) => {
     done();
+    if (opts && opts.quietDenied && isDenied(err)) return;
     console.error(`sync: ${label} failed`, err);
     for (const cb of [...errorListeners]) {
       try {

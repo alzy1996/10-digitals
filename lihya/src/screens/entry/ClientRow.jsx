@@ -26,9 +26,10 @@ function monogram(name) {
 /**
  * One client as a big tappable row (72 px): monogram, name, last visit (Muscat) and the
  * coarse labels saved with consent (face shape, age band, grow-ability). Demo clients
- * carry a Demo badge.
+ * carry a Demo badge. With `onEdit`, a separate edit button sits at the row's end
+ * (name and phone, saved photos); the row itself still starts the visit.
  */
-export default function ClientRow({ client, onPick, disabled }) {
+export default function ClientRow({ client, onPick, onEdit, disabled }) {
   const { t, lang } = useT();
   const p = client.profile || {};
   const chips = [];
@@ -41,12 +42,12 @@ export default function ClientRow({ client, onPick, disabled }) {
   }
   const name = client.displayName || t('common.walkIn');
 
-  return (
+  const row = (
     <button
       type="button"
       disabled={disabled}
       onClick={() => onPick(client)}
-      className="press flex min-h-[72px] w-full items-center gap-3 rounded-card border border-line bg-surface px-4 py-3 text-start active:bg-surface-2 disabled:opacity-40"
+      className="press flex min-h-[72px] w-full min-w-0 flex-1 items-center gap-3 rounded-card border border-line bg-surface px-4 py-3 text-start active:bg-surface-2 disabled:opacity-40"
     >
       <span
         aria-hidden="true"
@@ -71,5 +72,21 @@ export default function ClientRow({ client, onPick, disabled }) {
       </span>
       <Icon name="chevron-right" size={20} className="shrink-0 text-text-2" />
     </button>
+  );
+  if (typeof onEdit !== 'function') return row;
+  return (
+    <div className="flex items-stretch gap-2">
+      {row}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onEdit(client)}
+        aria-label={t('entry.client.editLabel', { name: `\u2068${name}\u2069` })}
+        title={t('entry.client.edit')}
+        className="press flex min-h-[72px] w-14 shrink-0 items-center justify-center rounded-card border border-line bg-surface text-text-2 active:bg-surface-2 disabled:opacity-40"
+      >
+        <Icon name="edit" size={22} />
+      </button>
+    </div>
   );
 }

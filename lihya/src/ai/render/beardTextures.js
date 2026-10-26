@@ -699,6 +699,26 @@ const NECK_SIDE = 0.6;
 const GONION_U = Object.freeze({ R: JAW_U[4], L: JAW_U[16] });
 const EAR_U = Object.freeze({ R: JAW_U[2], L: JAW_U[18] });
 
+/**
+ * Neckline depth below the jaw (mm) at jaw arc position u (0 at the customer's right ear,
+ * 1 at the left), for a neckline type and lines.necklineOffset (+ raises the line toward
+ * the jaw): the full depth across the front of the neck between the jaw angles, tapering
+ * to 0 at the ears (the squared neckline keeps more of it at the sides).
+ */
+export function neckDepthMm(neckType, offset, u) {
+  const off = Number(offset) || 0;
+  const base = Math.max(3, (NECK_DEPTH_MM[neckType] || 20) - 10 * off);
+  let prof;
+  if (u >= GONION_U.R && u <= GONION_U.L) {
+    const t = (u - GONION_U.R) / (GONION_U.L - GONION_U.R);
+    prof = neckType === 'squared' ? 1 - 0.35 * smoothstep(0.1, 0.0, Math.min(t, 1 - t)) : NECK_SIDE + (1 - NECK_SIDE) * Math.sin(Math.PI * t);
+  } else {
+    const t = u < GONION_U.R ? (u - EAR_U.R) / (GONION_U.R - EAR_U.R) : (EAR_U.L - u) / (EAR_U.L - GONION_U.L);
+    prof = (neckType === 'squared' ? 0.65 : NECK_SIDE) * smoothstep(0, 1, clamp(t, 0, 1));
+  }
+  return base * prof;
+}
+
 /** Value of a per-jaw-point array at arc position u (linear). */
 function atJawU(values, u) {
   if (u <= JAW_U[0]) return values[0];
@@ -777,7 +797,6 @@ export function shellColumns(P, coverage, SW, layout, fields = null) {
   const neck = new Float32Array(SW);
   const N = P.zones.N;
   const neckType = P.lines.neckline;
-  const baseDepth = Math.max(3, (NECK_DEPTH_MM[neckType] || 20) - 10 * (P.lines.necklineOffset || 0));
   // The chin shape (round, pointed, flat and so on) is drawn across the beard's own width:
   // the whole jaw for a full beard, the chin for a goatee.
   let lo = -1;
@@ -802,17 +821,7 @@ export function shellColumns(P, coverage, SW, layout, fields = null) {
     // Round off the ends of a short span (a goatee is not a box).
     const ends = spanH < 0.3 ? 0.45 + 0.55 * Math.sqrt(Math.max(0, 1 - sx * sx)) : 1;
     hang[x] = L * hf * shortScale * chinShapeFactor(P.shape.chin, sx) * ends;
-    if (N > 0.2) {
-      let prof;
-      if (u >= GONION_U.R && u <= GONION_U.L) {
-        const t = (u - GONION_U.R) / (GONION_U.L - GONION_U.R);
-        prof = neckType === 'squared' ? 1 - 0.35 * smoothstep(0.1, 0.0, Math.min(t, 1 - t)) : NECK_SIDE + (1 - NECK_SIDE) * Math.sin(Math.PI * t);
-      } else {
-        const t = u < GONION_U.R ? (u - EAR_U.R) / (GONION_U.R - EAR_U.R) : (EAR_U.L - u) / (EAR_U.L - GONION_U.L);
-        prof = (neckType === 'squared' ? 0.65 : NECK_SIDE) * smoothstep(0, 1, clamp(t, 0, 1));
-      }
-      neck[x] = baseDepth * prof;
-    }
+    if (N > 0.2) neck[x] = neckDepthMm(neckType, P.lines.necklineOffset, u);
   }
   const tails = layout && layout.mustache ? layout.mustache.tails : [];
   const tailCols = tails.map((tx) => {

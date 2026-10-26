@@ -26,6 +26,9 @@
 
 import COLORS from '../../data/colors.json';
 import { hexToLab } from '../analysis/color.js';
+// Barber's one-tap zone confirmations as densities: the same table as the profile's
+// applyOverrides, so a zone confirmed 'none' reads 0 in the ranking and in the profile.
+import { ZONE_CONFIRM_DENSITY } from '../analysis/zoneConfirm.js';
 import { paramsFromStyle, lengthClassOf } from '../../lib/look.js';
 import { jawlineDetail } from './jawline.js';
 import { pickReasons, warningsFor, faceChipFor, trimReason, POINTS } from './reasons.js';
@@ -41,8 +44,6 @@ export const WEAK_DENSITY = 40;
 export const WEAK_PENALTY = 25;
 export const EID_BOOST = POINTS.occasion;
 export const DEFAULT_AGE_FIT = 0.8;
-/** Barber's one-tap zone confirmations (PRD 5.5) as densities. */
-export const CONFIRM_DENSITY = Object.freeze({ dense: 85, medium: 60, patchy: 30, none: 5 });
 export const VISIT_DAYS = Object.freeze({ weekly: 7, biweekly: 14, monthly: 30 });
 
 /** Values used when the profile does not have the input (same for every style, so the ranking is unaffected). */
@@ -133,7 +134,7 @@ export function isFreshlyShaved(profile, overrides = null) {
   const zones = profile && profile.beard && profile.beard.zones;
   if (!zones) return false;
   const conf = (overrides && overrides.zones) || {};
-  const ds = SHAVED_ZONES.filter((z) => !(conf[z] && CONFIRM_DENSITY[conf[z]] !== undefined))
+  const ds = SHAVED_ZONES.filter((z) => !(conf[z] && ZONE_CONFIRM_DENSITY[conf[z]] !== undefined))
     .map((z) => zones[z] && zones[z].density)
     .filter(isNum);
   if (ds.length < 2) return false;
@@ -151,7 +152,7 @@ export function zoneDensities(profile, overrides) {
   const shaved = isFreshlyShaved(profile, overrides);
   const out = {};
   for (const z of ZONES) {
-    if (conf[z] && CONFIRM_DENSITY[conf[z]] !== undefined) out[z] = CONFIRM_DENSITY[conf[z]];
+    if (conf[z] && ZONE_CONFIRM_DENSITY[conf[z]] !== undefined) out[z] = ZONE_CONFIRM_DENSITY[conf[z]];
     else if (!shaved && zones[z] && isNum(zones[z].density)) out[z] = clamp(zones[z].density, 0, 100);
   }
   return out;

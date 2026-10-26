@@ -74,7 +74,7 @@ function ZoneSlider({ label, value, onChange, lang, t }) {
 }
 
 /** Live preview: one large labelled diagram on desktop, front + side thumbnails on phones. */
-function Preview({ params, lang, t, wide, view, setView, lengthKey, summary }) {
+function Preview({ params, guardChart, lang, t, wide, view, setView, lengthKey, summary }) {
   const sideView = view === 'R' ? 'R' : 'L';
   return (
     <div aria-label={t('manage.sig.preview')} role="group" className="rounded-card border border-line bg-surface p-3 lg:p-4">
@@ -97,17 +97,17 @@ function Preview({ params, lang, t, wide, view, setView, lengthKey, summary }) {
             ]}
           />
           <div className="mx-auto mt-3 w-full max-w-[380px]">
-            <ZoneDiagram params={params} view={view === 'front' ? 'front' : 'profile'} side={sideView} lang={lang} />
+            <ZoneDiagram params={params} guardChart={guardChart} view={view === 'front' ? 'front' : 'profile'} side={sideView} lang={lang} />
           </div>
         </>
       ) : (
         <div className="mx-auto grid w-full max-w-[300px] grid-cols-2 gap-2">
           <figure className="min-w-0">
-            <ZoneDiagram params={params} view="front" lang={lang} showLabels={false} />
+            <ZoneDiagram params={params} guardChart={guardChart} view="front" lang={lang} showLabels={false} />
             <figcaption className="text-center text-xs text-text-2">{t('manage.sig.view.front')}</figcaption>
           </figure>
           <figure className="relative min-w-0">
-            <ZoneDiagram params={params} view="profile" side={sideView} lang={lang} showLabels={false} />
+            <ZoneDiagram params={params} guardChart={guardChart} view="profile" side={sideView} lang={lang} showLabels={false} />
             <figcaption className="text-center text-xs text-text-2">{t(`manage.sig.view.${sideView}`)}</figcaption>
             <IconButton
               icon="mirror"
@@ -132,7 +132,11 @@ function Preview({ params, lang, t, wide, view, setView, lengthKey, summary }) {
   );
 }
 
-export default function SignatureEditor({ mode, base, draft, setDraft, onSave, onCancel, t, lang }) {
+/**
+ * `guardChart` is the shop's chart (settings.guardChart), so the diagram's guard labels match
+ * the Cut Card. `saving` shows the Save button busy and ignores further taps.
+ */
+export default function SignatureEditor({ mode, base, draft, setDraft, onSave, onCancel, saving = false, guardChart, t, lang }) {
   const wide = useMediaQuery('(min-width: 1024px)');
   const [view, setView] = useState('front');
   const [tried, setTried] = useState(false);
@@ -155,6 +159,7 @@ export default function SignatureEditor({ mode, base, draft, setDraft, onSave, o
   const setZone = (zone, mm) => setDraft((d) => setDraftZone(d, zone, mm));
 
   const save = () => {
+    if (saving) return;
     setTried(true);
     if (errors.length) return;
     onSave(signaturePatch(base, draft));
@@ -165,7 +170,7 @@ export default function SignatureEditor({ mode, base, draft, setDraft, onSave, o
 
   const footer = (
     <BottomAction>
-      <Button icon="check" onClick={save}>
+      <Button icon="check" onClick={save} loading={saving}>
         {mode === 'edit' ? t('manage.sig.saveChanges') : t('manage.sig.save')}
       </Button>
     </BottomAction>
@@ -205,7 +210,7 @@ export default function SignatureEditor({ mode, base, draft, setDraft, onSave, o
         </div>
 
         <div className="sticky top-0 z-10 -mx-[var(--gutter)] border-b border-line bg-bg px-[var(--gutter)] pb-3 pt-1 lg:top-4 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:mx-0 lg:border-b-0 lg:p-0">
-          <Preview params={params} lang={lang} t={t} wide={wide} view={view} setView={setView} lengthKey={lengthKey} summary={summary} />
+          <Preview params={params} guardChart={guardChart} lang={lang} t={t} wide={wide} view={view} setView={setView} lengthKey={lengthKey} summary={summary} />
         </div>
 
         <div className="flex flex-col gap-4 lg:col-start-2 lg:row-start-2">

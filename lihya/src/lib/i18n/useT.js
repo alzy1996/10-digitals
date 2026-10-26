@@ -27,6 +27,14 @@ function readPref() {
   }
 }
 
+/**
+ * True when this device has a chosen language (the language toggle saved 'ar' or
+ * 'en'). A shop's default language applies only when it is false.
+ */
+export function hasLangPref() {
+  return readPref() !== null;
+}
+
 /** Interpolate {name} placeholders. */
 export function format(str, vars) {
   if (!vars) return str;
@@ -58,9 +66,12 @@ export function I18nProvider({ children, initialLang }) {
     el.dir = lang === 'ar' ? 'rtl' : 'ltr';
   }, [lang]);
 
-  const setLang = useCallback((next) => {
+  // setLang(lang) is the person's choice and is kept on this device; setLang(lang,
+  // { persist: false }) only switches the screen (a shop's default language).
+  const setLang = useCallback((next, { persist = true } = {}) => {
     if (next !== 'ar' && next !== 'en') return;
     setLangState(next);
+    if (!persist) return;
     try {
       localStorage.setItem(PREF_KEYS.lang, next);
     } catch {

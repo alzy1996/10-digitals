@@ -30,6 +30,8 @@ import { hiddenByWorkRule, pairingHints, recommend, workRuleNotice } from '../ai
 import { useThumbnails } from './studio/useThumbnails.js';
 
 const isGulf = (style) => Array.isArray(style && style.tags) && style.tags.includes('gulf');
+/** The trim interval is the badge on the card's photo, so its reason chip is not repeated. */
+const TRIM_SHOWN = Object.freeze(['low_maint']);
 
 export default function S07Styles() {
   const { mode } = useSession();
@@ -420,6 +422,7 @@ function StylesView({ styles, loading, error, onRetry, settings }) {
                     <StyleCard
                       ranked={r}
                       thumb={th && th.url ? th.url : null}
+                      omitReasonIds={r.trim ? TRIM_SHOWN : undefined}
                       selected={activeId === r.styleId}
                       onClick={() => open(r.style)}
                       className="h-full"

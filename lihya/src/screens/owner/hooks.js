@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { dayKey } from '../../lib/time.js';
-import { getIdToken } from '../../services/auth.js';
 import { watchDemoPresence } from '../../services/clients.js';
 import { useLive } from '../../hooks/useLive.js';
 import { workerUrl } from './util.js';
@@ -21,60 +20,46 @@ export function useToday() {
 }
 
 /**
- * Account-wide AI preview usage from the Worker (GET /quota). Only asked when the Worker
- * URL is configured, AI preview is on and the phone is online; any failure is silent
- * (null) because the dashboard already shows the shop's own count from dailyStats.
- * `refreshKey` (for example today's aiRenders) asks again when it changes.
+ * The AI Worker's own usage for this shop (fetchAiQuota: GET /quota with the ID token and,
+ * when App Check is set up, the App Check token, so it keeps working once Firestore enforces
+ * App Check). The Worker counts per UTC day, so its count resets at 04:00 Muscat, exactly
+ * like the cap it enforces. Only asked when the Worker URL is configured, AI preview is on
+ * and the phone is online.
+ * Returns { quota, pending }: `quota` is null when the Worker could not be asked (the
+ * dashboard then falls back to its own estimate); `pending` is true while the answer to the
+ * current request is on its way. `refreshKey` (for example today's aiRenders) asks again
+ * when it changes, keeping the last answer meanwhile.
+ * The AI facade is imported on demand: the owner screens that use these hooks must not
+ * download the rendering bundle (three.js) when no Worker is asked.
  */
 export function useAiQuota({ shopId, enabled, online, refreshKey }) {
-  const [quota, setQuota] = useState(null);
-  const base = workerUrl();
-  const active = Boolean(base && enabled && online && shopId);
+  const active = Boolean(workerUrl() && enabled && online && shopId);
+  const key = active ? `${shopId}|${refreshKey}` : null;
+  // The last answer and the request it answered (pending = no answer for this request yet).
+  const [answer, setAnswer] = useState({ key: null, shopId: null, quota: null });
 
   useEffect(() => {
-    if (!active) {
-      setQuota(null);
-      return undefined;
-    }
+    if (!active) return undefined;
     let alive = true;
     const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
-    const timer = setTimeout(() => ctrl && ctrl.abort(), 8000);
-    (async () => {
-      try {
-        const token = await getIdToken(false);
-        if (!token || !alive) return;
-        const res = await fetch(`${base}/quota?shopId=${encodeURIComponent(shopId)}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: 'no-store',
-          signal: ctrl ? ctrl.signal : undefined,
-        });
-        if (!res.ok) throw new Error(`quota ${res.status}`);
-        const body = await res.json();
-        const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
-        if (alive) {
-          setQuota({
-            usedToday: n(body.usedToday),
-            cap: n(body.cap),
-            accountUsed: n(body.accountUsed),
-            accountCap: n(body.accountCap),
-            resetsAt: typeof body.resetsAt === 'string' ? body.resetsAt : null,
-          });
-        }
-      } catch (err) {
-        if (alive && err && err.name !== 'AbortError') console.warn('AI quota not available', err);
-        if (alive) setQuota(null);
-      } finally {
-        clearTimeout(timer);
-      }
-    })();
+    const asked = `${shopId}|${refreshKey}`;
+    import('../../ai/index.js')
+      .then(({ fetchAiQuota }) => fetchAiQuota(shopId, { signal: ctrl ? ctrl.signal : undefined }))
+      .catch((err) => {
+        console.warn('AI quota not available', err);
+        return null;
+      })
+      .then((quota) => {
+        if (alive) setAnswer({ key: asked, shopId, quota: quota || null });
+      });
     return () => {
       alive = false;
-      clearTimeout(timer);
       if (ctrl) ctrl.abort();
     };
-  }, [active, base, shopId, refreshKey]);
+  }, [active, shopId, refreshKey]);
 
-  return quota;
+  if (!active) return { quota: null, pending: false };
+  return { quota: answer.shopId === shopId ? answer.quota : null, pending: answer.key !== key };
 }
 
 /**

@@ -4,17 +4,23 @@
 //                  -> 200 image/jpeg|png|webp (the AI preview), headers
 //                     X-Lihya-Used / X-Lihya-Cap (this shop today) and X-Lihya-Seed
 //   GET  /quota?shopId=<id>
-//                  -> 200 { usedToday, cap, accountUsed, accountCap, enabled, day, resetsAt }
+//                  -> 200 { usedToday, cap, accountUsed, accountCap, enabled, allowed, day, resetsAt }
+//                     (UTC day: the caps reset at 00:00 UTC, 04:00 Muscat)
 //   OPTIONS        CORS preflight for the two routes above
 //
 // Every request needs an allowed Origin (ALLOWED_ORIGINS) and
-// "Authorization: Bearer <Firebase ID token>" of a staff account (not anonymous)
-// that is active staff of the shop (checked through Firestore with the user's
-// own token, so the security rules decide). /render also needs
-// shops/{shopId}.settings.aiPreview == true and a free slot under the caps.
+// "Authorization: Bearer <Firebase ID token>" of a staff account (not anonymous,
+// email_verified true: email-link and Google sign-ins always are) that is active
+// staff of the shop (checked through Firestore with the user's own token, so the
+// security rules decide). /render also needs shops/{shopId}.settings.aiPreview == true,
+// the shop on the allowlist (KV ai:allowed:<shopId> or the AI_SHOPS var, set by Sam;
+// anyone can create a shop in the app, so the shared daily budget is only for shops
+// he lists) and a free slot under the caps. A shop's cap is min(settings.aiDailyCap
+// ?? 20, its allowlist number (default 20), ACCOUNT_DAILY_CAP).
 //
 // Errors are JSON { error: <code>, ...details }:
-//   400 bad_request {field, reason?}   401 auth {reason}       403 anonymous | not_staff | disabled | origin
+//   400 bad_request {field, reason?}   401 auth {reason}
+//   403 anonymous | email_not_verified | not_staff | disabled | not_allowed | origin
 //   404 not_found   405 method          413 too_large           415 media_type
 //   429 cap {scope: 'account'|'shop', resetsAt}                500 config | internal
 //   502 model | upstream {service}      503 busy | upstream {service: 'jwks'}
@@ -23,7 +29,7 @@
 // cached (Cache-Control: no-store), and the access log holds the route,
 // status, error code and timings only, never a header, field or image.
 
-import { readConfig, normalizeOrigin, shopCapFrom } from './config.js';
+import { allowanceFromKv, allowlistKey, readConfig, normalizeOrigin, shopCapFrom } from './config.js';
 import { HttpError, errorResponse, finalizeResponse, httpErrorResponse, jsonResponse } from './http.js';
 import { bearerToken, verifyFirebaseIdToken } from './auth.js';
 import { loadShopAccess } from './firestore.js';
@@ -58,7 +64,27 @@ async function authenticate(request, config, deps) {
   const token = bearerToken(request);
   if (!token) throw new HttpError(401, 'auth', { reason: 'missing' });
   const user = await verifyFirebaseIdToken(token, { projectId: config.projectId, jwks: deps.jwks, now: nowFrom(deps) });
+  // A password account made through the public API has an unverified email: no AI for it.
+  if (!user.emailVerified) throw new HttpError(403, 'email_not_verified');
   return { token, user };
+}
+
+/**
+ * Whether the shop may use the AI Final Look, and the most renders a day it may set:
+ * the KV key ai:allowed:<shopId> when it exists, else the AI_SHOPS var, else not allowed.
+ * @returns {Promise<{ allowed: boolean, maxCap: number }>}
+ */
+export async function shopAllowance(kv, config, shopId) {
+  let raw;
+  try {
+    raw = await kv.get(allowlistKey(shopId));
+  } catch (err) {
+    throw new CapStoreError('kv read failed', { cause: err });
+  }
+  const fromKv = allowanceFromKv(raw);
+  if (fromKv) return fromKv;
+  if (config.aiShops.has(shopId)) return { allowed: true, maxCap: config.aiShops.get(shopId) };
+  return { allowed: false, maxCap: 0 };
 }
 
 function shopAccess(request, config, deps, { shopId, uid, token }) {
@@ -87,8 +113,10 @@ async function handleRender(request, env, config, deps, meta) {
   const form = await parseRenderForm(request, { random: deps.random });
   const access = await shopAccess(request, config, deps, { shopId: form.shopId, uid: user.uid, token });
   if (!access.settings.aiPreview) throw new HttpError(403, 'disabled');
+  const allowance = await shopAllowance(kv, config, form.shopId);
+  if (!allowance.allowed) throw new HttpError(403, 'not_allowed');
 
-  const shopCap = shopCapFrom(access.settings.aiDailyCap, config.accountCap);
+  const shopCap = shopCapFrom(access.settings.aiDailyCap, config.accountCap, allowance.maxCap);
   const reservation = await reserve(kv, {
     shopId: form.shopId,
     accountCap: config.accountCap,
@@ -145,13 +173,17 @@ async function handleQuota(request, url, env, config, deps) {
   const { token, user } = await authenticate(request, config, deps);
   const shopId = parseShopId(url.searchParams.get('shopId'));
   const access = await shopAccess(request, config, deps, { shopId, uid: user.uid, token });
-  const usage = await readUsage(env.LIHYA_CAPS, shopId, nowFrom(deps));
+  const [allowance, usage] = await Promise.all([
+    shopAllowance(env.LIHYA_CAPS, config, shopId),
+    readUsage(env.LIHYA_CAPS, shopId, nowFrom(deps)),
+  ]);
   return jsonResponse(200, {
     usedToday: usage.shopUsed,
-    cap: shopCapFrom(access.settings.aiDailyCap, config.accountCap),
+    cap: allowance.allowed ? shopCapFrom(access.settings.aiDailyCap, config.accountCap, allowance.maxCap) : 0,
     accountUsed: usage.accountUsed,
     accountCap: config.accountCap,
-    enabled: access.settings.aiPreview,
+    enabled: access.settings.aiPreview && allowance.allowed,
+    allowed: allowance.allowed,
     day: usage.day,
     resetsAt: usage.resetsAt,
   });

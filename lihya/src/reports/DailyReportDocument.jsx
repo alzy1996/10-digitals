@@ -197,7 +197,8 @@ export default function DailyReportDocument({ report, shop = null, lang = 'ar', 
         <Kpi label={t('report.kpi.approvals')} value={r.approvals} />
         <Kpi label={t('report.kpi.conversion')} value={pct(r.conversionPct)} />
         <Kpi label={t('report.kpi.decision')} value={dur(r.avgDecisionSeconds)} />
-        <Kpi label={t('report.kpi.ai')} value={t('report.kpi.aiOf', { used: r.aiPreviewsUsed, cap: r.aiCap })} />
+        {/* Renders made on this Muscat day; the Worker's cap counts per UTC day (resets 04:00 Muscat), so it is not "x of cap". */}
+        <Kpi label={t('report.kpi.ai')} value={r.aiPreviewsUsed} sub={t('report.kpi.aiCapDay', { cap: r.aiCap })} />
         <Kpi
           label={t('report.kpi.addOns')}
           value={r.addOns.count}

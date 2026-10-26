@@ -101,6 +101,110 @@ service cloud.firestore {
       return v is string && v.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
     }
 
+    // A short list of scalars (join() fails on nested data), all of them printed in
+    // at most `maxChars` characters: no images, no blobs.
+    function shortStrings(list, maxItems, maxChars) {
+      return list is list && list.size() <= maxItems && list.join(',').size() <= maxChars;
+    }
+
+    // Every value of a map is a scalar (join() fails on a map, a list or a timestamp)
+    // and all of them print in at most `max` characters: no nested data, no blobs.
+    // Cheap enough for the 1,000-expression limit of a request.
+    function scalarsOk(m, max) {
+      return m.values().join(',').size() <= max;
+    }
+
+    // ------------------------------------------------------------ look shape (ARCHITECTURE 5)
+
+    function zoneKeysOk(m) {
+      return m is map && m.keys().hasOnly(['M', 'S', 'C', 'J_L', 'J_R', 'K_L', 'K_R', 'B_L', 'B_R', 'N']);
+    }
+
+    // The 10 beard zones, each a number from 0 to 300 (math.abs fails on anything
+    // that is not a number).
+    function validZones(m) {
+      return zoneKeysOk(m)
+        && math.abs(m.get('M', 0) - 150) <= 150 && math.abs(m.get('S', 0) - 150) <= 150
+        && math.abs(m.get('C', 0) - 150) <= 150 && math.abs(m.get('J_L', 0) - 150) <= 150
+        && math.abs(m.get('J_R', 0) - 150) <= 150 && math.abs(m.get('K_L', 0) - 150) <= 150
+        && math.abs(m.get('K_R', 0) - 150) <= 150 && math.abs(m.get('B_L', 0) - 150) <= 150
+        && math.abs(m.get('B_R', 0) - 150) <= 150 && math.abs(m.get('N', 0) - 150) <= 150;
+    }
+
+    // At most 10 entries with short scalar values (Cut Card guards and notes, style weights).
+    function zoneScalars(m, max) {
+      return m is map && m.size() <= 10 && scalarsOk(m, max);
+    }
+
+    // Line option ids and offsets: the 7 known keys, short scalars.
+    function validLines(m) {
+      return m is map
+        && m.keys().hasOnly(['cheek', 'cheekOffset', 'neckline', 'necklineOffset', 'sideburn', 'edge', 'mustacheEdge'])
+        && scalarsOk(m, 200);
+    }
+
+    function validShape(m) {
+      return m is map
+        && m.keys().hasOnly(['chin', 'jFront', 'mustacheFloating', 'fadeB', 'flare', 'lengthAdjustable'])
+        && [m.get('chin', ''), m.get('jFront', false), m.get('mustacheFloating', false),
+            m.get('flare', false), m.get('lengthAdjustable', '')].join(',').size() <= 80
+        && (m.get('fadeB', null) == null || fadeOk(m.fadeB));
+    }
+
+    // fadeB: [fromMm, toMm] (numbers or nulls).
+    function fadeOk(f) {
+      return f is list && f.size() <= 2 && f.join(',').size() <= 24;
+    }
+
+    function styleIdOk(v) {
+      return v is string && v.matches('^[A-Za-z0-9_-]{1,80}$');
+    }
+
+    // LookParams (ARCHITECTURE 5): the designed beard only, never a photo or a
+    // thumbnail: the known keys, zones / lines / shape with at most 10 short
+    // scalars each, no nested data. `strict` (Look Codes, which anyone may write)
+    // also checks every key, id and range.
+    function validLookParams(p, strict) {
+      return p is map
+        && p.keys().hasOnly(['styleId', 'zones', 'lines', 'mustacheId', 'fadeStartMm', 'colorId',
+                             'greyTarget', 'finish', 'shape', 'presetId'])
+        && p.get('zones', {}).size() <= 10 && p.get('lines', {}).size() <= 7
+        && p.get('zones', {}).values()
+             .concat(p.get('lines', {}).values())
+             .concat([p.get('styleId', ''), p.get('mustacheId', ''), p.get('colorId', ''), p.get('finish', ''),
+                      p.get('presetId', ''), p.get('fadeStartMm', 0), p.get('greyTarget', 0)])
+             .join(',').size() <= 700
+        && (p.get('shape', null) == null || validShape(p.shape))
+        && (!strict || strictLookParams(p));
+    }
+
+    function strictLookParams(p) {
+      return validZones(p.get('zones', {}))
+        && p.get('lines', {}).keys().hasOnly(['cheek', 'cheekOffset', 'neckline', 'necklineOffset', 'sideburn',
+                                              'edge', 'mustacheEdge'])
+        && math.abs(p.get('lines', {}).get('cheekOffset', 0)) <= 1
+        && math.abs(p.get('lines', {}).get('necklineOffset', 0)) <= 1
+        && (p.get('styleId', null) == null || styleIdOk(p.styleId))
+        && [p.get('mustacheId', ''), p.get('colorId', ''), p.get('finish', ''), p.get('presetId', '')]
+             .removeAll([null]).join('').matches('^[A-Za-z0-9_-]*$')
+        && (p.get('fadeStartMm', null) == null || math.abs(p.fadeStartMm - 150) <= 150)
+        && (p.get('greyTarget', null) == null || math.abs(p.greyTarget - 50) <= 50);
+    }
+
+    // The stored Cut Card summary (services/model.js compactCutCard): zone maps of
+    // at most 10 short scalars, two numbers, a short list of safety flags.
+    function validCutCard(c) {
+      return c is map
+        && c.keys().hasOnly(['zonesMm', 'guards', 'cheekLineMm', 'necklineMm', 'notes', 'safetyFlags'])
+        && c.get('zonesMm', {}).size() <= 10 && c.get('guards', {}).size() <= 10 && c.get('notes', {}).size() <= 10
+        && c.get('zonesMm', {}).values()
+             .concat(c.get('guards', {}).values())
+             .concat(c.get('notes', {}).values())
+             .concat([c.get('cheekLineMm', null), c.get('necklineMm', null)])
+             .join(',').size() <= 2600
+        && (c.get('safetyFlags', null) == null || shortStrings(c.safetyFlags, 20, 1300));
+    }
+
     // ------------------------------------------------------------ validators
 
     function validSettings(s) {
@@ -182,12 +286,53 @@ service cloud.firestore {
         && created(d);
     }
 
+    function nameOk(n) {
+      return n is map
+        && n.keys().hasOnly(['en', 'ar'])
+        && n.get('en', '') is string && n.get('ar', '') is string
+        && n.values().join(',').size() <= 161;
+    }
+
+    function ageFitOk(m) {
+      return m is map
+        && m.keys().hasOnly(['18-24', '25-34', '35-44', '45-54', '55+'])
+        && scalarsOk(m, 60);
+    }
+
+    // Style docs are public while Try at home is on: the catalog shape only
+    // (src/data/styles.json keys, plus baseId for signature styles and the stamps).
     function validStyle(styleId, d) {
-      return d.id == styleId
+      return d.keys().hasOnly(['id', 'name', 'zones', 'zoneNote', 'shape', 'lines', 'mustacheId', 'faces',
+                               'trimDays', 'localFit', 'lengthClass', 'weights', 'required', 'ageFit',
+                               'theatrical', 'tags', 'order', 'hidden', 'signature', 'baseId',
+                               'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+        && d.id == styleId
         && d.hidden is bool
         && d.get('signature', false) is bool
-        && d.get('order', 0) is number
+        && nameOk(d.name)
+        && validZones(d.zones)
+        && (d.get('shape', null) == null || validShape(d.shape))
+        && (d.get('lines', null) == null || validLines(d.lines))
+        // Short text and number fields (join() refuses nested data).
+        && [d.get('zoneNote', ''), d.get('mustacheId', ''), d.get('lengthClass', ''), d.get('baseId', ''),
+            d.get('trimDays', 0), d.get('theatrical', false)].join(',').size() <= 500
+        && d.get('localFit', 0) is int && math.abs(d.get('localFit', 0) * 2 - 5) <= 5
+        && math.abs(d.get('order', 0)) <= 100000
+        && (d.get('faces', null) == null || shortStrings(d.faces, 10, 60))
+        && (d.get('tags', null) == null || shortStrings(d.tags, 20, 400))
+        && (d.get('weights', null) == null || zoneScalars(d.weights, 120))
+        && (d.get('required', null) == null || zoneScalars(d.required, 120))
+        && (d.get('ageFit', null) == null || ageFitOk(d.ageFit))
         && stamped(d);
+    }
+
+    // An owner or manager writing a valid style (the staff doc read once: the rules
+    // engine allows 1,000 expressions per request).
+    function styleWriteOk(shopId, styleId) {
+      let staff = getAfter(staffPath(shopId));
+      return isSignedIn()
+        && staff != null && staff.data.active == true && staff.data.role in ['owner', 'manager']
+        && validStyle(styleId, request.resource.data);
     }
 
     function validProduct(d) {
@@ -213,44 +358,107 @@ service cloud.firestore {
     }
 
     function validClient(d) {
-      return d.keys().hasOnly(['displayName', 'displayNameLower', 'phone', 'consent', 'profile',
-                               'growthMmPerDay', 'lastVisitAt', 'lastLengths', 'demo',
+      return d.keys().hasOnly(['displayName', 'displayNameLower', 'searchTokens', 'phoneTokens', 'phone',
+                               'consent', 'profile', 'growthMmPerDay', 'lastVisitAt', 'lastLengths', 'demo',
                                'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
         && d.displayName is string && d.displayName.size() > 0 && d.displayName.size() <= 80
         && d.displayNameLower is string && d.displayNameLower.size() <= 80
         && (d.get('phone', null) == null || (d.phone is string && d.phone.matches('^[+][0-9]{8,15}$')))
-        && (d.get('profile', null) == null || validProfile(d.profile))
         && (d.get('consent', null) == null
-            || (d.consent is map && d.consent.keys().hasOnly(['profile', 'at', 'by'])))
+            || (d.consent is map && d.consent.keys().hasOnly(['profile', 'at', 'by'])
+                && d.consent.get('profile', false) is bool))
+        // Profile labels only with the customer's recorded consent.
+        && (d.get('profile', null) == null
+            || (validProfile(d.profile) && d.get('consent', null) is map && d.consent.get('profile', false) == true))
         && (d.get('growthMmPerDay', null) == null
             || (d.growthMmPerDay is number && d.growthMmPerDay >= 0 && d.growthMmPerDay <= 3))
         && optTimestamp(d, 'lastVisitAt')
         && (d.get('lastLengths', null) == null
-            || (d.lastLengths is map && d.lastLengths.keys().hasOnly(['zonesMm', 'at'])))
+            || (d.lastLengths.keys().hasOnly(['zonesMm', 'at'])
+                && zoneKeysOk(d.lastLengths.get('zonesMm', {}))
+                && d.lastLengths.get('zonesMm', {}).values().join(',').size() <= 100
+                && d.lastLengths.get('at', null) is timestamp))
+        && (d.get('searchTokens', null) == null || shortStrings(d.searchTokens, 80, 1500))
+        && (d.get('phoneTokens', null) == null || shortStrings(d.phoneTokens, 20, 200))
         && d.get('demo', false) is bool;
+    }
+
+    // Consent is always mine and now (demo clients are seeded with past dates by an
+    // owner or manager, see demoAllowed).
+    function consentHonest(d) {
+      return d.consent.get('by', null) == request.auth.uid && d.consent.get('at', null) == request.time;
     }
 
     function validConsultation(d) {
       return d.keys().hasOnly(['clientId', 'barberUid', 'styleId', 'params', 'cutCard', 'status',
                                'startedAt', 'approvedAt', 'decisionSeconds', 'aiPreviewUsed', 'addOns',
-                               'rating', 'nextVisitDays', 'dayKey', 'demo',
+                               'rating', 'nextVisitDays', 'dayKey', 'demo', 'approvalCountedAt', 'addOnsCountedAt',
                                'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
-        && d.keys().hasAll(['barberUid', 'status', 'dayKey'])
+        // barberUid, status and dayKey are required: reading a missing one fails.
         && d.barberUid is string
-        && optString(d, 'clientId', 64)
-        && optString(d, 'styleId', 80)
-        && (d.get('params', null) == null || d.params is map)
-        && (d.get('cutCard', null) == null || d.cutCard is map)
+        && [d.get('clientId', ''), d.get('styleId', '')].join(',').size() <= 150
         && d.status in ['draft', 'approved', 'done', 'cancelled']
         && optTimestamp(d, 'startedAt')
         && optTimestamp(d, 'approvedAt')
         && optInt(d, 'decisionSeconds', 0, 3600)
         && d.get('aiPreviewUsed', false) is bool
-        && d.get('addOns', []) is list && d.get('addOns', []).size() <= 20
+        && (d.get('addOns', null) == null || shortStrings(d.addOns, 20, 1400))
+        && optTimestamp(d, 'approvalCountedAt')
+        && optTimestamp(d, 'addOnsCountedAt')
         && optInt(d, 'rating', 1, 5)
         && optInt(d, 'nextVisitDays', 0, 365)
         && isDayKey(d.dayKey)
         && d.get('demo', false) is bool;
+    }
+
+    // The designed look and the Cut Card summary, checked when they are written
+    // (on create, and on an update that changes them).
+    function consultationLookOk(d, fields) {
+      return (!('params' in fields) || d.get('params', null) == null || validLookParams(d.params, false))
+        && (!('cutCard' in fields) || d.get('cutCard', null) == null || validCutCard(d.cutCard));
+    }
+
+    // dailyStats are bumped in the same batch that stamps one of these fields with
+    // the server time, so a consultation is counted once whatever the device,
+    // reload or offline queue: a second stamp is refused, and with it the whole
+    // batch (the stats increments included).
+    function statsStampOnce(d, field, fromStatus, changed) {
+      return !(field in changed)
+        || (d[field] == request.time
+            && resource.data.get(field, null) == null
+            && resource.data.status in fromStatus);
+    }
+
+    // A new consultation (demo ones only from an owner or a manager), each value
+    // read once (the rules engine allows 1,000 expressions per request).
+    function consultationCreateOk(shopId) {
+      let d = request.resource.data;
+      let staff = getAfter(staffPath(shopId));
+      return isSignedIn()
+        && staff != null && staff.data.active == true
+        && (d.get('demo', false) == false || staff.data.role in ['owner', 'manager'])
+        && created(d)
+        && d.barberUid == request.auth.uid
+        && (d.get('updatedBy', null) == null || stamped(d))
+        && validConsultation(d)
+        && (d.get('params', null) == null || validLookParams(d.params, false))
+        && (d.get('cutCard', null) == null || validCutCard(d.cutCard));
+    }
+
+    // One update of a consultation, with the change computed once (the rules
+    // engine allows 1,000 expressions per request).
+    function consultationUpdateOk(shopId) {
+      let d = request.resource.data;
+      let changed = d.diff(resource.data).affectedKeys();
+      return isStaffAfter(shopId)
+        && stamped(d)
+        && !changed.hasAny(['createdAt', 'createdBy', 'barberUid', 'dayKey', 'demo'])
+        && validConsultation(d)
+        && consultationLookOk(d, changed)
+        && statsStampOnce(d, 'approvalCountedAt', ['draft', 'cancelled'], changed)
+        && statsStampOnce(d, 'addOnsCountedAt', ['draft', 'approved'], changed)
+        // A cancel never undoes an approval (session wipes cancel abandoned drafts only).
+        && (d.status != 'cancelled' || resource.data.status in ['draft', 'cancelled']);
     }
 
     // Demo records can only come from an owner or a manager.
@@ -258,10 +466,12 @@ service cloud.firestore {
       return d.get('demo', false) == false || hasRoleAfter(shopId, ['owner', 'manager']);
     }
 
+    // Style parameters only (PRD 8.2), every value bounded: a code is a few hundred
+    // bytes, never a photo, whoever writes it (anonymous visitors included).
     function validLookCode(d) {
       return d.keys().hasOnly(['styleId', 'params', 'createdAt', 'expiresAt', 'createdBy'])
-        && d.styleId is string && d.styleId.size() > 0 && d.styleId.size() <= 80
-        && d.params is map
+        && styleIdOk(d.styleId)
+        && validLookParams(d.params, true)
         && created(d)
         && d.expiresAt is timestamp
         && d.expiresAt > request.time
@@ -286,24 +496,43 @@ service cloud.firestore {
         && d.at == request.time;
     }
 
+    function counterOk(d, k) {
+      let v = d.get(k, 0);
+      return v is int && v >= 0 && v <= 1000000;
+    }
+
     function validStats(d) {
       return d.keys().hasOnly(['consultations', 'approvals', 'totalDecisionSeconds', 'aiRenders',
                                'addOns', 'topStyles', 'updatedAt', 'updatedBy'])
-        && d.get('consultations', 0) is number
-        && d.get('approvals', 0) is number
-        && d.get('totalDecisionSeconds', 0) is number
-        && d.get('aiRenders', 0) is number
-        && d.get('addOns', 0) is number
+        && counterOk(d, 'consultations')
+        && counterOk(d, 'approvals')
+        && counterOk(d, 'totalDecisionSeconds')
+        && counterOk(d, 'aiRenders')
+        && counterOk(d, 'addOns')
         && d.get('topStyles', {}) is map
+        && d.get('topStyles', {}).size() <= 100
+        && d.get('topStyles', {}).keys().join(',').size() <= 4000
+        && scalarsOk(d.get('topStyles', {}), 1500)
         && stamped(d);
     }
 
+    // Counters only go up (increments), except for an owner or manager taking demo data out.
+    function notLower(k) {
+      return request.resource.data.get(k, 0) >= (resource == null ? 0 : resource.data.get(k, 0));
+    }
+
+    function countersOnlyUp() {
+      return notLower('consultations') && notLower('approvals') && notLower('totalDecisionSeconds')
+        && notLower('aiRenders') && notLower('addOns');
+    }
+
     function validPublicInfo(d) {
-      return d.keys().hasOnly(['name', 'nameAr', 'tryAtHome', 'whatsapp', 'updatedAt', 'updatedBy'])
+      return d.keys().hasOnly(['name', 'nameAr', 'tryAtHome', 'whatsapp', 'defaultLanguage', 'updatedAt', 'updatedBy'])
         && d.name is string && d.name.size() > 0 && d.name.size() <= 80
         && optString(d, 'nameAr', 80)
         && d.tryAtHome is bool
         && optString(d, 'whatsapp', 20)
+        && d.get('defaultLanguage', 'ar') in ['ar', 'en']
         && stamped(d);
     }
 
@@ -311,8 +540,10 @@ service cloud.firestore {
 
     match /shops/{shopId} {
       allow read: if isStaff(shopId);
-      // Bootstrap: any real account may create a shop it owns.
+      // Bootstrap: any real account with a verified email (email link, Google) may
+      // create a shop it owns. Unverified password sign-ups cannot.
       allow create: if isAccount()
+        && request.auth.token.email_verified == true
         && created(request.resource.data)
         && validShop(request.resource.data);
       allow update: if hasRoleAfter(shopId, ['owner'])
@@ -349,12 +580,8 @@ service cloud.firestore {
       match /styles/{styleId} {
         allow read: if isStaff(shopId)
           || (resource.data.hidden == false && tryAtHomeOn(shopId));
-        allow create: if hasRoleAfter(shopId, ['owner', 'manager'])
-          && created(request.resource.data)
-          && validStyle(styleId, request.resource.data);
-        allow update: if hasRoleAfter(shopId, ['owner', 'manager'])
-          && unchanged(['id', 'createdAt', 'createdBy'])
-          && validStyle(styleId, request.resource.data);
+        allow create: if styleWriteOk(shopId, styleId) && created(request.resource.data);
+        allow update: if styleWriteOk(shopId, styleId) && unchanged(['id', 'createdAt', 'createdBy']);
         allow delete: if false;
       }
 
@@ -377,27 +604,25 @@ service cloud.firestore {
           && created(request.resource.data)
           && (request.resource.data.get('updatedBy', null) == null || stamped(request.resource.data))
           && validClient(request.resource.data)
-          && demoAllowed(shopId, request.resource.data);
+          && demoAllowed(shopId, request.resource.data)
+          && (request.resource.data.get('consent', null) == null
+              || request.resource.data.get('demo', false) == true
+              || consentHonest(request.resource.data));
         allow update: if isStaffAfter(shopId)
           && stamped(request.resource.data)
           && unchanged(['createdAt', 'createdBy', 'demo'])
-          && validClient(request.resource.data);
+          && validClient(request.resource.data)
+          && (!('consent' in request.resource.data.diff(resource.data).affectedKeys())
+              || request.resource.data.get('consent', null) == null
+              || consentHonest(request.resource.data));
         allow delete: if hasRole(shopId, ['owner'])
           || (resource.data.get('demo', false) == true && hasRole(shopId, ['owner', 'manager']));
       }
 
       match /consultations/{consultationId} {
         allow read: if isStaff(shopId);
-        allow create: if isStaffAfter(shopId)
-          && created(request.resource.data)
-          && request.resource.data.barberUid == request.auth.uid
-          && (request.resource.data.get('updatedBy', null) == null || stamped(request.resource.data))
-          && validConsultation(request.resource.data)
-          && demoAllowed(shopId, request.resource.data);
-        allow update: if isStaffAfter(shopId)
-          && stamped(request.resource.data)
-          && unchanged(['createdAt', 'createdBy', 'barberUid', 'dayKey', 'demo'])
-          && validConsultation(request.resource.data);
+        allow create: if consultationCreateOk(shopId);
+        allow update: if consultationUpdateOk(shopId);
         allow delete: if hasRole(shopId, ['owner'])
           || (resource.data.get('demo', false) == true && hasRole(shopId, ['owner', 'manager']));
       }
@@ -428,7 +653,8 @@ service cloud.firestore {
         allow read: if isStaff(shopId);
         allow create, update: if isStaffAfter(shopId)
           && isDayKey(day)
-          && validStats(request.resource.data);
+          && validStats(request.resource.data)
+          && (hasRoleAfter(shopId, ['owner', 'manager']) || countersOnlyUp());
         allow delete: if false;
       }
 

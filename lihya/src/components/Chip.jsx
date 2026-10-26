@@ -4,10 +4,10 @@ import { cx } from './kit.js';
 
 const TONES = {
   default: 'border-line bg-surface-2 text-text',
-  warn: 'border-warn/50 bg-warn/10 text-warn',
-  keep: 'border-keep/50 bg-keep/10 text-keep',
-  cut: 'border-cut/50 bg-cut/10 text-cut',
-  info: 'border-info/50 bg-info/10 text-info',
+  warn: 'border-warn/50 bg-warn/10 text-warn-ink',
+  keep: 'border-keep/50 bg-keep/10 text-keep-ink',
+  cut: 'border-cut/50 bg-cut/10 text-cut-ink',
+  info: 'border-info/50 bg-info/10 text-info-ink',
 };
 
 // 40 px pill (PRD 9.6). The invisible ::before extends the tap area to 44 px.

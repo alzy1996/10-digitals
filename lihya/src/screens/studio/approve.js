@@ -46,6 +46,7 @@ export function approveLook({ session, shop = null, settings = null, styles = nu
     style,
     guardChart: s.guardChart,
     safety: session.safety,
+    answers: session.answers,
     growthMmPerDay: growth,
     now: approved.at,
     front: session.shots ? session.shots.front : null,
@@ -70,6 +71,8 @@ export function approveLook({ session, shop = null, settings = null, styles = nu
       cutCard,
       decisionSeconds: approved.decisionSeconds,
       aiPreviewUsed: aiPreviewUsed === undefined ? Boolean(session.aiResult) : aiPreviewUsed === true,
+      // The visit's own day for the stats (a re-approval after a reload past midnight).
+      startedAt: session.startedAt || approved.at,
     });
   } catch (err) {
     // The Cut Card is on this phone already; only the shop's record is missing.

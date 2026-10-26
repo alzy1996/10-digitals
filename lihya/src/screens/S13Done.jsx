@@ -30,16 +30,9 @@ import { formatDuration } from '../reports/text.js';
 import { releaseFinalLook } from './approve/finalLookJob.js';
 import { reminderBilingual } from './approve/cardText.js';
 import { useClientRecord, useStyle } from './approve/hooks.js';
+import { needsVisitReplan, nextVisitChoices, replanNextVisit, suggestNextVisitDays } from '../lib/cutcard.js';
 
-const VISIT_DAYS = Object.freeze([7, 14, 21, 30]);
 const DEFAULT_VISIT_DAYS = 14;
-
-/** The chip closest to the suggested days (the Cut Card's, else the style's trim interval). */
-function nearestVisitChip(days) {
-  const n = Number(days);
-  if (!Number.isFinite(n) || n <= 0) return DEFAULT_VISIT_DAYS;
-  return VISIT_DAYS.reduce((best, d) => (Math.abs(d - n) < Math.abs(best - n) ? d : best), VISIT_DAYS[0]);
-}
 
 function daysLabel(t, n) {
   return t(n >= 3 && n <= 10 ? 'approve.done.days.few' : 'approve.done.days.many', { n });
@@ -79,16 +72,30 @@ export default function S13Done() {
   const { show } = useSnackbar();
   const session = useSession();
   const { shopId, shop } = useShop();
-  const { path, wipe, cutCard, approved, consultationId, client, keepPhotos, shots, effectiveProfile, profile, hydrated } = session;
+  const { path, wipe, cutCard: storedCard, answers, approved, consultationId, client, keepPhotos, shots, effectiveProfile, profile, hydrated } = session;
+  // The Cut Card's next visit, planned with his visit-frequency answer (the same rule the
+  // Cut Card screen prints), so the chip preselected here is exactly the card's.
+  const cutCard = useMemo(
+    () => (storedCard && needsVisitReplan(storedCard, answers) ? replanNextVisit(storedCard, answers) : storedCard),
+    [storedCard, answers],
+  );
   const style = useStyle(shopId, (cutCard && cutCard.styleId) || (approved && approved.params ? approved.params.styleId : null));
   const record = useClientRecord(shopId, client);
   const [productsAttempt, setProductsAttempt] = useState(0);
   const live = useLive((cb, onError) => watchProducts(shopId, cb, onError), [shopId, productsAttempt]);
 
-  const suggested = cutCard && cutCard.nextVisitDays ? cutCard.nextVisitDays : style && style.trimDays ? style.trimDays : null;
+  const visitFrequency = answers ? answers.visitFrequency : null;
+  const suggested =
+    cutCard && Number.isFinite(cutCard.nextVisitDays) && cutCard.nextVisitDays > 0
+      ? cutCard.nextVisitDays
+      : style && style.trimDays
+        ? suggestNextVisitDays({ trimDays: style.trimDays, visitFrequency })
+        : null;
   const [rating, setRating] = useState(0);
   const [addOns, setAddOns] = useState([]);
-  const [visitDays, setVisitDays] = useState(() => nearestVisitChip(suggested));
+  // null until the barber picks a chip: the suggestion (once the session is back) stays selected.
+  const [picked, setPicked] = useState(null);
+  const visitDays = picked ?? suggested ?? DEFAULT_VISIT_DAYS;
   const [finishing, setFinishing] = useState(false);
 
   const active = useMemo(() => (Array.isArray(live.data) ? live.data.filter((p) => p && p.active !== false) : []), [live.data]);
@@ -103,7 +110,7 @@ export default function S13Done() {
     active.filter((p) => addOns.includes(p.id)).reduce((sum, p) => sum + (Number.isFinite(Number(p.priceOmr)) ? Number(p.priceOmr) : 0), 0),
   );
 
-  const visitOptions = VISIT_DAYS.map((d) => ({ value: d, label: daysLabel(t, d), icon: d === nearestVisitChip(suggested) && suggested ? 'star-line' : undefined }));
+  const visitOptions = nextVisitChoices(suggested).map((d) => ({ value: d, label: daysLabel(t, d), icon: suggested && d === suggested ? 'star-line' : undefined }));
 
   const sendReminder = () => {
     const text = reminderBilingual({ shop, clientName: realClient ? client.displayName : null, dayKey: nextKey });
@@ -131,7 +138,7 @@ export default function S13Done() {
     setFinishing(true);
     if (canRecord) {
       try {
-        completeConsultation(shopId, consultationId, { rating: rating || null, nextVisitDays: visitDays, addOns });
+        completeConsultation(shopId, consultationId, { rating: rating || null, nextVisitDays: visitDays, addOns, startedAt: session.startedAt });
       } catch (err) {
         console.error('The visit could not be completed', err);
       }
@@ -267,7 +274,7 @@ export default function S13Done() {
             title={t('approve.done.nextVisit')}
             hint={suggested ? t('approve.done.suggested', { days: daysLabel(t, suggested) }) : null}
           >
-            <ChipRow options={visitOptions} value={visitDays} onChange={(v) => v && setVisitDays(v)} />
+            <ChipRow options={visitOptions} value={visitDays} onChange={(v) => v && setPicked(v)} />
             <p className="flex items-center gap-2 text-base text-text">
               <Icon name="calendar" size={20} className="text-brass" />
               <span className="num">{t('approve.done.nextDate', { date: nextDate })}</span>

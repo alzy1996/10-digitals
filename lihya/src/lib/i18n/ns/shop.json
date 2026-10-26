@@ -16,7 +16,10 @@
     "shop.public.inactive.title": "This shop link is not active",
     "shop.public.inactive.body": "The shop has turned off Try at home, or the link is wrong. Ask the shop for its current link.",
     "shop.public.offlineBody": "Connect to the internet to open the shop's page. Your photo always stays on your phone.",
-    "shop.public.errorBody": "The shop's page did not load. Try again."
+    "shop.public.errorBody": "The shop's page did not load. Try again.",
+    "shop.slow.title": "The shop is taking too long to open",
+    "shop.slow.body": "This phone is online but the server has not answered. Check the Wi-Fi or mobile data, then try again. The shop opens by itself as soon as the answer arrives.",
+    "shop.public.slowBody": "The shop's page has not answered yet. Check your internet, then try again. Your photo always stays on your phone."
   },
   "ar": {
     "shop.pickAnother": "اختر محلًا آخر",
@@ -35,6 +38,9 @@
     "shop.public.inactive.title": "رابط هذا المحل غير مفعّل",
     "shop.public.inactive.body": "أوقف المحل خدمة التجربة من البيت، أو أن الرابط غير صحيح. اطلب من المحل رابطه الحالي.",
     "shop.public.offlineBody": "اتصل بالإنترنت لفتح صفحة المحل. صورتك تبقى على جهازك دائمًا.",
-    "shop.public.errorBody": "لم تُحمَّل صفحة المحل. حاول مرة أخرى."
+    "shop.public.errorBody": "لم تُحمَّل صفحة المحل. حاول مرة أخرى.",
+    "shop.slow.title": "فتح المحل يستغرق وقتًا طويلًا",
+    "shop.slow.body": "الجهاز متصل بالإنترنت لكن الخادم لم يردّ بعد. تحقق من الواي فاي أو بيانات الجوال ثم حاول مرة أخرى. سيفتح المحل وحده حال وصول الرد.",
+    "shop.public.slowBody": "صفحة المحل لم تردّ بعد. تحقق من اتصالك ثم حاول مرة أخرى. صورتك تبقى على جهازك دائمًا."
   }
 }

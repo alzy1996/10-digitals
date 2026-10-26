@@ -5,7 +5,8 @@ vi.mock('../../src/services/auth.js', () => ({
 }));
 
 const { getIdToken } = await import('../../src/services/auth.js');
-const { createCloudflareFlux, workerBaseUrl, REQUEST_TIMEOUT_MS } = await import('../../src/ai/render/cloudflareFlux.js');
+const { createCloudflareFlux, workerBaseUrl, parseQuota, REQUEST_TIMEOUT_MS, QUOTA_TIMEOUT_MS } = await import('../../src/ai/render/cloudflareFlux.js');
+const { finalLookErrorInfo, unavailableReason } = await import('../../src/screens/approve/aiMessages.js');
 const {
   FINAL_LOOK_PROMPT,
   FINAL_LOOK_SIZE,
@@ -165,6 +166,110 @@ describe('cloudflareFlux provider', () => {
     await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS + 10);
     await check;
     vi.useRealTimers();
+  });
+});
+
+describe('allowlist answers (SEC-08)', () => {
+  it('maps not_allowed and email_not_verified to notAllowed with its own message', async () => {
+    const json = (error) => async () => fakeResponse(403, { type: 'application/json', json: { error } });
+    const notAllowed = createCloudflareFlux({ url: 'https://w.example', fetchImpl: json('not_allowed') });
+    const err = await notAllowed.render(request()).catch((e) => e);
+    expect(err).toMatchObject({ code: 'notAllowed', status: 403 });
+    expect(finalLookErrorInfo(err)).toEqual({ code: 'notAllowed', key: 'approve.ai.notAllowed', retry: false });
+    const unverified = createCloudflareFlux({ url: 'https://w.example', fetchImpl: json('email_not_verified') });
+    const err2 = await unverified.render(request()).catch((e) => e);
+    expect(err2).toMatchObject({ code: 'notAllowed', reason: 'emailNotVerified' });
+    expect(finalLookErrorInfo(err2).key).toBe('approve.ai.emailNotVerified');
+    const notStaff = createCloudflareFlux({ url: 'https://w.example', fetchImpl: json('not_staff') });
+    await expect(notStaff.render(request())).rejects.toMatchObject({ code: 'failed' });
+  });
+
+  it('says before the consent when the Worker does not allow the shop or the cap is used up', () => {
+    const base = { settings: { aiPreview: true }, online: true, available: true, hasLook: true, hasPhoto: true };
+    expect(unavailableReason(base)).toBe(null);
+    expect(unavailableReason({ ...base, quota: null })).toBe(null);
+    expect(unavailableReason({ ...base, quota: { allowed: false, usedToday: 0, cap: 0 } })).toBe('notAllowed');
+    expect(unavailableReason({ ...base, quota: { allowed: true, usedToday: 20, cap: 20 } })).toBe('cap');
+    expect(unavailableReason({ ...base, quota: { allowed: true, usedToday: 3, cap: 20, accountUsed: 80, accountCap: 80 } })).toBe('cap');
+    expect(unavailableReason({ ...base, quota: { allowed: true, usedToday: 3, cap: 20, accountUsed: 10, accountCap: 80 } })).toBe(null);
+    expect(unavailableReason({ ...base, settings: { aiPreview: false }, quota: { allowed: false } })).toBe('disabled');
+  });
+});
+
+describe('fetchAiQuota (GET /quota)', () => {
+  const body = { usedToday: 3, cap: 20, accountUsed: 11, accountCap: 80, enabled: true, allowed: true, day: '2026-10-26', resetsAt: '2026-10-27T00:00:00.000Z' };
+
+  it('sends the ID token and the App Check token, and returns the Worker day numbers', async () => {
+    vi.stubGlobal('navigator', { onLine: true });
+    const fetchImpl = vi.fn(async () => fakeResponse(200, { type: 'application/json', json: body }));
+    const p = createCloudflareFlux({ url: 'https://w.example/', fetchImpl, getAppCheck: async () => 'app-check-token' });
+    expect(await p.quota('shop 1')).toEqual(body);
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe('https://w.example/quota?shopId=shop%201');
+    expect(init.method).toBe('GET');
+    expect(init.headers).toEqual({ Authorization: 'Bearer id-token', 'X-Firebase-AppCheck': 'app-check-token' });
+    expect(init.cache).toBe('no-store');
+  });
+
+  it('leaves the App Check header out when there is no token, and refreshes an expired ID token once', async () => {
+    vi.stubGlobal('navigator', { onLine: true });
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(fakeResponse(401, { type: 'application/json', json: { error: 'auth' } }))
+      .mockResolvedValueOnce(fakeResponse(200, { type: 'application/json', json: body }));
+    const p = createCloudflareFlux({ url: 'https://w.example', fetchImpl, getAppCheck: async () => null });
+    expect(await p.quota('s1')).toMatchObject({ usedToday: 3, cap: 20 });
+    expect(fetchImpl.mock.calls[0][1].headers).toEqual({ Authorization: 'Bearer id-token' });
+    expect(fetchImpl.mock.calls[1][1].headers.Authorization).toBe('Bearer fresh-token');
+  });
+
+  it('resolves null without a URL, offline, on a refusal, a network error or a timeout', async () => {
+    vi.stubGlobal('navigator', { onLine: true });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const ok = async () => fakeResponse(200, { type: 'application/json', json: body });
+    expect(await createCloudflareFlux({ url: '', fetchImpl: ok }).quota('s1')).toBe(null);
+    expect(await createCloudflareFlux({ url: 'https://w.example', fetchImpl: ok }).quota('')).toBe(null);
+    const refused = async () => fakeResponse(403, { type: 'application/json', json: { error: 'not_staff' } });
+    expect(await createCloudflareFlux({ url: 'https://w.example', fetchImpl: refused }).quota('s1')).toBe(null);
+    const broken = async () => {
+      throw new TypeError('Failed to fetch');
+    };
+    expect(await createCloudflareFlux({ url: 'https://w.example', fetchImpl: broken }).quota('s1')).toBe(null);
+    vi.stubGlobal('navigator', { onLine: false });
+    expect(await createCloudflareFlux({ url: 'https://w.example', fetchImpl: ok }).quota('s1')).toBe(null);
+    vi.stubGlobal('navigator', { onLine: true });
+    vi.useFakeTimers();
+    const hang = (url, init) =>
+      new Promise((resolve, rejectFn) => {
+        init.signal.addEventListener('abort', () => {
+          const err = new Error('aborted');
+          err.name = 'AbortError';
+          rejectFn(err);
+        });
+      });
+    const pending = createCloudflareFlux({ url: 'https://w.example', fetchImpl: hang }).quota('s1');
+    await vi.advanceTimersByTimeAsync(QUOTA_TIMEOUT_MS + 10);
+    expect(await pending).toBe(null);
+    vi.useRealTimers();
+    const ctrl = new AbortController();
+    const stopped = createCloudflareFlux({ url: 'https://w.example', fetchImpl: hang }).quota('s1', { signal: ctrl.signal });
+    ctrl.abort();
+    expect(await stopped).toBe(null);
+    warn.mockRestore();
+  });
+
+  it('keeps only well-formed numbers', () => {
+    expect(parseQuota({ usedToday: -1, cap: '20', accountUsed: 2.7, accountCap: null, enabled: 'yes', day: 'today', resetsAt: 'soon' })).toEqual({
+      usedToday: null,
+      cap: null,
+      accountUsed: 2,
+      accountCap: null,
+      enabled: null,
+      allowed: null,
+      day: null,
+      resetsAt: null,
+    });
+    expect(parseQuota(null).usedToday).toBe(null);
   });
 });
 

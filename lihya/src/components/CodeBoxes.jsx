@@ -49,6 +49,14 @@ export default function CodeBoxes({
     if (autoFocus && inputRef.current) inputRef.current.focus({ preventScroll: true });
   }, [autoFocus]);
 
+  // The keypad coming back (S14 "Enter another code", or a lookup that found nothing) puts the
+  // caret back in the boxes, as on first open, so a hardware keyboard types at once.
+  const keypadShown = useRef(keypad);
+  useEffect(() => {
+    if (autoFocus && keypad && !keypadShown.current && !disabled && inputRef.current) inputRef.current.focus({ preventScroll: true });
+    keypadShown.current = keypad;
+  }, [keypad, autoFocus, disabled]);
+
   const flashHint = (text) => {
     clearTimeout(hintTimer.current);
     setHint(text);
@@ -164,7 +172,7 @@ export default function CodeBoxes({
         />
       </div>
 
-      <p id={hintId} role="status" aria-live="polite" className={cx('min-h-[1.5em] text-center text-sm', error ? 'text-cut' : 'text-text-2')}>
+      <p id={hintId} role="status" aria-live="polite" className={cx('min-h-[1.5em] text-center text-sm', error ? 'text-cut-ink' : 'text-text-2')}>
         {error || hint}
       </p>
 

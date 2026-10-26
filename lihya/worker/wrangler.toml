@@ -25,6 +25,15 @@ FIREBASE_PROJECT_ID = "lihya"
 ALLOWED_ORIGINS = "https://lihya.web.app,https://lihya.firebaseapp.com,https://alzy1996.github.io,http://localhost:5173"
 # Renders per UTC day for the whole Cloudflare account (0..80; the Worker never goes above 80).
 ACCOUNT_DAILY_CAP = "80"
+# Shops allowed to use the AI preview (anyone can create a shop in the app, so the shared
+# daily budget is only for shops Sam lists). Comma separated Firebase shop ids; add ":<n>"
+# to let that shop's owner set up to n renders a day (1..80), otherwise the most is 20.
+# Example: "AbC123shopId,XyZ789shopId:40". Empty = no shop, unless it has a KV key.
+# The KV key ai:allowed:<shopId> in LIHYA_CAPS does the same without a redeploy and wins
+# over this list ("yes" or a number allows, "off" blocks):
+#   npx wrangler kv key put "ai:allowed:<shopId>" "20" --binding=LIHYA_CAPS --remote
+#   npx wrangler kv key delete "ai:allowed:<shopId>" --binding=LIHYA_CAPS --remote
+AI_SHOPS = ""
 
 # Logs: no invocation logs (they carry request details); the Worker writes one
 # line per request with the route, status, error code and timings only.

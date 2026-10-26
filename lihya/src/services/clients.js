@@ -11,8 +11,14 @@ import {
   autoId,
   cleanText,
   coarseLabels,
+  digitsOf,
   learnGrowthRate,
+  nameMatches,
+  nameQueryToken,
+  nameTokens,
   normalizePhone,
+  phoneQueryToken,
+  phoneTokens,
   searchKey,
   zoneLengths,
 } from './model.js';
@@ -34,7 +40,7 @@ import { toDate } from '../lib/time.js';
 function nameFields(displayName) {
   const name = cleanText(displayName, 80);
   if (!name) throw codedError('invalid-argument', 'displayName');
-  return { displayName: name, displayNameLower: searchKey(name) };
+  return { displayName: name, displayNameLower: searchKey(name), searchTokens: nameTokens(name) };
 }
 
 function phoneField(raw) {
@@ -93,32 +99,78 @@ export function watchDemoPresence(shopId, cb, onError) {
   return () => unsubs.forEach((u) => u && u());
 }
 
+// Candidates read per search before the on-device filter (multi-word names).
+const SEARCH_READ = 40;
+
+function byName(a, b) {
+  return String(a.displayNameLower || '').localeCompare(String(b.displayNameLower || ''));
+}
+
+/** Wait for every read; fail only when nothing was found and a read failed. */
+async function settle(reads, found) {
+  const results = await Promise.allSettled(reads);
+  if (!found.size) {
+    const failed = results.find((r) => r.status === 'rejected');
+    if (failed) throw failed.reason;
+  }
+  return [...found.values()].sort(byName).slice(0, SEARCH_LIMIT);
+}
+
 /**
- * Search by name prefix (Arabic letter variants and case ignored), or by phone when
- * the text is a phone number. Up to 10 results. Works offline from the cache.
+ * Search by the start of any word of the name (Arabic letter variants and case
+ * ignored, "Al Balushi" or "سالم" find "Hamad Al Balushi" or "أحمد سالم"), or by
+ * phone: a full number, or any 4 or more of its digits ("9123" finds +968 9123 4567).
+ * Up to 10 results, by name. Works offline from the cache. Clients saved before
+ * search tokens existed are still found by the start of their full name.
  */
 export async function searchClients(shopId, text) {
   requireShopId(shopId);
   const raw = String(text ?? '').trim();
   if (!raw) return [];
   const col = colRef(`shops/${shopId}/clients`);
-  const digits = raw.replace(/[^\d٠-٩+]/g, '');
-  if (digits.length >= 8) {
-    const phone = normalizePhone(raw);
-    if (phone.valid && phone.value) {
-      return readQuery(query(col, where('phone', '==', phone.value), limit(SEARCH_LIMIT)));
+  const found = new Map();
+  const add = (list) => {
+    for (const c of list || []) if (c && c.id && !found.has(c.id)) found.set(c.id, c);
+  };
+  const reads = [];
+
+  const digits = digitsOf(raw);
+  const isNumber = /^[\s\d٠-٩۰-۹+()-]+$/.test(raw);
+  if (isNumber && digits.length >= 4) {
+    const token = phoneQueryToken(raw);
+    if (token) reads.push(readQuery(query(col, where('phoneTokens', 'array-contains', token), limit(SEARCH_LIMIT))).then(add));
+    if (digits.length >= 8) {
+      const phone = normalizePhone(raw);
+      if (phone.valid && phone.value) {
+        reads.push(readQuery(query(col, where('phone', '==', phone.value), limit(SEARCH_LIMIT))).then(add));
+      }
     }
+    return settle(reads, found);
   }
+
   const key = searchKey(raw);
   if (!key) return [];
-  const q = query(
-    col,
-    where('displayNameLower', '>=', key),
-    where('displayNameLower', '<=', `${key}`),
-    orderBy('displayNameLower'),
-    limit(SEARCH_LIMIT),
+  const token = nameQueryToken(raw);
+  if (token) {
+    reads.push(
+      readQuery(query(col, where('searchTokens', 'array-contains', token), limit(SEARCH_READ))).then((list) =>
+        add(list.filter((c) => nameMatches(raw, c.displayName || c.displayNameLower))),
+      ),
+    );
+  }
+  // Older clients without tokens: the start of the whole name.
+  reads.push(
+    readQuery(
+      query(
+        col,
+        where('displayNameLower', '>=', key),
+        where('displayNameLower', '<=', `${key}\uf8ff`),
+        orderBy('displayNameLower'),
+        limit(SEARCH_LIMIT),
+      ),
+    ).then(add),
   );
-  return readQuery(q);
+  return settle(reads, found);
 }
 
 /** New client at the chair. Returns the id at once (offline-safe). */
@@ -126,13 +178,16 @@ export function createClient(shopId, { displayName, phone } = {}) {
   requireShopId(shopId);
   const me = requireUser();
   const id = autoId();
+  const names = nameFields(displayName);
+  const phoneValue = phoneField(phone);
   commitOps(
     [
       {
         path: `shops/${shopId}/clients/${id}`,
         data: {
-          ...nameFields(displayName),
-          phone: phoneField(phone),
+          ...names,
+          phone: phoneValue,
+          phoneTokens: phoneTokens(phoneValue),
           demo: false,
           lastVisitAt: serverTimestamp(),
           ...createdStamp(me.uid),
@@ -151,7 +206,10 @@ export function updateClient(shopId, id, patch = {}) {
   if (!id) throw codedError('invalid-argument', 'id');
   const change = {};
   if (patch.displayName !== undefined) Object.assign(change, nameFields(patch.displayName));
-  if (patch.phone !== undefined) change.phone = phoneField(patch.phone);
+  if (patch.phone !== undefined) {
+    change.phone = phoneField(patch.phone);
+    change.phoneTokens = phoneTokens(change.phone);
+  }
   if (!Object.keys(change).length) return;
   commitOps([{ path: `shops/${shopId}/clients/${id}`, data: { ...change, ...updatedStamp(me.uid) }, update: true }], 'client.update');
 }
@@ -249,8 +307,11 @@ export function importClients(shopId, rows) {
       data: {
         displayName: name,
         displayNameLower: searchKey(name),
+        searchTokens: nameTokens(name),
         phone: phone.value,
+        phoneTokens: phoneTokens(phone.value),
         demo: false,
+        // Never visited yet: the retention purge uses createdAt for these (shops.purgeExpiredData).
         lastVisitAt: null,
         ...createdStamp(me.uid),
       },

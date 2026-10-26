@@ -6,7 +6,7 @@ const TONES = {
   default: 'text-text active:bg-surface-2',
   muted: 'text-text-2 active:bg-surface-2',
   brass: 'text-brass active:bg-brass/10',
-  danger: 'text-cut active:bg-cut/10',
+  danger: 'text-cut-ink active:bg-cut/10',
   onBrass: 'bg-brass text-on-brass active:bg-brass/80',
   bordered: 'border border-line text-text active:bg-surface-2',
 };

@@ -95,7 +95,13 @@
     "capture.q.occasion": "A big occasion coming up?",
     "capture.q.occasion.eid": "Eid or wedding",
     "capture.q.occasion.none": "None",
-    "capture.q.answered": "{n} of 3 answered"
+    "capture.q.answered": "{n} of 3 answered",
+    "capture.card.chip": "White card",
+    "capture.card.chipHint": "Show the white-paper color check after the front photo",
+    "capture.manualCheck.photoLabel": "Hand photo for {shot}",
+    "capture.manualCheck.body": "Taken by hand for {shot}, but the pose does not match:",
+    "capture.manualCheck.retake": "Take it again",
+    "capture.card.once": "Asked once per session. Tap White card on the camera screen to use it again."
   },
   "ar": {
     "capture.title": "الصور",
@@ -193,6 +199,12 @@
     "capture.q.occasion": "هل لديك مناسبة قريبة؟",
     "capture.q.occasion.eid": "عيد أو عرس",
     "capture.q.occasion.none": "لا",
-    "capture.q.answered": "تمت الإجابة على {n} من 3"
+    "capture.q.answered": "تمت الإجابة على {n} من 3",
+    "capture.card.chip": "ورقة بيضاء",
+    "capture.card.chipHint": "اعرض معايرة الألوان بالورقة البيضاء بعد الصورة الأمامية",
+    "capture.manualCheck.photoLabel": "صورة يدوية لـ {shot}",
+    "capture.manualCheck.body": "التُقطت يدويًا لـ {shot}، لكن الوضعية غير مطابقة:",
+    "capture.manualCheck.retake": "أعد الالتقاط",
+    "capture.card.once": "تظهر مرة واحدة في كل جلسة. اضغط «ورقة بيضاء» في شاشة الكاميرا لاستخدامها مرة أخرى."
   }
 }

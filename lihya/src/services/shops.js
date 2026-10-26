@@ -13,6 +13,7 @@ import {
   colRef,
   commitOps,
   listenDoc,
+  readDoc,
   readQuery,
   recall,
   requireDb,
@@ -100,7 +101,8 @@ export function updateShop(shopId, patch = {}) {
 /**
  * Change settings (guard chart, growth rate, language, AI preview and cap,
  * retention, Try at home, WhatsApp). Invalid values throw before anything is
- * written. tryAtHome and whatsapp are mirrored into the public info doc.
+ * written. tryAtHome, whatsapp and defaultLanguage are mirrored into the public
+ * info doc (the Try at home page opens in the shop's language).
  */
 export function updateSettings(shopId, patch = {}) {
   requireShopId(shopId);
@@ -115,6 +117,7 @@ export function updateSettings(shopId, patch = {}) {
   const pub = {};
   if ('tryAtHome' in value) pub.tryAtHome = value.tryAtHome;
   if ('whatsapp' in value) pub.whatsapp = value.whatsapp;
+  if ('defaultLanguage' in value) pub.defaultLanguage = value.defaultLanguage;
   if (Object.keys(pub).length) {
     ops.push({ path: `shops/${shopId}/public/info`, data: { ...pub, ...updatedStamp(user.uid) }, merge: true });
   }
@@ -210,7 +213,7 @@ export function watchMyShops(uid, cb, onError) {
 }
 
 /**
- * Public info for Try at home: cb({ name, nameAr, tryAtHome, whatsapp }|null, meta).
+ * Public info for Try at home: cb({ name, nameAr, tryAtHome, whatsapp, defaultLanguage? }|null, meta).
  * When Try at home is off the rules hide the doc from the public: cb(null, { denied: true }).
  */
 export function watchPublicInfo(shopId, cb, onError) {
@@ -244,6 +247,30 @@ export function seedDemoData(shopId) {
   return { ...DEMO_COUNTS };
 }
 
+const COUNTERS = ['consultations', 'approvals', 'totalDecisionSeconds', 'aiRenders', 'addOns'];
+
+/**
+ * Negative stats deltas limited so no counter goes below 0 (the rules refuse a
+ * negative counter). `stats` is the day's current doc, or null when unknown (no
+ * limit is applied then, as before).
+ */
+export function floorDeltas(deltas, stats) {
+  if (!stats) return deltas;
+  const out = { ...deltas, topStyles: {} };
+  for (const k of COUNTERS) {
+    const d = Number(deltas[k]);
+    if (!Number.isFinite(d) || d >= 0) continue;
+    const have = Math.max(0, Number(stats[k]) || 0);
+    out[k] = Math.max(d, -have);
+  }
+  for (const [id, raw] of Object.entries(deltas.topStyles || {})) {
+    const d = Number(raw);
+    if (!Number.isFinite(d)) continue;
+    out.topStyles[id] = d >= 0 ? d : Math.max(d, -Math.max(0, Number(stats.topStyles?.[id]) || 0));
+  }
+  return out;
+}
+
 /**
  * Delete every demo client and consultation and take their numbers back out of
  * dailyStats. Needs a read of the demo docs (works from the cache offline).
@@ -260,9 +287,13 @@ export async function deleteDemoData(shopId) {
     ...clients.map((c) => ({ path: `shops/${shopId}/clients/${c.id}`, delete: true })),
     ...consultations.map((c) => ({ path: `shops/${shopId}/consultations/${c.id}`, delete: true })),
   ];
-  for (const [key, deltas] of Object.entries(reverseStats(consultations))) {
-    ops.push(statsOp(shopId, key, deltas, user.uid));
-  }
+  const reverse = reverseStats(consultations);
+  const current = await Promise.all(
+    Object.keys(reverse).map((key) => readDoc(`shops/${shopId}/dailyStats/${key}`).catch(() => null)),
+  );
+  Object.entries(reverse).forEach(([key, deltas], i) => {
+    ops.push(statsOp(shopId, key, floorDeltas(deltas, current[i]), user.uid));
+  });
   const deleted = clients.length + consultations.length;
   if (deleted) {
     ops.push(
@@ -281,10 +312,12 @@ const PURGE_LIMIT = 400;
 
 /**
  * Owner only: delete consultations older than the shop's retention period
- * (settings.retentionDays, Muscat days) and clients not seen since then. Spark has
- * no scheduled functions, so the owner's app runs this (for example when the owner
- * dashboard opens). Consent logs, the audit log and daily totals are kept.
- * Deletes at most 400 of each per call; `more` is true when another call is needed.
+ * (settings.retentionDays, Muscat days) and clients not seen since then. Clients
+ * who never visited (imported from CSV: lastVisitAt null) go when they were added
+ * before the cutoff. Spark has no scheduled functions, so the owner's app runs
+ * this (for example when the owner dashboard opens). Consent logs, the audit log
+ * and daily totals are kept. Deletes at most 400 of each kind per call; `more` is
+ * true when another call is needed.
  * Resolves { deleted, consultations, clients, cutoffKey, more }.
  */
 export async function purgeExpiredData(shopId, { now = new Date() } = {}) {
@@ -293,10 +326,13 @@ export async function purgeExpiredData(shopId, { now = new Date() } = {}) {
   const days = mergeSettings(recall(`shops/${shopId}`)?.settings).retentionDays;
   const cutoffKey = addDaysToKey(muscatDayKey(now), -days);
   const cutoffAt = Timestamp.fromDate(muscatDayRange(cutoffKey).start);
-  const [consultations, clients] = await Promise.all([
+  const clientsCol = colRef(`shops/${shopId}/clients`);
+  const [consultations, seen, neverSeen] = await Promise.all([
     readQuery(query(colRef(`shops/${shopId}/consultations`), where('dayKey', '<', cutoffKey), limit(PURGE_LIMIT))),
-    readQuery(query(colRef(`shops/${shopId}/clients`), where('lastVisitAt', '<', cutoffAt), limit(PURGE_LIMIT))),
+    readQuery(query(clientsCol, where('lastVisitAt', '<', cutoffAt), limit(PURGE_LIMIT))),
+    readQuery(query(clientsCol, where('lastVisitAt', '==', null), where('createdAt', '<', cutoffAt), limit(PURGE_LIMIT))),
   ]);
+  const clients = [...new Map([...seen, ...neverSeen].map((c) => [c.id, c])).values()];
   const deleted = consultations.length + clients.length;
   if (deleted) {
     commitOps(
@@ -321,6 +357,6 @@ export async function purgeExpiredData(shopId, { now = new Date() } = {}) {
     consultations: consultations.length,
     clients: clients.length,
     cutoffKey,
-    more: consultations.length === PURGE_LIMIT || clients.length === PURGE_LIMIT,
+    more: consultations.length === PURGE_LIMIT || seen.length === PURGE_LIMIT || neverSeen.length === PURGE_LIMIT,
   };
 }

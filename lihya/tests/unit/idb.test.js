@@ -12,6 +12,12 @@ import {
   listSavedForClient,
   deleteSavedForClient,
   pruneSaved,
+  savedKeyClient,
+  savedSummary,
+  countSaved,
+  countSavedForClient,
+  deleteAllSaved,
+  subscribeSaved,
 } from '../../src/lib/idb.js';
 
 // Minimal in-memory IndexedDB: open/upgrade, out-of-line keys, put/get/delete/clear/
@@ -65,6 +71,7 @@ function createFakeIndexedDB() {
           clear: () => write(() => (map.clear(), undefined)),
           getAll: () => request(() => [...map.values()].map((v) => structuredClone(v))),
           getAllKeys: () => request(() => [...map.keys()]),
+          count: () => request(() => map.size),
         });
         later(finish);
         return tx;
@@ -121,6 +128,10 @@ describe('without IndexedDB (private mode)', () => {
     expect(await listSavedForClient('c1')).toEqual([]);
     expect(await deleteSavedForClient('c1')).toBe(0);
     expect(await pruneSaved(30)).toBe(0);
+    expect(await countSaved()).toBe(0);
+    expect(await countSavedForClient('c1')).toBe(0);
+    expect(await savedSummary()).toEqual({ pairs: 0, clients: 0, byClient: {} });
+    expect(await deleteAllSaved()).toBe(0);
   });
 
   it('fails soft when opening throws', async () => {
@@ -186,6 +197,56 @@ describe('with IndexedDB', () => {
     expect(await deleteSavedForClient('c1')).toBe(1);
     expect(await listSavedForClient('c1')).toEqual([]);
     expect(await listSavedForClient('c2')).toHaveLength(1);
+  });
+
+  it('counts kept pairs per client from the keys, and deletes them all', async () => {
+    const changes = [];
+    const unsubscribe = subscribeSaved(() => changes.push('changed'));
+    const day = (d) => new Date(`2026-10-${d}T10:00:00Z`);
+    await saveBeforeAfter('c1', { before: new Blob(['a']), after: new Blob(['b']), at: day(10) });
+    await saveBeforeAfter('c1', { before: new Blob(['a']), after: new Blob(['b']), at: day(11) });
+    await saveBeforeAfter('c2', { before: new Blob(['a']), after: new Blob(['b']), at: day(12) });
+    expect(changes).toHaveLength(3);
+    expect(await countSaved()).toBe(3);
+    expect(await countSavedForClient('c1')).toBe(2);
+    expect(await countSavedForClient('nobody')).toBe(0);
+    expect(await countSavedForClient('')).toBe(0);
+    expect(await savedSummary()).toEqual({ pairs: 3, clients: 2, byClient: { c1: 2, c2: 1 } });
+    expect(await deleteSavedForClient('c2')).toBe(1);
+    expect(changes).toHaveLength(4);
+    expect(await deleteSavedForClient('c2')).toBe(0);
+    expect(changes).toHaveLength(4);
+    expect(await deleteAllSaved()).toBe(2);
+    expect(changes).toHaveLength(5);
+    expect(await countSaved()).toBe(0);
+    expect(await listSavedForClient('c1')).toEqual([]);
+    unsubscribe();
+    await saveBeforeAfter('c3', { before: new Blob(['a']), after: new Blob(['b']) });
+    expect(changes).toHaveLength(5);
+  });
+
+  it('prunes with the retention days it is given, and tells listeners only when something went', async () => {
+    const changes = [];
+    const unsubscribe = subscribeSaved(() => changes.push('changed'));
+    const now = new Date('2026-10-25T10:00:00Z');
+    await saveBeforeAfter('c1', { before: new Blob(['a']), after: new Blob(['b']), at: new Date('2026-09-01T10:00:00Z') });
+    await saveBeforeAfter('c2', { before: new Blob(['a']), after: new Blob(['b']), at: new Date('2026-10-20T10:00:00Z') });
+    changes.length = 0;
+    expect(await pruneSaved(365, now)).toBe(0);
+    expect(changes).toHaveLength(0);
+    // A shop that keeps records 30 days: the September pair goes, last week's stays.
+    expect(await pruneSaved(30, now)).toBe(1);
+    expect(changes).toHaveLength(1);
+    expect(await savedSummary()).toEqual({ pairs: 1, clients: 1, byClient: { c2: 1 } });
+    unsubscribe();
+  });
+
+  it('reads the client id back from a saved key', () => {
+    expect(savedKeyClient('c1:1761300000000:a1b2c3')).toBe('c1');
+    expect(savedKeyClient('odd:id:1761300000000:a1b2c3')).toBe('odd:id');
+    expect(savedKeyClient('nokey')).toBe(null);
+    expect(savedKeyClient(':1:2')).toBe(null);
+    expect(savedKeyClient(42)).toBe(null);
   });
 
   it('the session wipe clears the session store but keeps saved photos', async () => {

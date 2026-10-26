@@ -3,7 +3,8 @@
 // Counters are keyed by the UTC date because the Workers AI free allocation
 // resets at 00:00 UTC (04:00 Muscat):
 //   ai:account:<YYYY-MM-DD>           renders for the whole Cloudflare account (cap 80)
-//   ai:shop:<shopId>:<YYYY-MM-DD>     renders for one shop (cap min(settings.aiDailyCap ?? 20, 80))
+//   ai:shop:<shopId>:<YYYY-MM-DD>     renders for one shop (cap min(settings.aiDailyCap ?? 20, the
+//                                     shop's allowlist number (default 20), 80); see config.js
 // Each counter expires by itself three days later.
 //
 // A render reserves one slot on both counters BEFORE the model runs and gives

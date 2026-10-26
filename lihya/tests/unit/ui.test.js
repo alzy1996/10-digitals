@@ -1,6 +1,6 @@
 // UI kit: pure helpers, the icon sprite, the Zone Diagram geometry and static renders of the
 // pure-SVG components (they must work outside the app providers, inside the Cut Card PDF).
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +25,14 @@ const read = (p) => readFileSync(resolve(ROOT, p), 'utf8');
 
 // The test runner has no React plugin, so JSX compiles to React.createElement.
 globalThis.React = React;
+
+// Network and queued-write state for the SyncBadge renders (the real hooks need a browser and Firestore).
+const net = vi.hoisted(() => ({ online: true, pending: 0 }));
+vi.mock('../../src/hooks/useOnline.js', () => ({
+  useOnline: () => net.online,
+  usePendingWrites: () => net.pending,
+  default: () => net.online,
+}));
 
 const REQUIRED_ICONS = (
   'camera face profile scissors razor guard ruler timeline compare share print whatsapp lock cloud globe settings ' +
@@ -267,6 +275,222 @@ describe('pure SVG components render without providers', () => {
     expect((ruler.match(/<line /g) || []).length).toBeGreaterThan(30);
     const ring = renderToStaticMarkup(React.createElement(Ring, { value: 78, label: 'Grow-ability', lang: 'en' }));
     expect(ring).toContain('Grow-ability: 78%');
+  });
+
+  it('writes one percent sign, the Latin one, in Arabic too', () => {
+    const ring = renderToStaticMarkup(React.createElement(Ring, { value: 64, label: 'قابلية النمو', lang: 'ar' }));
+    expect(ring).toContain('قابلية النمو: 64%');
+    expect(ring).not.toContain('٪');
+  });
+});
+
+describe('status text contrast (PRD 9.1: WCAG AA in both themes)', () => {
+  const css = read('src/styles/tokens.css');
+  const block = (selector) => {
+    const start = css.indexOf(selector);
+    return css.slice(start, css.indexOf('}', start));
+  };
+  const tokens = (text) => Object.fromEntries([...text.matchAll(/--([a-z0-9-]+):\s*(#[0-9a-f]{6});/gi)].map((m) => [m[1], m[2]]));
+  const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const lum = (c) => {
+    const [r, g, b] = c.map((v) => {
+      const x = v / 255;
+      return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => {
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const tint = (fg, bg, alpha) => fg.map((v, i) => Math.round(v * alpha + bg[i] * (1 - alpha)));
+  const themes = { dark: tokens(block(':root,')), light: { ...tokens(block(':root,')), ...tokens(block("[data-theme='light']")) } };
+
+  it('every status ink reads at 4.5:1 or more on each surface and on its own 10% tint', () => {
+    const low = [];
+    for (const [theme, tk] of Object.entries(themes)) {
+      for (const tone of ['keep', 'cut', 'warn', 'info']) {
+        const ink = rgb(tk[`${tone}-ink`]);
+        for (const surface of ['bg', 'surface', 'surface-2']) {
+          const back = rgb(tk[surface]);
+          for (const [label, bg] of [[surface, back], [`${tone}/10 on ${surface}`, tint(rgb(tk[tone]), back, 0.1)]]) {
+            const r = ratio(ink, bg);
+            if (r < 4.5) low.push(`${theme} ${tone}-ink on ${label}: ${r.toFixed(2)}`);
+          }
+        }
+      }
+    }
+    expect(low).toEqual([]);
+  });
+
+  it('keeps the rgb triplets in step with the hex tokens', () => {
+    for (const [theme, tk] of Object.entries(themes)) {
+      for (const tone of ['keep', 'cut', 'warn', 'info']) {
+        const sel = theme === 'dark' ? ':root,' : "[data-theme='light']";
+        const m = new RegExp(`--${tone}-ink-rgb:\\s*(\\d+) (\\d+) (\\d+);`).exec(block(sel));
+        expect(m, `${theme} ${tone}-ink-rgb`).not.toBe(null);
+        expect(m.slice(1).map(Number), `${theme} ${tone}`).toEqual(rgb(tk[`${tone}-ink`]));
+      }
+    }
+  });
+
+  it('routes text-keep/cut/warn/info to the ink tokens and leaves fills on the PRD tokens', async () => {
+    const cfg = (await import('../../tailwind.config.js')).default;
+    for (const tone of ['keep', 'cut', 'warn', 'info']) {
+      expect(cfg.theme.extend.textColor[tone]).toBe(`rgb(var(--${tone}-ink-rgb) / <alpha-value>)`);
+      expect(cfg.theme.extend.colors[tone]).toBe(`rgb(var(--${tone}-rgb) / <alpha-value>)`);
+      expect(cfg.theme.extend.colors[`${tone}-ink`]).toBe(`rgb(var(--${tone}-ink-rgb) / <alpha-value>)`);
+    }
+  });
+});
+
+describe('sync badge (PRD 10.4, 14.2)', () => {
+  let SyncBadge;
+  let SyncStrip;
+  let syncBadgeState;
+  let en;
+  let ar;
+  beforeAll(async () => {
+    const mod = await import('../../src/components/SyncBadge.jsx');
+    SyncBadge = mod.default;
+    SyncStrip = mod.SyncStrip;
+    syncBadgeState = mod.syncBadgeState;
+    en = JSON.parse(read('src/lib/i18n/en.json'));
+    ar = JSON.parse(read('src/lib/i18n/ar.json'));
+  });
+
+  const render = (online, pending, Comp = SyncBadge, props = {}) => {
+    net.online = online;
+    net.pending = pending;
+    return renderToStaticMarkup(React.createElement(Comp, props));
+  };
+  // The phone copy: the visible lines below md (aria-hidden, md:hidden).
+  const phoneText = (html) => {
+    const m = /<span aria-hidden="true" class="[^"]*md:hidden[^"]*">([\s\S]*?)<\/span><span aria-hidden="true"/.exec(html);
+    return m ? m[1].replace(/<[^>]+>/g, '|') : '';
+  };
+
+  it('shows the pending message whenever writes are queued, online or not', () => {
+    expect(syncBadgeState({ online: true, pending: 0 })).toBe(null);
+    expect(syncBadgeState({ online: false, pending: 0 })).toMatchObject({ kind: 'offline', full: ['common.offline'] });
+    expect(syncBadgeState({ online: true, pending: 2 })).toMatchObject({ kind: 'pending', full: ['common.pendingSync'] });
+    expect(syncBadgeState({ online: false, pending: 2 })).toMatchObject({
+      kind: 'offline-pending',
+      full: ['common.offline', 'common.pendingSync'],
+      short: ['common.offline', 'ui.sync.savedShort'],
+    });
+  });
+
+  it('offline with queued writes: the reassurance is visible on phones and read in full', () => {
+    const html = render(false, 2);
+    expect(html).toContain(`${ar['common.offline']} · ${ar['common.pendingSync']}`);
+    const phone = phoneText(html);
+    expect(phone).toContain(ar['common.offline']);
+    expect(phone).toContain('محفوظ، ستتم المزامنة');
+    expect(phone).not.toContain('sr-only');
+  });
+
+  it('online with queued writes: visible on phones too, never icon-only', () => {
+    const html = render(true, 3);
+    expect(html).toContain(ar['common.pendingSync']);
+    expect(phoneText(html)).toContain('محفوظ، ستتم المزامنة');
+    expect(html).not.toContain(ar['common.offline']);
+  });
+
+  it('offline with nothing queued: Offline only; synced: an empty live region', () => {
+    const offline = render(false, 0);
+    expect(offline).toContain(ar['common.offline']);
+    expect(offline).not.toContain(ar['common.pendingSync']);
+    const synced = render(true, 0);
+    expect(synced).toContain('role="status"');
+    expect(synced).not.toContain(ar['common.offline']);
+    expect(synced).not.toContain(ar['common.pendingSync']);
+    expect(en['common.pendingSync']).toBe('Saved on this phone, will sync');
+  });
+
+  it('colors the badge text with the AA ink tokens', () => {
+    expect(render(false, 1)).toContain('text-warn-ink');
+    expect(render(true, 1)).toContain('text-info-ink');
+  });
+
+  it('in the top bar, phones get the offline message as a full line under the bar', () => {
+    // The pill leaves the offline states to the strip below md, and keeps them from md up.
+    const pill = render(false, 2, SyncBadge, { offlineStrip: true });
+    expect(pill).toContain('hidden md:inline-flex');
+    expect(pill).toContain(`${ar['common.offline']} · ${ar['common.pendingSync']}`);
+    // The brief online state stays in the bar on phones (no layout shift for each save).
+    expect(render(true, 2, SyncBadge, { offlineStrip: true })).not.toContain('hidden md:inline-flex');
+    const strip = render(false, 2, SyncStrip);
+    expect(strip).toContain('role="status"');
+    expect(strip).toContain('md:hidden');
+    expect(strip).toContain(`<span>${ar['common.offline']} · ${ar['common.pendingSync']}</span>`);
+    expect(strip).toContain('text-warn-ink');
+    expect(render(false, 0, SyncStrip)).toContain(`<span>${ar['common.offline']}</span>`);
+    expect(render(true, 2, SyncStrip)).not.toContain('data-sync');
+    expect(render(true, 0, SyncStrip)).not.toContain('data-sync');
+  });
+});
+
+describe('screen change motion (PRD 9.3)', () => {
+  let mod;
+  beforeAll(async () => {
+    mod = await import('../../src/components/ScreenTransition.jsx');
+  });
+
+  it('reads the duration token', () => {
+    expect(mod.parseDurationMs('320ms')).toBe(320);
+    expect(mod.parseDurationMs(' 0.32s ')).toBeCloseTo(320);
+    expect(mod.parseDurationMs('0ms')).toBe(0);
+    expect(mod.parseDurationMs('')).toBe(0);
+    expect(mod.parseDurationMs(undefined)).toBe(0);
+  });
+
+  it('runs 320 ms with the ease-out curve and leaves nothing applied afterwards', () => {
+    const plan = mod.screenEnterAnimation({ navType: 'PUSH', rtl: false, durationMs: 320, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' });
+    expect(plan.options).toEqual({ duration: 320, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'none' });
+    expect(plan.keyframes[0].opacity).toBe(0);
+    expect(plan.keyframes.at(-1)).toEqual({ opacity: 1, transform: 'none' });
+  });
+
+  it('slides in from the end side, mirrored in RTL and reversed for Back', () => {
+    const shift = (navType, rtl) => mod.screenEnterAnimation({ navType, rtl, durationMs: 320 }).keyframes[0].transform;
+    const px = mod.SCREEN_SHIFT_PX;
+    expect(shift('PUSH', false)).toBe(`translate3d(${px}px, 0, 0)`);
+    expect(shift('PUSH', true)).toBe(`translate3d(${-px}px, 0, 0)`);
+    expect(shift('POP', false)).toBe(`translate3d(${-px}px, 0, 0)`);
+    expect(shift('POP', true)).toBe(`translate3d(${px}px, 0, 0)`);
+    expect(shift('REPLACE', true)).toBeUndefined();
+  });
+
+  it('does not move at all with reduced motion or a zero duration', () => {
+    expect(mod.screenEnterAnimation({ navType: 'PUSH', durationMs: 320, reducedMotion: true })).toBe(null);
+    expect(mod.screenEnterAnimation({ navType: 'PUSH', durationMs: 0 })).toBe(null);
+  });
+});
+
+describe('route error boundary', () => {
+  let ErrorBoundary;
+  beforeAll(async () => {
+    ErrorBoundary = (await import('../../src/state/ErrorBoundary.jsx')).default;
+  });
+
+  it('clears the error when the route changes, and keeps one thrown on the new route', () => {
+    const boom = new Error('boom');
+    const crashed = { ...ErrorBoundary.getDerivedStateFromError(boom), resetKey: '/s/x/cut-card' };
+    expect(crashed.error).toBe(boom);
+    // Same route: the fallback stays.
+    expect(ErrorBoundary.getDerivedStateFromProps({ resetKey: '/s/x/cut-card' }, crashed)).toBe(null);
+    // Back to the Studio: the error clears and the new key is recorded.
+    expect(ErrorBoundary.getDerivedStateFromProps({ resetKey: '/s/x/studio' }, crashed)).toEqual({ error: null, resetKey: '/s/x/studio' });
+    // A screen that throws while the new route renders: the key is already recorded, so the error stays.
+    const navigated = { error: null, resetKey: '/s/x/studio' };
+    const thrownThere = { ...navigated, ...ErrorBoundary.getDerivedStateFromError(boom) };
+    expect(ErrorBoundary.getDerivedStateFromProps({ resetKey: '/s/x/studio' }, thrownThere)).toBe(null);
+  });
+
+  it('renders the children until something throws', () => {
+    const html = renderToStaticMarkup(React.createElement(ErrorBoundary, { resetKey: '/' }, React.createElement('p', null, 'screen')));
+    expect(html).toBe('<p>screen</p>');
   });
 });
 

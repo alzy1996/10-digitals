@@ -4,7 +4,9 @@
 //   'session'  the current chair or home session (cleared by the session wipe:
 //              "Next customer" or 10 minutes idle).
 //   'saved'    before/after photos the customer agreed to keep on this device
-//              (keepPhotos). Never synced, never uploaded.
+//              (keepPhotos). Never synced, never uploaded. Pruned with the shop's
+//              retention setting (pruneSaved, run by ShopRoute), deleted per client
+//              (deleteSavedForClient) or all at once from Settings (deleteAllSaved).
 //
 // Everything fails soft: in private mode, with storage blocked or without IndexedDB
 // at all, reads resolve to empty values and writes resolve to false, so the app
@@ -19,6 +21,27 @@ const STORE_NAMES = Object.values(STORES);
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 let dbPromise = null;
+const savedListeners = new Set();
+
+/**
+ * Called after the 'saved' store changed in this tab (a pair kept, pruned or deleted), so a
+ * screen showing the count can read it again. Returns the unsubscribe function.
+ */
+export function subscribeSaved(cb) {
+  if (typeof cb !== 'function') return () => {};
+  savedListeners.add(cb);
+  return () => savedListeners.delete(cb);
+}
+
+function savedChanged() {
+  for (const cb of [...savedListeners]) {
+    try {
+      cb();
+    } catch (err) {
+      console.warn('idb: saved-photos listener failed', err);
+    }
+  }
+}
 
 function idbFactory() {
   try {
@@ -218,6 +241,7 @@ export async function saveBeforeAfter(clientId, { before, after, at } = {}) {
   const when = timeOf(at ?? Date.now());
   const id = `${clientId}:${when}:${randomPart()}`;
   const ok = await idbPut(STORES.saved, id, { id, clientId, before: b, after: a, at: when, savedAt: Date.now() });
+  if (ok) savedChanged();
   return ok ? id : null;
 }
 
@@ -236,6 +260,7 @@ export async function deleteSavedForClient(clientId) {
   if (!clientId) return 0;
   const keys = (await idbAll(STORES.saved)).filter((e) => e && e.clientId === clientId).map((e) => e.id);
   const ok = await idbDeleteMany(STORES.saved, keys);
+  if (ok && keys.length) savedChanged();
   return ok ? keys.length : 0;
 }
 
@@ -246,5 +271,50 @@ export async function pruneSaved(maxAgeDays, now = Date.now()) {
   const cutoff = timeOf(now) - days * DAY_MS;
   const keys = (await idbAll(STORES.saved)).filter((e) => e && Number(e.at) < cutoff).map((e) => e.id);
   const ok = await idbDeleteMany(STORES.saved, keys);
+  if (ok && keys.length) savedChanged();
   return ok ? keys.length : 0;
+}
+
+/** Client id of a saved pair key `${clientId}:${at}:${random}` (null when the key has another shape). */
+export function savedKeyClient(key) {
+  if (typeof key !== 'string') return null;
+  const parts = key.split(':');
+  if (parts.length < 3) return null;
+  const clientId = parts.slice(0, -2).join(':');
+  return clientId || null;
+}
+
+/**
+ * What the 'saved' store holds, read from the keys only (no photo is loaded):
+ * { pairs, clients, byClient: { [clientId]: pairs } }.
+ */
+export async function savedSummary() {
+  const byClient = {};
+  const keys = await idbKeys(STORES.saved);
+  for (const k of keys) {
+    const id = savedKeyClient(k);
+    if (id) byClient[id] = (byClient[id] || 0) + 1;
+  }
+  return { pairs: keys.length, clients: Object.keys(byClient).length, byClient };
+}
+
+/** How many before/after pairs this device keeps (0 when IndexedDB is not available). */
+export async function countSaved() {
+  const r = await run(STORES.saved, 'readonly', (s) => s.count());
+  return r.ok && Number.isFinite(r.value) ? r.value : 0;
+}
+
+/** How many before/after pairs this device keeps for one client. */
+export async function countSavedForClient(clientId) {
+  if (!clientId) return 0;
+  const { byClient } = await savedSummary();
+  return byClient[clientId] || 0;
+}
+
+/** Delete every before/after pair kept on this device. Resolves how many were removed. */
+export async function deleteAllSaved() {
+  const n = await countSaved();
+  const ok = await idbClearStore(STORES.saved);
+  if (ok) savedChanged();
+  return ok ? n : 0;
 }

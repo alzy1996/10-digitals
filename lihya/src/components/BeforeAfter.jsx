@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Icon from './Icon.jsx';
+import { formatPercent } from '../lib/format.js';
 import { clamp, cx, useOptionalT } from './kit.js';
 
 const HOLD_MS = 180; // press this long without moving = show the original
@@ -45,7 +46,7 @@ export default function BeforeAfter({
   onHoldChange,
   className,
 }) {
-  const { t, isRTL: rtl } = useOptionalT();
+  const { t, lang, isRTL: rtl } = useOptionalT();
   const boxRef = useRef(null);
   const press = useRef(null);
   const [split, setSplit] = useState(clamp(Number.isFinite(Number(initial)) ? Number(initial) : 50, 0, 100));
@@ -173,7 +174,7 @@ export default function BeforeAfter({
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={Math.round(split)}
-              aria-valuetext={`${Math.round(split)}%`}
+              aria-valuetext={formatPercent(split, lang)}
               onKeyDown={onKeyDown}
               className="pointer-events-auto absolute top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border-2 border-text bg-bg text-text rtl:translate-x-1/2"
             >

@@ -108,6 +108,42 @@ export function faceBeardCrop(landmarks, w, h, beardBelowMm = 40) {
   return fitRect({ x: box.cx - side / 2, y: y0 - (side - (y1 - y0)) / 2, w: side, h: side }, w, h);
 }
 
+/** Time without a face from the start, once the landmarker can look, before Live AR says so (ms). */
+export const NO_FACE_MS = 1500;
+
+/**
+ * Decides when Live AR reports the face state. A change (found <-> lost) is reported at
+ * once. When no face is ever found, the state is still reported once, after noFaceMs of
+ * frames the landmarker really looked at (a model still loading does not count), so
+ * the screen can ask the customer to face the camera.
+ * Returns step(now, { found, changed, canDetect }) -> true | false (report this state) |
+ * null (nothing to report), and reset() for a new start.
+ */
+export function faceAnnouncer(noFaceMs = NO_FACE_MS) {
+  let announced = false;
+  let since = null;
+  return {
+    step(now, { found, changed, canDetect }) {
+      if (changed) {
+        announced = true;
+        return Boolean(found);
+      }
+      if (announced || found || !canDetect) return null;
+      if (since === null) {
+        since = now;
+        return null;
+      }
+      if (now - since < noFaceMs) return null;
+      announced = true;
+      return false;
+    },
+    reset() {
+      announced = false;
+      since = null;
+    },
+  };
+}
+
 let lightCanvas = null;
 
 /** Mean linear RGB of a disc of an RGBA buffer ([NaN x 3] when empty). */

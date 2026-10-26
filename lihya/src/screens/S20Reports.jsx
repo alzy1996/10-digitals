@@ -25,6 +25,7 @@ import ScreenFrame from '../components/ScreenFrame.jsx';
 import Stat from '../components/Stat.jsx';
 import Toggle from '../components/Toggle.jsx';
 import { useSnackbar } from '../components/Snackbar.jsx';
+import ClientImport from './owner/ClientImport.jsx';
 import ConsultationTable, { rowView } from './owner/ConsultationTable.jsx';
 import RangePrint, { PRINT_WIDTH } from './owner/RangePrint.jsx';
 import { Section } from './owner/ui.jsx';
@@ -240,6 +241,7 @@ export default function S20Reports() {
   );
 
   const kpiLoading = loading;
+  const showData = valid && !failed;
 
   return (
     <OwnerShell>
@@ -290,62 +292,61 @@ export default function S20Reports() {
               className="rounded-card border border-line bg-surface"
             />
           ) : valid ? (
-            <>
-              <section aria-labelledby="rep-summary" className="flex flex-col gap-3">
-                <div>
-                  <h2 id="rep-summary" className="text-xl">
-                    {t('owner.rep.summary.title')}
-                  </h2>
-                  <p className="mt-0.5 text-sm text-text-2">
-                    {rangeText} · {includeDemo ? t('report.daily.demoIncluded') : t('report.daily.demoExcluded')}
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                  <Stat icon="users" label={t('report.kpi.consultations')} value={summary.consultations} loading={kpiLoading} />
-                  <Stat icon="scissors" label={t('report.kpi.approvals')} value={summary.approvals} loading={kpiLoading} />
-                  <Stat
-                    icon="check"
-                    label={t('report.kpi.conversion')}
-                    value={isNum(summary.conversionPct) ? formatPercent(summary.conversionPct, lang) : <NoValue label={none} />}
-                    loading={kpiLoading}
-                  />
-                  <Stat
-                    icon="clock"
-                    label={t('owner.dash.kpi.decision')}
-                    value={isNum(summary.avgDecisionSeconds) ? formatDecision(summary.avgDecisionSeconds, t) : <NoValue label={none} />}
-                    loading={kpiLoading}
-                  />
-                  <Stat
-                    icon="star-line"
-                    label={t('report.kpi.rating')}
-                    value={isNum(summary.avgRating) ? oneDecimal(summary.avgRating) : <NoValue label={none} />}
-                    sub={summary.ratingCount ? t('owner.dash.kpi.ratingSub', { n: summary.ratingCount }) : null}
-                    loading={kpiLoading}
-                  />
-                  <Stat
-                    icon="box"
-                    label={t('report.kpi.addOns')}
-                    value={summary.addOns.count}
-                    sub={summary.addOns.count ? formatOmr(summary.addOns.totalOmr, lang) : null}
-                    loading={kpiLoading}
-                  />
-                  <Stat
-                    icon="cloud"
-                    label={t('report.kpi.ai')}
-                    value={singleDay ? t('report.kpi.aiOf', { used: aiUsed, cap: settings.aiDailyCap }) : aiUsed}
-                    loading={kpiLoading}
-                    className="col-span-2"
-                  />
-                </div>
-              </section>
+            <section aria-labelledby="rep-summary" className="flex flex-col gap-3">
+              <div>
+                <h2 id="rep-summary" className="text-xl">
+                  {t('owner.rep.summary.title')}
+                </h2>
+                <p className="mt-0.5 text-sm text-text-2">
+                  {rangeText} · {includeDemo ? t('report.daily.demoIncluded') : t('report.daily.demoExcluded')}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <Stat icon="users" label={t('report.kpi.consultations')} value={summary.consultations} loading={kpiLoading} />
+                <Stat icon="scissors" label={t('report.kpi.approvals')} value={summary.approvals} loading={kpiLoading} />
+                <Stat
+                  icon="check"
+                  label={t('report.kpi.conversion')}
+                  value={isNum(summary.conversionPct) ? formatPercent(summary.conversionPct, lang) : <NoValue label={none} />}
+                  loading={kpiLoading}
+                />
+                <Stat
+                  icon="clock"
+                  label={t('owner.dash.kpi.decision')}
+                  value={isNum(summary.avgDecisionSeconds) ? formatDecision(summary.avgDecisionSeconds, t) : <NoValue label={none} />}
+                  loading={kpiLoading}
+                />
+                <Stat
+                  icon="star-line"
+                  label={t('report.kpi.rating')}
+                  value={isNum(summary.avgRating) ? oneDecimal(summary.avgRating) : <NoValue label={none} />}
+                  sub={summary.ratingCount ? t('owner.dash.kpi.ratingSub', { n: summary.ratingCount }) : null}
+                  loading={kpiLoading}
+                />
+                <Stat
+                  icon="box"
+                  label={t('report.kpi.addOns')}
+                  value={summary.addOns.count}
+                  sub={summary.addOns.count ? formatOmr(summary.addOns.totalOmr, lang) : null}
+                  loading={kpiLoading}
+                />
+                <Stat
+                  icon="cloud"
+                  label={t('report.kpi.ai')}
+                  value={aiUsed}
+                  sub={singleDay ? t('report.kpi.aiCapDay', { cap: settings.aiDailyCap }) : null}
+                  loading={kpiLoading}
+                  className="col-span-2"
+                />
+              </div>
+            </section>
+          ) : null}
 
-              <div className="grid items-start gap-4 xl:grid-cols-3">
-                <Section
-                  title={t('owner.rep.export.title')}
-                  description={t('owner.rep.export.sub')}
-                  icon="download"
-                  className="xl:col-start-3 xl:row-start-1"
-                >
+          <div className="grid items-start gap-4 xl:grid-cols-3">
+            {/* Data out (exports) and data in (clients import) share the side column. */}
+            <div className="flex min-w-0 flex-col gap-4 xl:col-start-3 xl:row-start-1">
+              {showData ? (
+                <Section title={t('owner.rep.export.title')} description={t('owner.rep.export.sub')} icon="download">
                   <ExportRow title={t('owner.rep.pdf.title')} description={t('owner.rep.pdf.sub')}>
                     {singleDay ? (
                       <p className="text-sm text-text">{t('owner.rep.pdf.forDay', { date: mediumDay(pdfDay, lang) })}</p>
@@ -383,18 +384,21 @@ export default function S20Reports() {
                     </Button>
                   </ExportRow>
                 </Section>
+              ) : null}
+              <ClientImport shopId={shopId} t={t} />
+            </div>
 
-                <Section
-                  title={t('owner.rep.table.title')}
-                  description={t('owner.rep.table.sub', { n: list.length })}
-                  icon="list"
-                  className="xl:col-span-2 xl:col-start-1 xl:row-start-1"
-                >
-                  <ConsultationTable consultations={list} staff={staff} styles={styles} loading={loading} />
-                </Section>
-              </div>
-            </>
-          ) : null}
+            {showData ? (
+              <Section
+                title={t('owner.rep.table.title')}
+                description={t('owner.rep.table.sub', { n: list.length })}
+                icon="list"
+                className="xl:col-span-2 xl:col-start-1 xl:row-start-1"
+              >
+                <ConsultationTable consultations={list} staff={staff} styles={styles} loading={loading} />
+              </Section>
+            ) : null}
+          </div>
         </div>
       </ScreenFrame>
     </OwnerShell>

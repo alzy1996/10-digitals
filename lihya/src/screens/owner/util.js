@@ -152,6 +152,31 @@ export function workerUrl() {
   return raw.replace(/\/+$/, '');
 }
 
+/**
+ * What the dashboard's AI card shows. The Worker enforces the cap on its own count per UTC
+ * day (resets at 04:00 Muscat), so that count (quota.usedToday, quota.cap from fetchAiQuota)
+ * is shown whenever the Worker answered. Without an answer (offline, no Worker URL, refused)
+ * the shop's dailyStats.aiRenders for the Muscat day is shown against the settings cap and
+ * marked as an estimate, because the two days do not line up between 00:00 and 04:00 Muscat.
+ * @param {{ quota: object|null, statsRenders: number, settingsCap: number }} input
+ * @returns {{ used: number, cap: number, source: 'worker'|'estimate',
+ *   account: { used: number, cap: number }|null, notAllowed: boolean }}
+ */
+export function aiUsage({ quota = null, statsRenders = 0, settingsCap = 0 } = {}) {
+  const count = (v) => (isNum(v) && Number(v) >= 0 ? Math.floor(Number(v)) : null);
+  const q = quota && typeof quota === 'object' ? quota : null;
+  const fallbackCap = count(settingsCap) ?? 0;
+  const accountUsed = q ? count(q.accountUsed) : null;
+  const accountCap = q ? count(q.accountCap) : null;
+  const account = accountUsed !== null && accountCap !== null ? { used: accountUsed, cap: accountCap } : null;
+  const workerUsed = q ? count(q.usedToday) : null;
+  if (workerUsed !== null) {
+    const workerCap = count(q.cap);
+    return { used: workerUsed, cap: workerCap ?? fallbackCap, source: 'worker', account, notAllowed: q.allowed === false };
+  }
+  return { used: count(statsRenders) ?? 0, cap: fallbackCap, source: 'estimate', account, notAllowed: false };
+}
+
 // ------------------------------------------------------------------ one-shot reads from watchers
 
 /**
@@ -196,4 +221,46 @@ export function firstValue(subscribe, waitMs = 5000) {
       else finish(reject, Object.assign(new Error('timeout'), { code: 'unavailable' }));
     }, waitMs);
   });
+}
+
+// ------------------------------------------------------------------ clients CSV import (S20)
+
+const HEADER_REASON = 'report.csv.reason.header';
+const EMPTY_PARSE = Object.freeze({ rows: [], skipped: [], errors: [], preview: [], total: 0 });
+
+/** True for a file that looks like a CSV (by its name or its type). */
+export function isCsvFile(file) {
+  const name = String((file && file.name) || '').toLowerCase();
+  const type = String((file && file.type) || '').toLowerCase();
+  return name.endsWith('.csv') || type.includes('csv') || (type === 'text/plain' && !name.includes('.'));
+}
+
+/** The shop's client phones, for parseClientsCsv's "already in the shop" check. */
+export function clientPhones(clients) {
+  return (Array.isArray(clients) ? clients : []).map((c) => (c && c.phone ? String(c.phone) : '')).filter(Boolean);
+}
+
+/**
+ * What the clients import card shows for a parseClientsCsv() result.
+ * `filter` 'all' | 'skipped' (rows that will not be imported: problems and repeated phones).
+ * @returns {{ counts: { total, ready, duplicates, problems }, preview: object[], headerError: boolean,
+ *   noHeader: boolean, empty: boolean }}
+ */
+export function clientImportView(parsed, filter = 'all') {
+  const p = parsed && typeof parsed === 'object' ? { ...EMPTY_PARSE, ...parsed } : EMPTY_PARSE;
+  const headerError = p.errors.some((e) => Array.isArray(e.reasons) && e.reasons.includes(HEADER_REASON));
+  const preview = filter === 'skipped' ? p.preview.filter((x) => !x.ok) : p.preview;
+  return {
+    counts: {
+      total: p.total,
+      ready: p.rows.length,
+      duplicates: p.skipped.length,
+      problems: headerError ? 0 : p.errors.length,
+    },
+    preview,
+    headerError,
+    // Without a header row the parser reads displayName, phone in that order from row 1.
+    noHeader: p.preview.length > 0 && p.preview[0].row === 1,
+    empty: !headerError && p.total === 0,
+  };
 }

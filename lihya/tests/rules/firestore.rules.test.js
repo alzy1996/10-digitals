@@ -27,7 +27,16 @@ import {
 } from 'firebase/firestore';
 import { demoOps, reverseStats, shopOps } from '../../src/services/seed.js';
 import { applyOps, auditOp, statsOp } from '../../src/services/ops.js';
-import { DEFAULT_SETTINGS } from '../../src/services/model.js';
+import {
+  DEFAULT_SETTINGS,
+  clientSearchFields,
+  compactCutCard,
+  sanitizeParams,
+  sanitizeStylePatch,
+  styleData,
+} from '../../src/services/model.js';
+import { addOnsCountOps, approvalCountOps } from '../../src/services/consultations.js';
+import { clampParams, paramsFromStyle } from '../../src/lib/look.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
@@ -541,6 +550,7 @@ describe('clients', () => {
     const d = as.barber();
     await assertSucceeds(updateDoc(doc(d, `shops/${SHOP}/clients/c1`), {
       profile: { faceShape: 'square', mst: 6, undertone: 'olive', ageBand: '35-44', growability: 60 },
+      consent: { profile: true, at: serverTimestamp(), by: BARBER },
       updatedAt: serverTimestamp(), updatedBy: BARBER,
     }));
     await assertFails(updateDoc(doc(d, `shops/${SHOP}/clients/c1`), { createdBy: BARBER + 'x', updatedAt: serverTimestamp(), updatedBy: BARBER }));
@@ -771,5 +781,320 @@ describe('demo data', () => {
       expect(s.data().approvals ?? 0).toBe(0);
       expect(s.data().totalDecisionSeconds ?? 0).toBe(0);
     }
+  });
+});
+
+// ------------------------------------------------------------------ review fixes
+
+const BIG = 'data:image/jpeg;base64,' + 'A'.repeat(200 * 1024);
+
+// A full look as the Studio makes it (clampParams of a catalog style), stored the
+// way the services store it (sanitizeParams).
+function fullParams(styleId = 'goatee') {
+  const style = STYLES.find((x) => x.id === styleId) || STYLES[0];
+  return sanitizeParams(clampParams({ ...paramsFromStyle(style), presetId: 'eid-lineup' }));
+}
+
+describe('shop creation needs a verified email (SEC-08)', () => {
+  it('denies an unverified password account creating a shop', async () => {
+    const d = env.authenticatedContext('pw1', token('pw@lihya.test', { verified: false, provider: 'password' })).firestore();
+    await assertFails(setDoc(doc(d, 'shops/pw-shop'), { ...shopData(), createdBy: 'pw1', createdAt: serverTimestamp() }));
+  });
+
+  it('allows a verified account', async () => {
+    const d = env.authenticatedContext('pw2', token('pw2@lihya.test', { verified: true, provider: 'password' })).firestore();
+    await assertSucceeds(setDoc(doc(d, 'shops/pw-shop2'), { ...shopData(), createdBy: 'pw2', createdAt: serverTimestamp() }));
+  });
+});
+
+describe('look codes hold bounded style parameters only (SEC-01)', () => {
+  const create = (params, code = 'XYZ789') =>
+    setDoc(doc(as.anon(), `shops/${SHOP}/lookCodes/${code}`), lookCodeData(ANON, { params }));
+
+  it('allows a full look as the app stores it', async () => {
+    await seed();
+    await assertSucceeds(create(fullParams()));
+  });
+
+  it('denies a data: image, a thumbnail or any unknown key', async () => {
+    await seed();
+    await assertFails(create({ ...fullParams(), thumb: BIG }, 'XYZ781'));
+    await assertFails(create({ ...fullParams(), colorId: BIG }, 'XYZ782'));
+    await assertFails(create({ ...fullParams(), extra: 1 }, 'XYZ783'));
+  });
+
+  it('denies lengths out of range and unknown zones', async () => {
+    await seed();
+    await assertFails(create({ ...fullParams(), zones: { ...fullParams().zones, C: 1e9 } }, 'XYZ784'));
+    await assertFails(create({ ...fullParams(), zones: { C: -1 } }, 'XYZ785'));
+    await assertFails(create({ ...fullParams(), zones: { X: 3 } }, 'XYZ786'));
+    await assertFails(create({ ...fullParams(), zones: { C: '15' } }, 'XYZ787'));
+  });
+
+  it('denies malformed lines, finish, shape and numbers', async () => {
+    await seed();
+    await assertFails(create({ ...fullParams(), lines: 7 }, 'XYZ788'));
+    await assertFails(create({ ...fullParams(), lines: { cheek: 'low', evil: 'x' } }, 'XYZ789'));
+    await assertFails(create({ ...fullParams(), lines: { cheekOffset: 5 } }, 'XYZ78A'));
+    await assertFails(create({ ...fullParams(), finish: {} }, 'XYZ78B'));
+    await assertFails(create({ ...fullParams(), shape: { chin: 'round', blob: BIG } }, 'XYZ78C'));
+    await assertFails(create({ ...fullParams(), shape: { fadeB: [BIG, 2] } }, 'XYZ78D'));
+    await assertFails(create({ ...fullParams(), greyTarget: 500 }, 'XYZ78E'));
+    await assertFails(create({ ...fullParams(), styleId: 'x y' }, 'XYZ78F'));
+  });
+
+  it('denies a code whose style id is not an id', async () => {
+    await seed();
+    await assertFails(setDoc(doc(as.anon(), `shops/${SHOP}/lookCodes/XYZ79A`), lookCodeData(ANON, { styleId: '<b>x</b>' })));
+  });
+});
+
+describe('dailyStats only go up for barbers (SEC-04)', () => {
+  const stamp = (uid) => ({ updatedAt: serverTimestamp(), updatedBy: uid });
+  const statsDoc = `shops/${SHOP}/dailyStats/2026-10-25`;
+
+  it('denies a barber overwriting counters with lower or negative values', async () => {
+    await seed();
+    await assertFails(setDoc(doc(as.barber(), statsDoc), { consultations: 0, approvals: 999, ...stamp(BARBER) }));
+    await assertFails(setDoc(doc(as.barber(), statsDoc), { aiRenders: increment(-50), ...stamp(BARBER) }, { merge: true }));
+    await assertFails(setDoc(doc(as.barber(), statsDoc), { consultations: increment(-1), ...stamp(BARBER) }, { merge: true }));
+  });
+
+  it('denies huge, fractional or oversized values', async () => {
+    await seed();
+    await assertFails(setDoc(doc(as.barber(), `shops/${SHOP}/dailyStats/2099-01-01`), { aiRenders: 1e9, ...stamp(BARBER) }));
+    await assertFails(setDoc(doc(as.barber(), statsDoc), { approvals: increment(0.5), ...stamp(BARBER) }, { merge: true }));
+    const topStyles = Object.fromEntries(Array.from({ length: 101 }, (_, i) => [`s${i}`, 1]));
+    await assertFails(setDoc(doc(as.barber(), statsDoc), { topStyles, ...stamp(BARBER) }, { merge: true }));
+  });
+
+  it('allows a manager to take numbers out, never below zero', async () => {
+    await seed();
+    await assertSucceeds(setDoc(doc(as.manager(), statsDoc), { consultations: increment(-1), ...stamp(MANAGER) }, { merge: true }));
+    await assertFails(setDoc(doc(as.manager(), statsDoc), { consultations: increment(-1), ...stamp(MANAGER) }, { merge: true }));
+  });
+});
+
+describe('consultations: bounded look, honest Cut Card, counted once (SEC-05, F1, F11)', () => {
+  const stamp = (uid) => ({ updatedAt: serverTimestamp(), updatedBy: uid });
+  const card = () =>
+    compactCutCard({
+      zonesMm: { C: 15, K_L: 0 },
+      guards: { C: '4', K_L: 'shave' },
+      cheekLineMm: 22,
+      necklineMm: 30,
+      notes: { K_L: 'cutcard.scissorKeep' },
+      safetyFlags: ['patchTest48h'],
+    });
+  const approveData = (extra = {}) => ({
+    status: 'approved', approvedAt: serverTimestamp(), decisionSeconds: 90, params: fullParams(), styleId: 'goatee',
+    cutCard: card(), ...stamp(BARBER), ...extra,
+  });
+  const commit = (d, ops) => applyOps(writeBatch(d), d, ops).commit();
+  const countOps = () => approvalCountOps(SHOP, 'k1', { dayKey: '2026-10-25', seconds: 90, styleId: 'goatee', uid: BARBER });
+
+  it('allows the real approval data, denies an image in params or the Cut Card', async () => {
+    await seed();
+    const d = as.barber();
+    await assertFails(updateDoc(doc(d, `shops/${SHOP}/consultations/k1`), approveData({ params: { ...fullParams(), thumb: BIG } })));
+    await assertFails(updateDoc(doc(d, `shops/${SHOP}/consultations/k1`), approveData({ cutCard: { ...card(), photo: BIG } })));
+    await assertFails(updateDoc(doc(d, `shops/${SHOP}/consultations/k1`), approveData({ cutCard: { ...card(), notes: { C: BIG } } })));
+    await assertFails(updateDoc(doc(d, `shops/${SHOP}/consultations/k1`), approveData({ cutCard: { ...card(), safetyFlags: [BIG] } })));
+    await assertFails(updateDoc(doc(d, `shops/${SHOP}/consultations/k1`), approveData({ addOns: [BIG] })));
+    await assertSucceeds(updateDoc(doc(d, `shops/${SHOP}/consultations/k1`), approveData()));
+  });
+
+  it('counts an approval once: the second count batch is refused as a whole', async () => {
+    await seed();
+    const d = as.barber();
+    await assertSucceeds(commit(d, countOps()));
+    await assertSucceeds(updateDoc(doc(d, `shops/${SHOP}/consultations/k1`), approveData()));
+    // Reload + approve again: a new count batch, then the data.
+    await assertFails(commit(d, countOps()));
+    await assertSucceeds(updateDoc(doc(d, `shops/${SHOP}/consultations/k1`), approveData({ decisionSeconds: 169 })));
+    const stats = (await getDoc(doc(d, `shops/${SHOP}/dailyStats/2026-10-25`))).data();
+    expect(stats.approvals).toBe(1);
+    expect(stats.totalDecisionSeconds).toBe(90);
+    expect(stats.topStyles.goatee).toBe(1);
+  });
+
+  it('does not count a consultation approved before the flag existed', async () => {
+    await seed();
+    const d = as.barber();
+    await assertSucceeds(updateDoc(doc(d, `shops/${SHOP}/consultations/k1`), approveData()));
+    await assertFails(commit(d, countOps()));
+  });
+
+  it('counts add-ons once, at the first done', async () => {
+    await seed();
+    const d = as.barber();
+    const addOns = () => addOnsCountOps(SHOP, 'k1', { dayKey: '2026-10-25', count: 2, uid: BARBER });
+    await assertSucceeds(updateDoc(doc(d, `shops/${SHOP}/consultations/k1`), approveData()));
+    await assertSucceeds(commit(d, addOns()));
+    await assertSucceeds(updateDoc(doc(d, `shops/${SHOP}/consultations/k1`), { status: 'done', addOns: ['p1', 'p2'], rating: 5, ...stamp(BARBER) }));
+    await assertFails(commit(d, addOns()));
+  });
+
+  it('cancels a draft, never an approved consultation', async () => {
+    await seed();
+    const d = as.barber();
+    await assertSucceeds(updateDoc(doc(d, `shops/${SHOP}/consultations/k1`), approveData()));
+    await assertFails(updateDoc(doc(d, `shops/${SHOP}/consultations/k1`), { status: 'cancelled', ...stamp(BARBER) }));
+    await assertSucceeds(setDoc(doc(d, `shops/${SHOP}/consultations/k5`), consultationData(BARBER)));
+    await assertSucceeds(updateDoc(doc(d, `shops/${SHOP}/consultations/k5`), { status: 'cancelled', ...stamp(BARBER) }));
+  });
+});
+
+describe('clients: consent is honest, labels only with consent (SEC-05)', () => {
+  const stamp = (uid) => ({ updatedAt: serverTimestamp(), updatedBy: uid });
+  const labels = { faceShape: 'oval', mst: 5, undertone: 'warm', ageBand: '25-34', growability: 70 };
+
+  it("denies consent in the owner's name or with a past date", async () => {
+    await seed();
+    const d = as.barber();
+    await assertFails(updateDoc(doc(d, `shops/${SHOP}/clients/c1`), { consent: { profile: true, by: OWNER, at: past() }, ...stamp(BARBER) }));
+    await assertFails(updateDoc(doc(d, `shops/${SHOP}/clients/c1`), { consent: { profile: true, by: BARBER, at: past() }, ...stamp(BARBER) }));
+    await assertFails(setDoc(doc(d, `shops/${SHOP}/clients/c7`), clientData(BARBER, { consent: { profile: true, by: OWNER, at: past() } })));
+  });
+
+  it('denies profile labels without consent', async () => {
+    await seed();
+    await assertFails(updateDoc(doc(as.barber(), `shops/${SHOP}/clients/c1`), { profile: labels, ...stamp(BARBER) }));
+    await assertFails(updateDoc(doc(as.barber(), `shops/${SHOP}/clients/c1`), {
+      profile: labels, consent: { profile: false, by: BARBER, at: serverTimestamp() }, ...stamp(BARBER),
+    }));
+  });
+
+  it('allows the real visit record, denies blobs in it', async () => {
+    await seed();
+    const d = as.barber();
+    await assertSucceeds(updateDoc(doc(d, `shops/${SHOP}/clients/c1`), {
+      lastLengths: { zonesMm: { C: 15, M: 6 }, at: Timestamp.now() }, lastVisitAt: Timestamp.now(), ...stamp(BARBER),
+    }));
+    await assertFails(updateDoc(doc(d, `shops/${SHOP}/clients/c1`), {
+      lastLengths: { zonesMm: BIG, at: Timestamp.now() }, ...stamp(BARBER),
+    }));
+    await assertFails(updateDoc(doc(d, `shops/${SHOP}/clients/c1`), {
+      lastLengths: { zonesMm: { C: 15, photo: 1 }, at: Timestamp.now() }, ...stamp(BARBER),
+    }));
+  });
+
+  it('allows the visit record on a client with every field set (profile, consent, tokens)', async () => {
+    await seed();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `shops/${SHOP}/clients/full`), {
+        ...clientData(BARBER, { createdAt: past() }),
+        displayName: 'Abdulrahman Mohammed Al Mahrouqi',
+        ...clientSearchFields('Abdulrahman Mohammed Al Mahrouqi', '+96891234567'),
+        consent: { profile: true, at: past(), by: BARBER },
+        profile: labels,
+        growthMmPerDay: 0.4,
+        lastLengths: { zonesMm: { M: 6, S: 10, C: 15, J_L: 8, J_R: 8, K_L: 6, K_R: 6, B_L: 4, B_R: 4, N: 0 }, at: past() },
+      });
+    });
+    await assertSucceeds(updateDoc(doc(as.barber(), `shops/${SHOP}/clients/full`), {
+      lastLengths: { zonesMm: { M: 5, S: 9, C: 14, J_L: 7, J_R: 7, K_L: 5, K_R: 5, B_L: 3, B_R: 3, N: 0 }, at: Timestamp.now() },
+      lastVisitAt: Timestamp.now(), growthMmPerDay: 0.45, ...stamp(BARBER),
+    }));
+    await assertSucceeds(updateDoc(doc(as.barber(), `shops/${SHOP}/clients/full`), {
+      profile: { ...labels, mst: 6 }, consent: { profile: true, at: serverTimestamp(), by: BARBER }, ...stamp(BARBER),
+    }));
+  });
+
+  it('allows search tokens, denies oversized ones', async () => {
+    await seed();
+    const d = as.barber();
+    await assertSucceeds(setDoc(doc(d, `shops/${SHOP}/clients/c8`), clientData(BARBER, {
+      displayName: 'Hamad Al Balushi', ...clientSearchFields('Hamad Al Balushi', '+96891234567'),
+    })));
+    await assertFails(setDoc(doc(d, `shops/${SHOP}/clients/c9`), clientData(BARBER, { searchTokens: [BIG] })));
+    await assertFails(setDoc(doc(d, `shops/${SHOP}/clients/c10`), clientData(BARBER, { phoneTokens: [{ digits: '1234' }] })));
+  });
+
+  it('finds a client by any word and by part of the phone', async () => {
+    await seed();
+    const d = as.barber();
+    await setDoc(doc(d, `shops/${SHOP}/clients/c8`), clientData(BARBER, {
+      displayName: 'Hamad Al Balushi', ...clientSearchFields('Hamad Al Balushi', '+96891234567'),
+    }));
+    const col = collection(d, `shops/${SHOP}/clients`);
+    const byWord = await getDocs(query(col, where('searchTokens', 'array-contains', 'balushi'), limit(10)));
+    expect(byWord.docs.map((x) => x.id)).toEqual(['c8']);
+    const byDigits = await getDocs(query(col, where('phoneTokens', 'array-contains', '9123'), limit(10)));
+    expect(byDigits.docs.map((x) => x.id)).toEqual(['c8']);
+  });
+
+  it('lets the owner find clients who never visited for the retention purge (SEC-11)', async () => {
+    await seed();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `shops/${SHOP}/clients/imp1`), {
+        ...clientData(OWNER), lastVisitAt: null, createdAt: Timestamp.fromMillis(Date.now() - 5 * 365 * 86400000),
+      });
+    });
+    const q = query(collection(as.owner(), `shops/${SHOP}/clients`), where('lastVisitAt', '==', null), where('createdAt', '<', past()), limit(400));
+    const snap = await assertSucceeds(getDocs(q));
+    expect(snap.docs.map((x) => x.id)).toEqual(['imp1']);
+    await assertSucceeds(deleteDoc(doc(as.owner(), `shops/${SHOP}/clients/imp1`)));
+  });
+});
+
+describe('styles have the catalog shape (SEC-06)', () => {
+  const stamp = (uid) => ({ updatedAt: serverTimestamp(), updatedBy: uid });
+
+  it('denies a blob, a style without name or zones, and a non-text name', async () => {
+    await seed();
+    const d = as.manager();
+    await assertFails(updateDoc(doc(d, `shops/${SHOP}/styles/goatee`), { blob: BIG, ...stamp(MANAGER) }));
+    await assertFails(setDoc(doc(d, `shops/${SHOP}/styles/junk`), {
+      id: 'junk', hidden: false, order: -1e9, createdAt: serverTimestamp(), createdBy: MANAGER, ...stamp(MANAGER),
+    }));
+    await assertFails(updateDoc(doc(d, `shops/${SHOP}/styles/goatee`), { name: 42, ...stamp(MANAGER) }));
+    await assertFails(updateDoc(doc(d, `shops/${SHOP}/styles/goatee`), { name: { en: BIG, ar: 'x' }, ...stamp(MANAGER) }));
+    await assertFails(updateDoc(doc(d, `shops/${SHOP}/styles/goatee`), { zones: { C: 1e6 }, ...stamp(MANAGER) }));
+    await assertFails(updateDoc(doc(d, `shops/${SHOP}/styles/goatee`), { tags: [BIG], ...stamp(MANAGER) }));
+  });
+
+  it('allows a signature style as S16 creates it, and its edits', async () => {
+    await seed();
+    const d = as.manager();
+    const base = STYLES.find((x) => x.id === 'goatee') || STYLES[0];
+    const patch = sanitizeStylePatch({
+      name: { en: 'House goatee', ar: 'غوتي المحل' },
+      zones: { ...base.zones, C: 20 },
+      lines: { cheek: 'low', neckline: '2f', sideburn: 'blended', edge: 'crisp', mustacheEdge: 'at' },
+      faces: ['all'],
+      trimDays: 5,
+      localFit: 4,
+      lengthClass: 'short',
+      weights: null,
+      zoneNote: 'C 20, S 10, rest 0',
+    });
+    const { id: _id, ...rest } = base;
+    const data = styleData({ ...rest, ...patch, id: 'sig-goatee-abc123', hidden: false, signature: true, order: 91 });
+    data.baseId = base.id;
+    await assertSucceeds(setDoc(doc(d, `shops/${SHOP}/styles/sig-goatee-abc123`), {
+      ...data, createdAt: serverTimestamp(), createdBy: MANAGER, ...stamp(MANAGER),
+    }));
+    await assertSucceeds(updateDoc(doc(d, `shops/${SHOP}/styles/sig-goatee-abc123`), { ...patch, localFit: 2, ...stamp(MANAGER) }));
+    await assertSucceeds(updateDoc(doc(d, `shops/${SHOP}/styles/goatee`), { order: 340, ...stamp(MANAGER) }));
+  });
+});
+
+describe('public info carries the default language (PRD-01)', () => {
+  const info = (uid, extra = {}) => ({
+    name: 'Brass Chair', nameAr: 'الكرسي', tryAtHome: true, whatsapp: '', updatedAt: serverTimestamp(), updatedBy: uid, ...extra,
+  });
+
+  it('allows ar or en, denies anything else', async () => {
+    await seed();
+    await assertSucceeds(setDoc(doc(as.owner(), `shops/${SHOP}/public/info`), info(OWNER, { defaultLanguage: 'en' })));
+    await assertFails(setDoc(doc(as.owner(), `shops/${SHOP}/public/info`), info(OWNER, { defaultLanguage: 'fr' })));
+  });
+
+  it('lets a customer read it without signing in', async () => {
+    await seed();
+    await setDoc(doc(as.owner(), `shops/${SHOP}/public/info`), info(OWNER, { defaultLanguage: 'en' }));
+    const snap = await getDoc(doc(as.nobody(), `shops/${SHOP}/public/info`));
+    expect(snap.data().defaultLanguage).toBe('en');
   });
 });

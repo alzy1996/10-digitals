@@ -5,6 +5,7 @@ import { useShop } from '../state/ShopContext.jsx';
 import { useOnline } from '../hooks/useOnline.js';
 import { deleteDemoData, purgeExpiredData, updateSettings, updateShop } from '../services/shops.js';
 import { normalizeOmanPhone } from '../lib/format.js';
+import { deleteAllSaved, pruneSaved, savedSummary, subscribeSaved } from '../lib/idb.js';
 import { LIMITS } from '../config/app.js';
 import BottomAction from '../components/BottomAction.jsx';
 import Button from '../components/Button.jsx';
@@ -40,6 +41,76 @@ function useHashScroll() {
     }, 120);
     return () => clearTimeout(timer);
   }, [hash]);
+}
+
+/**
+ * Before/after photos customers agreed to keep on this device (IndexedDB 'saved' store):
+ * how many there are, the retention that deletes them, and "Delete all" with Undo.
+ */
+function SavedPhotos({ retentionDays }) {
+  const { t } = useT();
+  const { show, confirmUndo } = useSnackbar();
+  const [summary, setSummary] = useState(null);
+  // 'idle' | 'waiting' (Undo still showing) | 'deleting'
+  const [step, setStep] = useState('idle');
+
+  useEffect(() => {
+    let alive = true;
+    const read = () =>
+      savedSummary().then(
+        (s) => {
+          if (alive) setSummary(s);
+        },
+        () => {
+          if (alive) setSummary({ pairs: 0, clients: 0 });
+        },
+      );
+    read();
+    const unsubscribe = subscribeSaved(read);
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const pairs = summary ? summary.pairs : 0;
+  const deleteAll = () => {
+    if (!pairs || step !== 'idle') return;
+    setStep('waiting');
+    confirmUndo({
+      message: t('session.saved.confirm', { n: pairs }),
+      actionLabel: t('common.undo'),
+      onCommit: async () => {
+        setStep('deleting');
+        const n = await deleteAllSaved();
+        const left = (await savedSummary()).pairs;
+        setStep('idle');
+        show({ message: left ? t('session.saved.failed') : t('session.saved.deleted', { n }) });
+      },
+      onUndo: () => setStep('idle'),
+    });
+  };
+
+  let status;
+  if (!summary) status = t('session.saved.loading');
+  else if (!pairs) status = t('session.saved.none');
+  else if (summary.clients === 1) status = t('session.saved.countOne', { n: pairs });
+  else status = t('session.saved.count', { n: pairs, c: summary.clients });
+
+  return (
+    <Section title={t('session.saved.title')} description={t('session.saved.sub')} icon="compare">
+      <p className="num text-base text-text" aria-live="polite">
+        {status}
+      </p>
+      <p className="text-sm text-text-2">{t('session.saved.retention', { n: retentionDays })}</p>
+      <div>
+        <Button variant="danger" icon="trash" onClick={deleteAll} loading={step === 'deleting'} disabled={!pairs || step !== 'idle'}>
+          {t('session.saved.deleteAll')}
+        </Button>
+      </div>
+      <p className="text-sm text-text-2">{t('session.saved.otherDevices')}</p>
+    </Section>
+  );
 }
 
 /** S19: owner settings (/s/:shopId/owner/settings). */
@@ -172,6 +243,8 @@ export default function S19Settings() {
       actionLabel: t('common.undo'),
       onCommit: async () => {
         setBusy((b) => ({ ...b, purge: true }));
+        // Before/after photos kept on this phone follow the same period (this device only).
+        pruneSaved(days).catch((err) => console.warn('old before/after photos could not be deleted', err));
         try {
           let total = 0;
           for (let i = 0; i < 10; i += 1) {
@@ -417,6 +490,8 @@ export default function S19Settings() {
                 </div>
               </div>
             </Section>
+
+            <SavedPhotos retentionDays={settings.retentionDays} />
 
             <Section title={t('owner.set.device.title')} description={t('owner.set.device.sub')} icon="phone">
               <ChipRow

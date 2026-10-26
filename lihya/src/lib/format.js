@@ -29,10 +29,15 @@ export function formatMm(mm, lang = 'ar') {
   return lang === 'ar' ? `${v} مم` : `${v} mm`;
 }
 
-export function formatPercent(value, lang = 'ar') {
+/**
+ * Whole percent with the Latin sign in both languages ("64%"): digits stay Latin in Arabic, so one
+ * sign everywhere keeps chips, rings, sliders and sentences alike. The language argument stays in
+ * the signature so every caller keeps passing it.
+ */
+export function formatPercent(value, _lang = 'ar') {
   const n = Math.round(Number(value));
   if (!Number.isFinite(n)) return '';
-  return lang === 'ar' ? `${n}٪` : `${n}%`;
+  return `${n}%`;
 }
 
 /** Oman mobile/landline: +968 and 8 digits. Returns the normalized "+968XXXXXXXX" or null. */

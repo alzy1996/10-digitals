@@ -12,9 +12,8 @@
 // WhatsApp), 'screen' (fluid, theme colors).
 
 import ZoneDiagram, { ZONE_DIAGRAM_PRINT_PALETTE, ZONE_DIAGRAM_SCREEN_PALETTE } from '../components/ZoneDiagram.jsx';
-import BarberRuler from '../components/BarberRuler.jsx';
 import { translate, pickLang } from '../lib/i18n/useT.js';
-import { formatMm } from '../lib/format.js';
+import { formatMm, formatPercent } from '../lib/format.js';
 import { formatDayKey, formatMuscat, toDate } from '../lib/time.js';
 import { DEFAULT_GUARD_CHART } from '../lib/guards.js';
 import COLORS from '../data/colors.json';
@@ -24,6 +23,7 @@ import MUSTACHES from '../data/mustaches.json';
 import REASONS from '../data/reasons.json';
 import STYLES from '../data/styles.json';
 import { daysPhrase, trimPhrase, formatDuration, textDir } from './text.js';
+import { jawRuler, JAW_RULER_MAJOR_MM, JAW_RULER_TICK_MM } from './jawRuler.js';
 
 export const CUT_CARD_WIDTH = Object.freeze({ print: 440, share: 640 });
 
@@ -36,6 +36,10 @@ const PRINT = Object.freeze({
   keep: '#2E7D53',
   cut: '#A8331F',
   warn: '#9A6A12',
+  // Text in the status colours (the print hexes already read on white paper).
+  keepInk: '#2E7D53',
+  cutInk: '#A8331F',
+  warnInk: '#9A6A12',
 });
 const SCREEN = Object.freeze({
   paper: 'var(--surface)',
@@ -46,6 +50,10 @@ const SCREEN = Object.freeze({
   keep: 'var(--keep)',
   cut: 'var(--cut)',
   warn: 'var(--warn)',
+  // AA text versions of the status colours (tokens.css --*-ink); the plain ones stay for dots and fills.
+  keepInk: 'var(--keep-ink)',
+  cutInk: 'var(--cut-ink)',
+  warnInk: 'var(--warn-ink)',
 });
 
 const FONT_BODY = "'IBM Plex Sans Arabic', system-ui, sans-serif";
@@ -62,10 +70,17 @@ const FINISH_MAP = byId(FINISHES);
 const MUSTACHE_MAP = byId(MUSTACHES);
 const SAFETY_MAP = byId(REASONS.safetyQuestions);
 const STYLE_MAP = byId(STYLES);
+/** The barber's ruler laid along the jaw of the front diagram (same for every card). */
+const JAW_RULER = jawRuler();
+/** Visit-frequency answers the card can name (session.answers.visitFrequency). */
+const FREQUENCIES = new Set(['weekly', 'biweekly', 'monthly']);
+
+/** Only text or a number is printed; anything else (a broken look) prints a dash. */
+const printable = (v) => (typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v)) ? v : '—');
 
 function lineName(L, type, id) {
   const o = LINE_MAP.get(type)?.get(id);
-  return o ? pickLang(L, o.name) : id || '';
+  return o ? pickLang(L, o.name) : typeof id === 'string' ? id : '';
 }
 
 const sep = (L) => (L === 'ar' ? '، ' : ', ');
@@ -193,9 +208,9 @@ function Section({ title, pal, fs, children, first = false }) {
 function Pair({ label, value, sub, pal, fs }) {
   return (
     <div style={{ minWidth: 0 }}>
-      <div style={{ fontSize: fs.small, color: pal.ink2, lineHeight: 1.3 }}>{label}</div>
-      <div style={{ fontSize: fs.body, color: pal.ink, fontWeight: 500, lineHeight: 1.35 }}>{value}</div>
-      {sub ? <div style={{ fontSize: fs.small, color: pal.ink2, lineHeight: 1.3 }}>{sub}</div> : null}
+      <div style={{ fontSize: fs.small, color: pal.ink2, lineHeight: 1.3 }}>{printable(label)}</div>
+      <div style={{ fontSize: fs.body, color: pal.ink, fontWeight: 500, lineHeight: 1.35 }}>{printable(value)}</div>
+      {sub ? <div style={{ fontSize: fs.small, color: pal.ink2, lineHeight: 1.3 }}>{printable(sub)}</div> : null}
     </div>
   );
 }
@@ -216,7 +231,7 @@ function ZoneTable({ rows, L, t, pal, fs }) {
       </thead>
       <tbody>
         {rows.map((r) => (
-          <tr key={r.zone}>
+          <tr key={r.zone} data-pdf-block="">
             <td style={{ ...td, whiteSpace: 'nowrap' }}>
               <Dot color={r.shaved ? pal.cut : pal.keep} />
               {t(`zone.${r.zone}`)}
@@ -242,7 +257,7 @@ function ZoneList({ rows, L, t, pal, fs }) {
         {rows.map((r) => {
           const note = r.note && SHARE_NOTES.has(r.note.key) ? noteText(t, L, r.note) : '';
           return (
-            <tr key={r.zone}>
+            <tr key={r.zone} data-pdf-block="">
               <td style={td}>
                 <div style={{ whiteSpace: 'nowrap' }}>
                   <Dot color={r.shaved ? pal.cut : pal.keep} />
@@ -305,7 +320,7 @@ function lineValues(card, L, t) {
     { id: 'mustache', label: t('report.cut.mustache'), value: mustValue },
     { id: 'sideburn', label: t('report.cut.sideburn'), value: lineName(L, 'sideburn', sb.join), sub: sbSub },
     { id: 'edge', label: t('report.cut.edge'), value: lineName(L, 'edge', card.edge) },
-    { id: 'finish', label: t('report.cut.finish'), value: finish ? pickLang(L, finish.name) : card.finish || '' },
+    { id: 'finish', label: t('report.cut.finish'), value: finish ? pickLang(L, finish.name) : typeof card.finish === 'string' ? card.finish : '' },
   ];
 }
 
@@ -319,20 +334,32 @@ function LinesGrid({ card, L, t, pal, fs, columns, compact = false }) {
   );
 }
 
-function colorInfo(card, colors, L, t) {
-  const color = card.color || { id: 'natural', questions: [] };
+/**
+ * The colour line: the catalog name, and how much grey is kept when the look sets it.
+ * Grey blending is one phrase ("Grey blending, 50% grey kept"), never the name twice.
+ */
+export function colorLine(card, colors, L) {
+  const t = (k, v) => translate(L, k, v);
+  const color = card && card.color && typeof card.color === 'object' ? card.color : { id: 'natural', questions: [] };
   const entry = byId(colors).get(color.id) || COLOR_MAP.get(color.id);
   const natural = !entry || color.id === 'natural';
-  let name = natural ? t('report.cut.colorNatural') : pickLang(L, entry.name);
-  if (!natural && Number.isFinite(color.greyTarget)) {
-    name = `${name}${sep(L)}${t('report.cut.grey', { pct: `${color.greyTarget}${L === 'ar' ? '٪' : '%'}` })}`;
-  }
-  return { color, name, questions: Array.isArray(color.questions) ? color.questions : [] };
+  const grey = Number.isFinite(color.greyTarget) ? Math.round(color.greyTarget) : null;
+  const pct = grey === null ? '' : formatPercent(grey, L);
+  if (natural) return t('report.cut.colorNatural');
+  if (color.id === 'grey-blend') return t('report.cut.greyKeep', { pct: pct || formatPercent(entry.greyDefault ?? 50, L) });
+  const name = pickLang(L, entry.name);
+  return grey === null ? name : t('report.cut.greyKept', { name, pct });
+}
+
+function colorInfo(card, colors, L) {
+  const color = card.color || { id: 'natural', questions: [] };
+  return { color, name: colorLine(card, colors, L), questions: Array.isArray(color.questions) ? color.questions : [] };
 }
 
 function ColorBlock({ card, colors, L, t, pal, fs, compact = false }) {
-  const { color, name, questions } = colorInfo(card, colors, L, t);
+  const { color, name, questions } = colorInfo(card, colors, L);
   const tone = { ok: pal.keep, ask: pal.warn, stop: pal.cut };
+  const toneInk = { ok: pal.keepInk, ask: pal.warnInk, stop: pal.cutInk };
   const levelText = { ok: t('report.safety.ok'), ask: t('report.safety.ask'), stop: t('report.safety.stop') };
   const shown = compact ? questions.filter((q) => q.level !== 'ok') : questions;
   return (
@@ -352,14 +379,48 @@ function ColorBlock({ card, colors, L, t, pal, fs, compact = false }) {
                 <div style={{ minWidth: 0, fontSize: fs.small, color: pal.ink, lineHeight: 1.35 }}>
                   <span>{text}</span>
                   {compact ? null : <span style={{ color: pal.ink2 }}>{` ${t('report.safety.answerIs', { answer: answerText(t, q.answer) })}`}</span>}
-                  <span style={{ fontWeight: 600, color: tone[q.level] || pal.ink }}>{` · ${levelText[q.level] || ''}`}</span>
+                  <span style={{ fontWeight: 600, color: toneInk[q.level] || pal.ink }}>{` · ${levelText[q.level] || ''}`}</span>
                 </div>
               </div>
             );
           })}
         </div>
       ) : null}
-      {color.blocked ? <div style={{ marginTop: 3, fontSize: fs.body, fontWeight: 600, color: pal.cut }}>{t('report.cut.blocked')}</div> : null}
+      {color.blocked ? <div style={{ marginTop: 3, fontSize: fs.body, fontWeight: 600, color: pal.cutInk }}>{t('report.cut.blocked')}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * Why the next visit is not the trim interval, when it is not (chair:F18): he shapes it
+ * at home between visits ('homeTrim'), or he comes more often than the style needs
+ * ('visits'). Empty when the next visit is the trim interval itself.
+ */
+export function visitReason(card, L) {
+  const t = (k, v) => translate(L, k, v);
+  const basis = card ? card.nextVisitBasis : null;
+  if (basis === 'homeTrim') return t('report.cut.visit.homeTrim');
+  if (basis === 'visits' && FREQUENCIES.has(card.visitFrequency)) {
+    return t('report.cut.visit.visits', { freq: t(`report.cut.freq.${card.visitFrequency}`) });
+  }
+  return '';
+}
+
+/** Trim interval, next visit, and why they differ (both layouts). */
+function Maintenance({ card, nextDate, L, t, pal, fs, growth = true }) {
+  const reason = visitReason(card, L);
+  const trim = Number.isFinite(card.trimDays) && card.trimDays > 0 ? card.trimDays : null;
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: fs.small, color: pal.ink2, lineHeight: 1.3 }}>{t('report.cut.maintenance')}</div>
+      {trim ? <div style={{ fontSize: fs.body, color: pal.ink, fontWeight: 500, lineHeight: 1.35 }}>{trimPhrase(L, trim)}</div> : null}
+      <div style={{ fontSize: fs.body, color: pal.ink, fontWeight: 500, lineHeight: 1.35 }}>
+        {t('report.cut.nextVisit', { date: nextDate, days: daysPhrase(L, card.nextVisitDays) })}
+      </div>
+      {reason ? <div style={{ fontSize: fs.small, color: pal.ink2, lineHeight: 1.3 }}>{reason}</div> : null}
+      {growth && Number.isFinite(card.growthMmPerDay) ? (
+        <div style={{ fontSize: fs.small, color: pal.ink2, lineHeight: 1.3 }}>{t('report.cut.growth', { rate: card.growthMmPerDay })}</div>
+      ) : null}
     </div>
   );
 }
@@ -368,19 +429,27 @@ function ApprovalMaintenance({ card, approval, nextDate, L, t, pal, fs }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '6px 12px' }}>
       <Pair pal={pal} fs={fs} label={t('report.cut.approved')} value={approval} />
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: fs.small, color: pal.ink2, lineHeight: 1.3 }}>{t('report.cut.maintenance')}</div>
-        {card.trimDays ? (
-          <div style={{ fontSize: fs.body, color: pal.ink, fontWeight: 500, lineHeight: 1.35 }}>{trimPhrase(L, card.trimDays)}</div>
-        ) : null}
-        <div style={{ fontSize: fs.body, color: pal.ink, fontWeight: 500, lineHeight: 1.35 }}>
-          {t('report.cut.nextVisit', { date: nextDate, days: daysPhrase(L, card.nextVisitDays) })}
-        </div>
-        {Number.isFinite(card.growthMmPerDay) ? (
-          <div style={{ fontSize: fs.small, color: pal.ink2, lineHeight: 1.3 }}>{t('report.cut.growth', { rate: card.growthMmPerDay })}</div>
-        ) : null}
-      </div>
+      <Maintenance card={card} nextDate={nextDate} L={L} t={t} pal={pal} fs={fs} />
     </div>
+  );
+}
+
+/** The barber's ruler laid along the jaw, drawn over the front diagram in its own viewBox. */
+function JawRulerOverlay({ color }) {
+  if (!JAW_RULER) return null;
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox={`0 0 ${JAW_RULER.width} ${JAW_RULER.height}`}
+      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none' }}
+    >
+      <path d={JAW_RULER.d} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      <g stroke={color} strokeLinecap="round">
+        {JAW_RULER.ticks.map((tk, i) => (
+          <line key={i} x1={tk.x1} y1={tk.y1} x2={tk.x2} y2={tk.y2} strokeWidth={tk.major ? 1.25 : 0.9} />
+        ))}
+      </g>
+    </svg>
   );
 }
 
@@ -415,9 +484,6 @@ export default function CutCardDocument({ data, lang = 'ar', variant = 'print', 
   const chart = Array.isArray(d.guardChart) && d.guardChart.length ? d.guardChart : DEFAULT_GUARD_CHART;
   const zdPalette = screen ? ZONE_DIAGRAM_SCREEN_PALETTE : ZONE_DIAGRAM_PRINT_PALETTE;
   const diagramSize = share ? 196 : 176;
-  const kept = card.rows.filter((r) => r.mm > 0);
-  const longest = kept.length ? kept.reduce((a, b) => (b.mm > a.mm ? b : a)) : null;
-  const rulerMax = longest ? Math.min(160, Math.max(40, Math.ceil((longest.mm + 5) / 10) * 10)) : 40;
 
   const approvedAt = d.approved && d.approved.at ? toDate(d.approved.at) : null;
   const approval = approvedAt
@@ -432,29 +498,29 @@ export default function CutCardDocument({ data, lang = 'ar', variant = 'print', 
 
   const diagram = (view) => (
     <figure style={{ margin: 0, minWidth: 0, width: screen ? '100%' : diagramSize }}>
-      <ZoneDiagram
-        cutCard={card}
-        params={d.params || null}
-        view={view}
-        lang={L}
-        size={screen ? undefined : diagramSize}
-        guardChart={chart}
-        palette={zdPalette}
-      />
+      <div style={{ position: 'relative' }}>
+        <ZoneDiagram
+          cutCard={card}
+          params={d.params || null}
+          view={view}
+          lang={L}
+          size={screen ? undefined : diagramSize}
+          guardChart={chart}
+          palette={zdPalette}
+        />
+        {view === 'front' ? <JawRulerOverlay color={zdPalette.brass} /> : null}
+      </div>
       <figcaption style={{ textAlign: 'center', fontSize: fs.small, color: pal.ink2, lineHeight: 1.2 }}>
         {view === 'front' ? t('report.cut.front') : t('report.cut.profile')}
       </figcaption>
     </figure>
   );
 
-  const ruler = longest ? (
-    <div style={{ marginBottom: 6, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <div style={{ width: screen ? '100%' : 300, maxWidth: '100%' }}>
-        <BarberRuler mm={longest.mm} maxMm={rulerMax} lang={L} size={screen ? undefined : 300} color={pal.brass} textColor={pal.ink} />
-      </div>
-      <div style={{ fontSize: fs.small, color: pal.ink2, textAlign: 'center' }}>
-        {t('report.cut.ruler', { zone: t(`zone.${longest.zone}`), mm: formatMm(longest.mm, L) })}
-      </div>
+  // The ruler's key, under the two diagrams.
+  const rulerKey = JAW_RULER ? (
+    <div style={{ marginTop: 3, fontSize: fs.small, color: pal.ink2, textAlign: 'center', lineHeight: 1.3 }}>
+      <Dot color={pal.brass} />
+      {t('report.cut.jawRuler', { tick: formatMm(JAW_RULER_TICK_MM, L), major: formatMm(JAW_RULER_MAJOR_MM, L) })}
     </div>
   ) : null;
 
@@ -526,9 +592,12 @@ export default function CutCardDocument({ data, lang = 'ar', variant = 'print', 
       <article dir={L === 'ar' ? 'rtl' : 'ltr'} lang={L} className={className} style={rootStyle}>
         {header}
         {title}
-        <div data-pdf-block="" style={{ display: 'flex', justifyContent: 'center', gap: 28, marginTop: 4 }}>
-          {diagram('front')}
-          {diagram('profile')}
+        <div data-pdf-block="" style={{ marginTop: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 28 }}>
+            {diagram('front')}
+            {diagram('profile')}
+          </div>
+          {rulerKey}
         </div>
         <div data-pdf-block="" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, marginTop: 6 }}>
           <ZoneList rows={card.rows.slice(0, half)} L={L} t={t} pal={pal} fs={fs} />
@@ -544,13 +613,7 @@ export default function CutCardDocument({ data, lang = 'ar', variant = 'print', 
               <ColorBlock card={card} colors={d.colors} L={L} t={t} pal={pal} fs={fs} compact />
             </div>
             <Pair pal={pal} fs={fs} label={t('report.cut.approved')} value={approval} />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: fs.small, color: pal.ink2, lineHeight: 1.3 }}>{t('report.cut.maintenance')}</div>
-              {card.trimDays ? <div style={{ fontSize: fs.body, fontWeight: 500, lineHeight: 1.35 }}>{trimPhrase(L, card.trimDays)}</div> : null}
-              <div style={{ fontSize: fs.body, fontWeight: 500, lineHeight: 1.35 }}>
-                {t('report.cut.nextVisit', { date: nextDate, days: daysPhrase(L, card.nextVisitDays) })}
-              </div>
-            </div>
+            <Maintenance card={card} nextDate={nextDate} L={L} t={t} pal={pal} fs={fs} growth={false} />
           </div>
         </Section>
         {footer}
@@ -562,15 +625,17 @@ export default function CutCardDocument({ data, lang = 'ar', variant = 'print', 
     <article dir={L === 'ar' ? 'rtl' : 'ltr'} lang={L} className={className} style={rootStyle}>
       {header}
       {title}
-      <div data-pdf-block="" style={{ display: 'flex', justifyContent: 'center', gap: screen ? 12 : 24, marginTop: 4 }}>
-        {diagram('front')}
-        {diagram('profile')}
+      <div data-pdf-block="" style={{ marginTop: 4 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: screen ? 12 : 24 }}>
+          {diagram('front')}
+          {diagram('profile')}
+        </div>
+        {rulerKey}
       </div>
       <Section pal={pal} fs={fs} first>
         <ZoneTable rows={card.rows} L={L} t={t} pal={pal} fs={fs} />
       </Section>
       <Section title={t('report.cut.lines')} pal={pal} fs={fs}>
-        {ruler}
         <LinesGrid card={card} L={L} t={t} pal={pal} fs={fs} columns={2} />
       </Section>
       <Section title={t('report.cut.color')} pal={pal} fs={fs}>

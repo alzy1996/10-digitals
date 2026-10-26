@@ -284,6 +284,17 @@ export function sameDraft(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+/**
+ * Whether closing the signature editor may step back in history (navigate(-1)) instead of
+ * replacing its URL: only when the list opened it (location state `fromList`) and the entry
+ * behind it belongs to this app (the router's history index is above 0). A deep-linked or
+ * reloaded editor has nothing of ours behind it, and going back would leave the app.
+ */
+export function canStepBack(locationState, historyState) {
+  const idx = historyState && typeof historyState === 'object' ? Number(historyState.idx) : NaN;
+  return Boolean(locationState && locationState.fromList) && Number.isInteger(idx) && idx > 0;
+}
+
 // ---------------------------------------------------------------- products
 
 /**

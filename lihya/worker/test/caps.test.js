@@ -10,7 +10,7 @@ import {
   shopCounterKey,
   utcDayKey,
 } from '../src/caps.js';
-import { parseAccountCap, shopCapFrom } from '../src/config.js';
+import { allowanceFromKv, allowlistKey, parseAccountCap, parseAiShops, parseAllowCap, readConfig, shopCapFrom } from '../src/config.js';
 import { MemoryKV, SHOP_ID } from './helpers.js';
 
 const noSleep = async () => {};
@@ -44,15 +44,54 @@ describe('cap values', () => {
     expect(parseAccountCap('-3')).toBe(0);
   });
 
-  it('shop cap is min(settings.aiDailyCap ?? 20, account cap)', () => {
+  it('shop cap is min(settings.aiDailyCap ?? 20, the allowlist number, account cap)', () => {
+    // Not allowlisted with a higher number: never above the default 20 (SEC-08).
     expect(shopCapFrom(null, 80)).toBe(20);
     expect(shopCapFrom(undefined, 80)).toBe(20);
-    expect(shopCapFrom(50, 80)).toBe(50);
-    expect(shopCapFrom(80, 80)).toBe(80);
-    expect(shopCapFrom(500, 80)).toBe(80);
+    expect(shopCapFrom(50, 80)).toBe(20);
+    expect(shopCapFrom(500, 80)).toBe(20);
     expect(shopCapFrom(0, 80)).toBe(0);
-    expect(shopCapFrom(30, 10)).toBe(10);
     expect(shopCapFrom(12.7, 80)).toBe(12);
+    // Allowlisted with a higher number: the owner's cap within it and the account cap.
+    expect(shopCapFrom(50, 80, 80)).toBe(50);
+    expect(shopCapFrom(80, 80, 80)).toBe(80);
+    expect(shopCapFrom(500, 80, 80)).toBe(80);
+    expect(shopCapFrom(50, 80, 40)).toBe(40);
+    expect(shopCapFrom(null, 80, 40)).toBe(20);
+    expect(shopCapFrom(30, 10, 80)).toBe(10);
+    expect(shopCapFrom(30, 80, 'x')).toBe(20);
+  });
+});
+
+describe('allowlist (SEC-08)', () => {
+  it('reads the AI_SHOPS var as shop ids with an optional daily number', () => {
+    const shops = parseAiShops(' shopA , shopB:40, shopC:200, shopD:abc, ../evil, shopE:0, shopF:off, , shopG:  ');
+    expect([...shops.entries()]).toEqual([
+      ['shopA', 20],
+      ['shopB', 40],
+      ['shopC', 80],
+      ['shopD', 20],
+      ['shopG', 20],
+    ]);
+    expect(parseAiShops(undefined).size).toBe(0);
+    expect(parseAiShops('').size).toBe(0);
+    expect(readConfig({ AI_SHOPS: 'shopA:30' }).aiShops.get('shopA')).toBe(30);
+    expect(readConfig({}).aiShops.size).toBe(0);
+  });
+
+  it('reads the KV value: a number is the most a day, a block word blocks, anything else is the default', () => {
+    expect(allowlistKey('Shop1')).toBe('ai:allowed:Shop1');
+    expect(allowanceFromKv(null)).toBe(null);
+    expect(allowanceFromKv(undefined)).toBe(null);
+    expect(allowanceFromKv('40')).toEqual({ allowed: true, maxCap: 40 });
+    expect(allowanceFromKv(' 80 ')).toEqual({ allowed: true, maxCap: 80 });
+    expect(allowanceFromKv('500')).toEqual({ allowed: true, maxCap: 80 });
+    expect(allowanceFromKv('yes')).toEqual({ allowed: true, maxCap: 20 });
+    expect(allowanceFromKv('')).toEqual({ allowed: true, maxCap: 20 });
+    for (const word of ['0', 'no', 'OFF', 'false']) expect(allowanceFromKv(word)).toEqual({ allowed: false, maxCap: 0 });
+    expect(parseAllowCap('7')).toBe(7);
+    expect(parseAllowCap('-3')).toBe(20);
+    expect(parseAllowCap('1.5')).toBe(20);
   });
 });
 

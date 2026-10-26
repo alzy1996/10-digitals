@@ -7,15 +7,18 @@ import {
   hiddenByWorkRule,
   faceShares,
   faceFit,
-  growFor,
   contrastOf,
   contrastFit,
   lifeFit,
   eidBoosted,
   isFreshlyShaved,
+  zoneDensities,
+  growFor,
   WEAK_PENALTY,
   EID_BOOST,
 } from '../../src/ai/recommend/score.js';
+import { applyOverrides, ZONE_CONFIRM_DENSITY } from '../../src/ai/analysis/profile.js';
+import { ZONE_CONFIRM_DENSITY as SHARED_CONFIRM } from '../../src/ai/analysis/zoneConfirm.js';
 import { trimReason, pairingHints, warningsFor, workRuleNotice, MAX_REASONS } from '../../src/ai/recommend/reasons.js';
 
 const ZONES = ['M', 'S', 'C', 'J_L', 'J_R', 'K_L', 'K_R', 'B_L', 'B_R', 'N'];
@@ -445,5 +448,28 @@ describe('recommend: performance', () => {
     times.sort((a, b) => a - b);
     expect(times[Math.floor(times.length / 2)]).toBeLessThan(50);
     expect(times[times.length - 1]).toBeLessThan(150);
+  });
+});
+
+describe('zone confirmations score the same everywhere (code:F19)', () => {
+  it('uses one table: the profile and the ranking read a confirmed zone alike', () => {
+    expect(ZONE_CONFIRM_DENSITY).toBe(SHARED_CONFIRM);
+    expect(ZONE_CONFIRM_DENSITY.none).toBe(0);
+    const p = makeProfile({ density: 85 });
+    const overrides = { zones: { K_L: 'none', K_R: 'patchy', C: 'medium', M: 'dense' } };
+    const ranked = zoneDensities(p, overrides);
+    const effective = applyOverrides(p, overrides).beard.zones;
+    for (const z of ['K_L', 'K_R', 'C', 'M']) expect(ranked[z]).toBe(effective[z].density);
+    expect(ranked.K_L).toBe(0);
+  });
+
+  it('a barber-confirmed none counts like a measured none for the style cards', () => {
+    const style = STYLES.find((s) => s.id === 'full-medium');
+    const measured = makeProfile({ density: 85, zones: { K_L: 0 } });
+    const confirmed = makeProfile({ density: 85 });
+    const a = growFor(style, zoneDensities(measured, null));
+    const b = growFor(style, zoneDensities(confirmed, { zones: { K_L: 'none' } }));
+    expect(b.growability).toBe(a.growability);
+    expect(b.weak).toEqual(a.weak);
   });
 });

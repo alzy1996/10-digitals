@@ -12,7 +12,9 @@
 //   - segmentation every 3rd frame (only while a shell is shown), the light estimate
 //     every 12th frame;
 //   - an FPS meter; under 15 fps for 2 s it emits 'low-fps' so the screen can offer
-//     Photo Studio.
+//     Photo Studio;
+//   - 'face' events when the face is found or lost, and once 'face' false when no face
+//     is found for NO_FACE_MS from the start (frame.js faceAnnouncer).
 // Textures are generated off the main thread (textureJobs.js) and only when the look
 // changes: a quick 384 px pass first, then the full 1024 px beard.
 //
@@ -27,7 +29,7 @@ import { FACE_TEX_SIZE, FAST_TEX_SIZE, hasBeard } from './beardTextures.js';
 import { needsOutline } from './inpaint.js';
 import { textureJob, cachedTextures } from './textureJobs.js';
 import { growthAt, DEFAULT_GROWTH_MM_PER_DAY } from './timeline.js';
-import { frameMmPerPx, estimateLight } from './frame.js';
+import { frameMmPerPx, estimateLight, faceAnnouncer } from './frame.js';
 import { clamp, isNum, makeCanvas, nowMs } from './util.js';
 import { detectVideo, getLandmarker } from '../models/landmarker.js';
 import { segmentVideo, segmenterReliable } from '../models/segmenter.js';
@@ -135,6 +137,8 @@ export function createArRenderer({ canvas, video, mirror = true, growthMmPerDay 
   let light = null;
   let missing = LOST_FRAMES;
   let faceFound = false;
+  // 'face' events: every change, and once 'no face' when none is found from the start.
+  const faceState = faceAnnouncer();
   let seg = null;
 
   let params = null;
@@ -395,7 +399,12 @@ export function createArRenderer({ canvas, video, mirror = true, growthMmPerDay 
       missing += 1;
       if (missing >= LOST_FRAMES) faceFound = false;
     }
-    if (wasFound !== faceFound) emit('face', faceFound);
+    const report = faceState.step(now, {
+      found: faceFound,
+      changed: wasFound !== faceFound,
+      canDetect: modelStatus().landmarker === 'ready',
+    });
+    if (report !== null) emit('face', report);
 
     resize(vw, vh);
     const view = coverView(vw, vh, bufW, bufH);
@@ -468,6 +477,7 @@ export function createArRenderer({ canvas, video, mirror = true, growthMmPerDay 
       running = true;
       lowSince = 0;
       frameTimes.length = 0;
+      faceState.reset();
       getLandmarker().catch((err) => {
         console.error('Face landmarker failed to load', err);
         emit('error', err);

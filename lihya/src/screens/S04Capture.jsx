@@ -1,12 +1,15 @@
 // S04 Capture (PRD 5.2, 8.1 step 2, 8.2 step 3): full-screen front camera with a ghost
 // face outline, pose arrows, the customer's-left/right hint pill and the 4 shot dots.
-// The auto-shutter fires by itself; a hand shutter appears after 6 s without a shot.
-// Chair mode offers the optional white-card calibration on the front photo. Home mode
-// can use a photo instead of the live camera. Then the on-device analysis runs with a
-// skeleton shimmer and the step name, and the screen moves on to the profile (or to
-// the Studio when a Look Code is loaded). Photos never leave this phone.
+// The auto-shutter fires by itself; a hand shutter appears after 6 s without a shot
+// (a hand shot in the wrong pose is kept only after a warning). Chair mode offers the
+// optional white-card calibration on the front photo, once per working session (the
+// White card chip brings it back). Quick mode, once chosen, stays for the next
+// customers. Home mode can use a photo instead of the live camera. Then the on-device
+// analysis runs with a skeleton shimmer and the step name, and the screen moves on to
+// the profile (or to the Studio when a Look Code is loaded). Photos never leave this phone.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import ScreenFrame from '../components/ScreenFrame.jsx';
 import Button from '../components/Button.jsx';
@@ -23,6 +26,8 @@ import CaptureDots from './capture/CaptureDots.jsx';
 import GhostOverlay from './capture/GhostOverlay.jsx';
 import ShotView from './capture/ShotView.jsx';
 import { createShutterSound } from './capture/shutterSound.js';
+import { initialCaptureMode, markWhiteCardShown, whiteCardShown, writeCaptureModePref } from './capture/capturePrefs.js';
+import { manualShotWarnings } from './capture/manualCheck.js';
 import {
   cameraErrorKind,
   chooseFit,
@@ -42,6 +47,12 @@ const FALLBACK_MODEL_MB = 20;
 const orderFor = (mode) => (mode === 'quick' ? ['front'] : FULL_ORDER);
 const firstMissing = (mode, shots) => orderFor(mode).find((id) => !(shots && shots[id])) || null;
 const isComplete = (mode, shots) => orderFor(mode).every((id) => shots && shots[id]);
+
+/** "45°" in a left-to-right isolate so the degree sign stays after the number in Arabic (once). */
+function isolateDegrees(text) {
+  // Not inside a number (the lookbehind also skips digits), so an already isolated "⁦45°⁩" stays as it is.
+  return String(text).replace(/(?<![\u2066\d])(\d+°)/g, '\u2066$1\u2069');
+}
 
 function releaseCanvas(shot) {
   if (!shot || !shot.canvas) return;
@@ -139,6 +150,9 @@ export default function S04Capture() {
   const modeRef = useRef(captureMode);
   const lookCodeRef = useRef(lookCode);
   const cardDoneForRef = useRef(null);
+  // The white-card step for this customer: on for the first customer of the session.
+  const [cardWanted, setCardWantedState] = useState(() => mode === 'chair' && !whiteCardShown());
+  const cardWantedRef = useRef(cardWanted);
   const mirrorRef = useRef(true);
   const handlersRef = useRef({});
 
@@ -161,6 +175,7 @@ export default function S04Capture() {
   const [flashKey, setFlashKey] = useState(0);
   const [cardMsg, setCardMsg] = useState(null);
   const [upload, setUpload] = useState(null);
+  const [manualReview, setManualReview] = useState(null);
   const [step, setStep] = useState(null);
   const [capKey, setCapKey] = useState(0);
   const [stageSize, setStageSize] = useState(null);
@@ -176,6 +191,11 @@ export default function S04Capture() {
   const goPhase = useCallback((p) => {
     phaseRef.current = p;
     setPhaseState(p);
+  }, []);
+
+  const setCardWanted = useCallback((on) => {
+    cardWantedRef.current = on;
+    setCardWantedState(on);
   }, []);
 
   /* ------------------------------------------------------------ mount / unmount */
@@ -197,16 +217,18 @@ export default function S04Capture() {
     };
   }, []);
 
-  // A fresh capture: home mode defaults to the quick (front only) capture; a capture
-  // left half-way starts over (the auto-shutter always runs the shots in order).
+  // A fresh capture starts in the capture mode chosen earlier in this session (else the
+  // chair takes 4 photos and Try at home the quick front photo); a capture left half-way
+  // starts over (the auto-shutter always runs the shots in order).
   useEffect(() => {
     if (phaseRef.current !== 'live') return;
     const s = shotsRef.current;
     const any = FULL_ORDER.some((id) => s[id]);
     if (any) clearShots();
-    if (mode === 'home' && !any && !session.profile && modeRef.current !== 'quick') {
-      modeRef.current = 'quick';
-      setCaptureMode('quick');
+    const want = initialCaptureMode(mode);
+    if (!any && !session.profile && modeRef.current !== want) {
+      modeRef.current = want;
+      setCaptureMode(want);
     }
     // Runs once on mount only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -287,7 +309,9 @@ export default function S04Capture() {
   }, []);
 
   /* ------------------------------------------------------------ camera */
-  const cameraWanted = (phase === 'live' || phase === 'card') && visible;
+  // The camera stays on under the white-card step and the hand-shot check, so going
+  // back to the live view is instant.
+  const cameraWanted = (phase === 'live' || phase === 'card' || phase === 'manualReview') && visible;
 
   useEffect(() => {
     if (!cameraWanted) return undefined;
@@ -405,7 +429,15 @@ export default function S04Capture() {
       const result = await m.analyzeShots(input, {
         whiteCard: whiteCardRef.current,
         onStep: (_key, info) => {
-          if (!stale() && info) setStep({ index: info.index, total: info.total, i18nKey: info.i18nKey });
+          if (stale() || !info) return;
+          // Commit now: the analysis waits for the next paint before the step runs,
+          // so the step name is on screen while the heavy work blocks the thread.
+          const next = { index: info.index, total: info.total, i18nKey: info.i18nKey };
+          try {
+            flushSync(() => setStep(next));
+          } catch {
+            setStep(next);
+          }
         },
       });
       if (stale()) return;
@@ -417,18 +449,24 @@ export default function S04Capture() {
     }
   }, [goPhase, navigate, path, setProfile]);
 
-  /** After a shot: the white-card step (chair, new front photo), the next shot, or the analysis. */
+  /** The white-card step for the front photo, when wanted and not done for this photo yet. */
+  const openCard = useCallback(() => {
+    const front = shotsRef.current.front;
+    if (!chair || !cardWantedRef.current || !front || cardDoneForRef.current === front) return false;
+    if (capRef.current) capRef.current.stop();
+    setCardMsg(null);
+    markWhiteCardShown();
+    goPhase('card');
+    return true;
+  }, [chair, goPhase]);
+
+  /** After a shot: the white-card step (chair, new front photo, once per session), the next shot, or the analysis. */
   const afterShot = useCallback(
     (id) => {
-      if (chair && id === 'front' && shotsRef.current.front && cardDoneForRef.current !== shotsRef.current.front) {
-        if (capRef.current) capRef.current.stop();
-        setCardMsg(null);
-        goPhase('card');
-        return;
-      }
+      if (id === 'front' && openCard()) return;
       if (isComplete(modeRef.current, shotsRef.current)) runAnalysis();
     },
-    [chair, goPhase, runAnalysis],
+    [openCard, runAnalysis],
   );
 
   // Capture-session callbacks read the latest closures through this ref.
@@ -513,10 +551,18 @@ export default function S04Capture() {
     try {
       if (!blob) throw new Error('no video frame');
       const m = modRef.current || (await modPromiseRef.current);
-      const { shot } = await m.shotFromImage(blob, id);
+      const { shot, issues } = await m.shotFromImage(blob, id);
       if (!mountedRef.current) return;
       if (!shot) {
         setManualMsg('noFace');
+        return;
+      }
+      // The pose is not checked by hand: a side or chin-up photo in the wrong pose (or a
+      // front photo turned well away) is kept only when the barber says so.
+      const warnings = manualShotWarnings(id, shot.pose, issues);
+      if (warnings.length) {
+        setManualReview({ shot, id, issues: warnings });
+        goPhase('manualReview');
         return;
       }
       acceptShot(shot);
@@ -527,6 +573,22 @@ export default function S04Capture() {
     } finally {
       if (mountedRef.current) setManualBusy(false);
     }
+  };
+
+  const keepManualShot = () => {
+    const review = manualReview;
+    if (!review) return;
+    setManualReview(null);
+    goPhase('live');
+    acceptShot(review.shot);
+    afterShot(review.id);
+  };
+
+  const retakeManualShot = () => {
+    if (manualReview) releaseCanvas(manualReview.shot);
+    setManualReview(null);
+    setManualMsg(null);
+    goPhase('live');
   };
 
   /* ------------------------------------------------------------ actions */
@@ -540,6 +602,8 @@ export default function S04Capture() {
 
   const restartAll = () => {
     analysisRunRef.current += 1;
+    if (manualReview) releaseCanvas(manualReview.shot);
+    setManualReview(null);
     clearShots();
     shotsRef.current = { front: null, left: null, right: null, chinUp: null };
     whiteCardRef.current = null;
@@ -561,12 +625,20 @@ export default function S04Capture() {
     const next = captureMode === 'quick' ? 'full' : 'quick';
     modeRef.current = next;
     setCaptureMode(next);
+    writeCaptureModePref(mode, next);
     setManualMode(false);
     setStatus(null);
     if (next === 'quick') {
       for (const id of ['left', 'right', 'chinUp']) if (shotsRef.current[id]) dropShot(id);
       if (shotsRef.current.front) afterShot('front');
     }
+  };
+
+  // White card chip: brings the white-paper step back for this customer (or skips it).
+  const toggleCard = () => {
+    const next = !cardWantedRef.current;
+    setCardWanted(next);
+    if (next && phaseRef.current === 'live') openCard();
   };
 
   const toggleMirror = () => {
@@ -596,6 +668,8 @@ export default function S04Capture() {
 
   const finishCard = () => {
     cardDoneForRef.current = shotsRef.current.front;
+    // Skipped: not asked again for this customer (a retaken front photo goes straight on).
+    if (!whiteCardRef.current) setCardWanted(false);
     setCardMsg(null);
     if (isComplete(modeRef.current, shotsRef.current)) {
       runAnalysis();
@@ -699,16 +773,12 @@ export default function S04Capture() {
   else hintText = '';
 
   // "45°" kept in a left-to-right isolate so the degree sign stays after the number in Arabic.
-  const shotLine = currentId
-    ? `${t('ai.shot.count', { n: index + 1, total: order.length })} · ${t(`ai.shot.${currentId}`)}`.replace(
-        /(\d+°)/g,
-        '\u2066$1\u2069',
-      )
-    : '';
+  const shotLine = currentId ? isolateDegrees(`${t('ai.shot.count', { n: index + 1, total: order.length })} · ${t(`ai.shot.${currentId}`)}`) : '';
 
   const titles = {
     live: t('capture.title'),
     card: t('capture.card.title'),
+    manualReview: t('ai.issue.title'),
     upload: t('ai.issue.title'),
     analyzing: t('capture.analyzing'),
     analysisError: t('capture.analyzing'),
@@ -831,6 +901,7 @@ export default function S04Capture() {
             <span className="me-2 inline-block rounded-full border border-line px-2 text-xs text-text-2">{t('capture.card.optional')}</span>
             {t('ai.whiteCard.help')}
           </p>
+          <p className="mt-1 text-xs text-text-2">{t('capture.card.once')}</p>
           {cardMsg ? (
             <p
               role="alert"
@@ -844,6 +915,37 @@ export default function S04Capture() {
       </div>
     </>
   );
+
+  const issueBox = (issues, sub) => (
+    <div className="gutter absolute inset-x-0 bottom-3">
+      <div role="alert" className="mx-auto max-w-md rounded-card border border-warn/60 bg-bg p-4 text-start">
+        <h2 className="flex items-center gap-2 text-lg text-warn">
+          <Icon name="warning" size={22} />
+          {t('ai.issue.title')}
+        </h2>
+        {sub ? <p className="mt-1 text-sm text-text-2">{sub}</p> : null}
+        <ul className="mt-2 flex flex-col gap-1 text-text">
+          {issues.map((k) => (
+            <li key={k} className="flex items-start gap-2">
+              <span aria-hidden="true" className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-warn" />
+              <span>{t(`ai.hint.${k}`)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+
+  const renderManualReview = () => {
+    if (!manualReview) return null;
+    const shotName = isolateDegrees(t(`ai.shot.${manualReview.id}`));
+    return (
+      <>
+        <ShotView shot={manualReview.shot} label={t('capture.manualCheck.photoLabel', { shot: shotName })} />
+        {issueBox(manualReview.issues, t('capture.manualCheck.body', { shot: shotName }))}
+      </>
+    );
+  };
 
   const renderUpload = () => {
     if (!upload || upload.state === 'checking') {
@@ -866,22 +968,7 @@ export default function S04Capture() {
     return (
       <>
         <ShotView shot={upload.shot} label={t('capture.upload.photoLabel')} />
-        <div className="gutter absolute inset-x-0 bottom-3">
-          <div role="alert" className="mx-auto max-w-md rounded-card border border-warn/60 bg-bg p-4 text-start">
-            <h2 className="flex items-center gap-2 text-lg text-warn">
-              <Icon name="warning" size={22} />
-              {t('ai.issue.title')}
-            </h2>
-            <ul className="mt-2 flex flex-col gap-1 text-text">
-              {upload.issues.map((k) => (
-                <li key={k} className="flex items-start gap-2">
-                  <span aria-hidden="true" className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-warn" />
-                  <span>{t(`ai.hint.${k}`)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+        {issueBox(upload.issues)}
       </>
     );
   };
@@ -954,6 +1041,7 @@ export default function S04Capture() {
     analyzing: renderAnalyzing,
     analysisError: renderAnalysisError,
     review: renderReview,
+    manualReview: renderManualReview,
   }[phase];
 
   /* ------------------------------------------------------------ footer */
@@ -972,11 +1060,18 @@ export default function S04Capture() {
             </Button>
           </div>
         ) : null}
-        <div className="flex flex-wrap items-center gap-3">
-          <Chip selected={captureMode === 'quick'} onClick={toggleQuick} icon="flash">
-            {t('capture.quick')}
-          </Chip>
-          <span className="text-sm text-text-2">{t('capture.quickHint')}</span>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <span className="inline-flex items-center gap-3">
+            <Chip selected={captureMode === 'quick'} onClick={toggleQuick} icon="flash">
+              {t('capture.quick')}
+            </Chip>
+            <span className="text-sm text-text-2">{t('capture.quickHint')}</span>
+          </span>
+          {chair ? (
+            <Chip selected={cardWanted} onClick={toggleCard} icon="bulb" disabled={manualBusy} title={t('capture.card.chipHint')}>
+              {t('capture.card.chip')}
+            </Chip>
+          ) : null}
         </div>
         {uploadButton}
       </BottomAction>
@@ -989,6 +1084,17 @@ export default function S04Capture() {
         </Button>
         <Button variant="ghost" icon="refresh" onClick={retakeFrontFromCard} full>
           {t('capture.card.retakeFront')}
+        </Button>
+      </BottomAction>
+    );
+  } else if (phase === 'manualReview' && manualReview) {
+    footer = (
+      <BottomAction>
+        <Button variant="primary" icon="check" onClick={keepManualShot}>
+          {t('ai.issue.useAnyway')}
+        </Button>
+        <Button variant="secondary" icon="camera" onClick={retakeManualShot} full>
+          {t('capture.manualCheck.retake')}
         </Button>
       </BottomAction>
     );
@@ -1076,7 +1182,6 @@ export default function S04Capture() {
         ref={fileRef}
         type="file"
         accept="image/*"
-        capture="user"
         className="hidden"
         tabIndex={-1}
         aria-hidden="true"

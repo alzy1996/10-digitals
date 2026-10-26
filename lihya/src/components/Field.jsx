@@ -67,7 +67,7 @@ const Field = forwardRef(function Field(
         {end}
       </div>
       {error ? (
-        <p id={msgId} className="flex items-start gap-1.5 text-sm text-cut">
+        <p id={msgId} className="flex items-start gap-1.5 text-sm text-cut-ink">
           <Icon name="warning" size={16} className="mt-0.5" />
           <span>{error}</span>
         </p>

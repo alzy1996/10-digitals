@@ -17,7 +17,7 @@ import ScreenFrame from '../components/ScreenFrame.jsx';
 import Skeleton from '../components/Skeleton.jsx';
 import ZoneDiagram from '../components/ZoneDiagram.jsx';
 import { useSnackbar } from '../components/Snackbar.jsx';
-import { createOnce, findCode, lookKey } from './home/codeCache.js';
+import { createOnce, findCode, lookKey, rememberCode } from './home/codeCache.js';
 import { lookCodeCardBlob, saveCardImage } from './home/codeCard.js';
 import { findStyle, longDate, shopNames, spelled, styleNames } from './home/text.js';
 
@@ -114,12 +114,24 @@ function bookingText({ lang, info, style, code }) {
   return `${part(lang)}\n\n${part(other)}`;
 }
 
+/** The session's code for this look when it is still valid (survives a reload), else null. */
+function issuedFor(issuedCode, key, now = Date.now()) {
+  return issuedCode && key && issuedCode.key === key && issuedCode.expiresAt > now ? issuedCode : null;
+}
+
+/** What the session keeps of a code: no photo, no params copy (the key names the look). */
+function toIssued(entry, key, styleId) {
+  return { code: entry.code, key, styleId, createdAt: entry.createdAt, expiresAt: entry.expiresAt };
+}
+
 /**
  * S22 Look Code result (/try/:shopId/code). The Studio's "Get my Look Code" lands here with
  * the designed look in useSession().activeParams. The code is made once per look (anonymous
  * sign-in, style parameters only, never a photo), shown huge, and can be copied, saved as an
  * image or sent to the shop on WhatsApp. Making the code needs internet; the look stays on
- * this phone until the customer starts over or the session's idle wipe runs.
+ * this phone until the customer starts over or the session's idle wipe runs. The code is
+ * kept in the session snapshot (useSession().issuedCode), so a reload, or the phone dropping
+ * the tab while the customer is in WhatsApp, shows the same code instead of making another.
  */
 export default function S22LookCodeResult() {
   const { t, lang } = useT();
@@ -128,7 +140,7 @@ export default function S22LookCodeResult() {
   const pendingWrites = usePendingWrites();
   const { show, confirmUndo } = useSnackbar();
   const { shopId, info, styles } = usePublicShop();
-  const { activeParams, hydrated, wipe, path } = useSession();
+  const { activeParams, hydrated, wipe, path, issuedCode, setIssuedCode } = useSession();
 
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState({ status: 'idle', key: null, entry: null });
@@ -140,6 +152,7 @@ export default function S22LookCodeResult() {
   const styleId = activeParams ? activeParams.styleId || null : null;
   const key = activeParams && styleId ? lookKey(styleId, activeParams) : null;
   keyRef.current = key;
+  const restored = issuedFor(issuedCode, key);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -148,9 +161,16 @@ export default function S22LookCodeResult() {
     };
   }, []);
 
-  // Make the code for this look (once; a look that already has a code on this phone reuses it).
+  // A code restored from the session (after a reload) is this visit's code again: the
+  // landing page shows it too.
   useEffect(() => {
-    if (!hydrated || !key || findCode(shopId, key)) return;
+    if (restored && !findCode(shopId, key)) rememberCode(shopId, restored);
+  }, [restored, shopId, key]);
+
+  // Make the code for this look (once; a look that already has a code on this phone, in
+  // memory or in the session snapshot, reuses it).
+  useEffect(() => {
+    if (!hydrated || !key || findCode(shopId, key) || restored) return;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       setResult({ status: 'offline', key, entry: null });
       return;
@@ -158,6 +178,8 @@ export default function S22LookCodeResult() {
     setResult({ status: 'creating', key, entry: null });
     createOnce(shopId, key, styleId, () => createLookCode(shopId, { styleId, params: activeParams })).then(
       (entry) => {
+        // Kept in the session even when the customer has left this screen: a reload later shows it.
+        setIssuedCode(toIssued(entry, key, styleId));
         if (mountedRef.current && keyRef.current === key) setResult({ status: 'ready', key, entry });
       },
       (err) => {
@@ -165,7 +187,7 @@ export default function S22LookCodeResult() {
         if (mountedRef.current && keyRef.current === key) setResult({ status: failureKind(err), key, entry: null });
       },
     );
-  }, [hydrated, key, shopId, styleId, activeParams, attempt]);
+  }, [hydrated, key, shopId, styleId, activeParams, attempt, restored, setIssuedCode]);
 
   // The phone comes back online after "You need internet": make the code now. Only on the
   // offline -> online change: a failed request while the phone says it is online waits for Retry.
@@ -176,7 +198,16 @@ export default function S22LookCodeResult() {
     if (online && !was && result.status === 'offline' && result.key === key) setAttempt((n) => n + 1);
   }, [online, result.status, result.key, key]);
 
-  const entry = (key && findCode(shopId, key)) || (result.key === key && result.status === 'ready' ? result.entry : null);
+  const entry =
+    (key && findCode(shopId, key)) || restored || (result.key === key && result.status === 'ready' ? result.entry : null);
+
+  // A code made on this phone for this look (memory cache after Undo, for example) goes into
+  // the session too, so the next reload shows it.
+  useEffect(() => {
+    if (entry && key && (!issuedCode || issuedCode.key !== key || issuedCode.code !== entry.code)) {
+      setIssuedCode(toIssued(entry, key, styleId));
+    }
+  }, [entry, key, styleId, issuedCode, setIssuedCode]);
   let status;
   if (!hydrated) status = 'restoring';
   else if (!key) status = 'empty';

@@ -161,6 +161,99 @@ export function searchKey(value) {
     .slice(0, 80);
 }
 
+const WORD_SPLIT = /[^\p{L}\p{N}]+/u;
+const TOKEN_MAX_LEN = 15;
+const NAME_TOKENS_MAX = 80;
+const PHONE_TOKEN_MIN = 4;
+const PHONE_TOKEN_DIGITS = 8;
+
+/** Words of a name or query in search form (searchKey, split on spaces and punctuation). */
+export function searchWords(value) {
+  return searchKey(value).split(WORD_SPLIT).filter(Boolean);
+}
+
+/**
+ * Stored search tokens for a client name: every prefix (1..15 letters) of every
+ * word, so a search for any word start finds the client ("سالم" finds
+ * "أحمد سالم", "balushi" finds "Hamad Al Balushi"). Arabic words that start
+ * with the article "ال" also get prefixes without it ("بلوشي" finds "البلوشي").
+ */
+export function nameTokens(displayName) {
+  const tokens = new Set();
+  const words = [];
+  for (const w of searchWords(displayName)) {
+    words.push(w);
+    if (w.startsWith('ال') && w.length > 3) words.push(w.slice(2));
+  }
+  for (const w of words) {
+    const max = Math.min(w.length, TOKEN_MAX_LEN);
+    for (let i = 1; i <= max; i += 1) {
+      tokens.add(w.slice(0, i));
+      if (tokens.size >= NAME_TOKENS_MAX) return [...tokens];
+    }
+  }
+  return [...tokens];
+}
+
+/** The search token for a typed name: its longest word (most selective), cut like the stored tokens. */
+export function nameQueryToken(text) {
+  const words = searchWords(text);
+  if (!words.length) return null;
+  const longest = words.reduce((a, b) => (b.length > a.length ? b : a));
+  return longest.slice(0, TOKEN_MAX_LEN);
+}
+
+/** True when every typed word starts one of the name's words (or the name contains the whole text). */
+export function nameMatches(text, displayName) {
+  const key = searchKey(text);
+  if (!key) return false;
+  const nameKey = searchKey(displayName);
+  if (nameKey.includes(key)) return true;
+  const words = [];
+  for (const w of searchWords(displayName)) {
+    words.push(w);
+    if (w.startsWith('ال') && w.length > 3) words.push(w.slice(2));
+  }
+  return searchWords(text).every((q) => words.some((w) => w.startsWith(q.slice(0, TOKEN_MAX_LEN))));
+}
+
+/** Digits only (Arabic-Indic digits read as Latin). */
+export function digitsOf(value) {
+  return String(value ?? '')
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/\D/g, '');
+}
+
+/**
+ * Stored search tokens for a phone: every run of 4 or more digits inside its last
+ * 8 digits (the local number), so "9123" or "4567" finds +968 9123 4567.
+ */
+export function phoneTokens(phone) {
+  const local = digitsOf(phone).slice(-PHONE_TOKEN_DIGITS);
+  if (local.length < PHONE_TOKEN_MIN) return [];
+  const tokens = new Set();
+  for (let len = PHONE_TOKEN_MIN; len <= local.length; len += 1) {
+    for (let i = 0; i + len <= local.length; i += 1) tokens.add(local.slice(i, i + len));
+  }
+  return [...tokens];
+}
+
+/** The token for typed digits (4+), matching phoneTokens(): its last 8 digits. */
+export function phoneQueryToken(text) {
+  const d = digitsOf(text);
+  return d.length >= PHONE_TOKEN_MIN ? d.slice(-PHONE_TOKEN_DIGITS) : null;
+}
+
+/** Name and phone search fields of a client document. */
+export function clientSearchFields(displayName, phone) {
+  return {
+    displayNameLower: searchKey(displayName),
+    searchTokens: nameTokens(displayName),
+    phoneTokens: phoneTokens(phone),
+  };
+}
+
 export function normalizeEmail(value) {
   return String(value ?? '').trim().toLowerCase();
 }
@@ -349,12 +442,17 @@ export function diffFields(before, after, prefix = '') {
 // ---------------------------------------------------------------- look params, cut card, profile
 
 const LINE_KEYS = ['cheek', 'cheekOffset', 'neckline', 'necklineOffset', 'sideburn', 'edge', 'mustacheEdge'];
+const LINE_OFFSET_KEYS = ['cheekOffset', 'necklineOffset'];
+const SHAPE_FLAGS = ['jFront', 'mustacheFloating', 'flare'];
+const PARAM_TEXT_KEYS = ['mustacheId', 'colorId', 'finish', 'presetId'];
 
-function scalar(v, maxLen = 80) {
-  if (typeof v === 'string') return v.slice(0, maxLen);
-  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-  if (typeof v === 'boolean' || v === null) return v;
-  return undefined;
+/** The only top-level keys a stored LookParams may have (firestore.rules validLookParams). */
+export const PARAM_KEYS = Object.freeze([
+  'styleId', 'zones', 'lines', 'mustacheId', 'fadeStartMm', 'colorId', 'greyTarget', 'finish', 'shape', 'presetId',
+]);
+
+function textOrNull(v, maxLen) {
+  return typeof v === 'string' ? v.slice(0, maxLen) : null;
 }
 
 function zonesMap(src, maxMm = 300) {
@@ -367,33 +465,57 @@ function zonesMap(src, maxMm = 300) {
   return out;
 }
 
+function linesMap(src) {
+  const lines = {};
+  for (const k of LINE_KEYS) {
+    const v = src[k];
+    if (LINE_OFFSET_KEYS.includes(k)) {
+      // Offsets are always numbers (0 = the option's own line); the rules check them as such.
+      const n = numOrNull(v);
+      lines[k] = n === null ? 0 : Math.round(clamp(n, -1, 1) * 1000) / 1000;
+    } else {
+      lines[k] = textOrNull(v, 40);
+    }
+  }
+  return lines;
+}
+
+function shapeMap(src) {
+  const shape = {};
+  if ('chin' in src) shape.chin = textOrNull(src.chin, 40);
+  for (const k of SHAPE_FLAGS) if (k in src) shape[k] = typeof src[k] === 'boolean' ? src[k] : null;
+  if ('fadeB' in src) {
+    shape.fadeB = Array.isArray(src.fadeB) && src.fadeB.length === 2 ? src.fadeB.map((x) => numOrNull(x)) : null;
+  }
+  if ('lengthAdjustable' in src) shape.lengthAdjustable = textOrNull(src.lengthAdjustable, 8);
+  return shape;
+}
+
 /**
  * LookParams as stored in consultations and Look Codes: the designed beard only
- * (zones in mm, lines, mustache, fade, color, grey, finish, shape). Unknown nested
- * objects are dropped; extra top-level scalars are kept for forward compatibility.
+ * (zones in mm, lines, mustache, fade, color, grey, finish, shape, preset). Only the
+ * known keys are kept, every value is bounded, so a stored look is a few hundred
+ * bytes and never carries a thumbnail or any other image.
  */
 export function sanitizeParams(p) {
   if (!p || typeof p !== 'object') return null;
   const out = {};
-  for (const [k, v] of Object.entries(p)) {
-    if (['zones', 'lines', 'shape'].includes(k)) continue;
-    const s = scalar(v);
-    if (s !== undefined) out[k] = s;
+  if ('styleId' in p) {
+    const id = textOrNull(p.styleId, 80);
+    out.styleId = id && /^[A-Za-z0-9_-]+$/.test(id) ? id : null;
+  }
+  for (const k of PARAM_TEXT_KEYS) if (k in p) out[k] = textOrNull(p[k], 80);
+  if ('fadeStartMm' in p) {
+    const n = numOrNull(p.fadeStartMm);
+    out.fadeStartMm = n === null ? null : round1(clamp(n, 0, 300));
+  }
+  if ('greyTarget' in p) {
+    const n = numOrNull(p.greyTarget);
+    out.greyTarget = n === null ? null : Math.round(clamp(n, 0, 100));
   }
   out.zones = zonesMap(p.zones);
-  if (p.lines && typeof p.lines === 'object') {
-    const lines = {};
-    for (const [k, v] of Object.entries(p.lines)) {
-      const s = scalar(v, 40);
-      if (s !== undefined) lines[k] = s;
-    }
-    for (const k of LINE_KEYS) if (!(k in lines)) lines[k] = null;
-    out.lines = lines;
-  }
-  if (p.shape && typeof p.shape === 'object') out.shape = firestoreSafe(p.shape);
-  for (const k of ['fadeStartMm', 'greyTarget']) {
-    if (k in out) out[k] = numOrNull(out[k]);
-  }
+  if (p.lines && typeof p.lines === 'object') out.lines = linesMap(p.lines);
+  if (p.shape && typeof p.shape === 'object') out.shape = shapeMap(p.shape);
   return out;
 }
 
@@ -569,28 +691,44 @@ export function productKey(p) {
 
 const STYLE_RESERVED = ['createdAt', 'createdBy', 'updatedAt', 'updatedBy'];
 
-/** Style document data from a catalog style (styles.json shape), safe to write. */
+/** Style fields the rules accept (firestore.rules validStyle): the styles.json keys, baseId and the stamps. */
+export const STYLE_KEYS = Object.freeze([
+  'id', 'name', 'zones', 'zoneNote', 'shape', 'lines', 'mustacheId', 'faces', 'trimDays', 'localFit',
+  'lengthClass', 'weights', 'required', 'ageFit', 'theatrical', 'tags', 'order', 'hidden', 'signature', 'baseId',
+]);
+
+function styleName(v) {
+  if (typeof v === 'string') return { en: cleanText(v, 80), ar: cleanText(v, 80) };
+  const src = v && typeof v === 'object' ? v : {};
+  return { en: cleanText(src.en, 80), ar: cleanText(src.ar, 80) };
+}
+
+/** Style document data from a catalog style (styles.json shape), safe to write. Unknown keys are dropped. */
 export function styleData(style) {
   const out = {};
   for (const [k, v] of Object.entries(style || {})) {
-    if (STYLE_RESERVED.includes(k) || v === undefined) continue;
+    if (STYLE_RESERVED.includes(k) || v === undefined || !STYLE_KEYS.includes(k)) continue;
     out[k] = firestoreSafe(v);
   }
   out.id = String(style.id);
+  if ('name' in out) out.name = styleName(out.name);
+  if ('localFit' in out) out.localFit = clampInt(out.localFit, 0, 5, 0);
   out.hidden = style.hidden === true;
   out.signature = style.signature === true;
-  out.order = numOrNull(style.order) ?? 0;
+  out.order = clamp(numOrNull(style.order) ?? 0, -100000, 100000);
   return out;
 }
 
-/** Owner/manager edit of a style: reserved keys and identity cannot change. */
+/** Owner/manager edit of a style: reserved keys and identity cannot change, unknown keys are dropped. */
 export function sanitizeStylePatch(patch) {
   const out = {};
   for (const [k, v] of Object.entries(patch || {})) {
     if (v === undefined || STYLE_RESERVED.includes(k) || k === 'id' || k === 'signature' || k === 'baseId') continue;
+    if (!STYLE_KEYS.includes(k)) continue;
     if (k === 'hidden') out.hidden = v === true;
     else if (k === 'localFit') out.localFit = clampInt(v, 0, 5, 0);
-    else if (k === 'order') out.order = numOrNull(v) ?? 0;
+    else if (k === 'order') out.order = clamp(numOrNull(v) ?? 0, -100000, 100000);
+    else if (k === 'name') out.name = styleName(v);
     else out[k] = firestoreSafe(v);
   }
   return out;

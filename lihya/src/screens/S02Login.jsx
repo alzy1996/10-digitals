@@ -1,9 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useT } from '../lib/i18n/useT.js';
 import { useAuth } from '../state/AuthContext.jsx';
 import { useOnline } from '../hooks/useOnline.js';
-import { authErrorKey, safeNextPath, sendEmailLink, signInGoogle, signOutUser } from '../services/auth.js';
+import { authErrorKey, safeNextPath, sendEmailLink, signInGoogle, signOutAndClear } from '../services/auth.js';
 import { acceptInvite } from '../services/invites.js';
 import BottomAction from '../components/BottomAction.jsx';
 import Button from '../components/Button.jsx';
@@ -323,6 +323,7 @@ function SignInForm({ next, joinMode }) {
 function JoinShop({ shopId, user }) {
   const { t } = useT();
   const navigate = useNavigate();
+  const location = useLocation();
   const online = useOnline();
   const { show } = useSnackbar();
   const [attempt, setAttempt] = useState(0);
@@ -359,13 +360,15 @@ function JoinShop({ shopId, user }) {
     };
   }, [shopId, user.uid, attempt, online, navigate, show, t]);
 
+  // Sign out (clearing this phone's session and offline copy) and come back to this
+  // invite, so the right account can sign in and join.
   const switchAccount = () => {
+    if (leaving) return;
     setLeaving(true);
-    signOutUser()
-      .catch((err) => {
-        console.error('sign out failed', err);
-        setLeaving(false);
-      });
+    signOutAndClear({ to: `${location.pathname}${location.search}` }).catch((err) => {
+      console.error('sign out failed', err);
+      setLeaving(false);
+    });
   };
 
   if (state.status === 'joining') return <Working title={t('entry.join.title')} label={t('entry.join.joining')} />;

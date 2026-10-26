@@ -2,30 +2,22 @@
 // cut plan. Pure functions, no React, no Firebase: the Cut Card screen, the PDF/PNG,
 // the stored consultation summary and the tests all share this.
 //
-// buildCutCard({ params, profile, style, guardChart, colors, safety, growthMmPerDay, now, front })
-//   -> { rows, cheekLine, neckline, mustacheEdge, sideburn, color, finish, trimDays, nextVisitDays, approx, ... }
+// buildCutCard({ params, profile, style, guardChart, colors, safety, answers, growthMmPerDay, now, front })
+//   -> { rows, cheekLine, neckline, mustacheEdge, sideburn, color, finish, trimDays, nextVisitDays,
+//        nextVisitBasis, approx, ... }
+//
+// The params are normalised first (cutCardParams), so a look from a restored session or
+// a Look Code can never put an unknown id or an out-of-range number on the printed card.
 //
 // Notes and flags are language-neutral ({ key, vars } and ids); CutCardDocument
 // translates them with the report namespace (src/lib/i18n/ns/report.json).
 // Left and right are always the customer's own sides.
 
-import { mmToGuard, DEFAULT_GUARD_CHART } from './guards.js';
+import { mmToGuard, validateGuardChart, DEFAULT_GUARD_CHART } from './guards.js';
 import { LIMITS } from '../config/app.js';
 import { addDaysToKey, dayKey as muscatDayKey, toDate } from './time.js';
-import {
-  JAW_CONTOUR,
-  MOUTH_CORNERS,
-  CHIN_BOTTOM,
-  FOREHEAD_TOP,
-  CHEEK_LINE_NATURAL_L,
-  CHEEK_LINE_NATURAL_R,
-  CHEEK_LINE_HIGH_L,
-  CHEEK_LINE_HIGH_R,
-  CHEEK_LINE_LOW_L,
-  CHEEK_LINE_LOW_R,
-  MUSTACHE_EDGE_L,
-  MUSTACHE_EDGE_R,
-} from '../ai/mesh/zones.js';
+import { clampParams, COLOR_IDS, FINISH_IDS, LINE_ENUMS, MUSTACHE_IDS, DEFAULT_COLOR_ID, DEFAULT_FINISH } from './look.js';
+import { CUT_CARD_LANDMARKS, VISIT_DAYS } from '../ai/index.js';
 import COLORS from '../data/colors.json';
 import LINES from '../data/lines.json';
 import REASONS from '../data/reasons.json';
@@ -67,6 +59,20 @@ const LEARN_MIN_DAYS = 3;
 const LEARN_MAX_DAYS = 120;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const {
+  JAW_CONTOUR,
+  MOUTH_CORNERS,
+  CHIN_BOTTOM,
+  FOREHEAD_TOP,
+  CHEEK_LINE_NATURAL_L,
+  CHEEK_LINE_NATURAL_R,
+  CHEEK_LINE_HIGH_L,
+  CHEEK_LINE_HIGH_R,
+  CHEEK_LINE_LOW_L,
+  CHEEK_LINE_LOW_R,
+  MUSTACHE_EDGE_L,
+  MUSTACHE_EDGE_R,
+} = CUT_CARD_LANDMARKS;
 const SAFETY_ORDER = ['patchTest48h', 'metallicSaltProducts', 'pureHenna', 'irritationToday'];
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -362,7 +368,9 @@ export function colorSafety(colorId, safety, colors = COLORS) {
   const questions = safetyIdsFor(color).map((id) => {
     const q = SAFETY_QUESTIONS.get(id);
     const riskWhen = q && Array.isArray(q.riskWhen) ? q.riskWhen : RISK_FALLBACK[id] || [];
-    const answer = answers[id] === undefined ? null : answers[id];
+    // Only a yes/no or a chip id is an answer; anything else reads as not answered yet.
+    const given = answers[id];
+    const answer = typeof given === 'boolean' || (typeof given === 'string' && given !== '') ? given : null;
     const risk = riskWhen.includes(answer);
     return { id, answer, risk, level: answer === null ? 'ask' : risk ? 'stop' : 'ok' };
   });
@@ -422,16 +430,89 @@ export function effectiveGrowth(growthMmPerDay) {
 }
 
 /**
- * Suggested days to the next visit: the time the shortest kept zone needs to grow
- * out of shape (a quarter of its length, at least 2 mm) at the client's growth rate,
- * 7..42 days. A fully shaved look gets the weekly minimum.
+ * The style's trim interval for this customer (days): style.trimDays is written for the
+ * PRD default growth of 0.4 mm/day, so a faster grower needs the trim sooner and a slower
+ * one later (trimDays x 0.4 / rate), 1..42 days. null when the style has none.
  */
-export function suggestNextVisitDays(zonesMm, growthMmPerDay) {
+export function trimIntervalDays(trimDays, growthMmPerDay) {
+  const base = numOr(trimDays, NaN);
+  if (!(base > 0)) return null;
   const rate = effectiveGrowth(growthMmPerDay);
+  return clamp(Math.round((base * LIMITS.growthMmPerDayDefault) / rate), 1, NEXT_VISIT_MAX_DAYS);
+}
+
+/** Days between shop visits for a visit-frequency answer ('weekly' 7, 'biweekly' 14, 'monthly' 30), else null. */
+export function visitFrequencyDays(answer) {
+  const days = typeof answer === 'string' && Object.prototype.hasOwnProperty.call(VISIT_DAYS, answer) ? VISIT_DAYS[answer] : null;
+  return isNum(days) && days > 0 ? days : null;
+}
+
+/** Days the shortest kept zone takes to grow out of shape (a quarter of its length, at least 2 mm); null when nothing is kept. */
+function growthToleranceDays(zonesMm, growthMmPerDay) {
   const kept = Object.values(zoneMap(zonesMm)).filter((mm) => mm > SHAVE_MM);
-  if (!kept.length) return NEXT_VISIT_MIN_DAYS;
-  const tolerance = Math.max(2, Math.min(...kept) * 0.25);
-  return clamp(Math.round(tolerance / rate), NEXT_VISIT_MIN_DAYS, NEXT_VISIT_MAX_DAYS);
+  if (!kept.length) return null;
+  return Math.max(2, Math.min(...kept) * 0.25) / effectiveGrowth(growthMmPerDay);
+}
+
+/**
+ * Next shop visit: one rule for the Cut Card, the stored consultation and the Done
+ * screen (chair:F18). `need` is the style's trim interval for this customer
+ * (trimIntervalDays); a style without one uses the growth tolerance of the shortest kept
+ * zone. Then:
+ *   need < 7 days (stubble, circle beard...): he keeps it up at home between visits and
+ *     the shop visit follows how often he said he comes (weekly when he did not say)
+ *     -> basis 'homeTrim' ('visits' / 'growth' for a style without a trim interval);
+ *   he comes more often than the style needs -> his rhythm, basis 'visits';
+ *   otherwise -> the trim interval, basis 'trim' ('growth' without one).
+ * Always 7..42 days, so the card never shows a trim interval that disagrees with the
+ * next visit without saying why (the basis is printed with it).
+ *
+ * @param {object} o
+ * @param {number|null} [o.trimDays] the style's trimDays
+ * @param {string|null} [o.visitFrequency] session.answers.visitFrequency
+ * @param {object|null} [o.zonesMm] the approved lengths (for a style without trimDays)
+ * @param {number|null} [o.growthMmPerDay] learned or shop growth rate
+ * @returns {{ days: number, basis: 'trim'|'growth'|'visits'|'homeTrim', trimDays: number|null, visitDays: number|null }}
+ */
+export function nextVisitPlan({ trimDays = null, visitFrequency = null, zonesMm = null, growthMmPerDay = null } = {}) {
+  const trim = trimIntervalDays(trimDays, growthMmPerDay);
+  const visit = visitFrequencyDays(visitFrequency);
+  const need = trim !== null ? trim : growthToleranceDays(zonesMm, growthMmPerDay);
+  const fit = (days) => clamp(Math.round(days), NEXT_VISIT_MIN_DAYS, NEXT_VISIT_MAX_DAYS);
+  let days;
+  let basis;
+  if (need === null || need < NEXT_VISIT_MIN_DAYS) {
+    days = visit !== null ? visit : NEXT_VISIT_MIN_DAYS;
+    basis = trim !== null ? 'homeTrim' : visit !== null ? 'visits' : 'growth';
+  } else if (visit !== null && visit < need) {
+    days = visit;
+    basis = 'visits';
+  } else {
+    days = need;
+    basis = trim !== null ? 'trim' : 'growth';
+  }
+  return { days: fit(days), basis, trimDays: trim, visitDays: visit };
+}
+
+/**
+ * Suggested days to the next visit (nextVisitPlan(...).days), 7..42.
+ * @param {{ trimDays?, visitFrequency?, zonesMm?, growthMmPerDay? }} o
+ */
+export function suggestNextVisitDays(o = {}) {
+  return nextVisitPlan(o).days;
+}
+
+/** The Done screen's next-visit chips (days). */
+export const NEXT_VISIT_CHIPS = Object.freeze([7, 14, 21, 30]);
+
+/**
+ * The next-visit chips with the suggestion itself among them (so a card's 10 or 42 days
+ * is kept as it is, never snapped to the nearest chip), in order, without duplicates.
+ */
+export function nextVisitChoices(suggested) {
+  const n = Number(suggested);
+  const extra = suggested !== null && suggested !== undefined && Number.isFinite(n) && n > 0 ? [Math.round(n)] : [];
+  return [...new Set([...NEXT_VISIT_CHIPS, ...extra])].sort((a, b) => a - b);
 }
 
 /** The next visit as a Date (same time of day, `days` later) and its Muscat dayKey. */
@@ -471,16 +552,70 @@ function rowNote({ zone, mm, guard, currentMm, fade, params, shape }) {
 
 /* ------------------------------------------------------------------ build */
 
+/** Line defaults when neither the look nor the style has a known option (same as src/lib/look.js). */
+const DEFAULT_LINE_IDS = Object.freeze({ cheek: 'natural', neckline: '2f', sideburn: 'blended', edge: 'soft', mustacheEdge: 'at' });
+const STYLE_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
+
+const isText = (v) => typeof v === 'string' && v !== '';
+
+/**
+ * The look the card prints, made safe (code:extra-1): params can come from the session
+ * snapshot or a Look Code, so nothing is trusted. clampParams (src/lib/look.js) fills
+ * and clamps every number (zones 0..200 mm, offsets -1..1, grey 0..100, fade start);
+ * unknown ids fall back to the style's own value, then to the defaults: line options
+ * per type, finish 'matte', color 'natural', mustache none, chin shape 'natural'.
+ * The style fills what the look leaves out (zones, lines, shape).
+ */
+export function cutCardParams(params, style = null, colors = COLORS) {
+  const raw = params && typeof params === 'object' && !Array.isArray(params) ? params : {};
+  const st = style && typeof style === 'object' ? style : {};
+  const objOr = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
+  const p = clampParams({
+    ...raw,
+    zones: objOr(raw.zones) || objOr(st.zones) || {},
+    lines: { ...(objOr(st.lines) || {}), ...(objOr(raw.lines) || {}) },
+    shape: objOr(raw.shape) || objOr(st.shape) || {},
+  });
+  const styleLines = objOr(st.lines) || {};
+  for (const type of Object.keys(DEFAULT_LINE_IDS)) {
+    const allowed = LINE_ENUMS[type] || [];
+    if (allowed.includes(p.lines[type])) continue;
+    p.lines[type] = allowed.includes(styleLines[type]) ? styleLines[type] : DEFAULT_LINE_IDS[type];
+  }
+  const colorIds = Array.isArray(colors) && colors.length ? colors.filter((c) => c && isText(c.id)).map((c) => c.id) : COLOR_IDS;
+  if (!colorIds.includes(p.colorId)) p.colorId = DEFAULT_COLOR_ID;
+  if (!FINISH_IDS.includes(p.finish)) p.finish = DEFAULT_FINISH;
+  if (p.mustacheId !== null && !MUSTACHE_IDS.includes(p.mustacheId)) p.mustacheId = MUSTACHE_IDS.includes(st.mustacheId) ? st.mustacheId : null;
+  const ownId = isText(p.styleId) && STYLE_ID_RE.test(p.styleId) ? p.styleId : null;
+  p.styleId = ownId || (isText(st.id) && STYLE_ID_RE.test(st.id) ? st.id : null);
+  return p;
+}
+
+/** The shop chart when it is a valid chart (validateGuardChart), else the default chart. */
+function chartOf(guardChart) {
+  return Array.isArray(guardChart) && guardChart.length && validateGuardChart(guardChart).length === 0 ? guardChart : DEFAULT_GUARD_CHART;
+}
+
+/** A guard label as two strings (a shop chart label may be a plain string). */
+function labelOf(label, fallback) {
+  if (isText(label)) return { en: label, ar: label };
+  const l = label && typeof label === 'object' ? label : {};
+  const en = isText(l.en) ? l.en : isText(l.ar) ? l.ar : fallback;
+  return { en, ar: isText(l.ar) ? l.ar : en };
+}
+
 /**
  * Build the Cut Card for an approved look (ARCHITECTURE 6).
  *
  * @param {object} o
- * @param {object} o.params LookParams (zones in mm, lines, mustacheId, fadeStartMm, colorId, greyTarget, finish, shape)
+ * @param {object} o.params LookParams (zones in mm, lines, mustacheId, fadeStartMm, colorId, greyTarget, finish, shape);
+ *   normalised by cutCardParams, so a broken look still makes a valid card
  * @param {object} [o.profile] effective FaceProfile (scale.mmPerPx, beard.zones[z].lengthMm)
  * @param {object} [o.style] the style (trimDays, zones fallback, shape)
  * @param {Array}  [o.guardChart] the shop's guard chart (settings.guardChart)
  * @param {Array}  [o.colors] colors catalog (src/data/colors.json shape)
  * @param {object} [o.safety] session safety answers
+ * @param {object} [o.answers] session answers (visitFrequency drives the next visit with the trim interval)
  * @param {number} [o.growthMmPerDay] the client's learned or the shop's default growth rate
  * @param {Date}   [o.now]
  * @param {object} [o.front] front Shot ({ landmarks, width, height }) to measure the cheek line
@@ -492,68 +627,110 @@ export function buildCutCard({
   guardChart = DEFAULT_GUARD_CHART,
   colors = COLORS,
   safety = null,
+  answers = null,
   growthMmPerDay = null,
   now = new Date(),
   front = null,
 } = {}) {
-  const p = params && typeof params === 'object' ? params : {};
-  const zonesIn = p.zones || (style && style.zones) || {};
-  const lines = { ...((style && style.lines) || {}), ...(p.lines || {}) };
-  const shape = p.shape || (style && style.shape) || {};
-  const chart = Array.isArray(guardChart) && guardChart.length ? guardChart : DEFAULT_GUARD_CHART;
+  const catalog = Array.isArray(colors) && colors.length ? colors : COLORS;
+  const p = cutCardParams(params, style, catalog);
+  const lines = p.lines;
+  const shape = p.shape;
+  const chart = chartOf(guardChart);
   const beardZones = (profile && profile.beard && profile.beard.zones) || {};
-  const sideburnJoin = lines.sideburn || 'blended';
-  const fade = fadeOf(p, style) || (sideburnJoin === 'skin-fade' ? { from: 0, to: null } : null);
+  const sideburnJoin = lines.sideburn;
+  const fade = fadeOf(p, null) || (sideburnJoin === 'skin-fade' ? { from: 0, to: null } : null);
 
   const rows = CUT_ZONES.map((zone) => {
-    const mm = Math.max(0, round1(numOr(zonesIn[zone], 0)));
+    const mm = Math.max(0, round1(numOr(p.zones[zone], 0)));
     const g = mmToGuard(mm, chart);
-    const guard = { kind: g.kind, guardId: g.guardId, label: g.label, mm: g.mm };
-    const current = beardZones[zone] && isNum(beardZones[zone].lengthMm) ? round1(beardZones[zone].lengthMm) : null;
+    const guard = { kind: g.kind, guardId: isText(g.guardId) ? g.guardId : null, label: labelOf(g.label, g.guardId || ''), mm: g.mm };
+    const lengthMm = beardZones[zone] ? beardZones[zone].lengthMm : null;
+    const current = isNum(lengthMm) && lengthMm >= 0 ? round1(lengthMm) : null;
     const note = rowNote({ zone, mm, guard, currentMm: current, fade, params: p, shape });
     return { zone, mm, guard, note, shaved: g.kind === 'shave', currentMm: current };
   });
 
-  const cheekType = lines.cheek || 'natural';
+  const cheekType = lines.cheek;
   const cheek = cheekLineHeight({
     type: cheekType,
     offset: lines.cheekOffset,
     front,
     mmPerPx: profile && profile.scale ? profile.scale.mmPerPx : null,
   });
-  const neckline = necklinePosition(lines.neckline || '2f', lines.necklineOffset);
+  const neckline = necklinePosition(lines.neckline, lines.necklineOffset);
   const growth = effectiveGrowth(growthMmPerDay);
   const zonesMm = Object.fromEntries(rows.map((r) => [r.zone, r.mm]));
-  const nextVisitDays = suggestNextVisitDays(zonesMm, growth);
+  const styleTrim = style && isNum(style.trimDays) && style.trimDays > 0 ? style.trimDays : null;
+  const visitFrequency = answers && typeof answers === 'object' && isText(answers.visitFrequency) ? answers.visitFrequency : null;
+  const plan = nextVisitPlan({ trimDays: styleTrim, visitFrequency, zonesMm, growthMmPerDay: growth });
   const at = toDate(now);
   const created = Number.isNaN(at.getTime()) ? new Date() : at;
-  const colorId = p.colorId || 'natural';
-  const color = colorSafety(colorId, safety, colors);
-  const grey = numOr(p.greyTarget, NaN);
+  const color = colorSafety(p.colorId, safety, catalog);
 
   return {
     version: CUT_CARD_VERSION,
-    styleId: p.styleId || (style && style.id) || null,
+    styleId: p.styleId,
     rows,
     shavedZones: rows.filter((r) => r.shaved).map((r) => r.zone),
-    cheekLine: { type: cheekType, mmAboveJaw: cheek.mm, offset: clamp(numOr(lines.cheekOffset, 0), -1, 1), source: cheek.source },
+    cheekLine: { type: cheekType, mmAboveJaw: cheek.mm, offset: lines.cheekOffset, source: cheek.source },
     neckline,
-    mustacheEdge: lines.mustacheEdge || 'at',
-    mustache: { id: p.mustacheId || null, mm: zonesMm.M, edge: lines.mustacheEdge || 'at' },
+    mustacheEdge: lines.mustacheEdge,
+    mustache: { id: p.mustacheId, mm: zonesMm.M, edge: lines.mustacheEdge },
     sideburn: {
       join: sideburnJoin,
       fadeStartMm: fade ? round1(fade.from) : null,
       fadeEndMm: fade ? round1(fade.to !== null && fade.to > fade.from ? fade.to : Math.max(zonesMm.B_L, zonesMm.B_R)) : null,
     },
-    edge: lines.edge || 'soft',
-    color: { ...color, greyTarget: Number.isFinite(grey) ? Math.round(grey) : null },
-    finish: p.finish || 'matte',
-    trimDays: style && isNum(style.trimDays) && style.trimDays > 0 ? style.trimDays : null,
-    nextVisitDays,
-    nextVisitDayKey: nextVisitDate(nextVisitDays, created).dayKey,
+    edge: lines.edge,
+    color: { ...color, greyTarget: p.greyTarget },
+    finish: p.finish,
+    trimDays: plan.trimDays,
+    styleTrimDays: styleTrim,
+    nextVisitDays: plan.days,
+    nextVisitBasis: plan.basis,
+    visitFrequency: plan.visitDays !== null ? visitFrequency : null,
+    nextVisitDayKey: nextVisitDate(plan.days, created).dayKey,
     growthMmPerDay: growth,
     approx: true,
     createdAt: created.toISOString(),
+  };
+}
+
+/** The visit-frequency answer the card should follow ('weekly' | 'biweekly' | 'monthly' | null). */
+function answeredFrequency(answers) {
+  const v = answers && typeof answers === 'object' ? answers.visitFrequency : null;
+  return visitFrequencyDays(v) !== null ? v : null;
+}
+
+/**
+ * true when a card's next visit was not planned with these answers (a card built before
+ * the visit-frequency answer was passed in, or restored from an older session).
+ */
+export function needsVisitReplan(card, answers) {
+  if (!card || typeof card !== 'object' || !Array.isArray(card.rows)) return false;
+  return card.nextVisitBasis === undefined || (card.visitFrequency ?? null) !== answeredFrequency(answers);
+}
+
+/**
+ * The same card with its next visit planned again for these answers (nextVisitPlan with
+ * the card's own trim interval, lengths and growth rate). Everything else is unchanged.
+ */
+export function replanNextVisit(card, answers) {
+  if (!card || typeof card !== 'object' || !Array.isArray(card.rows)) return card;
+  const styleTrim = card.styleTrimDays !== undefined ? card.styleTrimDays : card.trimDays;
+  const visitFrequency = answeredFrequency(answers);
+  const plan = nextVisitPlan({ trimDays: styleTrim, visitFrequency, zonesMm: cutCardZonesMm(card), growthMmPerDay: card.growthMmPerDay });
+  const at = toDate(card.createdAt);
+  const created = Number.isNaN(at.getTime()) ? new Date() : at;
+  return {
+    ...card,
+    trimDays: plan.trimDays,
+    styleTrimDays: isNum(styleTrim) && styleTrim > 0 ? styleTrim : null,
+    nextVisitDays: plan.days,
+    nextVisitBasis: plan.basis,
+    visitFrequency: plan.visitDays !== null ? visitFrequency : null,
+    nextVisitDayKey: nextVisitDate(plan.days, created).dayKey,
   };
 }
 

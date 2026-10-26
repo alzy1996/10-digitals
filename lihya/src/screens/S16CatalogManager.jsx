@@ -15,7 +15,7 @@ import { useSnackbar } from '../components/Snackbar.jsx';
 import SignatureEditor from './manage/SignatureEditor.jsx';
 import StyleRow from './manage/StyleRow.jsx';
 import { ListSkeleton, LiveRegion } from './manage/ui.jsx';
-import { EMPTY, draftFromStyle, sameDraft, styleNames } from './manage/util.js';
+import { EMPTY, canStepBack, draftFromStyle, sameDraft, styleNames } from './manage/util.js';
 
 const VISIBILITY = ['all', 'shown', 'hidden', 'signature'];
 const FOCUS_TTL_MS = 4000;
@@ -42,7 +42,7 @@ function Count({ label, value, tone }) {
 /** S16: catalog manager (/s/:shopId/owner/catalog, owner and manager). */
 export default function S16CatalogManager() {
   const { t, lang } = useT();
-  const { shopId } = useShop();
+  const { shopId, settings } = useShop();
   const { show } = useSnackbar();
   const navigate = useNavigate();
   const location = useLocation();
@@ -63,6 +63,9 @@ export default function S16CatalogManager() {
   const focusRef = useRef(null);
   // Key of an editor whose URL change is still on its way (router updates land in a transition).
   const openingRef = useRef(null);
+  // One save per editor: a double tap on Save must not create two styles or go back twice.
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
 
   const byId = useMemo(() => new Map(styles.map((s) => [s.id, s])), [styles]);
   const filtered = useMemo(() => styles.filter((s) => matchesLength(s, length) && matchesVisibility(s, vis)), [styles, length, vis]);
@@ -223,19 +226,32 @@ export default function S16CatalogManager() {
     setEditor((e) => (e ? { ...e, draft: typeof next === 'function' ? next(e.draft) : next } : e));
   }, []);
 
+  // A new editor (or the list) is ready for the next save.
+  useEffect(() => {
+    savingRef.current = false;
+    setSaving(false);
+  }, [editorKey]);
+
+  // Back to the list. Opened from the list: step back over the editor's history entry, but
+  // only when that entry belongs to this app (a deep-linked or reloaded editor replaces its
+  // own URL instead, so Back or Save never leaves the app).
   const closeEditor = useCallback(() => {
-    if (location.state && location.state.fromList) navigate(-1);
+    if (canStepBack(location.state, window.history.state)) navigate(-1);
     else setSearchParams({}, { replace: true });
   }, [location.state, navigate, setSearchParams]);
 
   const saveEditor = (patch) => {
-    if (!editor || !editorStyle) return;
+    if (!editor || !editorStyle || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     const name = patch.name[lang === 'ar' ? 'ar' : 'en'];
     let id = editorStyle.id;
     try {
       if (editor.mode === 'edit') updateStyle(shopId, editorStyle.id, patch);
       else id = createSignatureStyle(shopId, editorStyle, patch);
     } catch (err) {
+      savingRef.current = false;
+      setSaving(false);
       fail(err);
       return;
     }
@@ -299,6 +315,8 @@ export default function S16CatalogManager() {
           setDraft={setDraft}
           onSave={saveEditor}
           onCancel={closeEditor}
+          saving={saving}
+          guardChart={settings && settings.guardChart ? settings.guardChart : undefined}
           t={t}
           lang={lang}
         />

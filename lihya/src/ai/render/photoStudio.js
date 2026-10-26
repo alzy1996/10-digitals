@@ -15,6 +15,7 @@ import { textureJob, clearTextureJobs } from './textureJobs.js';
 import { growthAt, DEFAULT_GROWTH_MM_PER_DAY } from './timeline.js';
 import { frameMmPerPx, estimateLight, lowerFaceCrop } from './frame.js';
 import { makeCanvas, isNum } from './util.js';
+import { lineGuides } from './lineGuides.js';
 import { segmentImage } from '../models/segmenter.js';
 import { modelStatus } from '../models/status.js';
 
@@ -234,6 +235,14 @@ export async function renderStudio({
   ctx.drawImage(gl, 0, 0, W, H);
   return out;
 }
+
+/**
+ * Where the look's cheek lines, neckline and jaw sit on a shot, in that shot's pixels
+ * (lineGuides.js): the Studio draws them over the photo, puts its cheek-line and
+ * neckline drag handles on them and lays the barber's ruler along the jaw. Reached
+ * through the AI facade as renderStudio.lineGuides(shot, params).
+ */
+renderStudio.lineGuides = lineGuides;
 
 /**
  * Style-card thumbnail: the look on a 4:5 crop of the lower face, as a JPEG data URL.

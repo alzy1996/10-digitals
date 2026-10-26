@@ -18,11 +18,13 @@ import {
   signInWithRedirect,
   signOut,
 } from 'firebase/auth';
-import { auth } from '../lib/firebase.js';
+import { clearIndexedDbPersistence, terminate, waitForPendingWrites } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase.js';
 import { PREF_KEYS } from '../config/app.js';
 import { isValidEmail, normalizeEmail } from './model.js';
 import { codedError } from './db.js';
 import { appUrl } from '../lib/paths.js';
+import { STORES, idbClearStore } from '../lib/idb.js';
 
 function requireAuth() {
   if (!auth) throw codedError('app/not-configured', 'Firebase is not configured');
@@ -51,11 +53,30 @@ function applyAppLanguage(a) {
   a.languageCode = readPref(PREF_KEYS.lang) === 'en' ? 'en' : 'ar';
 }
 
+// Control characters (the browser drops tabs and new lines, so "/\t/x.com" would
+// become "//x.com") and backslashes (read as "/" in URLs) never belong in a path.
+function hasUnsafeChar(text) {
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text.charCodeAt(i);
+    if (c < 0x20 || c === 0x7f || c === 0x5c) return true;
+  }
+  return false;
+}
+
 /** A same-origin path to continue to after sign-in, or `fallback` (blocks open redirects). */
 export function safeNextPath(next, fallback = '/') {
   if (typeof next !== 'string' || !next) return fallback;
-  if (!next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) return fallback;
-  return next;
+  if (hasUnsafeChar(next)) return fallback;
+  if (!next.startsWith('/') || next.startsWith('//')) return fallback;
+  try {
+    const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://app.invalid';
+    const url = new URL(next, origin);
+    if (url.origin !== origin) return fallback;
+    const path = `${url.pathname}${url.search}${url.hash}`;
+    return path.startsWith('//') ? fallback : path;
+  } catch {
+    return fallback;
+  }
 }
 
 /** The URL an email link continues to: <origin>/login?next=<path>. */
@@ -220,6 +241,66 @@ export async function signInAnon() {
 export function signOutUser() {
   if (!auth) return Promise.resolve();
   return signOut(auth);
+}
+
+const SYNC_WAIT_MS = 4000;
+
+/** True when every queued write reached the server within `ms` (false offline). */
+async function writesSynced(store, ms) {
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(false), ms);
+  });
+  try {
+    return await Promise.race([waitForPendingWrites(store).then(() => true, () => false), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Sign out on a shared phone and leave nothing of the shop behind: the customer
+ * session snapshot (IndexedDB 'session' store), then this phone's Firestore cache
+ * (client names, phones, consultations), then the account. Ends with a full page
+ * load of `to` (default '/'), because the Firestore instance is shut down and the
+ * next person needs a fresh one.
+ *
+ * Writes that have not reached the server yet are never thrown away: when they
+ * do not sync within a few seconds (offline), the cache is kept so they are sent
+ * the next time this account signs in on this phone. Saved before/after photos
+ * (kept only with the customer's agreement) stay. Never rejects.
+ */
+export async function signOutAndClear({ to = '/' } = {}) {
+  try {
+    await idbClearStore(STORES.session);
+  } catch {
+    // no IndexedDB here (private mode): nothing was stored
+  }
+  if (db) {
+    const synced = await writesSynced(db, SYNC_WAIT_MS).catch(() => false);
+    try {
+      await terminate(db);
+    } catch {
+      // already terminated
+    }
+    if (synced) {
+      try {
+        await clearIndexedDbPersistence(db);
+      } catch {
+        // another tab still has the app open; its cache goes when that tab signs out
+      }
+    }
+  }
+  if (auth) {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error('sign out failed', err);
+    }
+  }
+  if (typeof window !== 'undefined' && window.location) {
+    window.location.assign(appUrl(safeNextPath(to, '/')));
+  }
 }
 
 /** Firebase ID token for the AI Worker (null when signed out). */

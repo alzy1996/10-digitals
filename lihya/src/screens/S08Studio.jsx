@@ -43,6 +43,8 @@ import {
 } from '../ai/index.js';
 import { readMirrorPref, writeMirrorPref } from './capture/camera.js';
 import CropCanvas from './studio/CropCanvas.jsx';
+import JawRuler from './studio/JawRuler.jsx';
+import LineHandles from './studio/LineHandles.jsx';
 import SavedLooks from './studio/SavedLooks.jsx';
 import { JawlineLine, JawlineSketch } from './studio/Jawline.jsx';
 import { ColorControls, GROUPS, GroupChips, LengthControls, LinesControls, TimelineControls } from './studio/StudioControls.jsx';
@@ -51,6 +53,7 @@ import { useClientGrowth } from './studio/useClientGrowth.js';
 import { useLivePreview } from './studio/useLivePreview.js';
 import { useMirrorMode } from './studio/useMirrorMode.js';
 import { CROP_ASPECT, beardBelowPx, cropDataUrl, faceCrop, fitBox, renderScale, scaleRect } from './studio/frame.js';
+import { initialStudioPreview, lowFpsDeclined, markLowFpsDeclined, writeStudioPreview } from './studio/studioPrefs.js';
 
 const VIEWS = Object.freeze(['front', 'left', 'right']);
 const PHOTO_DEBOUNCE_MS = 120;
@@ -60,6 +63,8 @@ const RULER_HIDE_MS = 1400;
 const PATCHY_COVER = 0.6;
 /** Height of the controls sheet on phones (the Sheet's h-[46dvh]); the canvas keeps the space above it. */
 const SHEET_VH = 46;
+/** A line's handle shows only when the beard has hair at that edge (mm). */
+const EDGE_MIN_MM = 0.2;
 
 export default function S08Studio() {
   const { mode } = useSession();
@@ -121,6 +126,8 @@ function Studio({ shop, settings, styles, learnedGrowth }) {
     looks,
     saveLook,
     removeLook,
+    restoreLook,
+    favoriteLookId,
     path,
     lookCode,
     consultationId,
@@ -138,7 +145,8 @@ function Studio({ shop, settings, styles, learnedGrowth }) {
   const rate = learnedGrowth || (Number.isFinite(shopGrowth) && shopGrowth > 0 ? shopGrowth : LIMITS.growthMmPerDayDefault);
 
   /* ------------------------------------------------------------ state */
-  const [preview, setPreview] = useState(() => (mirrorMode ? 'live' : 'photo'));
+  // Live or Photo as the barber last chose in this session (a slow device stays in Photo).
+  const [preview, setPreview] = useState(() => initialStudioPreview(mirrorMode));
   const [view, setView] = useState('front');
   const [group, setGroup] = useState(null);
   const [draft, setDraft] = useState(null);
@@ -164,6 +172,7 @@ function Studio({ shop, settings, styles, learnedGrowth }) {
   const rulerTimer = useRef(0);
   const photoCanvasRef = useRef(null);
   const renderSeq = useRef(0);
+  const sheetBodyRef = useRef(null);
 
   const params = draft || activeParams;
   const hasParams = Boolean(params);
@@ -179,6 +188,13 @@ function Studio({ shop, settings, styles, learnedGrowth }) {
   useEffect(() => {
     if (!mirrorMode) setGroup(null);
   }, [mirrorMode]);
+
+  // A group picked in the phone sheet opens at its top (the sheet body scrolls; Mirror Mode
+  // remounts its panel per group instead).
+  useEffect(() => {
+    const scroller = sheetBodyRef.current && sheetBodyRef.current.parentElement;
+    if (scroller && scroller.scrollTop > 0) scroller.scrollTop = 0;
+  }, [group]);
 
   /* ------------------------------------------------------------ derived look state */
   const need = useMemo(() => (params ? needsOutline(params, profile) : { needed: false, zones: [] }), [params, profile]);
@@ -204,6 +220,24 @@ function Studio({ shop, settings, styles, learnedGrowth }) {
   // The two biggest changes ("Face reads 8% longer · Jaw reads 6% softer").
   const jawLabels = useMemo(() => (params ? jawlineLabels(jawlineDelta(profile, params)).slice(0, 2) : []), [params, profile]);
   const jawDetail = useMemo(() => (params && showSketch ? jawlineDetail(profile, params) : null), [params, profile, showSketch]);
+
+  // Cheek line, neckline and jaw on the front photo: the drag handles while the Lines group
+  // is open, and the barber's ruler along the jaw while a length moves (Photo mode).
+  const onFrontPhoto = preview === 'photo' && Boolean(shot) && shot === front;
+  const zonesNow = (params && params.zones) || {};
+  const cheekEdge = Number(zonesNow.K_L) > EDGE_MIN_MM || Number(zonesNow.K_R) > EDGE_MIN_MM;
+  const neckEdge = Number(zonesNow.N) > EDGE_MIN_MM;
+  const handlesWanted = onFrontPhoto && sheetGroup === 'lines' && (cheekEdge || neckEdge);
+  const rulerOnJaw = onFrontPhoto && Boolean(ruler);
+  const guides = useMemo(() => {
+    if (!(handlesWanted || rulerOnJaw) || !params) return null;
+    try {
+      return renderStudio.lineGuides(shot, params);
+    } catch (err) {
+      console.warn('studio: line guides failed', err);
+      return null;
+    }
+  }, [handlesWanted, rulerOnJaw, shot, params]);
 
   /* ------------------------------------------------------------ lifecycle */
   useEffect(() => {
@@ -278,10 +312,16 @@ function Studio({ shop, settings, styles, learnedGrowth }) {
     setNotice(kind);
   }, []);
   const lowFps = useCallback(() => {
+    // Once Photo was taken from this message, it is not offered again in this session.
+    if (lowFpsDeclined()) return;
     show({
       message: t('render.lowFps'),
       actionLabel: t('render.lowFps.action'),
-      onAction: () => setPreview('photo'),
+      onAction: () => {
+        markLowFpsDeclined();
+        writeStudioPreview('photo');
+        setPreview('photo');
+      },
       duration: 10000,
     });
   }, [show, t]);
@@ -364,9 +404,9 @@ function Studio({ shop, settings, styles, learnedGrowth }) {
     },
     [setActiveParams],
   );
-  const onRuler = useCallback((mm, label, ended = false) => {
+  const onRuler = useCallback((mm, label, ended = false, zone = null) => {
     clearTimeout(rulerTimer.current);
-    setRuler({ mm, label });
+    setRuler({ mm, label, zone });
     if (ended) rulerTimer.current = setTimeout(() => setRuler(null), RULER_HIDE_MS);
   }, []);
 
@@ -379,6 +419,7 @@ function Studio({ shop, settings, styles, learnedGrowth }) {
   const choosePreview = (v) => {
     if (!v || v === preview) return;
     if (v === 'live') setNotice(null);
+    writeStudioPreview(v);
     setPreview(v);
   };
 
@@ -425,14 +466,17 @@ function Studio({ shop, settings, styles, learnedGrowth }) {
     setActiveParams(look.params);
   };
 
+  // Undo puts the same look back: same number (place), id, thumbnail and favourite.
   const removeSaved = (look) => {
+    const index = looks.findIndex((l) => l.id === look.id);
+    const wasFavorite = favoriteLookId === look.id;
     removeLook(look.id);
     show({
       message: t('studio.looks.removed'),
       actionLabel: t('common.undo'),
       onAction: () => {
-        const res = saveLook({ styleId: look.styleId, params: look.params, thumb: look.thumb });
-        if (!res.ok) show({ message: t('session.looks.max') });
+        const res = restoreLook(look, index, wasFavorite);
+        if (!res.ok && res.reason === 'max') show({ message: t('session.looks.max') });
       },
     });
   };
@@ -526,30 +570,37 @@ function Studio({ shop, settings, styles, learnedGrowth }) {
   const box = stageSize ? fitBox(stageSize.w, stageSize.h, CROP_ASPECT) : null;
   const shotLabel = (id) => t(`ai.shot.${id}`).replace(/(\d+°)/g, '⁦$1⁩');
 
-  const overlayBottom = (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 p-3">
-      {ruler ? (
-        <div className="w-full max-w-sm rounded-ctl border border-line bg-bg/90 px-3 pb-1 pt-2">
-          <p className="num truncate text-xs text-text-2">{ruler.label}</p>
-          <BarberRuler mm={ruler.mm} lang={lang} />
-        </div>
-      ) : null}
-      {growth ? (
-        <StagePill tone="brass" role="status" className="pointer-events-auto rounded-card pe-1">
-          <Icon name="timeline" size={18} />
-          <span className="min-w-0 leading-snug">{t(growth.labelKey)}</span>
-          <button
-            type="button"
-            onClick={() => setTimelineIdx(null)}
-            aria-label={t('studio.timeline.off')}
-            className="press -my-1 inline-flex h-9 w-9 items-center justify-center rounded-full text-text-2 active:bg-surface-2"
-          >
-            <Icon name="close" size={18} />
-          </button>
-        </StagePill>
-      ) : null}
+  // The barber's ruler while a length moves (PRD 9.5): laid along the jaw on the front
+  // photo, just outside the beard (JawRuler); in Live AR and on the 45 degree shots a thin
+  // ruler at the top of the frame, over the forehead, never over the beard being edited.
+  const jawRuler = rulerOnJaw && guides && crop && box ? (
+    <JawRuler guides={guides} crop={crop} box={box} zones={zonesNow} zone={ruler.zone} mm={ruler.mm} label={ruler.label} />
+  ) : null;
+  const overlayTop = ruler && !jawRuler ? (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 flex justify-center p-2">
+      <div className="w-[min(200px,60%)] rounded-ctl bg-bg/45 px-2 pt-1">
+        <p className="num truncate text-center text-xs font-medium text-text">{ruler.label}</p>
+        <BarberRuler mm={ruler.mm} lang={lang} />
+      </div>
     </div>
-  );
+  ) : null;
+
+  const overlayBottom = growth ? (
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 p-3">
+      <StagePill tone="brass" role="status" className="pointer-events-auto rounded-card pe-1">
+        <Icon name="timeline" size={18} />
+        <span className="min-w-0 leading-snug">{t(growth.labelKey)}</span>
+        <button
+          type="button"
+          onClick={() => setTimelineIdx(null)}
+          aria-label={t('studio.timeline.off')}
+          className="press -my-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-2 active:bg-surface-2"
+        >
+          <Icon name="close" size={18} />
+        </button>
+      </StagePill>
+    </div>
+  ) : null;
 
   const sketch = showSketch && jawDetail ? (
     <div className="pointer-events-none absolute end-2 top-12 rounded-ctl border border-line bg-bg/80 p-1">
@@ -587,6 +638,7 @@ function Studio({ shop, settings, styles, learnedGrowth }) {
           className={cx('absolute bottom-2 end-2 bg-bg/85', mirror && 'border-brass text-brass')}
         />
         {sketch}
+        {overlayTop}
         {overlayBottom}
       </div>
     );
@@ -615,6 +667,22 @@ function Studio({ shop, settings, styles, learnedGrowth }) {
           ) : null}
         </div>
         {sketch}
+        {handlesWanted && guides && crop ? (
+          <LineHandles
+            guides={guides}
+            crop={crop}
+            box={box}
+            params={params}
+            cheek={cheekEdge}
+            neck={neckEdge}
+            front={front}
+            mmPerPx={mmPerPx}
+            onDraft={onDraft}
+            onCommit={onCommit}
+          />
+        ) : null}
+        {jawRuler}
+        {overlayTop}
         {overlayBottom}
       </div>
     ) : null;
@@ -743,6 +811,7 @@ function Studio({ shop, settings, styles, learnedGrowth }) {
           onChange={onCommit}
           front={front}
           mmPerPx={mmPerPx}
+          dragHint={handlesWanted && guides ? 'photo' : preview === 'live' && (cheekEdge || neckEdge) ? 'live' : null}
         />
       );
     }
@@ -809,7 +878,10 @@ function Studio({ shop, settings, styles, learnedGrowth }) {
           </div>
           <aside className="flex min-h-0 basis-[30%] flex-col gap-3 border-s border-line ps-6" aria-label={t('studio.controls')}>
             <GroupChips value={sheetGroup} onChange={(g) => g && setGroup(g)} layout="grid" />
-            <div className="-me-2 min-h-0 flex-1 overflow-y-auto pe-2">{controls(sheetGroup)}</div>
+            {/* Keyed by group: a new group opens at its top, not at the last group's scroll. */}
+            <div key={sheetGroup} className="-me-2 min-h-0 flex-1 overflow-y-auto pe-2">
+              {controls(sheetGroup)}
+            </div>
             {primary}
           </aside>
         </div>
@@ -855,7 +927,7 @@ function Studio({ shop, settings, styles, learnedGrowth }) {
         className="h-[46dvh]"
       >
         <GroupChips value={group} onChange={(g) => g && setGroup(g)} className="sticky top-0 z-10 -mx-1 bg-surface px-1 pb-1" />
-        {controls(group)}
+        <div ref={sheetBodyRef}>{controls(group)}</div>
       </Sheet>
     </ScreenFrame>
   );

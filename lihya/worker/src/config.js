@@ -15,6 +15,17 @@ export const ACCOUNT_CAP_MAX = 80;
 export const ACCOUNT_CAP_DEFAULT = 80;
 export const SHOP_CAP_DEFAULT = 20;
 
+// Allowlist (SEC-08): anyone can create a shop in the app, so only shops Sam lists may
+// render, and only an allowlisted cap may go above SHOP_CAP_DEFAULT. Two sources:
+//   KV key  ai:allowed:<shopId>  (binding LIHYA_CAPS, set with wrangler, no redeploy)
+//   var     AI_SHOPS = "shopA, shopB:40"  (wrangler.toml)
+// The KV key wins when it exists. Its value (and the ":<n>" of an AI_SHOPS entry) is
+// the most renders a day the shop may set (1..80); "0", "no", "off" or "false" in KV
+// blocks the shop; any other value allows it with the default 20.
+export const ALLOWLIST_KEY_PREFIX = 'ai:allowed:';
+const SHOP_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+const BLOCK_VALUES = new Set(['0', 'no', 'off', 'false']);
+
 // Request limits. Two JPEGs under 512 x 512 are far below these.
 export const MAX_BODY_BYTES = 2 * 1024 * 1024;
 export const MAX_IMAGE_BYTES = 1024 * 1024;
@@ -58,14 +69,49 @@ export function parseAccountCap(value) {
   return Math.min(ACCOUNT_CAP_MAX, Math.max(0, Math.floor(n)));
 }
 
+/** The most renders a day an allowlist entry grants: an integer 1..80, else the default 20. */
+export function parseAllowCap(value) {
+  const text = value === undefined || value === null ? '' : String(value).trim();
+  if (!/^\d{1,3}$/.test(text)) return SHOP_CAP_DEFAULT;
+  const n = Number(text);
+  return n >= 1 ? Math.min(ACCOUNT_CAP_MAX, n) : SHOP_CAP_DEFAULT;
+}
+
+/** AI_SHOPS ("shopA, shopB:40") -> Map(shopId -> max cap). Invalid entries are dropped. */
+export function parseAiShops(value) {
+  const out = new Map();
+  if (typeof value !== 'string') return out;
+  for (const entry of value.split(',')) {
+    const [rawId, rawCap] = entry.trim().split(':');
+    const id = (rawId || '').trim();
+    if (!SHOP_ID_RE.test(id) || (rawCap !== undefined && BLOCK_VALUES.has(rawCap.trim().toLowerCase()))) continue;
+    out.set(id, parseAllowCap(rawCap));
+  }
+  return out;
+}
+
+/** Allowlist KV value -> { allowed, maxCap }; null when the key does not exist. */
+export function allowanceFromKv(raw) {
+  if (raw === null || raw === undefined) return null;
+  const text = String(raw).trim().toLowerCase();
+  if (BLOCK_VALUES.has(text)) return { allowed: false, maxCap: 0 };
+  return { allowed: true, maxCap: parseAllowCap(text) };
+}
+
+export function allowlistKey(shopId) {
+  return `${ALLOWLIST_KEY_PREFIX}${shopId}`;
+}
+
 /**
- * Per-shop cap: min(settings.aiDailyCap ?? 20, account cap). The owner sets
- * aiDailyCap in Settings (0..80); a missing or broken value means 20.
+ * Per-shop cap: min(settings.aiDailyCap ?? 20, the allowlist's max for the shop, account
+ * cap). The owner sets aiDailyCap in Settings (0..80); a missing or broken value means
+ * 20, and a shop that is not allowlisted with a higher number cannot go above 20.
  */
-export function shopCapFrom(aiDailyCap, accountCap) {
+export function shopCapFrom(aiDailyCap, accountCap, maxCap = SHOP_CAP_DEFAULT) {
   let cap = SHOP_CAP_DEFAULT;
   if (typeof aiDailyCap === 'number' && Number.isFinite(aiDailyCap)) cap = Math.max(0, Math.floor(aiDailyCap));
-  return Math.min(cap, accountCap);
+  const max = typeof maxCap === 'number' && Number.isFinite(maxCap) ? Math.max(0, Math.floor(maxCap)) : SHOP_CAP_DEFAULT;
+  return Math.min(cap, max, accountCap);
 }
 
 export function readConfig(env) {
@@ -75,5 +121,6 @@ export function readConfig(env) {
     projectId,
     allowedOrigins: parseAllowedOrigins(source.ALLOWED_ORIGINS),
     accountCap: parseAccountCap(source.ACCOUNT_DAILY_CAP),
+    aiShops: parseAiShops(source.AI_SHOPS),
   };
 }

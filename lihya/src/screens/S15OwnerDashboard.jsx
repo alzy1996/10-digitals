@@ -25,7 +25,7 @@ import TopStyles from './owner/TopStyles.jsx';
 import TrendBars from './owner/TrendBars.jsx';
 import { Meter, Note, Section } from './owner/ui.jsx';
 import { useAiQuota, useDemoPresence, useToday } from './owner/hooks.js';
-import { TARGETS, formatDecision, isNum, lastDays, longDay, markPurged, oneDecimal, purgeDue } from './owner/util.js';
+import { TARGETS, aiUsage, formatDecision, isNum, lastDays, longDay, markPurged, oneDecimal, purgeDue, workerUrl } from './owner/util.js';
 
 const EMPTY = Object.freeze([]);
 const purging = new Set();
@@ -73,9 +73,17 @@ function TargetSub({ text, met }) {
   );
 }
 
-function AiCard({ used, cap, enabled, quota, loading, isOwner, settingsPath }) {
+/**
+ * AI previews used today. `usage` comes from aiUsage(): the Worker's own count (the one its
+ * cap is enforced on, UTC day, resets 04:00 Muscat), or this shop's Muscat-day count marked
+ * as an estimate when the Worker could not be asked.
+ */
+function AiCard({ usage, enabled, configured, loading, isOwner, settingsPath }) {
   const { t } = useT();
-  const ratio = cap > 0 ? used / cap : 0;
+  const { used, cap, source, account, notAllowed } = usage;
+  const ratio = cap > 0 ? used / cap : used > 0 ? 1 : 0;
+  // Without a Worker URL nothing can render: there is no count to estimate.
+  const estimate = source !== 'worker' && enabled && configured;
   return (
     <div className="col-span-2 flex min-w-0 flex-col gap-3 rounded-card border border-line bg-surface p-4">
       <div className="flex min-w-0 items-center gap-2 text-sm text-text-2">
@@ -93,15 +101,19 @@ function AiCard({ used, cap, enabled, quota, loading, isOwner, settingsPath }) {
       {loading ? (
         <Skeleton className="h-9 w-28" />
       ) : (
-        <div className="display num text-2xl font-semibold leading-none text-text">
-          <bdi>{t('owner.dash.kpi.aiValue', { used, cap })}</bdi>
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="display num text-2xl font-semibold leading-none text-text">
+            <bdi>{t('owner.dash.kpi.aiValue', { used, cap })}</bdi>
+          </span>
+          {estimate ? <span className="text-xs font-medium text-warn">{t('owner.dash.kpi.aiEstimateTag')}</span> : null}
         </div>
       )}
       <Meter value={ratio} label={t('owner.dash.kpi.aiMeter', { used, cap })} />
       <div className="flex flex-col gap-1 text-xs text-text-2">
-        {quota && isNum(quota.accountUsed) && isNum(quota.accountCap) ? (
-          <span>{t('owner.dash.kpi.aiAccount', { used: quota.accountUsed, cap: quota.accountCap })}</span>
-        ) : null}
+        {account ? <span>{t('owner.dash.kpi.aiAccount', { used: account.used, cap: account.cap })}</span> : null}
+        {enabled && notAllowed ? <span className="text-warn">{t('owner.dash.kpi.aiNotAllowed')}</span> : null}
+        {estimate && !loading ? <span>{t('owner.dash.kpi.aiEstimate')}</span> : null}
+        {enabled && !configured ? <span className="text-warn">{t('owner.dash.kpi.aiNotConfigured')}</span> : null}
         <span>{enabled ? t('owner.dash.kpi.aiResets') : t('owner.dash.kpi.aiOff')}</span>
         {!enabled && isOwner ? (
           <Link to={settingsPath} className="press -my-2 inline-flex min-h-tap items-center gap-1 self-start font-medium text-brass underline-offset-4 hover:underline">
@@ -210,9 +222,16 @@ export default function S15OwnerDashboard() {
   }, [trendLive.data, week]);
 
   const demo = useDemoPresence(shopId, consultations);
-  const aiUsed = stats ? stats.aiRenders : 0;
-  const aiCap = Number(settings.aiDailyCap) || 0;
-  const quota = useAiQuota({ shopId, enabled: settings.aiPreview === true, online, refreshKey: aiUsed });
+  const aiOn = settings.aiPreview === true;
+  // This shop's renders on today's Muscat day: an estimate only, and the refresh signal for
+  // the Worker's own count (every new render asks the Worker again).
+  const aiStatsRenders = stats ? Number(stats.aiRenders) || 0 : 0;
+  // Asked once today's stats are in (then again after every new render).
+  const { quota, pending: quotaPending } = useAiQuota({ shopId, enabled: aiOn && !statsLive.loading, online, refreshKey: aiStatsRenders });
+  const aiShown = useMemo(
+    () => aiUsage({ quota, statsRenders: aiStatsRenders, settingsCap: settings.aiDailyCap }),
+    [quota, aiStatsRenders, settings.aiDailyCap],
+  );
 
   const loading = consultLive.loading || statsLive.loading;
   const failed = consultLive.error || statsLive.error;
@@ -330,11 +349,10 @@ export default function S15OwnerDashboard() {
                     loading={loading || productsLive.loading}
                   />
                   <AiCard
-                    used={aiUsed}
-                    cap={aiCap}
-                    enabled={settings.aiPreview === true}
-                    quota={quota}
-                    loading={statsLive.loading}
+                    usage={aiShown}
+                    enabled={aiOn}
+                    configured={Boolean(workerUrl())}
+                    loading={statsLive.loading || (quotaPending && !quota)}
                     isOwner={isOwner}
                     settingsPath={`${base}/owner/settings#ai`}
                   />

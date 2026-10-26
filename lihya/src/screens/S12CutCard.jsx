@@ -16,7 +16,7 @@ import Toggle from '../components/Toggle.jsx';
 import { useSnackbar } from '../components/Snackbar.jsx';
 import { useT } from '../lib/i18n/useT.js';
 import { dayKey as muscatDayKey, formatMuscat } from '../lib/time.js';
-import { cutCardZonesMm } from '../lib/cutcard.js';
+import { cutCardZonesMm, needsVisitReplan, replanNextVisit } from '../lib/cutcard.js';
 import { useSession } from '../hooks/useSession.js';
 import { useShop } from '../state/ShopContext.jsx';
 import { recordVisitLengths, saveClientProfile } from '../services/clients.js';
@@ -74,7 +74,18 @@ export default function S12CutCard() {
   const { show, confirmUndo } = useSnackbar();
   const session = useSession();
   const { shopId, shop, settings, me } = useShop();
-  const { mode, path, cutCard, approved, client, hydrated, effectiveProfile, profile, shots, keepPhotos, setKeepPhotos, consultationId } = session;
+  const { mode, path, cutCard: storedCard, answers, setCutCard, approved, client, hydrated, effectiveProfile, profile, shots, keepPhotos, setKeepPhotos, consultationId } =
+    session;
+  // One rule for the next visit (chair:F18): a card built without his visit-frequency
+  // answer (or restored from an older session) is planned again with it, here and in the
+  // session, so the Done screen preselects exactly what this card says.
+  const cutCard = useMemo(
+    () => (storedCard && needsVisitReplan(storedCard, answers) ? replanNextVisit(storedCard, answers) : storedCard),
+    [storedCard, answers],
+  );
+  useEffect(() => {
+    if (cutCard && cutCard !== storedCard && typeof setCutCard === 'function') setCutCard(cutCard);
+  }, [cutCard, storedCard, setCutCard]);
   const style = useStyle(shopId, cutCard ? cutCard.styleId : null);
   const record = useClientRecord(shopId, client);
   const [consent, setConsent] = useProfileConsent(session);

@@ -98,35 +98,78 @@ export async function withMounted(element, { width, lang = 'ar' }, work) {
   }
 }
 
-/** Bottom edges (CSS px from the top of `node`) of its [data-pdf-block] sections: safe page breaks. */
+/** Gap (CSS px) kept above a block when a page ends just before it. */
+export const BREAK_ABOVE_PX = 2;
+
+/**
+ * Safe page breaks (CSS px from the top of `node`) from its [data-pdf-block] elements:
+ * each block's bottom edge, and just above its top edge, so a page can end between two
+ * table rows (every row is a block) as well as after a whole section. Sorted, unique.
+ */
 export function blockBreaks(node) {
   const top = node.getBoundingClientRect().top;
-  return [...node.querySelectorAll('[data-pdf-block]')]
-    .map((el) => {
-      const r = el.getBoundingClientRect();
-      return Math.round(r.bottom - top);
-    })
-    .filter((y) => y > 0)
-    .sort((a, b) => a - b);
+  const out = new Set();
+  for (const el of node.querySelectorAll('[data-pdf-block]')) {
+    const r = el.getBoundingClientRect();
+    out.add(Math.round(r.bottom - top));
+    out.add(Math.round(r.top - top - BREAK_ABOVE_PX));
+  }
+  return [...out].filter((y) => y > 0).sort((a, b) => a - b);
+}
+
+// html2canvas 1.4.1 finds each font's baseline with a probe it appends to the page's own
+// <body>: <div style="visibility: hidden"> holding a <span> and a 1 x 1 <img> on the
+// baseline (FontMetrics.parseMetrics). Tailwind's preflight makes every img a block, so
+// the probe image drops to the next line, the baseline comes out about one line too low
+// and every text run is drawn ~8 CSS px under its DOM box: table borders cut through the
+// text and page breaks taken from the DOM slice the last row (chair:F2). While a
+// document is rasterized, this rule puts the probe image back inline.
+export const H2C_PROBE_FIX_ID = 'lihya-h2c-probe-fix';
+export const H2C_PROBE_FIX_CSS =
+  'body > div[style*="visibility: hidden"] > img { display: inline !important; width: 1px !important; height: 1px !important; max-width: none !important; }';
+let probeFixUsers = 0;
+
+/** Add the probe fix (counted, so overlapping exports share one style element). */
+export function addProbeFix(doc = typeof document !== 'undefined' ? document : null) {
+  if (!doc || !doc.head) return () => {};
+  probeFixUsers += 1;
+  if (!doc.getElementById(H2C_PROBE_FIX_ID)) {
+    const style = doc.createElement('style');
+    style.id = H2C_PROBE_FIX_ID;
+    style.textContent = H2C_PROBE_FIX_CSS;
+    doc.head.appendChild(style);
+  }
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    probeFixUsers = Math.max(0, probeFixUsers - 1);
+    if (probeFixUsers === 0) doc.getElementById(H2C_PROBE_FIX_ID)?.remove();
+  };
 }
 
 /** html2canvas at RASTER_SCALE with the options every document needs. */
 export async function rasterize(node, { background = '#FFFFFF', scale = RASTER_SCALE } = {}) {
   const { default: html2canvas } = await import('html2canvas');
   const rect = node.getBoundingClientRect();
-  return html2canvas(node, {
-    scale,
-    // Never clone the dev-server error overlay into a PDF.
-    ignoreElements: (el) => el.tagName === 'VITE-ERROR-OVERLAY',
-    backgroundColor: background,
-    useCORS: true,
-    logging: false,
-    width: Math.ceil(rect.width),
-    height: Math.ceil(rect.height),
-    windowWidth: Math.max(Math.ceil(rect.width), 360),
-    scrollX: 0,
-    scrollY: 0,
-  });
+  const removeFix = addProbeFix();
+  try {
+    return await html2canvas(node, {
+      scale,
+      // Never clone the dev-server error overlay into a PDF.
+      ignoreElements: (el) => el.tagName === 'VITE-ERROR-OVERLAY',
+      backgroundColor: background,
+      useCORS: true,
+      logging: false,
+      width: Math.ceil(rect.width),
+      height: Math.ceil(rect.height),
+      windowWidth: Math.max(Math.ceil(rect.width), 360),
+      scrollX: 0,
+      scrollY: 0,
+    });
+  } finally {
+    removeFix();
+  }
 }
 
 /**
@@ -244,7 +287,9 @@ export async function printElement(element, { lang = 'ar', pageSize = 'a4', widt
   style.id = PRINT_STYLE_ID;
   style.textContent = [
     `@page { size: ${page.w}mm ${page.h}mm; margin: 0; }`,
-    `@media screen { #${PRINT_ROOT_ID} { position: absolute; top: 0; left: -${width + 2000}px; width: ${width}px; } }`,
+    // On screen the print copy is a clipped 0 x 0 fixed box: an element pushed off to the left
+    // would widen the scrollable page in Arabic (RTL scrolls to the left) until afterprint.
+    `@media screen { #${PRINT_ROOT_ID} { position: fixed; top: 0; left: 0; width: 0; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; } }`,
     '@media print {',
     `  html, body { background: #FFFFFF !important; }`,
     `  body > *:not(#${PRINT_ROOT_ID}) { display: none !important; }`,

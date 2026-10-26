@@ -2,7 +2,14 @@ import Icon from './Icon.jsx';
 import Skeleton from './Skeleton.jsx';
 import { cx } from './kit.js';
 
-const TONES = { default: 'text-text', brass: 'text-brass', keep: 'text-keep', cut: 'text-cut', warn: 'text-warn', info: 'text-info' };
+const TONES = {
+  default: 'text-text',
+  brass: 'text-brass',
+  keep: 'text-keep-ink',
+  cut: 'text-cut-ink',
+  warn: 'text-warn-ink',
+  info: 'text-info-ink',
+};
 
 /**
  * KPI tile for the owner dashboard: label, big tabular value (display face), optional

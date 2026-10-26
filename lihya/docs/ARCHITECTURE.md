@@ -307,6 +307,14 @@ Layout: `ScreenFrame({ title, back, actions, children, footer, wide })` (top bar
 toggle + pending-sync badge), `TopBar`, `LangToggle`, `SyncBadge`, `OwnerShell({ children })`
 (desktop 2-column fixed side nav, phone tabs), `ScreenFallback` (skeleton), `ErrorState`, `EmptyState`,
 `ConfirmUndo` pattern via snackbar (no confirm dialogs).
+`SyncStrip` (exported from SyncBadge.jsx): `TopBar` uses `<SyncBadge offlineStrip />`, so on phones the offline
+states show as a full-width line under the bar and online-pending as a short "Saved, will sync" pill.
+`ScreenTransition` (src/components/ScreenTransition.jsx) wraps `<Routes>` inside `<Suspense>` in App.jsx (PRD 9.4
+screen motion; nothing remounts, reduced motion = none). `ErrorBoundary({ resetKey })` (src/state/ErrorBoundary.jsx):
+App.jsx passes the route path, so the next route clears an error without remounting the providers.
+Colours: `text-keep`, `text-cut`, `text-warn`, `text-info` map to the AA text tokens `--keep-ink`, `--cut-ink`,
+`--warn-ink`, `--info-ink` (tokens.css; `text-*-ink` also exists). `bg-`, `border-` and `fill-` utilities keep the PRD
+values. Inline styles that colour text use `var(--*-ink)`.
 
 ## 8. Folder ownership (build phase)
 
@@ -359,7 +367,9 @@ toggle + pending-sync badge), `TopBar`, `LangToggle`, `SyncBadge`, `OwnerShell({
   profile_save consent itself. `recordVisitLengths(shopId, id, { zonesMm, at, measuredMm })`.
 - Stats: consultations.js bumps consultations / approvals / decision seconds / topStyles / addOns itself. Screens only
   call `bumpAiRender(shopId)` (stats.js) once per AI render. Screens call `logConsent` for 'ai_render' only.
-- `getLookCode` returns `{ code, styleId, params, createdAt, expiresAt, usedAt, usedBy, expired, used } | null`.
+- `getLookCode` returns `{ code, styleId, params, createdAt, expiresAt, usedAt, usedBy, expired, used, invalid, errors } | null`.
+  `params` is already clamped (`lookCodes.lookCodeParams(data)` = `look.checkLookParams(data.params, data.styleId).params`);
+  `invalid` is true when the look still names unknown options (`errors` = `catalog.err.*` keys): S14 refuses such a code.
 - `shops.purgeExpiredData(shopId)` (owner) applies `settings.retentionDays`; call it when the owner dashboard opens.
   `deleteDemoData(shopId)` -> Promise. `watchPublicInfo` calls `cb(null, { denied: true })` when Try at home is off.
 - `sync.subscribeWriteErrors(cb(err, label))` for writes the server rejects.
@@ -417,8 +427,11 @@ toggle + pending-sync badge), `TopBar`, `LangToggle`, `SyncBadge`, `OwnerShell({
 - `useSession()` also returns `hydrated`, `hasData`, `clearApproval()`, `trackObjectUrl(url)`,
   `keepBeforeAfter({ before, after })`. The session keeps a photo-free snapshot for reload recovery (10 minutes).
   Idle wipes navigate home automatically (src/state/IdleWipeWatcher.jsx) — screens do not need to.
-- `buildCutCard({ params, profile, style, guardChart, colors, safety, growthMmPerDay, now, front: shots.front })`;
-  the card carries `nextVisitDayKey`, `color.questions`, `color.blocked`, notes as `{ key, vars }` (`report.note.*`).
+- `buildCutCard({ params, profile, style, guardChart, colors, safety, answers, growthMmPerDay, now, front: shots.front })`;
+  the card carries `nextVisitDayKey`, `color.questions`, `color.blocked`, notes as `{ key, vars }` (`report.note.*`),
+  and `nextVisitBasis: 'trim'|'growth'|'visits'|'homeTrim'`, `styleTrimDays`, `visitFrequency`. `trimDays` is the
+  style's interval scaled by the growth rate. Input params are normalised first (`cutCardParams`: zones 0..200, unknown
+  line/finish/colour/mustache ids fall back), so a forged look cannot break the card.
 - Reports: `<CutCardDocument data lang variant="screen"|"print"|"share" />`, `cutCardPdf(data, lang)`,
   `cutCardPng(data, lang)`, `printCutCard(data, lang)`, `cutCardFilename(dayKey, ext)`; data = `{ card, params, style,
   shop: { name, nameAr, logoUrl }, barber, client, approved: { at, decisionSeconds }, colors, guardChart }`.
@@ -428,12 +441,18 @@ toggle + pending-sync badge), `TopBar`, `LangToggle`, `SyncBadge`, `OwnerShell({
 - `share.js`: `shareFile(blob, filename, text)` -> `'shared'|'downloaded'|'cancelled'|'failed'`, `copyAndOpenWhatsApp(text,
   phone)` (call inside the tap handler with no await before it), `reminderText({ lang, shop, clientName, dayKey })`,
   `cutCardShareText({ lang, shop, style, card })`, `copyText`.
-- `idb.js`: `pruneSaved(maxAgeDays)` for the retention setting.
+- `idb.js`: `pruneSaved(maxAgeDays)` for the retention setting (ShopRoute runs it with `settings.retentionDays` when the
+  shop opens and once a day; `retentionDaysOf(settings)` is exported from src/state/ShopRoute.jsx). Also
+  `savedSummary() -> { pairs, clients, byClient }`, `countSaved()`, `countSavedForClient(id)`, `deleteAllSaved()`,
+  `deleteSavedForClient(id)`, `listSavedForClient(id)`, `subscribeSaved(cb) -> unsub`, `savedKeyClient(key)`.
 
 ### AI Worker (worker/)
 - `POST /render` (multipart `source`, `guide`, `seed`, `shopId`; Bearer Firebase ID token; optional
   `X-Firebase-AppCheck`) -> image bytes + `X-Lihya-Used`, `X-Lihya-Cap`; 429 `{ error: 'cap', scope, resetsAt }`.
-- `GET /quota?shopId=` -> `{ usedToday, cap, accountUsed, accountCap, enabled, day, resetsAt }` for the owner dashboard.
+- `GET /quota?shopId=` -> `{ usedToday, cap, accountUsed, accountCap, enabled, allowed, day, resetsAt }` for the owner
+  dashboard (UTC day = resets 04:00 Muscat). 403 codes: `email_not_verified` (token without a verified email),
+  `not_allowed` (shop not on the allowlist: KV `ai:allowed:<shopId>` wins over the `AI_SHOPS` var). `renderFinalLook`
+  maps both to `err.code === 'notAllowed'`.
 
 ### Integration additions
 - `clients.listClients(shopId, { includeDemo })` (one-time read of every client, labels only, for exports) and
@@ -445,3 +464,78 @@ toggle + pending-sync badge), `TopBar`, `LangToggle`, `SyncBadge`, `OwnerShell({
   refuses a queued write; `src/state/IdleWipeWatcher.jsx` returns to the mode's start screen after an idle wipe.
 - `PREF_KEYS.purgeDay` (per-device marker so the retention purge runs at most once a day).
 - AI facade also exports `MST_SWATCHES`, `clearRenderCaches`.
+
+### Review fixes (October 2026)
+Auth, language, sync
+- `auth.signOutAndClear({ to = '/' })`: clears the IndexedDB session store, waits up to 4 s for queued writes, then
+  `terminate(db)` and `clearIndexedDbPersistence(db)` (only when the writes synced, so offline work is never lost),
+  `signOut(auth)` and a full load of `appUrl(to)`. Never rejects. Every sign-out button uses it.
+- `safeNextPath(next, fallback)` also refuses control characters, DEL and backslashes, and resolves the path against
+  the origin (which must match); `emailLinkUrl` uses it.
+- `useT`: `hasLangPref()` (a saved choice exists on this device) and `setLang(lang, { persist = true })`. ShopProvider and
+  PublicShopProvider apply `settings.defaultLanguage` / `info.defaultLanguage` with `persist: false` when the device has
+  no saved choice. `shops/{id}/public/info` carries `defaultLanguage` ('ar'|'en'), copied by `updateSettings` and
+  `createShop`.
+- `sync.trackWrite(promise, label, { quietDenied })` and `db.commitOps(ops, label, opts)`: `quietDenied` refusals do not
+  show the write-error snackbar (used by the count-once stats batches and the draft cancel).
+- ShopProvider / PublicShopProvider show a "taking long" notice after 12 s of loading online (`shop.slow.*`), with Try
+  again; the listeners keep running.
+
+Consultations and stats
+- `approveConsultation(shopId, id, { params, cutCard, decisionSeconds, aiPreviewUsed, startedAt, dayKey })` and
+  `completeConsultation(shopId, id, { rating, nextVisitDays, addOns, startedAt, dayKey })`: the optional `startedAt` /
+  `dayKey` books the stats on the visit's own Muscat day (approve.js and S13 pass `session.startedAt`).
+  `cancelConsultation(shopId, id)` returns Promise<boolean> and never throws (the session wipe cancels an open draft).
+- Count once: `approvalCountOps` / `addOnsCountOps` build a separate quiet batch that sets
+  `consultation.approvalCountedAt` / `addOnsCountedAt` (serverTimestamp) with the stats increments; the rules accept
+  each stamp once, so a reload, a restored snapshot or another device cannot count a consultation twice.
+- `shops.floorDeltas(deltas, stats)`: `deleteDemoData` never takes a counter below 0. Rules: barbers can only raise
+  counters; every counter is an int 0..1,000,000; `topStyles` has at most 100 keys.
+- `purgeExpiredData` also deletes never-visited clients (`lastVisitAt == null`, `createdAt < cutoff`; composite index
+  in firestore.indexes.json).
+
+Clients and Look Codes
+- Client docs carry `searchTokens` (word prefixes, Arabic article stripped, up to 15 chars / 80 tokens) and
+  `phoneTokens` (4+ digit runs of the last 8 digits). `searchClients(shopId, text)` keeps its signature (array-contains
+  on the longest word or the digits, plus the old `displayNameLower` prefix query for older docs; at most 10).
+  model.js exports `PARAM_KEYS`, `STYLE_KEYS`, `nameTokens`, `phoneTokens`, `clientSearchFields`.
+- `look.checkLookParams(raw, fallbackStyleId) -> { params, errors }` (clampParams then validateParams). `validateParams`
+  requires `styleId` to match `/^[A-Za-z0-9_-]{1,80}$/`; `clampParams` keeps only known shape values (chin, lengthAdjustable,
+  fadeB). `model.sanitizeParams` keeps only the 10 LookParams keys and bounds every value.
+- `lookCodes.expiresAt` has a TTL policy (firestore.indexes.json). Rules check Look Code params strictly
+  (`validLookParams(params, true)`); consultation params, cut cards, styles and client profiles are bounded too.
+- Rules budget: Firestore evaluates at most 1,000 expressions per request. Keep per-zone range checks for Look Codes
+  only; consultations use the lighter bounded checks. Measure with a padded request before adding checks.
+
+Session (src/state/SessionContext.jsx)
+- `useSession()` also returns `restoreLook(look, index, favorite = false) -> { ok, id?, reason?: 'max'|'exists'|'invalid' }`
+  (Undo of a removed look: same id, thumbnail and position), `issuedCode` (`{ code, key, styleId, createdAt, expiresAt }`,
+  the Try-at-home code of this visit, photo-free, kept in the snapshot) and `setIssuedCode(ic)`.
+- Exports `cleanLookParams`, `cleanLookCode`, `cleanIssuedCode`, `onSessionRoutes`, `sameValue`. Every look that enters
+  the session goes through `cleanLookParams`.
+- Leaving the shop or /try routes wipes the session (provider unmount); a reload keeps the 10-minute snapshot. A wipe
+  other than 'next' cancels the session's open draft consultation. Kept before/after photos follow `settings.retentionDays`.
+- `home/codeCache.js` adds `rememberCode(shopId, entry)`. The barber's zone confirmations use the one table in
+  `src/ai/analysis/zoneConfirm.js` (`ZONE_CONFIRM_DENSITY`, also re-exported by the facade).
+
+Capture, Studio, entry
+- profile.js: `SIDE_MIN_YAW`, `sideShotPose(shot)` (side shots under 20 degrees are not used as sides), `paintTurn()`
+  (lets the step label paint between analysis steps).
+- `src/screens/capture/capturePrefs.js` (Quick mode and the once-per-session white card, sessionStorage) and
+  `manualCheck.js` (`manualShotWarnings`, pose and quality warnings for hand-shutter shots).
+- `src/screens/studio/studioPrefs.js` (Live/Photo choice and the declined low-FPS offer, sessionStorage),
+  `timelineSlider.js` (the growth slider's last stop = the final look).
+- `renderStudio.lineGuides` / `src/ai/render/lineGuides.js`: projected cheek-line and neckline curves for the Studio's
+  drag handles (Photo mode, Lines group open). `frame.faceAnnouncer` reports face found / lost for Live AR.
+- PREF_KEYS adds `captureMode`, `whiteCard`, `studioPreview`, `studioLowFps` (per-session, sessionStorage).
+- `ClientRow({ onEdit })` and `src/screens/entry/ClientSheet.jsx` (edit name and phone, delete the client's kept photos).
+
+Cut Card, reports, owner
+- cutcard.js exports `nextVisitPlan`, `trimIntervalDays`, `visitFrequencyDays`, `cutCardParams`, `needsVisitReplan`,
+  `replanNextVisit`, `nextVisitChoices`, `NEXT_VISIT_CHIPS`. S13's chips come from `nextVisitChoices(card suggestion)`.
+- `src/reports/jawRuler.js` (the Cut Card ruler along the Zone Diagram's jaw); CutCardDocument exports `colorLine` and
+  `visitReason`. `formatPercent` prints the Latin % in both languages.
+- The facade also exports `CUT_CARD_LANDMARKS`, `VISIT_DAYS` and `fetchAiQuota(shopId, { signal })` (ID token plus
+  App Check, one retry on 401, 8 s timeout, null when unavailable). The owner dashboard reads the Worker's count through
+  it (dynamic import of the facade) and falls back to `dailyStats.aiRenders` only as a labelled estimate.
+- The PRD 11.3 clients import UI is `src/screens/owner/ClientImport.jsx` inside S20 Reports.

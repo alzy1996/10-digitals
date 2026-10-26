@@ -77,7 +77,12 @@ The site will be at **https://alzy1996.github.io/10-digitals/**. Every push to `
 
 1. In the `lihya` folder: `npx firebase login` (browser opens → **Allow**).
 2. `npx firebase use --add` → pick `lihya` → alias `default`.
-3. `npx firebase deploy --only firestore:rules,firestore:indexes`
+3. `npx firebase deploy --only firestore:rules,firestore:indexes`. This also deploys the Look Code TTL policy
+   (`lookCodes.expiresAt`: Firestore deletes expired codes by itself, usually within a day) and the clients
+   (`lastVisitAt`, `createdAt`) index that the retention purge needs. Index builds take a few minutes; the purge of
+   never-visited clients waits until the index is ready.
+4. Updating a shop created with an earlier build: open **Owner** → **Settings** once and **Save**, so the shop's default
+   language is copied to its public page (staff phones and Try at home with no saved choice open in that language).
 
 ### C. GitHub (one time)
 
@@ -100,7 +105,8 @@ The site will be at **https://alzy1996.github.io/10-digitals/**. Every push to `
 ### D. First use on the phone
 
 1. Open the site on the phone → **Sign in** with your email → open the link from the email on the same phone.
-2. **Create your shop** → name in Arabic and English, WhatsApp number → **Create shop**.
+2. **Create your shop** → name in Arabic and English, WhatsApp number → **Create shop**. Creating a shop needs a
+   verified email: the email link and Google sign-in are verified, an unverified password account is refused.
 3. iPhone: Safari **Share** → **Add to Home Screen**. Android: Chrome menu → **Install app**.
 4. **Owner** → **Products**: add your products and prices (nothing is pre-filled, ever), or import the CSV template.
 5. **Owner** → **Staff**: invite your barbers by email.
@@ -123,10 +129,17 @@ nothing is stored or used for training. Capped at 80 renders a day for the accou
 4. In `wrangler.toml` set `FIREBASE_PROJECT_ID` to your `projectId`. `ALLOWED_ORIGINS` already lists
    `https://alzy1996.github.io`; remove `http://localhost:5173` when you are done testing.
 5. `npm test` (all pass) → `npx wrangler deploy` → copy the URL (`https://lihya-render.<subdomain>.workers.dev`).
-6. GitHub → **Settings** → **Secrets and variables** → **Actions** → add `VITE_AI_WORKER_URL` with that URL (no slash at
+   After this deploy no shop can render until it is allowed (next step).
+6. Allow each real shop (the `shopId` is the id in the app URL `/s/<shopId>`):
+   `npx wrangler kv key put "ai:allowed:<shopId>" "20" --binding=LIHYA_CAPS --remote`.
+   The number (up to 80) is the highest daily cap that owner may set; put `"off"` or run
+   `npx wrangler kv key delete "ai:allowed:<shopId>" --binding=LIHYA_CAPS --remote` to block the shop again. This
+   takes effect at once, with no redeploy. Or list the ids in `AI_SHOPS` in `wrangler.toml` (`"shopA, shopB:40"`) and
+   deploy again. AI renders also need a staff account with a verified email (email link or Google).
+7. GitHub → **Settings** → **Secrets and variables** → **Actions** → add `VITE_AI_WORKER_URL` with that URL (no slash at
    the end) → **Actions** → **LIHYA deploy to GitHub Pages** → **Run workflow**.
-7. In LIHYA: **Owner** → **Settings** → **AI preview** → **On**.
-8. **Legal (before selling to shops):** ask MTCIT or a lawyer whether processing customers' face images needs a permit
+8. In LIHYA: **Owner** → **Settings** → **AI preview** → **On**.
+9. **Legal (before selling to shops):** ask MTCIT or a lawyer whether processing customers' face images needs a permit
    under the PDPL (Royal Decree 6/2022, amended September 2026), and keep the answer on file.
 
 ## 5. Alternative: Firebase Hosting

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { useT } from '../lib/i18n/useT.js';
+import { hasLangPref, useT } from '../lib/i18n/useT.js';
 import { PREF_KEYS } from '../config/app.js';
 import { useAuth } from './AuthContext.jsx';
 import { useLive } from '../hooks/useLive.js';
@@ -8,7 +8,7 @@ import { useOnline } from '../hooks/useOnline.js';
 import { mergeSettings, watchPublicInfo, watchShop } from '../services/shops.js';
 import { watchMyStaff } from '../services/staff.js';
 import { watchPublicStyles } from '../services/styles.js';
-import { signOutUser } from '../services/auth.js';
+import { signOutAndClear } from '../services/auth.js';
 import Button from '../components/Button.jsx';
 import Icon from '../components/Icon.jsx';
 import ScreenFallback from '../components/ScreenFallback.jsx';
@@ -43,6 +43,37 @@ function Notice({ icon, title, body, note, children }) {
       </section>
     </FullScreen>
   );
+}
+
+// Online but no answer from the server (and nothing cached) for this long: say so
+// and offer a retry instead of a skeleton that never ends. Late data still opens
+// the shop: the listeners keep running.
+const LOAD_TIMEOUT_MS = 12000;
+
+/** True once `active` has lasted LOAD_TIMEOUT_MS for this `attempt` (a new attempt starts over). */
+function useLoadTimeout(active, attempt) {
+  const [expired, setExpired] = useState(null);
+  useEffect(() => {
+    if (!active) return undefined;
+    const timer = setTimeout(() => setExpired(attempt), LOAD_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [active, attempt]);
+  return active && expired === attempt;
+}
+
+/**
+ * The shop's default language (Settings) on a device where nobody chose one with
+ * the language toggle. Not saved as this device's choice, so the toggle still wins.
+ */
+function useShopLanguage(defaultLanguage) {
+  const { setLang } = useT();
+  // Runs when the shop's setting changes (not on every language change), and a
+  // toggle on this device saves a preference, so the person's choice stays.
+  useEffect(() => {
+    if (defaultLanguage !== 'ar' && defaultLanguage !== 'en') return;
+    if (hasLangPref()) return;
+    setLang(defaultLanguage, { persist: false });
+  }, [defaultLanguage, setLang]);
 }
 
 function rememberShop(shopId) {
@@ -93,6 +124,9 @@ export function ShopProvider({ shopId, children }) {
   const shop = shopLive.data;
   const role = active ? me.role : null;
   const settings = useMemo(() => mergeSettings(shop ? shop.settings : null), [shop]);
+  useShopLanguage(shop && shop.settings ? shop.settings.defaultLanguage : null);
+  const slow = useLoadTimeout(status === 'loading' && online, attempt);
+  const retry = () => setAttempt((n) => n + 1);
 
   useEffect(() => {
     if (status === 'ready') rememberShop(shopId);
@@ -120,10 +154,9 @@ export function ShopProvider({ shopId, children }) {
     [shopId, shop, settings, me, role, status, loadError, meLive.hasPendingWrites, shopLive.hasPendingWrites],
   );
 
+  // Shared phone: the session snapshot and the shop's cached data go with the account.
   const signOutAndLogin = () => {
-    signOutUser()
-      .catch((err) => console.error('sign out failed', err))
-      .finally(() => navigate('/login', { replace: true }));
+    signOutAndClear({ to: '/login' });
   };
   const pickShop = () => navigate('/');
 
@@ -131,13 +164,25 @@ export function ShopProvider({ shopId, children }) {
     if (!online) {
       return <Notice icon="wifi-off" title={t('shop.offline.title')} body={t('shop.offline.body')} />;
     }
+    if (slow) {
+      return (
+        <Notice icon="warning" title={t('shop.slow.title')} body={t('shop.slow.body')}>
+          <Button variant="primary" icon="refresh" onClick={retry}>
+            {t('common.retry')}
+          </Button>
+          <Button variant="secondary" icon="home" onClick={pickShop}>
+            {t('shop.pickAnother')}
+          </Button>
+        </Notice>
+      );
+    }
     return <ScreenFallback />;
   }
 
   if (status === 'error') {
     return (
       <FullScreen>
-        <ErrorState title={t('shop.error.title')} message={t('shop.error.body')} onRetry={() => setAttempt((n) => n + 1)} />
+        <ErrorState title={t('shop.error.title')} message={t('shop.error.body')} onRetry={retry} />
       </FullScreen>
     );
   }
@@ -233,6 +278,9 @@ export function PublicShopProvider({ shopId, children }) {
   const status = publicStatus({ shopId, infoLive, stylesLive });
   const info = infoLive.data;
   const styles = stylesLive.data;
+  useShopLanguage(info ? info.defaultLanguage : null);
+  const slow = useLoadTimeout(status === 'loading' && online, attempt);
+  const retry = () => setAttempt((n) => n + 1);
 
   const value = useMemo(
     () => ({
@@ -249,13 +297,22 @@ export function PublicShopProvider({ shopId, children }) {
     if (!online) {
       return <Notice icon="wifi-off" title={t('shop.offline.title')} body={t('shop.public.offlineBody')} />;
     }
+    if (slow) {
+      return (
+        <Notice icon="warning" title={t('shop.slow.title')} body={t('shop.public.slowBody')}>
+          <Button variant="primary" icon="refresh" onClick={retry}>
+            {t('common.retry')}
+          </Button>
+        </Notice>
+      );
+    }
     return <ScreenFallback />;
   }
 
   if (status === 'error') {
     return (
       <FullScreen>
-        <ErrorState title={t('shop.error.title')} message={t('shop.public.errorBody')} onRetry={() => setAttempt((n) => n + 1)} />
+        <ErrorState title={t('shop.error.title')} message={t('shop.public.errorBody')} onRetry={retry} />
       </FullScreen>
     );
   }
@@ -263,7 +320,7 @@ export function PublicShopProvider({ shopId, children }) {
   if (status === 'inactive') {
     return (
       <Notice icon="link" title={t('shop.public.inactive.title')} body={t('shop.public.inactive.body')}>
-        <Button variant="secondary" icon="refresh" onClick={() => setAttempt((n) => n + 1)}>
+        <Button variant="secondary" icon="refresh" onClick={retry}>
           {t('common.retry')}
         </Button>
       </Notice>
@@ -273,7 +330,7 @@ export function PublicShopProvider({ shopId, children }) {
   return <PublicShopContext.Provider value={value}>{children}</PublicShopContext.Provider>;
 }
 
-/** { shopId, info: { name, nameAr, tryAtHome, whatsapp }, styles, loading, error } */
+/** { shopId, info: { name, nameAr, tryAtHome, whatsapp, defaultLanguage? }, styles, loading, error } */
 export function usePublicShop() {
   const ctx = useContext(PublicShopContext);
   if (!ctx) throw new Error('usePublicShop must be used inside <PublicShopProvider>');

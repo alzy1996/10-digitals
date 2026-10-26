@@ -17,10 +17,11 @@ import ScreenFrame from '../components/ScreenFrame.jsx';
 import Skeleton from '../components/Skeleton.jsx';
 import { useSnackbar } from '../components/Snackbar.jsx';
 import ClientRow from './entry/ClientRow.jsx';
+import ClientSheet from './entry/ClientSheet.jsx';
 import ModelStatus, { useModelWarmup } from './entry/ModelStatus.jsx';
 
 const RECENT_COUNT = 20;
-const SEARCH_DELAY_MS = 300;
+const SEARCH_DELAY_MS = 250;
 
 function RowsSkeleton({ count = 3, label }) {
   return (
@@ -33,7 +34,10 @@ function RowsSkeleton({ count = 3, label }) {
   );
 }
 
-/** Client search by name or phone: debounced, works offline from the cache. */
+/**
+ * Client search by any word of the name or part of the phone: debounced, works offline
+ * from the cache. While a new search runs, the last results stay (no flicker per key).
+ */
 function useClientSearch(shopId, query) {
   const [state, setState] = useState({ q: '', status: 'idle', list: [], error: null });
   const [attempt, setAttempt] = useState(0);
@@ -75,6 +79,9 @@ function AddClientForm({ shopId, initialName, onCreated, onCancel }) {
   const [phone, setPhone] = useState('');
   const [nameError, setNameError] = useState(null);
   const [phoneError, setPhoneError] = useState(null);
+  // One client per tap: a second tap (or Enter) while the visit opens is ignored.
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
 
   const submit = (e) => {
     e.preventDefault();
@@ -83,10 +90,15 @@ function AddClientForm({ shopId, initialName, onCreated, onCancel }) {
       setNameError(t('entry.home.nameRequired'));
       return;
     }
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     try {
       const id = createClient(shopId, { displayName, phone: phone.trim() || null });
       onCreated({ id, displayName, walkIn: false });
     } catch (err) {
+      savingRef.current = false;
+      setSaving(false);
       if (err?.code === 'invalid-argument' && err.message === 'phone') setPhoneError(t('entry.home.phoneInvalid'));
       else if (err?.code === 'invalid-argument') setNameError(t('entry.home.nameRequired'));
       else {
@@ -135,12 +147,13 @@ function AddClientForm({ shopId, initialName, onCreated, onCancel }) {
           setPhoneError(null);
         }}
         error={phoneError}
+        hint={t('entry.home.phoneHint')}
       />
       <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-start">
-        <Button type="submit" variant="secondary" icon="check" full className="sm:w-auto sm:flex-1">
+        <Button type="submit" variant="secondary" icon="check" full loading={saving} className="sm:w-auto sm:flex-1">
           {t('entry.home.saveAndStart')}
         </Button>
-        <Button variant="ghost" full className="sm:w-auto" onClick={onCancel}>
+        <Button variant="ghost" full className="sm:w-auto" disabled={saving} onClick={onCancel}>
           {t('common.cancel')}
         </Button>
       </div>
@@ -159,6 +172,7 @@ export default function S03BarberHome() {
   const [query, setQuery] = useState('');
   const [adding, setAdding] = useState(null);
   const [recentAttempt, setRecentAttempt] = useState(0);
+  const [editing, setEditing] = useState(null);
   const startingRef = useRef(false);
   const search = useClientSearch(shopId, query);
 
@@ -187,9 +201,29 @@ export default function S03BarberHome() {
   const searching = Boolean(q);
   const isolated = `\u2068${q}\u2069`;
 
+  const editClient = (c) => setEditing(c);
+  // A renamed client may no longer match (or newly match) the search: run it again.
+  const onClientSaved = () => {
+    if (q) search.retry();
+  };
+
+  const rowList = (list, label, busy) => (
+    <ul className="flex flex-col gap-3" aria-label={label} aria-busy={busy || undefined}>
+      {list.map((c) => (
+        <li key={c.id}>
+          <ClientRow client={c} onPick={pickClient} onEdit={editClient} />
+        </li>
+      ))}
+    </ul>
+  );
+
   let results = null;
   if (searching) {
-    if (search.status === 'loading' || search.q !== q) {
+    const pending = search.status === 'loading' || search.q !== q;
+    if (pending && search.list.length) {
+      // The last results stay while the next search runs (no skeleton flash per key).
+      results = rowList(search.list, t('entry.home.results'), true);
+    } else if (pending) {
       results = <RowsSkeleton count={2} label={t('entry.home.searching')} />;
     } else if (search.status === 'error') {
       results = <ErrorState className="py-6" message={t('entry.home.searchError')} onRetry={search.retry} />;
@@ -205,15 +239,7 @@ export default function S03BarberHome() {
         </div>
       );
     } else {
-      results = (
-        <ul className="flex flex-col gap-3" aria-label={t('entry.home.results')}>
-          {search.list.map((c) => (
-            <li key={c.id}>
-              <ClientRow client={c} onPick={pickClient} />
-            </li>
-          ))}
-        </ul>
-      );
+      results = rowList(search.list, t('entry.home.results'), false);
     }
   }
 
@@ -227,15 +253,7 @@ export default function S03BarberHome() {
       <EmptyState icon="users" title={t('entry.home.recentEmpty.title')} message={t('entry.home.recentEmpty.body')} />
     );
   } else {
-    recentBody = (
-      <ul className="flex flex-col gap-3">
-        {recentList.map((c) => (
-          <li key={c.id}>
-            <ClientRow client={c} onPick={pickClient} />
-          </li>
-        ))}
-      </ul>
-    );
+    recentBody = rowList(recentList, t('entry.home.recentTitle'), false);
   }
 
   return (
@@ -269,8 +287,8 @@ export default function S03BarberHome() {
         </BottomAction>
       }
     >
-      <div className="grid gap-8 md:grid-cols-2 md:gap-6">
-        <section aria-labelledby="who-title" className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-6">
+        <section aria-labelledby="who-title" className="flex min-w-0 flex-col gap-4">
           <div>
             <h2 id="who-title" className="text-xl">
               {t('entry.home.whoTitle')}
@@ -324,7 +342,7 @@ export default function S03BarberHome() {
           )}
         </section>
 
-        <section aria-labelledby="recent-title" className={searching ? 'hidden flex-col gap-4 md:flex' : 'flex flex-col gap-4'}>
+        <section aria-labelledby="recent-title" className={searching ? 'hidden min-w-0 flex-col gap-4 md:flex' : 'flex min-w-0 flex-col gap-4'}>
           <h2 id="recent-title" className="text-xl">
             {t('entry.home.recentTitle')}
           </h2>
@@ -344,6 +362,8 @@ export default function S03BarberHome() {
           {t('entry.home.switchShop')}
         </Button>
       </div>
+
+      <ClientSheet shopId={shopId} client={editing} onClose={() => setEditing(null)} onSaved={onClientSaved} />
     </ScreenFrame>
   );
 }

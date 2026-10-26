@@ -41,7 +41,9 @@ export const LIMITS = {
 };
 
 // localStorage is used for per-device UI preferences only (language, theme,
-// camera mirror). Business data never goes to localStorage.
+// camera mirror). Business data never goes to localStorage. The capture and Studio
+// keys below are per-session UI choices kept in sessionStorage (capturePrefs.js,
+// studioPrefs.js).
 export const PREF_KEYS = {
   lang: 'lihya.pref.lang',
   theme: 'lihya.pref.theme',
@@ -49,4 +51,8 @@ export const PREF_KEYS = {
   lastShop: 'lihya.pref.lastShop',
   purgeDay: 'lihya.pref.purgeDay',
   emailForSignIn: 'lihya.auth.emailForSignIn',
+  captureMode: 'lihya.pref.captureMode',
+  whiteCard: 'lihya.pref.whiteCardShown',
+  studioPreview: 'lihya.pref.studioPreview',
+  studioLowFps: 'lihya.pref.studioLowFps',
 };

@@ -1,12 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import IconButton from './IconButton.jsx';
 import LangToggle from './LangToggle.jsx';
-import SyncBadge from './SyncBadge.jsx';
+import SyncBadge, { SyncStrip } from './SyncBadge.jsx';
 import { cx, useOptionalT } from './kit.js';
 
 /**
  * Top bar: back button (when `back` is set), title (the screen's h1), optional actions,
  * the pending-sync badge and the language toggle (PRD: a language toggle on every screen).
+ * On phones the offline message takes its own line under the bar so the title keeps its room.
  * back: true = history back, a string = navigate to that path, a function = call it.
  * `overlay` makes it transparent for full-screen camera screens.
  */
@@ -40,9 +41,10 @@ export default function TopBar({ title, back, onBack, actions, showSync = true, 
           <div className="min-w-0 flex-1" />
         )}
         {actions ? <div className="flex shrink-0 items-center gap-1">{actions}</div> : null}
-        {showSync ? <SyncBadge /> : null}
+        {showSync ? <SyncBadge offlineStrip /> : null}
         {showLang ? <LangToggle className="-me-2" /> : null}
       </div>
+      {showSync ? <SyncStrip /> : null}
     </header>
   );
 }

@@ -36,7 +36,8 @@
     "ui.owner.staff": "Staff",
     "ui.owner.settings": "Settings",
     "ui.owner.reports": "Reports",
-    "ui.owner.backToChair": "Back to chair"
+    "ui.owner.backToChair": "Back to chair",
+    "ui.sync.savedShort": "Saved, will sync"
   },
   "ar": {
     "ui.sheet.label": "الخيارات",
@@ -75,6 +76,7 @@
     "ui.owner.staff": "الفريق",
     "ui.owner.settings": "الإعدادات",
     "ui.owner.reports": "التقارير",
-    "ui.owner.backToChair": "العودة إلى الكرسي"
+    "ui.owner.backToChair": "العودة إلى الكرسي",
+    "ui.sync.savedShort": "محفوظ، ستتم المزامنة"
   }
 }

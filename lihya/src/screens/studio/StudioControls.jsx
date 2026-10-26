@@ -13,8 +13,8 @@ import Toggle from '../../components/Toggle.jsx';
 import Icon from '../../components/Icon.jsx';
 import { cx } from '../../components/kit.js';
 import { useT } from '../../lib/i18n/useT.js';
-import { formatMm, formatPercent } from '../../lib/format.js';
-import { cheekLineHeight, necklinePosition } from '../../lib/cutcard.js';
+import { formatPercent } from '../../lib/format.js';
+import { necklinePosition } from '../../lib/cutcard.js';
 import {
   LOOK_ZONES,
   PRESETS,
@@ -31,6 +31,8 @@ import COLORS from '../../data/colors.json';
 import FINISHES from '../../data/finishes.json';
 import MUSTACHES from '../../data/mustaches.json';
 import { TIMELINE_STOPS } from '../../ai/index.js';
+import { LINE_OFFSET_KEYS, lineOffsetText, withLineOffset } from './lineHandles.js';
+import { timelineIndexAt, timelineSliderValue } from './timelineSlider.js';
 
 export const GROUPS = Object.freeze([
   Object.freeze({ id: 'length', icon: 'ruler', labelKey: 'studio.group.length' }),
@@ -136,6 +138,8 @@ export function LengthControls({ params, committed, styleParams, onDraft, onComm
     return next;
   };
 
+  // onRuler(mm, label, ended, zone): the Studio lays the barber's ruler along the jaw and
+  // marks the zones this slider changes.
   const zoneSlider = (key, ids, label) => {
     const value = Number(zones[ids[0]]) || 0;
     const set = (mm) => setZoneLength(params, key, mm);
@@ -149,11 +153,11 @@ export function LengthControls({ params, committed, styleParams, onDraft, onComm
         step={0.5}
         unit="mm"
         onChange={(mm) => {
-          onRuler(mm, label);
+          onRuler(mm, label, false, key);
           onDraft(set(mm));
         }}
         onChangeEnd={(mm) => {
-          onRuler(mm, label, true);
+          onRuler(mm, label, true, key);
           onCommit(set(mm));
         }}
       />
@@ -182,11 +186,11 @@ export function LengthControls({ params, committed, styleParams, onDraft, onComm
           step={0.5}
           unit="mm"
           onChange={(mm) => {
-            onRuler(mm, t('studio.length.global'));
+            onRuler(mm, t('studio.length.global'), false, 'all');
             onDraft(overall(mm));
           }}
           onChangeEnd={(mm) => {
-            onRuler(mm, t('studio.length.global'), true);
+            onRuler(mm, t('studio.length.global'), true, 'all');
             onCommit(overall(mm));
           }}
         />
@@ -210,11 +214,11 @@ export function LengthControls({ params, committed, styleParams, onDraft, onComm
             step={0.5}
             unit="mm"
             onChange={(mm) => {
-              onRuler(mm, fadeLabel);
+              onRuler(mm, fadeLabel, false, 'fade');
               onDraft(clampParams({ ...params, fadeStartMm: mm }));
             }}
             onChangeEnd={(mm) => {
-              onRuler(mm, fadeLabel, true);
+              onRuler(mm, fadeLabel, true, 'fade');
               onCommit(clampParams({ ...params, fadeStartMm: mm }));
             }}
           />
@@ -231,7 +235,11 @@ function lineOptions(typeId, pick) {
   return tp ? tp.options.map((o) => ({ value: o.id, label: pick(o.name) })) : [];
 }
 
-export function LinesControls({ params, onDraft, onCommit, onChange, front, mmPerPx }) {
+/**
+ * dragHint: 'photo' when the cheek line and neckline can be dragged on the photo right
+ * now, 'live' when they can in Photo mode, null to say nothing.
+ */
+export function LinesControls({ params, onDraft, onCommit, onChange, front, mmPerPx, dragHint = null }) {
   const { t, lang, pick } = useT();
   const lines = params.lines || {};
 
@@ -241,16 +249,10 @@ export function LinesControls({ params, onDraft, onCommit, onChange, front, mmPe
     if (offsetKey) nextLines[offsetKey] = 0;
     onChange({ ...params, lines: nextLines, presetId: null });
   };
-  const withOffset = (key, v) => clampParams({ ...params, lines: { ...lines, [key]: v }, presetId: null });
-
-  const cheekText = (v) => {
-    const h = cheekLineHeight({ type: lines.cheek, offset: v, front, mmPerPx });
-    return t('studio.lines.aboveJaw', { mm: formatMm(h.mm, lang) });
-  };
-  const neckText = (v) => {
-    const n = necklinePosition(lines.neckline, v);
-    return n.mmAboveAdamsApple === null ? '' : t('studio.lines.aboveApple', { mm: formatMm(n.mmAboveAdamsApple, lang) });
-  };
+  const withOffset = (key, v) => withLineOffset(params, key, v);
+  const offsetText = (key) => (v) => lineOffsetText({ t, lang, key, lines, value: v, front, mmPerPx });
+  const cheekText = offsetText(LINE_OFFSET_KEYS.cheek);
+  const neckText = offsetText(LINE_OFFSET_KEYS.neck);
   const neck = necklinePosition(lines.neckline, lines.necklineOffset);
 
   const setMustache = (id) => {
@@ -274,6 +276,7 @@ export function LinesControls({ params, onDraft, onCommit, onChange, front, mmPe
       </Block>
 
       <Block title={pick(LINE_TYPES.get('cheek').name)}>
+        {dragHint ? <Note icon="hand">{t(dragHint === 'photo' ? 'studio.lines.dragHint' : 'studio.lines.dragHintLive')}</Note> : null}
         <ChipRow
           className="!gap-0"
           label={<span className="sr-only">{pick(LINE_TYPES.get('cheek').name)}</span>}
@@ -350,6 +353,15 @@ function Swatch({ hex }) {
 
 const ANSWER_LABEL = { true: 'common.yes', false: 'common.no', yes: 'common.yes', no: 'common.no', unsure: 'studio.safety.unsure' };
 
+/** Helper text for colours whose catalog note is a build note, not words for the customer. */
+const COLOR_NOTE_KEYS = Object.freeze({ 'grey-blend': 'studio.color.note.greyBlend', 'salt-pepper': 'studio.color.note.saltPepper' });
+
+function colorNote(color, t, pick) {
+  if (!color || color.id === 'natural') return null;
+  if (COLOR_NOTE_KEYS[color.id]) return t(COLOR_NOTE_KEYS[color.id]);
+  return color.notes ? pick(color.notes) : null;
+}
+
 export function ColorControls({ params, profile, onDraft, onCommit, onChange, hennaDay, onHennaDay, live, safety, setSafety }) {
   const { t, lang, pick } = useT();
   const color = getColor(params.colorId) || getColor('natural');
@@ -369,7 +381,7 @@ export function ColorControls({ params, profile, onDraft, onCommit, onChange, he
           onChange={(id) => id && onChange(setColor(params, id))}
         />
         {color.warn ? <Note icon="warning" tone="warn">{pick(color.warn)}</Note> : null}
-        {color.notes && color.id !== 'natural' ? <Note>{pick(color.notes)}</Note> : null}
+        {colorNote(color, t, pick) ? <Note>{colorNote(color, t, pick)}</Note> : null}
       </Block>
 
       {color.hexDay3 ? (
@@ -425,17 +437,18 @@ export function ColorControls({ params, profile, onDraft, onCommit, onChange, he
             onChange={(v) => v !== null && onChange(withGrey(v))}
           />
         ) : null}
+        {/* Step 1, so the value shown is the look's own (today's grey until it is moved). */}
         <Slider
           label={t('studio.color.grey')}
           value={grey}
           min={0}
           max={100}
-          step={5}
+          step={1}
           format={(v) => formatPercent(v, lang)}
           onChange={(v) => onDraft(withGrey(v))}
           onChangeEnd={(v) => onCommit(withGrey(v))}
         />
-        {detected !== null ? <p className="num text-sm text-text-2">{t('studio.color.greyNow', { pct: detected })}</p> : null}
+        {detected !== null ? <p className="num text-sm text-text-2">{t('studio.color.greyNow', { pct: formatPercent(detected, lang) })}</p> : null}
       </Block>
 
       <Block title={t('studio.color.finish')}>
@@ -455,6 +468,7 @@ export function ColorControls({ params, profile, onDraft, onCommit, onChange, he
 
 export function TimelineControls({ index, onIndex, growth, rate }) {
   const { t, lang } = useT();
+  const stops = TIMELINE_STOPS.length;
   const options = [
     { value: -1, label: t('studio.timeline.final'), icon: 'beard' },
     ...TIMELINE_STOPS.map((s, i) => ({ value: i, label: t(s.labelKey) })),
@@ -469,15 +483,19 @@ export function TimelineControls({ index, onIndex, growth, rate }) {
           value={index === null ? -1 : index}
           onChange={(v) => onIndex(v === null || v < 0 ? null : v)}
         />
+        {/* The last position is the final look, so the slider always reads what the canvas shows. */}
         <Slider
           label={t('studio.timeline.slider')}
-          value={index === null ? 0 : index}
+          value={timelineSliderValue(index, stops)}
           min={0}
-          max={TIMELINE_STOPS.length - 1}
+          max={stops}
           step={1}
-          format={(i) => t(TIMELINE_STOPS[Math.round(i)].labelKey)}
-          onChange={(i) => onIndex(Math.round(i))}
-          onChangeEnd={(i) => onIndex(Math.round(i))}
+          format={(i) => {
+            const at = timelineIndexAt(i, stops);
+            return at === null ? t('studio.timeline.final') : t(TIMELINE_STOPS[at].labelKey);
+          }}
+          onChange={(i) => onIndex(timelineIndexAt(i, stops))}
+          onChangeEnd={(i) => onIndex(timelineIndexAt(i, stops))}
         />
       </Block>
       <Block>

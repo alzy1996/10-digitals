@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import RENDER_STRINGS from '../../src/lib/i18n/ns/render.json';
 import {
   TIMELINE_STOPS,
@@ -10,6 +10,15 @@ import {
   DEFAULT_GROWTH_MM_PER_DAY,
   ZONES,
 } from '../../src/ai/render/timeline.js';
+import { faceAnnouncer, NO_FACE_MS } from '../../src/ai/render/frame.js';
+import { timelineIndexAt, timelineSliderValue } from '../../src/screens/studio/timelineSlider.js';
+import {
+  initialStudioPreview,
+  lowFpsDeclined,
+  markLowFpsDeclined,
+  readStudioPreview,
+  writeStudioPreview,
+} from '../../src/screens/studio/studioPrefs.js';
 
 const zonesAll = (mm) => Object.fromEntries(ZONES.map((z) => [z, mm]));
 
@@ -116,5 +125,120 @@ describe('coverage helpers', () => {
     const cov = zoneCoverage({ C: 10, M: 0 }, profile);
     expect(cov.C).toBeGreaterThan(0.9);
     expect(cov.M).toBe(0);
+  });
+});
+
+/* ------------------------------------------------------------------ Studio: growth slider */
+
+describe('growth timeline slider (Studio)', () => {
+  const n = TIMELINE_STOPS.length;
+
+  it('has a last position for the final look, so it never reads "Today" on the final look', () => {
+    expect(timelineSliderValue(null, n)).toBe(n);
+    expect(timelineSliderValue(undefined, n)).toBe(n);
+    expect(timelineSliderValue(0, n)).toBe(0);
+    expect(timelineSliderValue(3, n)).toBe(3);
+  });
+
+  it('maps slider positions back to stops, the last one to the final look', () => {
+    expect(timelineIndexAt(n, n)).toBeNull();
+    expect(timelineIndexAt(n + 3, n)).toBeNull();
+    expect(timelineIndexAt(0, n)).toBe(0);
+    expect(timelineIndexAt(2.4, n)).toBe(2);
+    expect(timelineIndexAt(-1, n)).toBe(0);
+    for (let i = 0; i < n; i++) expect(timelineIndexAt(timelineSliderValue(i, n), n)).toBe(i);
+  });
+});
+
+/* ------------------------------------------------------------------ Live AR: no-face hint */
+
+describe('faceAnnouncer (Live AR "no face" hint)', () => {
+  it('reports "no face" once after NO_FACE_MS of real looking without a face', () => {
+    const a = faceAnnouncer();
+    const none = { found: false, changed: false, canDetect: true };
+    expect(a.step(0, none)).toBeNull();
+    expect(a.step(NO_FACE_MS - 1, none)).toBeNull();
+    expect(a.step(NO_FACE_MS, none)).toBe(false);
+    expect(a.step(NO_FACE_MS + 500, none)).toBeNull();
+  });
+
+  it('does not count time while the face model is still loading', () => {
+    const a = faceAnnouncer(1000);
+    expect(a.step(0, { found: false, changed: false, canDetect: false })).toBeNull();
+    expect(a.step(5000, { found: false, changed: false, canDetect: false })).toBeNull();
+    expect(a.step(5000, { found: false, changed: false, canDetect: true })).toBeNull();
+    expect(a.step(5999, { found: false, changed: false, canDetect: true })).toBeNull();
+    expect(a.step(6000, { found: false, changed: false, canDetect: true })).toBe(false);
+  });
+
+  it('reports every change at once and says nothing when a face is there from the start', () => {
+    const a = faceAnnouncer(1000);
+    expect(a.step(0, { found: true, changed: true, canDetect: true })).toBe(true);
+    expect(a.step(2000, { found: true, changed: false, canDetect: true })).toBeNull();
+    expect(a.step(2100, { found: false, changed: true, canDetect: true })).toBe(false);
+    expect(a.step(2200, { found: true, changed: true, canDetect: true })).toBe(true);
+  });
+
+  it('starts over on reset', () => {
+    const a = faceAnnouncer(100);
+    const none = { found: false, changed: false, canDetect: true };
+    a.step(0, none);
+    expect(a.step(100, none)).toBe(false);
+    a.reset();
+    expect(a.step(200, none)).toBeNull();
+    expect(a.step(300, none)).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ Studio: Live / Photo for the session */
+
+describe('Studio preview kept for the session', () => {
+  let saved;
+  beforeEach(() => {
+    saved = globalThis.sessionStorage;
+    const data = new Map();
+    globalThis.sessionStorage = {
+      getItem: (k) => (data.has(k) ? data.get(k) : null),
+      setItem: (k, v) => data.set(k, String(v)),
+      removeItem: (k) => data.delete(k),
+    };
+  });
+  afterEach(() => {
+    if (saved === undefined) delete globalThis.sessionStorage;
+    else globalThis.sessionStorage = saved;
+  });
+
+  it('opens in Live in Mirror Mode and Photo on a phone until the barber picks one', () => {
+    expect(initialStudioPreview(true)).toBe('live');
+    expect(initialStudioPreview(false)).toBe('photo');
+  });
+
+  it('keeps Photo once chosen (a slow device does not restart Live for the next style)', () => {
+    writeStudioPreview('photo');
+    expect(initialStudioPreview(true)).toBe('photo');
+    writeStudioPreview('bogus');
+    expect(readStudioPreview()).toBe('photo');
+    writeStudioPreview('live');
+    expect(initialStudioPreview(false)).toBe('live');
+  });
+
+  it('remembers that the slow-preview offer was taken', () => {
+    expect(lowFpsDeclined()).toBe(false);
+    markLowFpsDeclined();
+    expect(lowFpsDeclined()).toBe(true);
+  });
+
+  it('works without storage', () => {
+    globalThis.sessionStorage = {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {
+        throw new Error('blocked');
+      },
+    };
+    expect(() => writeStudioPreview('photo')).not.toThrow();
+    expect(initialStudioPreview(true)).toBe('live');
+    expect(lowFpsDeclined()).toBe(false);
   });
 });

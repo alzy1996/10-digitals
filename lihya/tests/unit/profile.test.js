@@ -1,11 +1,14 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   applyOverrides,
   toCoarseProfile,
   analyzeShots,
   STEP_KEYS,
   ZONE_CONFIRM_DENSITY,
+  sideShotPose,
+  paintTurn,
+  SIDE_MIN_YAW,
 } from '../../src/ai/analysis/profile.js';
 import { beardColor, nearestShade, naturalShades, FALLBACK_COLOR_ID, MIN_HAIR_SAMPLES } from '../../src/ai/analysis/beardColor.js';
 import { growabilityOf } from '../../src/ai/analysis/beardDensity.js';
@@ -128,5 +131,62 @@ describe('analyzeShots', () => {
 
   it('names its steps for the progress screen', () => {
     expect(STEP_KEYS).toEqual(['prepare', 'scale', 'segment', 'faceShape', 'skin', 'beard', 'color', 'age', 'done']);
+  });
+});
+
+describe('side shots (chair:F7)', () => {
+  const shot = (yaw) => ({ id: 'left', canvas: { width: 640, height: 480 }, width: 640, height: 480, landmarks: [{ x: 0.5, y: 0.5, z: 0 }], pose: { yaw, pitch: 0, roll: 0 } });
+
+  it('reads a turned side shot for the jaw silhouette', () => {
+    expect(sideShotPose(shot(42))).toEqual({ yaw: 42, pitch: 0, roll: 0 });
+    expect(sideShotPose(shot(-38)).yaw).toBe(-38);
+    expect(sideShotPose(shot(SIDE_MIN_YAW)).yaw).toBe(SIDE_MIN_YAW);
+  });
+
+  it('leaves out a "side" shot taken facing the camera', () => {
+    expect(SIDE_MIN_YAW).toBe(20);
+    expect(sideShotPose(shot(3))).toBeNull();
+    expect(sideShotPose(shot(-19.9))).toBeNull();
+    expect(sideShotPose(shot(Number.NaN))).toBeNull();
+    expect(sideShotPose(null)).toBeNull();
+    expect(sideShotPose({ id: 'left', canvas: null, landmarks: [] })).toBeNull();
+  });
+});
+
+describe('paintTurn (chair:F6: the step name reaches the screen)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('waits for an animation frame, then a task', async () => {
+    vi.useFakeTimers();
+    const frames = [];
+    vi.stubGlobal('requestAnimationFrame', (cb) => frames.push(cb));
+    let done = false;
+    const p = paintTurn(50).then(() => {
+      done = true;
+    });
+    await vi.advanceTimersByTimeAsync(10);
+    expect(done).toBe(false);
+    frames.shift()(16);
+    expect(done).toBe(false);
+    await vi.advanceTimersByTimeAsync(0);
+    await p;
+    expect(done).toBe(true);
+  });
+
+  it('does not wait forever when no frame comes (hidden tab)', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('requestAnimationFrame', () => 0);
+    let done = false;
+    const p = paintTurn(50).then(() => {
+      done = true;
+    });
+    await vi.advanceTimersByTimeAsync(49);
+    expect(done).toBe(false);
+    await vi.advanceTimersByTimeAsync(2);
+    await p;
+    expect(done).toBe(true);
   });
 });

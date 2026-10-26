@@ -16,7 +16,7 @@ const VARIANTS = {
   primary: 'bg-brass font-semibold text-on-brass active:bg-brass/80',
   secondary: 'border border-line bg-transparent font-medium text-text active:bg-surface-2',
   ghost: 'bg-transparent font-medium text-text active:bg-surface-2',
-  danger: 'border border-cut/70 bg-transparent font-medium text-cut active:bg-cut/10',
+  danger: 'border border-cut/70 bg-transparent font-medium text-cut-ink active:bg-cut/10',
 };
 
 const DEFAULT_SIZE = { primary: 'lg', secondary: 'md', ghost: 'md', danger: 'md' };

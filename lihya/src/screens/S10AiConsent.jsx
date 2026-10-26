@@ -3,7 +3,7 @@
 // Both answers are logged (who and when, never a photo). The consent is asked every
 // time: nothing here is remembered, and "Allow once" starts exactly one render.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScreenFrame from '../components/ScreenFrame.jsx';
 import Button from '../components/Button.jsx';
@@ -16,7 +16,7 @@ import { useSession } from '../hooks/useSession.js';
 import { useOnline } from '../hooks/useOnline.js';
 import { useShop } from '../state/ShopContext.jsx';
 import { logConsent } from '../services/consents.js';
-import { finalLookAvailable } from '../ai/index.js';
+import { fetchAiQuota, finalLookAvailable } from '../ai/index.js';
 import { UNAVAILABLE_KEYS, unavailableReason } from './approve/aiMessages.js';
 import { startFinalLook } from './approve/finalLookJob.js';
 import { useStyle } from './approve/hooks.js';
@@ -27,6 +27,8 @@ const REASON_ICON = Object.freeze({
   notConfigured: 'cloud',
   noLook: 'beard',
   noPhoto: 'camera',
+  notAllowed: 'lock',
+  cap: 'clock',
 });
 
 /** The look the AI preview is made of: the favorite, the only saved look, or the Studio's current one. */
@@ -65,7 +67,25 @@ export default function S10AiConsent() {
   const front = shots ? shots.front : null;
   const hasPhoto = Boolean(front && front.canvas && front.canvas.width && Array.isArray(front.landmarks));
   const available = finalLookAvailable(settings);
-  const reason = unavailableReason({ settings, online, available, hasLook: Boolean(chosen), hasPhoto });
+  const baseReason = unavailableReason({ settings, online, available, hasLook: Boolean(chosen), hasPhoto });
+  // Ask the Worker once whether this shop may render and has renders left today, so a
+  // shop it does not allow (or a used-up cap) is said before the customer is asked.
+  // No answer (slow, offline, refused) keeps the consent: the render reports its own error.
+  const [quota, setQuota] = useState(null);
+  const askQuota = hydrated && baseReason === null && !answered;
+  useEffect(() => {
+    if (!askQuota) return undefined;
+    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    let alive = true;
+    fetchAiQuota(shopId, { signal: ctrl ? ctrl.signal : undefined }).then((q) => {
+      if (alive) setQuota(q);
+    });
+    return () => {
+      alive = false;
+      if (ctrl) ctrl.abort();
+    };
+  }, [askQuota, shopId]);
+  const reason = baseReason || (answered ? null : unavailableReason({ settings, online, available, hasLook: Boolean(chosen), hasPhoto, quota }));
 
   const compareFirst = Array.isArray(looks) && looks.length > 1;
   const backTo = compareFirst ? path('compare') : path('studio');

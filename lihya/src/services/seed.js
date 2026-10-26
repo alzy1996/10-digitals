@@ -4,7 +4,7 @@
 // names or prices are ever seeded), then demo clients and consultations marked
 // demo: true with matching dailyStats increments.
 
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp, serverTimestamp } from 'firebase/firestore';
 import { APP } from '../config/app.js';
 import { DEFAULT_GUARD_CHART, mmToGuard } from '../lib/guards.js';
 import { lastNDayKeys, muscatDayRange } from '../lib/time.js';
@@ -17,8 +17,8 @@ import {
   defaultGuardChart,
   normalizePhone,
   autoId,
+  clientSearchFields,
   sanitizeParams,
-  searchKey,
   sortStyles,
   styleData,
 } from './model.js';
@@ -73,6 +73,7 @@ export function shopOps({ shopId, uid, ownerName, ownerEmail, name, nameAr, what
         nameAr: shopNameAr,
         tryAtHome: settings.tryAtHome,
         whatsapp: settings.whatsapp,
+        defaultLanguage: settings.defaultLanguage,
         ...updatedStamp(uid),
       },
     },
@@ -238,6 +239,9 @@ export function demoOps({ shopId, uid, styles, now = new Date(), paramsFromStyle
           nextVisitDays: plan.status === 'done' ? plan.next : null,
           dayKey,
           demo: true,
+          // Counted in dailyStats by this same batch (see consultations.js).
+          approvalCountedAt: approved ? serverTimestamp() : null,
+          addOnsCountedAt: plan.status === 'done' ? serverTimestamp() : null,
           ...createdStamp(uid),
         },
       });
@@ -257,7 +261,7 @@ export function demoOps({ shopId, uid, styles, now = new Date(), paramsFromStyle
       path: `shops/${shopId}/clients/${clientIds[i]}`,
       data: {
         displayName: c.displayName,
-        displayNameLower: searchKey(c.displayName),
+        ...clientSearchFields(c.displayName, null),
         phone: null,
         consent: { profile: true, at: Timestamp.fromDate(consentAt), by: uid },
         profile: coarseLabels(c.profile),

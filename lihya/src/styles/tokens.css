@@ -1,5 +1,9 @@
 /* LIHYA design tokens (PRD 9.1). Dark is the default theme.
-   Each color is also exposed as an "r g b" triplet for Tailwind alpha utilities. */
+   Each color is also exposed as an "r g b" triplet for Tailwind alpha utilities.
+   The --*-ink tokens are the text versions of the status colors: they meet WCAG AA (4.5:1 or more)
+   on --bg, --surface, --surface-2 and on each tone's own 10% tint in both themes (PRD 9.1).
+   The PRD values stay as they are for fills, borders and zone tints; Tailwind's text-keep,
+   text-cut, text-warn and text-info resolve to the ink tokens (tailwind.config.js). */
 :root,
 [data-theme='dark'] {
   color-scheme: dark;
@@ -15,6 +19,10 @@
   --cut: #c2412d;
   --warn: #e0a43a;
   --info: #6e8ca8;
+  --keep-ink: #46af78;
+  --cut-ink: #e77866;
+  --warn-ink: #e0a43a;
+  --info-ink: #869fb6;
 
   --bg-rgb: 15 16 18;
   --surface-rgb: 26 28 31;
@@ -28,6 +36,10 @@
   --cut-rgb: 194 65 45;
   --warn-rgb: 224 164 58;
   --info-rgb: 110 140 168;
+  --keep-ink-rgb: 70 175 120;
+  --cut-ink-rgb: 231 120 102;
+  --warn-ink-rgb: 224 164 58;
+  --info-ink-rgb: 134 159 182;
 
   /* spacing, shape, motion (PRD 9.3) */
   --gutter: 16px;
@@ -55,6 +67,10 @@
   --cut: #a8331f;
   --warn: #9a6a12;
   --info: #3f5f7d;
+  --keep-ink: #286c48;
+  --cut-ink: #a8331f;
+  --warn-ink: #80570c;
+  --info-ink: #3f5f7d;
 
   --bg-rgb: 246 243 238;
   --surface-rgb: 255 255 255;
@@ -68,6 +84,10 @@
   --cut-rgb: 168 51 31;
   --warn-rgb: 154 106 18;
   --info-rgb: 63 95 125;
+  --keep-ink-rgb: 40 108 72;
+  --cut-ink-rgb: 168 51 31;
+  --warn-ink-rgb: 128 87 12;
+  --info-ink-rgb: 63 95 125;
 }
 
 @media (min-width: 768px) {

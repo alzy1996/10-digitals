@@ -5,9 +5,12 @@
 
 import { Timestamp, serverTimestamp } from 'firebase/firestore';
 import { LIMITS } from '../config/app.js';
+import { checkLookParams } from '../lib/look.js';
 import { generateLookCode, normalizeLookCode, sanitizeParams } from './model.js';
 import { codedError, commitOps, readDoc, requireShopId, requireUser } from './db.js';
 import { signInAnon } from './auth.js';
+
+const STYLE_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CONFIRM_MS = 12000;
@@ -30,7 +33,7 @@ export async function createLookCode(shopId, { styleId, params } = {}) {
   const user = await signInAnon();
   const clean = sanitizeParams(params);
   const style = String(styleId || clean?.styleId || '').slice(0, 80);
-  if (!style || !clean) throw codedError('invalid-argument', 'look');
+  if (!clean || !STYLE_ID_RE.test(style)) throw codedError('invalid-argument', 'look');
   let lastError = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const code = generateLookCode();
@@ -62,8 +65,20 @@ export async function createLookCode(shopId, { styleId, params } = {}) {
 }
 
 /**
+ * The params of a stored code as the Studio may use them: complete and clamped
+ * (zones 0..200 mm, offsets, grey, fade), unknown keys such as a thumbnail dropped,
+ * the code's style filled in. A code written by anyone is never trusted as is.
+ */
+export function lookCodeParams(data) {
+  return checkLookParams(data && data.params, data ? data.styleId : null).params;
+}
+
+/**
  * Staff lookup (needs a connection). Resolves null when there is no such code,
- * else { code, styleId, params, createdAt, expiresAt, usedAt, usedBy, expired, used }.
+ * else { code, styleId, params, createdAt, expiresAt, usedAt, usedBy, expired, used,
+ * invalid, errors }. `params` is already clamped (lookCodeParams); `invalid` is true
+ * when it still names unknown options (errors = catalog.err.* keys): show the
+ * not-found state instead of loading such a look.
  */
 export async function getLookCode(shopId, code) {
   requireShopId(shopId);
@@ -73,16 +88,20 @@ export async function getLookCode(shopId, code) {
   const data = await readDoc(`shops/${shopId}/lookCodes/${clean}`);
   if (!data) return null;
   const expiresAt = data.expiresAt?.toMillis ? data.expiresAt.toMillis() : 0;
+  // The same check the barber's S14 runs (look.js checkLookParams).
+  const { params, errors } = checkLookParams(data.params, data.styleId);
   return {
     code: clean,
-    styleId: data.styleId,
-    params: data.params,
+    styleId: typeof data.styleId === 'string' ? data.styleId : params.styleId,
+    params,
     createdAt: data.createdAt || null,
     expiresAt: data.expiresAt || null,
     usedAt: data.usedAt || null,
     usedBy: data.usedBy || null,
     expired: expiresAt <= Date.now(),
     used: Boolean(data.usedAt),
+    invalid: errors.length > 0,
+    errors,
   };
 }
 
