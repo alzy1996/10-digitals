@@ -1,7 +1,7 @@
 // Consultations + Agreement Card approvals (PRD 10.2). Day keys are Muscat dates.
 import { collection, doc, onSnapshot, setDoc, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase.js';
-import { fire, created, updated, snapList, newId, uid, clean } from './base.js';
+import { fire, created, updated, snapList, newId, uid, clean, pendingOf } from './base.js';
 import { dayKey as muscatDay } from '../lib/time.js';
 import { bumpStats } from './stats.js';
 import { pick, FIELDS } from './schema.js';
@@ -84,11 +84,11 @@ export function watchConsultationsDay(salonId, day, cb) {
 
 export function watchConsultationsRange(salonId, fromKey, toKey, cb) {
   const q = query(collection(db, 'salons', salonId, 'consultations'), where('dayKey', '>=', fromKey), where('dayKey', '<=', toKey), orderBy('dayKey', 'asc'));
-  return onSnapshot(q, { includeMetadataChanges: true }, (s) => cb(snapList(s), s.metadata.hasPendingWrites), () => cb([], false));
+  return onSnapshot(q, { includeMetadataChanges: true }, (s) => cb(snapList(s), pendingOf(s)), () => cb([], false));
 }
 
 export function watchConsultation(salonId, id, cb) {
-  return onSnapshot(doc(db, 'salons', salonId, 'consultations', id), { includeMetadataChanges: true }, (s) => cb(s.exists() ? { id: s.id, ...s.data(), _pending: s.metadata.hasPendingWrites } : null), () => cb(null));
+  return onSnapshot(doc(db, 'salons', salonId, 'consultations', id), { includeMetadataChanges: true }, (s) => cb(s.exists() ? { id: s.id, ...s.data(), _pending: pendingOf(s) } : null), () => cb(null));
 }
 
 export function watchClientConsultations(salonId, clientId, cb) {

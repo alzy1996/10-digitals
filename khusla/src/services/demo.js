@@ -2,7 +2,7 @@
 // 7 Muscat days, all demo: true, removable with "Delete demo data". No brands, codes or prices.
 import { collection, doc, getDocs, query, where, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase.js';
-import { created, newId, uid } from './base.js';
+import { committed, created, newId, uid } from './base.js';
 import { lastNDayKeys } from '../lib/time.js';
 import { logAudit } from './audit.js';
 
@@ -83,7 +83,7 @@ export async function seedDemo(salonId) {
       ...created(),
     });
   });
-  await batch.commit();
+  await committed(batch.commit(), 'demoSeed');
 }
 
 export async function deleteDemo(salonId) {
@@ -93,7 +93,7 @@ export async function deleteDemo(salonId) {
     for (let i = 0; i < s.docs.length; i += 400) {
       const batch = writeBatch(db);
       s.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
-      await batch.commit();
+      await committed(batch.commit(), 'demoDelete');
     }
     n += s.size;
   }

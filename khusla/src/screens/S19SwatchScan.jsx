@@ -15,6 +15,7 @@ import { createLine, watchSwatches, saveSwatch, deleteSwatch, importSwatches } f
 import { decodeToCanvas, canvasToImg, cardGains, measureRegion, repeatability, labToHex } from '../ai/index.js';
 import { validateSwatches } from '../reports/csv.js';
 import tones from '../data/tones.json';
+import { publicUrl } from '../lib/url.js';
 
 export default function S19SwatchScan() {
   const { t, name } = useT();
@@ -123,7 +124,7 @@ export default function S19SwatchScan() {
         )}
         <CsvImport
           title={t('swatch.importTitle')}
-          template="/templates/swatches-template.csv"
+          template={publicUrl('templates/swatches-template.csv')}
           columns={['line', 'code', 'level', 'tone']}
           note={t('swatch.importNote')}
           validate={(text) => validateSwatches(text, tones.map((x) => x.id))}

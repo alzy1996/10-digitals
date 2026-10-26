@@ -35,6 +35,7 @@ build sandbox, it says so.
 | 25 | Light Switcher strength | Partial adaptation 0.5 (50% toward the preset white) | Full adaptation turned the whole photo orange at 2700 K |
 | 26 | Theme | Light default; dark is a per-device choice in Settings | PRD 9.1 defines both palettes |
 | 27 | Deploy route | GitHub Actions: `khusla-ci.yml` runs lint, unit, rules, build and size checks on every PR; `khusla-deploy.yml` runs the same checks and then `firebase deploy` (Hosting + rules + indexes) on every merge to `main` | Sam asked to deploy from GitHub. Firebase Hosting stays (PRD stack, SPA rewrites and headers that GitHub Pages cannot set). The Worker stays a manual `wrangler deploy` (optional feature, off by default) |
+| 28 | GitHub Pages demo | `npm run build:pages` (Vite mode `pages`, base `/10-digitals/khusla/`): Firestore runs offline in memory (`memoryLocalCache` + `disableNetwork`), auth is a one-tap local stand-in, awaited writes resolve at once, missing docs read as "does not exist". A banner on every screen says nothing is saved. Same code as the live app (`src/lib/firebase.js` `demoMode`); real keys in `.env.local` turn the Pages build into the live app | Sam asked for it on GitHub like the Nail Mirror demo; GitHub Pages cannot host Firebase. Deep links use the site's root `404.html` handoff (same as Nail Mirror) |
 
 ## 2. Where everything is
 
@@ -154,4 +155,6 @@ Do these on real devices after deploying (README part A). Write the result next 
 - Try at home needs a connection on the first visit (salon name, public catalog, Look Code). The chair flow works offline after the first load.
 - The KV caps in the Worker are approximate under concurrent use (KV is eventually consistent).
 - Workers Free allows 10 ms CPU per request; decoding the model's image output is the heaviest step. Watch `npx wrangler tail` after the first real deploy.
+- The GitHub Pages demo keeps nothing: a refresh, a deep link or a new tab starts a fresh demo, and a
+  Look Code made there only works in the same tab. Real salons use the Firebase deploy.
 - Live mirror (real-time recolor on the camera) uses a simplified root map (vertical position), so placement-heavy techniques preview best on the still photo.

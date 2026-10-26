@@ -8,16 +8,44 @@ import {
   signInWithPopup,
   signOut as fbSignOut,
 } from 'firebase/auth';
-import { auth } from '../lib/firebase.js';
+import { auth, demoMode } from '../lib/firebase.js';
+import { appUrl } from '../lib/url.js';
 
 const EMAIL_KEY = 'khusla.emailForSignIn';
 
+// Demo build: a stand-in user kept in memory (lib/firebase.js). Same shape as the Firebase user fields we read.
+const demo = { user: null, subs: new Set() };
+function setDemoUser(user) {
+  demo.user = user;
+  demo.subs.forEach((cb) => cb(user));
+  return user;
+}
+function demoUser(email) {
+  return email
+    ? { uid: 'demo-owner', email, displayName: 'Demo', isAnonymous: false }
+    : { uid: `demo-guest-${Math.random().toString(36).slice(2, 8)}`, email: null, displayName: null, isAnonymous: true };
+}
+
+/** Demo build only: sign in as the demo owner with one tap. */
+export function signInDemo() {
+  return setDemoUser(demoUser('demo@khusla.app'));
+}
+
 export function onAuth(cb) {
+  if (demoMode) {
+    demo.subs.add(cb);
+    cb(demo.user);
+    return () => demo.subs.delete(cb);
+  }
   return onAuthStateChanged(auth, cb);
 }
 
 export async function sendEmailLink(email, continuePath = '/login') {
-  const url = `${location.origin}${continuePath}`;
+  if (demoMode) {
+    setDemoUser(demoUser(email));
+    return;
+  }
+  const url = appUrl(continuePath);
   await sendSignInLinkToEmail(auth, email, { url, handleCodeInApp: true });
   try {
     localStorage.setItem(EMAIL_KEY, email);
@@ -27,6 +55,7 @@ export async function sendEmailLink(email, continuePath = '/login') {
 }
 
 export function isEmailLink(href = location.href) {
+  if (demoMode) return false;
   return isSignInWithEmailLink(auth, href);
 }
 
@@ -39,6 +68,7 @@ export function storedEmail() {
 }
 
 export async function completeEmailLink(email, href = location.href) {
+  if (demoMode) return setDemoUser(demoUser(email));
   const res = await signInWithEmailLink(auth, email, href);
   try {
     localStorage.removeItem(EMAIL_KEY);
@@ -49,6 +79,7 @@ export async function completeEmailLink(email, href = location.href) {
 }
 
 export async function signInGoogle() {
+  if (demoMode) return signInDemo();
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   return (await signInWithPopup(auth, provider)).user;
@@ -56,14 +87,16 @@ export async function signInGoogle() {
 
 /** Customers at home: anonymous auth, only to create a Look Code. */
 export async function ensureAnonymous() {
+  if (demoMode) return demo.user || setDemoUser(demoUser(null));
   if (auth.currentUser) return auth.currentUser;
   return (await signInAnonymously(auth)).user;
 }
 
 export function signOut() {
+  if (demoMode) return Promise.resolve(setDemoUser(null));
   return fbSignOut(auth);
 }
 
 export function currentUser() {
-  return auth.currentUser;
+  return demoMode ? demo.user : auth.currentUser;
 }

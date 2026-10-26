@@ -1,0 +1,64 @@
+# KHUSLA demo on GitHub Pages: https://alzy1996.github.io/10-digitals/khusla/
+# On every merge to main that touches khusla/ (or by hand: Actions -> KHUSLA Pages demo -> Run workflow),
+# builds the demo (npm run build:pages: no Firebase, nothing saved) and replaces only the khusla/ folder
+# of the gh-pages branch. The other sites on gh-pages are left as they are.
+name: KHUSLA Pages demo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'khusla/**'
+      - '.github/workflows/khusla-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: khusla-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and publish the demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: khusla
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: khusla/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build:pages
+
+      - name: Publish to gh-pages/khusla
+        working-directory: .
+        run: |
+          git fetch --depth=1 origin gh-pages
+          git worktree add --detach "$RUNNER_TEMP/pages" FETCH_HEAD
+          rm -rf "$RUNNER_TEMP/pages/khusla"
+          cp -r khusla/dist-pages "$RUNNER_TEMP/pages/khusla"
+          cd "$RUNNER_TEMP/pages"
+          git add -A khusla
+          if git diff --cached --quiet; then
+            echo "Demo unchanged"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "KHUSLA demo: ${GITHUB_SHA::7}"
+          git push origin HEAD:gh-pages
+          {
+            echo "### KHUSLA demo updated"
+            echo ""
+            echo "https://alzy1996.github.io/10-digitals/khusla/ (live in about a minute)"
+          } >> "$GITHUB_STEP_SUMMARY"

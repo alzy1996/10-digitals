@@ -14,6 +14,7 @@ import { watchClients, importClients } from '../services/clients.js';
 import { validateProducts, validateClients } from '../reports/csv.js';
 import { PRODUCT_CATEGORIES } from '../services/schema.js';
 import { formatOmr } from '../lib/format.js';
+import { publicUrl } from '../lib/url.js';
 
 const EMPTY = { name: '', nameAr: '', category: 'service', priceOmr: '', active: true };
 
@@ -61,7 +62,7 @@ export default function S20Products() {
       <div className="grid grid-cols-1 gap-5 desk:grid-cols-2">
         <CsvImport
           title={t('products.importTitle')}
-          template="/templates/products-template.csv"
+          template={publicUrl('templates/products-template.csv')}
           columns={['name', 'nameAr', 'category', 'priceOmr', 'active']}
           note={t('products.importNote')}
           validate={validateProducts}
@@ -69,7 +70,7 @@ export default function S20Products() {
         />
         <CsvImport
           title={t('clients.importTitle')}
-          template="/templates/clients-template.csv"
+          template={publicUrl('templates/clients-template.csv')}
           columns={['displayName', 'phone']}
           note={t('clients.importNote')}
           validate={(text) => validateClients(text, clients || [])}

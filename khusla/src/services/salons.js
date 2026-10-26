@@ -1,16 +1,16 @@
 // Salons, users, publicSalons. "Create your salon" bootstrap + seed (PRD 10.7).
-import { doc, onSnapshot, getDoc, writeBatch, serverTimestamp, setDoc, arrayUnion } from 'firebase/firestore';
+import { doc, onSnapshot, writeBatch, serverTimestamp, setDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../lib/firebase.js';
-import { created, updated, fire, newId, uid, clean } from './base.js';
+import { created, updated, fire, committed, readDoc, pendingOf, newId, uid, clean } from './base.js';
 import { SALON_SETTINGS_DEFAULT } from '../config/app.js';
 import { SCHEMA_VERSION } from './schema.js';
 import { seedCatalog } from './catalog.js';
 import { seedDemo } from './demo.js';
 import { logAudit, diffFields } from './audit.js';
-import { auth } from '../lib/firebase.js';
+import { currentUser } from './auth.js';
 
 export function watchSalon(salonId, cb) {
-  return onSnapshot(doc(db, 'salons', salonId), (s) => cb(s.exists() ? { id: s.id, ...s.data(), _pending: s.metadata.hasPendingWrites } : null), () => cb(null));
+  return onSnapshot(doc(db, 'salons', salonId), (s) => cb(s.exists() ? { id: s.id, ...s.data(), _pending: pendingOf(s) } : null), () => cb(null));
 }
 
 export function watchUser(cb) {
@@ -18,7 +18,7 @@ export function watchUser(cb) {
 }
 
 export async function getPublicSalon(salonId) {
-  const s = await getDoc(doc(db, 'publicSalons', salonId));
+  const s = await readDoc(doc(db, 'publicSalons', salonId));
   return s.exists() ? { id: s.id, ...s.data() } : null;
 }
 
@@ -29,7 +29,7 @@ export async function getSalonSummaries(ids) {
       try {
         const pub = await getPublicSalon(id);
         if (pub) return pub;
-        const s = await getDoc(doc(db, 'salons', id));
+        const s = await readDoc(doc(db, 'salons', id));
         return s.exists() ? { id, name: s.data().name, nameAr: s.data().nameAr } : null;
       } catch {
         return null;
@@ -62,8 +62,8 @@ export async function createSalon({ name, nameAr, whatsapp, ownerName, withDemo 
   }));
   batch.set(doc(db, 'salons', salonId, 'staff', me), {
     uid: me,
-    name: ownerName || auth.currentUser?.displayName || auth.currentUser?.email || 'Owner',
-    email: (auth.currentUser?.email || '').toLowerCase(),
+    name: ownerName || currentUser()?.displayName || currentUser()?.email || 'Owner',
+    email: (currentUser()?.email || '').toLowerCase(),
     role: 'owner',
     active: true,
     ...created(),
@@ -76,7 +76,7 @@ export async function createSalon({ name, nameAr, whatsapp, ownerName, withDemo 
     whatsapp: whatsapp || null,
     ...updated(),
   });
-  await batch.commit();
+  await committed(batch.commit(), 'salon');
   await seedCatalog(salonId);
   if (withDemo) await seedDemo(salonId);
   logAudit(salonId, 'salon.create', `salons/${salonId}`, { name: [null, name || nameAr] });

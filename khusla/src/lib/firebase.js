@@ -1,10 +1,15 @@
-// src/lib/firebase.js — PRD 10.1, plus the emulator switch.
+// src/lib/firebase.js — PRD 10.1, plus the emulator switch and the demo build.
 // With no real keys yet (empty .env.local) the app runs against the Firebase Emulator Suite
 // under the "demo-khusla" project, so the build never waits for Sam's accounts.
+// The GitHub Pages build (`npm run build:pages`, mode "pages") has no Firebase project behind it:
+// Firestore runs offline in memory and auth is a local stand-in (services/auth.js). Nothing leaves
+// the device and a refresh starts fresh. Real keys in .env.local turn the same build into the live app.
 import { initializeApp } from 'firebase/app';
 import {
   connectFirestoreEmulator,
+  disableNetwork,
   initializeFirestore,
+  memoryLocalCache,
   persistentLocalCache,
   persistentMultipleTabManager,
 } from 'firebase/firestore';
@@ -13,7 +18,8 @@ import { initializeAppCheck, ReCaptchaV3Provider, getToken as getAppCheckTokenRa
 
 const env = import.meta.env;
 const hasRealConfig = Boolean(env.VITE_FB_PROJECT_ID && env.VITE_FB_API_KEY);
-export const usingEmulators = env.VITE_USE_EMULATORS === 'true' || !hasRealConfig;
+export const demoMode = env.MODE === 'pages' && !hasRealConfig;
+export const usingEmulators = !demoMode && (env.VITE_USE_EMULATORS === 'true' || !hasRealConfig);
 
 const config = hasRealConfig
   ? {
@@ -40,8 +46,10 @@ if (!usingEmulators && env.VITE_RECAPTCHA_SITE_KEY) {
 }
 
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  localCache: demoMode ? memoryLocalCache() : persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 });
+// Queued before any read or write, so the demo never talks to a server.
+if (demoMode) disableNetwork(db);
 export const auth = getAuth(app);
 export const projectId = config.projectId;
 

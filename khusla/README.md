@@ -10,6 +10,8 @@ Free tiers only (Firebase Spark, Workers Free).
 
 Read `BUILD_NOTES.md` for every decision, license note, test result and the manual checklist.
 
+**Live demo (no account, nothing saved):** https://alzy1996.github.io/10-digitals/khusla/
+
 ---
 
 ## Run it on your computer (no Firebase account needed)
@@ -35,11 +37,22 @@ With an empty `.env.local` the app always uses the emulators (project `demo-khus
 | `npm run test:rules` | Firestore security rules on the emulator (starts its own emulator; stop `npm run emulators` first) |
 | `cd worker && npm test` | Cloudflare Worker contract tests |
 | `npm run build && npm run check:size` | Production build, gzipped shell < 2 MB, no model files in `dist/`, no tracked secrets |
+| `npm run build:pages` | GitHub Pages demo build in `dist-pages/` (base `/10-digitals/khusla/`, no Firebase) |
 | `npm run test:e2e` | Browser end-to-end flow (needs emulators + dev server + `E2E_PHOTO=/path/to/front-photo.jpg`; see top of `scripts/e2e.cjs`) |
 
 ---
 
 ## Deploy — every click
+
+### 0 · GitHub Pages demo (already live, nothing to do)
+
+- https://alzy1996.github.io/10-digitals/khusla/ is the demo build (`npm run build:pages`): no Firebase
+  project behind it. Sign-in is one tap ("Open the demo"), data lives in the browser's memory only and a
+  page refresh starts fresh. The on-device AI, Color Lab, Cut Studio, Agreement Card PDF/PNG and the owner
+  screens all work. Not in the demo: real sign-in, saving between visits, sync between devices, AI Final Look.
+- Every merge to `main` that changes `khusla/` rebuilds it (`.github/workflows/khusla-pages.yml`); only the
+  `khusla/` folder of the `gh-pages` branch is replaced. By hand: **Actions → KHUSLA Pages demo → Run workflow**.
+- For a real salon use part A (Firebase): accounts, saving, sync, App Check.
 
 ### A · Firebase (required)
 
@@ -207,8 +220,9 @@ khusla/
    └─ styles/                tokens.css, index.css
 ```
 
-Repo root: `.github/workflows/khusla-ci.yml` (checks on every pull request) and
-`khusla-deploy.yml` (checks + Firebase deploy on every merge to `main`).
+Repo root: `.github/workflows/khusla-ci.yml` (checks on every pull request),
+`khusla-deploy.yml` (checks + Firebase deploy on every merge to `main`, skipped until the secrets exist) and
+`khusla-pages.yml` (GitHub Pages demo on every merge to `main`).
 
 ## Changing things later (MODIFY)
 

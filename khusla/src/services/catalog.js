@@ -2,7 +2,7 @@
 // Never invents brands, codes, products or prices.
 import { collection, doc, getDocs, onSnapshot, query, where, writeBatch, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase.js';
-import { fire, updated, snapList, clean, newId } from './base.js';
+import { fire, committed, updated, snapList, clean, newId } from './base.js';
 import { logAudit, diffFields } from './audit.js';
 import cuts from '../data/cuts.json';
 import fringes from '../data/fringes.json';
@@ -23,7 +23,7 @@ export async function seedCatalog(salonId) {
   for (let i = 0; i < all.length; i += 400) {
     const batch = writeBatch(db);
     for (const [kind, item] of all.slice(i, i + 400)) batch.set(doc(db, 'salons', salonId, kind, item.id), withOwnerFields(item));
-    await batch.commit();
+    await committed(batch.commit(), 'catalogSeed');
   }
 }
 

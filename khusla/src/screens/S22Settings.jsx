@@ -14,6 +14,7 @@ import { watchAudit } from '../services/audit.js';
 import { deleteDemo } from '../services/demo.js';
 import { normalizeOmanPhone } from '../reports/csv.js';
 import { formatDateTime } from '../lib/time.js';
+import { appUrl } from '../lib/url.js';
 import { SALON_SETTINGS_DEFAULT, DEFAULTS } from '../config/app.js';
 
 function themePref() {
@@ -33,7 +34,7 @@ export default function S22Settings() {
   const [wa, setWa] = useState(app.salon?.whatsapp || '');
   const [audit] = useLive(app.isOwner ? (cb) => watchAudit(app.salonId, cb, 30) : null, [app.salonId, app.isOwner], []);
   const set = (patch) => updateSettings(app.salon, patch);
-  const link = `${location.origin}/t/${app.salonId}`;
+  const link = appUrl(`/t/${app.salonId}`);
   const workerOk = Boolean(import.meta.env.VITE_AI_WORKER_URL);
 
   return (

@@ -11,6 +11,14 @@
     <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <title>KHUSLA خُصلة</title>
+    <script>
+      // GitHub Pages deep links: the site 404 page sends /<base>/some/route to /<base>/?__p=some/route.
+      // Restore the real URL before the router starts (no effect on Firebase Hosting, which rewrites to index.html).
+      (function () {
+        var m = location.search.match(/[?&]__p=([^&]*)/);
+        if (m) history.replaceState(null, '', location.pathname.replace(/\/?$/, '/') + decodeURIComponent(m[1]) + location.hash);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,8 +1,9 @@
 // Shared Firestore helpers. Every write goes through src/services/*; components never call Firestore.
 // Writes are fire-and-forget so the app keeps working offline: the persistent cache queues them and
 // snapshots report hasPendingWrites ("Saved on this device, will sync").
-import { serverTimestamp } from 'firebase/firestore';
-import { auth } from '../lib/firebase.js';
+import { getDoc, serverTimestamp } from 'firebase/firestore';
+import { demoMode } from '../lib/firebase.js';
+import { currentUser } from './auth.js';
 
 const listeners = new Set();
 export function onWriteError(fn) {
@@ -16,11 +17,27 @@ export function fire(promise, label = 'write') {
     console.warn(`[khusla] write failed: ${label} (${err?.code || 'unknown'})`);
     listeners.forEach((fn) => fn({ label, code: err?.code || 'unknown', message: err?.message }));
   });
-  return promise;
+  // Demo build: no server will ever ack, the local cache already holds the write.
+  return demoMode ? Promise.resolve() : promise;
+}
+
+/** A write the caller waits for (batch commits, Look Codes). In the demo build it resolves at once. */
+export function committed(promise, label = 'write') {
+  return demoMode ? fire(promise, label) : promise;
+}
+
+/** getDoc that, in the demo build, reads a document missing from the local cache as "does not exist". */
+export async function readDoc(ref) {
+  try {
+    return await getDoc(ref);
+  } catch (err) {
+    if (!demoMode || err?.code !== 'unavailable') throw err;
+    return { id: ref.id, ref, exists: () => false, data: () => undefined, metadata: { hasPendingWrites: false, fromCache: true } };
+  }
 }
 
 export function uid() {
-  const u = auth.currentUser;
+  const u = currentUser();
   if (!u) throw Object.assign(new Error('not-signed-in'), { code: 'auth' });
   return u.uid;
 }
@@ -45,8 +62,13 @@ export function clean(obj) {
   return obj;
 }
 
+/** "Saved on this device, will sync". Never shown in the demo build, where nothing ever syncs. */
+export function pendingOf(snap) {
+  return !demoMode && snap.metadata.hasPendingWrites;
+}
+
 export function snapList(snap) {
-  return snap.docs.map((d) => ({ id: d.id, ...d.data(), _pending: d.metadata.hasPendingWrites }));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data(), _pending: pendingOf(d) }));
 }
 
 export function newId(prefix = '') {

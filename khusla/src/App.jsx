@@ -5,6 +5,8 @@ import { SnackbarProvider } from './components/Snackbar.jsx';
 import { AppProvider, useApp } from './hooks/useApp.jsx';
 import { SessionProvider, useSession } from './hooks/useSession.jsx';
 import { APP } from './config/app.js';
+import { routerBase } from './lib/url.js';
+import { demoMode } from './lib/firebase.js';
 
 const S01Splash = lazy(() => import('./screens/S01Splash.jsx'));
 const S02Login = lazy(() => import('./screens/S02Login.jsx'));
@@ -42,6 +44,17 @@ function Loading() {
         <div className="font-display text-3xl text-plum">{lang === 'ar' ? APP.nameAr : APP.name}</div>
         <div className="mx-auto mt-4 h-0.5 w-16 bg-clay" style={{ animation: 'pulse-soft 1.2s infinite' }} />
       </div>
+    </div>
+  );
+}
+
+/** GitHub Pages demo build: one line on every screen so nobody mistakes it for the live app. */
+function DemoBanner() {
+  const { t } = useT();
+  if (!demoMode) return null;
+  return (
+    <div role="note" className="bg-plum px-4 py-1.5 text-center text-xs font-semibold text-onplum">
+      {t('demo.banner')}
     </div>
   );
 }
@@ -107,9 +120,10 @@ export default function App() {
   return (
     <LangProvider>
       <SnackbarProvider>
-        <BrowserRouter>
+        <BrowserRouter basename={routerBase || undefined}>
           <AppProvider>
             <SessionProvider>
+              <DemoBanner />
               <AppRoutes />
             </SessionProvider>
           </AppProvider>

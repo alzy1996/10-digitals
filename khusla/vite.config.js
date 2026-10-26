@@ -14,7 +14,9 @@ const runtimeCaching = CACHE_HOSTS.map(({ prefix, cache }) => ({
   },
 }));
 
-export default defineConfig({
+// Mode "pages" (npm run build:pages) is the GitHub Pages demo at alzy1996.github.io/10-digitals/khusla/.
+export default defineConfig(({ mode }) => ({
+  base: mode === 'pages' ? '/10-digitals/khusla/' : '/',
   plugins: [
     react(),
     VitePWA({
@@ -31,18 +33,18 @@ export default defineConfig({
         background_color: '#FBF8F4',
         display: 'standalone',
         orientation: 'any',
-        start_url: '/',
-        scope: '/',
+        start_url: './',
+        scope: './',
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,csv}'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        navigateFallback: '/index.html',
+        navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/__/],
         cleanupOutdatedCaches: true,
         runtimeCaching,
@@ -57,4 +59,4 @@ export default defineConfig({
   },
   server: { port: 5173, host: true },
   preview: { port: 4173, host: true },
-});
+}));

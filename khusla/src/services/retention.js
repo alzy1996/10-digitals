@@ -4,6 +4,7 @@
 import { collection, getDocs, query, where, writeBatch, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase.js';
 import { addDaysKey, dayKey } from '../lib/time.js';
+import { committed } from './base.js';
 import { logAudit } from './audit.js';
 
 const KEY = 'khusla.retentionSweep';
@@ -24,7 +25,7 @@ export async function sweepRetention(salonId, retentionDays) {
   for (let i = 0; i < refs.length; i += 400) {
     const batch = writeBatch(db);
     refs.slice(i, i + 400).forEach((r) => batch.delete(r));
-    await batch.commit();
+    await committed(batch.commit(), 'retention');
     n += Math.min(400, refs.length - i);
   }
   if (n) logAudit(salonId, 'retention.sweep', `salons/${salonId}`, { deleted: [null, String(n)], days: [null, String(retentionDays)] });

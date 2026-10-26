@@ -6,9 +6,9 @@ import { ErrorBox } from '../components/States.jsx';
 import Icon from '../components/Icon.jsx';
 import { useT } from '../lib/i18n/useT.js';
 import { useApp } from '../hooks/useApp.jsx';
-import { completeEmailLink, isEmailLink, sendEmailLink, signInGoogle, storedEmail, signOut } from '../services/auth.js';
+import { completeEmailLink, isEmailLink, sendEmailLink, signInDemo, signInGoogle, storedEmail, signOut } from '../services/auth.js';
 import { isEmail } from '../services/invites.js';
-import { usingEmulators } from '../lib/firebase.js';
+import { demoMode, usingEmulators } from '../lib/firebase.js';
 
 export default function S02Login() {
   const { t } = useT();
@@ -77,6 +77,22 @@ export default function S02Login() {
       if (e.code !== 'auth/popup-closed-by-user') setErr(e.code || 'error');
     }
   };
+
+  if (demoMode) {
+    return (
+      <main className="screen mx-auto max-w-[560px]">
+        <TopBar title={t('login.title')} onBack={() => navigate('/')} />
+        <div className="card mb-6 p-4" role="note">
+          <div className="font-semibold">{t('login.demoTitle')}</div>
+          <p className="mt-1 text-sm text-ink2">{t('login.demoBody')}</p>
+        </div>
+        <Button icon="check" onClick={() => signInDemo()}>
+          {t('login.demoEnter')}
+        </Button>
+        <p className="mt-8 text-xs text-ink2">{t('login.privacy')}</p>
+      </main>
+    );
+  }
 
   return (
     <main className="screen mx-auto max-w-[560px]">

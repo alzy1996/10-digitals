@@ -2,6 +2,7 @@ import { collection, doc, onSnapshot, setDoc, deleteDoc, serverTimestamp } from 
 import { db } from '../lib/firebase.js';
 import { fire, snapList, uid } from './base.js';
 import { logAudit } from './audit.js';
+import { appUrl } from '../lib/url.js';
 
 export function watchInvites(salonId, cb) {
   return onSnapshot(collection(db, 'salons', salonId, 'invites'), (s) => cb(snapList(s)), () => cb([]));
@@ -17,7 +18,7 @@ export function createInvite(salonId, email, role) {
   if (!['manager', 'stylist'].includes(role)) throw new Error('bad-role');
   fire(setDoc(doc(db, 'salons', salonId, 'invites', e), { email: e, role, createdAt: serverTimestamp(), createdBy: uid() }), 'invite');
   logAudit(salonId, 'invite.create', `salons/${salonId}/invites/${e}`, { role: [null, role] });
-  return `${location.origin}/join?salon=${encodeURIComponent(salonId)}`;
+  return appUrl(`/join?salon=${encodeURIComponent(salonId)}`);
 }
 
 export function deleteInvite(salonId, email) {

@@ -1,3 +1,5 @@
+const SPRITE = `${import.meta.env.BASE_URL}icons/sprite.svg`;
+
 export default function Icon({ name, size = 24, className = '', title, style }) {
   return (
     <svg
@@ -15,7 +17,7 @@ export default function Icon({ name, size = 24, className = '', title, style }) 
       role={title ? 'img' : undefined}
     >
       {title ? <title>{title}</title> : null}
-      <use href={`/icons/sprite.svg#i-${name}`} />
+      <use href={`${SPRITE}#i-${name}`} />
     </svg>
   );
 }

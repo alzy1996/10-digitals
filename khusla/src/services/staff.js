@@ -1,6 +1,7 @@
-import { collection, doc, onSnapshot, setDoc, deleteDoc, getDoc, writeBatch, serverTimestamp, arrayUnion } from 'firebase/firestore';
-import { db, auth } from '../lib/firebase.js';
-import { fire, updated, created, snapList, uid } from './base.js';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { db } from '../lib/firebase.js';
+import { fire, committed, readDoc, updated, created, snapList, uid } from './base.js';
+import { currentUser } from './auth.js';
 import { logAudit, diffFields } from './audit.js';
 
 export function watchStaff(salonId, cb) {
@@ -13,7 +14,7 @@ export function watchMe(salonId, cb) {
 
 export async function getMyStaff(salonId) {
   try {
-    const s = await getDoc(doc(db, 'salons', salonId, 'staff', uid()));
+    const s = await readDoc(doc(db, 'salons', salonId, 'staff', uid()));
     return s.exists() ? { id: s.id, ...s.data() } : null;
   } catch {
     return null;
@@ -38,20 +39,20 @@ export function removeStaff(salonId, member) {
 /** Join a salon from an invite link: create own staff doc with the invite's role. */
 export async function acceptInvite(salonId) {
   const me = uid();
-  const email = (auth.currentUser?.email || '').toLowerCase();
-  const inv = await getDoc(doc(db, 'salons', salonId, 'invites', email));
+  const email = (currentUser()?.email || '').toLowerCase();
+  const inv = await readDoc(doc(db, 'salons', salonId, 'invites', email));
   if (!inv.exists()) throw Object.assign(new Error('no-invite'), { code: 'no-invite' });
   const batch = writeBatch(db);
   batch.set(doc(db, 'salons', salonId, 'staff', me), {
     uid: me,
-    name: auth.currentUser?.displayName || email,
+    name: currentUser()?.displayName || email,
     email,
     role: inv.data().role,
     active: true,
     ...created(),
   });
   batch.set(doc(db, 'users', me), { salonIds: arrayUnion(salonId), lastSalonId: salonId, updatedAt: serverTimestamp() }, { merge: true });
-  await batch.commit();
+  await committed(batch.commit(), 'join');
   fire(deleteDoc(doc(db, 'salons', salonId, 'invites', email)), 'invite');
   return inv.data().role;
 }
