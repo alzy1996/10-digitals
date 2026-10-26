@@ -2,6 +2,8 @@
 # Runs on every push to main that touches lihya/, or by hand (Actions > this workflow > Run workflow).
 # One-time setup (Sam): Settings > Pages > Source: GitHub Actions; Settings > Secrets and variables >
 # Actions > New repository secret for each VITE_* below (the Firebase web config from .env.local).
+# Without the VITE_FB_* secrets the build is the zero-setup Demo mode (lihya/README.md, "Demo link"); adding them
+# switches the same link to the real app on the next run.
 name: LIHYA deploy to GitHub Pages
 
 on:

@@ -21,6 +21,7 @@
 
 import { getIdToken } from '../../services/auth.js';
 import { getAppCheckToken } from '../../lib/firebase.js';
+import { demoMode } from '../../lib/appMode.js';
 
 /** Request timeout (ms). FLUX klein usually answers in a few seconds. */
 export const REQUEST_TIMEOUT_MS = 60000;
@@ -35,8 +36,12 @@ export function finalLookError(code, message, extra = {}) {
   return err;
 }
 
-/** The configured Worker base URL without a trailing slash ('' when not set). */
+/**
+ * The configured Worker base URL without a trailing slash ('' when not set, and always in
+ * demo mode: the Worker needs a signed-in Firebase account, which the demo does not have).
+ */
 export function workerBaseUrl(env = typeof import.meta !== 'undefined' ? import.meta.env : null) {
+  if (demoMode) return '';
   const raw = env && env.VITE_AI_WORKER_URL ? String(env.VITE_AI_WORKER_URL).trim() : '';
   return raw.replace(/\/+$/, '');
 }

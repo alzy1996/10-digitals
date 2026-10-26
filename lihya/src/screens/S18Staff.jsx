@@ -281,11 +281,25 @@ export default function S18Staff() {
               {t('manage.staff.sentNext', { role: t(`role.${result.role}`) })}
             </Note>
           ) : (
-            <div role="status" className="flex flex-col gap-3 rounded-ctl border border-warn/50 bg-warn/10 p-3">
-              <p className="flex items-start gap-2 text-sm text-text">
-                <Icon name="warning" size={20} className="mt-0.5 shrink-0 text-warn" />
-                <span>{t('auth.inviteNotSent')}</span>
-              </p>
+            <div
+              role="status"
+              className={
+                result.demo
+                  ? 'flex flex-col gap-3 rounded-ctl border border-brass/50 bg-surface-2 p-3'
+                  : 'flex flex-col gap-3 rounded-ctl border border-warn/50 bg-warn/10 p-3'
+              }
+            >
+              {result.demo ? (
+                <p className="flex items-start gap-2 text-sm text-text">
+                  <Icon name="info" size={20} className="mt-0.5 shrink-0 text-brass" />
+                  <span>{t('demo.invite.notSent')}</span>
+                </p>
+              ) : (
+                <p className="flex items-start gap-2 text-sm text-text">
+                  <Icon name="warning" size={20} className="mt-0.5 shrink-0 text-warn" />
+                  <span>{t('auth.inviteNotSent')}</span>
+                </p>
+              )}
               <JoinLink
                 url={result.joinUrl || link}
                 t={t}

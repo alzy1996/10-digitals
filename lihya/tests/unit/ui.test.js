@@ -497,6 +497,8 @@ describe('route error boundary', () => {
 describe('ui strings', () => {
   const ns = JSON.parse(read('src/lib/i18n/ns/ui.json'));
   const shared = { en: JSON.parse(read('src/lib/i18n/en.json')), ar: JSON.parse(read('src/lib/i18n/ar.json')) };
+  // Demo mode strings (the Demo pill and its sheet) live in their own namespace.
+  const demo = JSON.parse(read('src/lib/i18n/ns/demo.json'));
 
   it('has the same ui.* keys in both languages, without emoji', () => {
     const en = Object.keys(ns.en).sort();
@@ -519,7 +521,7 @@ describe('ui strings', () => {
     expect(used.size).toBeGreaterThan(20);
     for (const key of used) {
       for (const lang of ['en', 'ar']) {
-        const has = key in ns[lang] || key in shared[lang];
+        const has = key in ns[lang] || key in shared[lang] || (key.startsWith('demo.') && key in demo[lang]);
         expect(has, `${lang}:${key}`).toBe(true);
       }
     }

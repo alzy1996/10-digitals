@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useT } from '../lib/i18n/useT.js';
 import { useShop } from '../state/ShopContext.jsx';
+import { useDemo } from '../state/DemoMode.jsx';
 import { useSession } from '../hooks/useSession.js';
 import { useLive } from '../hooks/useLive.js';
 import { useOnline } from '../hooks/useOnline.js';
@@ -134,6 +135,7 @@ export default function S14LookCodeEntry() {
   const navigate = useNavigate();
   const online = useOnline();
   const { shopId, settings } = useShop();
+  const demo = useDemo();
   const { client, consultationId, approved, wipe, setLookCode, setActiveParams, setClient, path } = useSession();
   const [code, setCode] = useState('');
   const [result, setResult] = useState({ status: 'idle', code: '', doc: null });
@@ -146,7 +148,8 @@ export default function S14LookCodeEntry() {
     (value) => {
       seqRef.current += 1;
       const seq = seqRef.current;
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      // Demo mode reads this browser's codes: no internet needed.
+      if (!demo && typeof navigator !== 'undefined' && navigator.onLine === false) {
         setResult({ status: 'offline', code: value, doc: null });
         return;
       }
@@ -167,7 +170,7 @@ export default function S14LookCodeEntry() {
         },
       );
     },
-    [shopId],
+    [shopId, demo],
   );
 
   const onCodeChange = (next) => {
@@ -282,7 +285,13 @@ export default function S14LookCodeEntry() {
           ) : null}
         </div>
 
-        {!online || status === 'offline' ? (
+        {demo && status === 'notFound' ? (
+          <Note tone="info" icon="info">
+            <p>{t('demo.sheet.links')}</p>
+          </Note>
+        ) : null}
+
+        {(!online && !demo) || status === 'offline' ? (
           <Note tone="warn" icon="wifi-off" title={t('entry.code.offline')}>
             <p>{t('entry.code.offlineHelp')}</p>
           </Note>

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { firebaseConfigured } from '../lib/firebase.js';
+import { DEMO_USER, demoMode, firebaseConfigured } from '../lib/firebase.js';
 import { useT } from '../lib/i18n/useT.js';
 import {
   clearEmailLinkFromUrl,
@@ -99,11 +99,26 @@ function AuthProviderInner({ children }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+const noop = () => {};
+
+// Demo mode: the demo owner is signed in from the first frame; Firebase Auth never runs.
+const DEMO_AUTH = Object.freeze({
+  user: DEMO_USER,
+  loading: false,
+  isAnonymous: false,
+  isStaffUser: true,
+  emailLink: Object.freeze({ status: 'none', error: null }),
+  completeEmailLink: () => Promise.resolve(DEMO_USER),
+  authError: null,
+  clearAuthError: noop,
+});
+
 /**
  * Auth state for the whole app. Without a Firebase config (and without the
- * emulator switch) it renders the setup notice instead of the app.
+ * emulator switch or demo mode) it renders the setup notice instead of the app.
  */
 export function AuthProvider({ children }) {
+  if (demoMode) return <AuthContext.Provider value={DEMO_AUTH}>{children}</AuthContext.Provider>;
   if (!firebaseConfigured) return <SetupNotice />;
   return <AuthProviderInner>{children}</AuthProviderInner>;
 }
@@ -119,8 +134,8 @@ export function useAuth() {
 }
 
 /**
- * Staff routes: signed-in, non-anonymous users only. Anyone else goes to
- * /login?next=<this path>. Must be rendered inside the router.
+ * Staff routes: signed-in, non-anonymous users only (the demo owner in demo mode). Anyone
+ * else goes to /login?next=<this path>. Must be rendered inside the router.
  */
 export function RequireAuth({ children }) {
   const { user, loading } = useAuth();

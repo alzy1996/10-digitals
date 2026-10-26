@@ -1,6 +1,7 @@
+import { useContext } from 'react';
 import Icon from './Icon.jsx';
 import { useOnline, usePendingWrites } from '../hooks/useOnline.js';
-import { cx, useOptionalT } from './kit.js';
+import { DemoContext, cx, useOptionalT } from './kit.js';
 
 const TONES = {
   warn: 'border-warn/50 bg-warn/10 text-warn-ink',
@@ -48,6 +49,9 @@ function useSyncState() {
  */
 export default function SyncBadge({ className, offlineStrip = false }) {
   const { t, state, full } = useSyncState();
+  // Demo mode: writes stay in this browser by design, so there is never anything to sync.
+  const demo = useContext(DemoContext);
+  if (demo) return null;
   const hideOnPhone = Boolean(state && offlineStrip && state.offline);
   return (
     <span role="status" aria-live="polite" className={cx('inline-flex shrink-0', className)}>
@@ -86,6 +90,8 @@ export default function SyncBadge({ className, offlineStrip = false }) {
  */
 export function SyncStrip({ className }) {
   const { state, full } = useSyncState();
+  const demo = useContext(DemoContext);
+  if (demo) return null;
   const show = Boolean(state && state.offline);
   return (
     <div role="status" aria-live="polite" className={cx('md:hidden', className)}>

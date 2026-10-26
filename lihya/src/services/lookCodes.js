@@ -7,8 +7,9 @@ import { Timestamp, serverTimestamp } from 'firebase/firestore';
 import { LIMITS } from '../config/app.js';
 import { checkLookParams } from '../lib/look.js';
 import { generateLookCode, normalizeLookCode, sanitizeParams } from './model.js';
-import { codedError, commitOps, readDoc, requireShopId, requireUser } from './db.js';
+import { codedError, commitOps, currentUser, readCachedDoc, readDoc, requireShopId, requireUser } from './db.js';
 import { signInAnon } from './auth.js';
+import { demoMode } from '../lib/appMode.js';
 
 const STYLE_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
 
@@ -27,16 +28,19 @@ function withTimeout(promise, ms) {
  * Save the look under a new code and resolve the code. Signs in anonymously when
  * nobody is signed in. Waits up to 12 s for the server; on a slow or offline
  * connection the code is returned anyway and the write syncs later.
+ * Demo mode: no sign-in and no server; the code is kept in this browser only.
  */
 export async function createLookCode(shopId, { styleId, params } = {}) {
   requireShopId(shopId);
-  const user = await signInAnon();
+  const user = demoMode ? currentUser() : await signInAnon();
   const clean = sanitizeParams(params);
   const style = String(styleId || clean?.styleId || '').slice(0, 80);
   if (!clean || !STYLE_ID_RE.test(style)) throw codedError('invalid-argument', 'look');
   let lastError = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const code = generateLookCode();
+    // Demo: no rules refuse a taken code, so this browser's copy is asked instead.
+    if (demoMode && (await readCachedDoc(`shops/${shopId}/lookCodes/${code}`))) continue;
     const write = commitOps(
       [
         {

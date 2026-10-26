@@ -5,6 +5,11 @@
 // between "send" and "open the link", as Firebase requires. When the link is
 // opened on another device the address is unknown and the login screen asks
 // for it again (never passed in the URL: that would allow session injection).
+//
+// Demo mode (src/lib/appMode.js): there is no Firebase Auth. Every sign-in resolves
+// DEMO_USER without the network, getIdToken() is null, and signOutAndClear() is
+// "Reset demo": it empties this browser's demo (session and saved photos, the local
+// database) and loads the start screen, which makes a fresh demo shop.
 
 import {
   GoogleAuthProvider,
@@ -19,10 +24,10 @@ import {
   signOut,
 } from 'firebase/auth';
 import { clearIndexedDbPersistence, terminate, waitForPendingWrites } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase.js';
+import { DEMO_USER, auth, db, demoGeneration, demoMode } from '../lib/firebase.js';
 import { PREF_KEYS } from '../config/app.js';
 import { isValidEmail, normalizeEmail } from './model.js';
-import { codedError } from './db.js';
+import { codedError, markDemoClosing } from './db.js';
 import { appUrl } from '../lib/paths.js';
 import { STORES, idbClearStore } from '../lib/idb.js';
 
@@ -86,6 +91,10 @@ export function emailLinkUrl(next) {
 }
 
 export function watchAuth(cb) {
+  if (demoMode) {
+    cb(DEMO_USER);
+    return () => {};
+  }
   if (!auth) {
     cb(null);
     return () => {};
@@ -98,8 +107,13 @@ export function watchAuth(cb) {
  * signing in is the one holding this phone); invites send without remembering.
  */
 export async function sendLinkTo(email, { next, remember = true } = {}) {
-  const a = requireAuth();
   const address = normalizeEmail(email);
+  // Demo: nothing is sent and nobody needs to sign in (the address is still checked).
+  if (demoMode) {
+    if (!isValidEmail(address)) throw codedError('auth/invalid-email');
+    return address;
+  }
+  const a = requireAuth();
   if (!isValidEmail(address)) throw codedError('auth/invalid-email');
   applyAppLanguage(a);
   await sendSignInLinkToEmail(a, address, { url: emailLinkUrl(next), handleCodeInApp: true });
@@ -148,6 +162,7 @@ const completions = new Map();
  * the login screen share one attempt.
  */
 export function completeEmailLink(href = window.location.href, emailOrNull = null) {
+  if (demoMode) return Promise.resolve(DEMO_USER);
   let a;
   try {
     a = requireAuth();
@@ -203,6 +218,7 @@ const REDIRECT_FALLBACK = new Set(['auth/popup-blocked', 'auth/operation-not-sup
  * Resolves with the user, or null when a redirect has started.
  */
 export async function signInGoogle() {
+  if (demoMode) return DEMO_USER;
   const a = requireAuth();
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
@@ -232,6 +248,7 @@ export async function consumeRedirectResult() {
 
 /** Customers at home: anonymous account, only used to create a Look Code. */
 export async function signInAnon() {
+  if (demoMode) return DEMO_USER;
   const a = requireAuth();
   if (a.currentUser) return a.currentUser;
   const cred = await signInAnonymously(a);
@@ -239,7 +256,7 @@ export async function signInAnon() {
 }
 
 export function signOutUser() {
-  if (!auth) return Promise.resolve();
+  if (demoMode || !auth) return Promise.resolve();
   return signOut(auth);
 }
 
@@ -271,6 +288,10 @@ async function writesSynced(store, ms) {
  * (kept only with the customer's agreement) stay. Never rejects.
  */
 export async function signOutAndClear({ to = '/' } = {}) {
+  if (demoMode) {
+    await resetDemo();
+    return;
+  }
   try {
     await idbClearStore(STORES.session);
   } catch {
@@ -303,8 +324,54 @@ export async function signOutAndClear({ to = '/' } = {}) {
   }
 }
 
-/** Firebase ID token for the AI Worker (null when signed out). */
+function removePref(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // no storage: nothing was kept
+  }
+}
+
+/**
+ * "Reset demo": the customer session and the kept before/after photos (IndexedDB
+ * 'lihya'), then this browser's demo database, then a full load of the start screen,
+ * which makes a fresh demo shop. The next demo generation is chosen first, so the
+ * reset holds even when another tab keeps the old database open (that copy is deleted
+ * here when it can be). Language and theme stay. Never rejects.
+ */
+async function resetDemo() {
+  for (const store of [STORES.session, STORES.saved]) {
+    try {
+      await idbClearStore(store);
+    } catch {
+      // no IndexedDB here (private mode): nothing was stored
+    }
+  }
+  try {
+    localStorage.setItem(PREF_KEYS.demoGeneration, String(demoGeneration() + 1));
+  } catch {
+    // no storage: clearing the database below is the reset
+  }
+  removePref(PREF_KEYS.lastShop);
+  if (db) {
+    markDemoClosing();
+    try {
+      await terminate(db);
+    } catch {
+      // already terminated
+    }
+    try {
+      await clearIndexedDbPersistence(db);
+    } catch {
+      // another tab still has the demo open; the next generation starts empty anyway
+    }
+  }
+  if (typeof window !== 'undefined' && window.location) window.location.assign(appUrl('/'));
+}
+
+/** Firebase ID token for the AI Worker (null when signed out, and always in demo mode). */
 export async function getIdToken(force = false) {
+  if (demoMode) return null;
   const user = auth ? auth.currentUser : null;
   return user ? user.getIdToken(Boolean(force)) : null;
 }

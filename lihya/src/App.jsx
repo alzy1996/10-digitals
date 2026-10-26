@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { I18nProvider } from './lib/i18n/useT.js';
 import { AuthProvider } from './state/AuthContext.jsx';
+import { DemoProvider } from './state/DemoMode.jsx';
 import { SnackbarProvider } from './components/Snackbar.jsx';
 import ScreenFallback from './components/ScreenFallback.jsx';
 import ScreenTransition from './components/ScreenTransition.jsx';
@@ -100,12 +101,14 @@ export default function App() {
   return (
     <I18nProvider>
       <SnackbarProvider>
-        <AuthProvider>
-          <WriteErrorWatcher />
-          <BrowserRouter basename={ROUTER_BASENAME}>
-            <RoutedApp />
-          </BrowserRouter>
-        </AuthProvider>
+        <DemoProvider>
+          <AuthProvider>
+            <WriteErrorWatcher />
+            <BrowserRouter basename={ROUTER_BASENAME}>
+              <RoutedApp />
+            </BrowserRouter>
+          </AuthProvider>
+        </DemoProvider>
       </SnackbarProvider>
     </I18nProvider>
   );

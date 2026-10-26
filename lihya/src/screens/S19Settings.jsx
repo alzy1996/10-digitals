@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useT } from '../lib/i18n/useT.js';
 import { useShop } from '../state/ShopContext.jsx';
+import { useDemo } from '../state/DemoMode.jsx';
 import { useOnline } from '../hooks/useOnline.js';
 import { deleteDemoData, purgeExpiredData, updateSettings, updateShop } from '../services/shops.js';
 import { normalizeOmanPhone } from '../lib/format.js';
@@ -117,6 +118,7 @@ function SavedPhotos({ retentionDays }) {
 export default function S19Settings() {
   const { t } = useT();
   const { shopId, shop, settings } = useShop();
+  const demoMode = useDemo();
   const { show, confirmUndo } = useSnackbar();
   const online = useOnline();
   useHashScroll();
@@ -255,7 +257,7 @@ export default function S19Settings() {
           show({ message: total ? t('owner.set.retention.applied', { n: total }) : t('owner.set.retention.nothing', { days }) });
         } catch (err) {
           console.error('purge failed', err);
-          show({ message: online ? t('owner.set.retention.failed') : t('owner.set.needOnline') });
+          show({ message: online || demoMode ? t('owner.set.retention.failed') : t('owner.set.needOnline') });
         } finally {
           setBusy((b) => ({ ...b, purge: false }));
         }
@@ -351,6 +353,11 @@ export default function S19Settings() {
                 description={t('owner.set.try.toggleSub')}
               />
               <ShopLink shopId={shopId} shop={shop} enabled={settings.tryAtHome === true} />
+              {demoMode ? (
+                <Note tone="info" icon="info">
+                  {t('demo.shopLink')}
+                </Note>
+              ) : null}
             </Section>
 
             <Section anchor="ai" title={t('owner.set.ai.title')} description={t('owner.set.ai.sub')} icon="cloud">
@@ -362,7 +369,11 @@ export default function S19Settings() {
                 label={t('owner.set.ai.toggle')}
                 description={settings.aiPreview ? t('owner.set.ai.toggleOn') : t('owner.set.ai.toggleOff')}
               />
-              {worker ? (
+              {demoMode ? (
+                <Note tone="info" icon="info">
+                  {t('demo.ai.off')}
+                </Note>
+              ) : worker ? (
                 <Note tone="keep" icon="check">
                   {t('owner.set.ai.workerOk')}
                 </Note>
@@ -470,10 +481,11 @@ export default function S19Settings() {
               />
               <p className="text-sm text-text-2">{t('owner.set.retention.explain', { n: settings.retentionDays })}</p>
               <div>
-                <Button variant="secondary" icon="refresh" onClick={applyRetentionNow} loading={busy.purge} disabled={!online}>
+                {/* Demo mode: the purge runs on this browser's copy, no internet needed. */}
+                <Button variant="secondary" icon="refresh" onClick={applyRetentionNow} loading={busy.purge} disabled={!online && !demoMode}>
                   {t('owner.set.retention.apply')}
                 </Button>
-                {!online ? <p className="mt-2 text-sm text-warn">{t('owner.set.needOnline')}</p> : null}
+                {!online && !demoMode ? <p className="mt-2 text-sm text-warn">{t('owner.set.needOnline')}</p> : null}
               </div>
               <hr className="border-line" />
               <div id="demo" className="flex scroll-mt-4 flex-col gap-3">

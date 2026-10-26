@@ -138,7 +138,8 @@ Idle 10 minutes or "Next customer" calls `wipe()`. Before/after photos are writt
 ## 3. Firebase layer (src/lib/firebase.js, src/services/*.js, src/hooks/useLive.js)
 
 `src/lib/firebase.js` exports `app, db, auth, usingEmulators, firebaseConfigured` (PRD 10.1 init,
-emulator switch when `VITE_USE_EMULATORS=true`, App Check skipped on emulators).
+emulator switch when `VITE_USE_EMULATORS=true`, App Check skipped on emulators), plus `demoMode`, `DEMO_USER`,
+`resolveMode` and `demoGeneration()` for the no-login demo (section 9, Demo mode).
 
 Writes are optimistic and must never block the UI offline: services create document refs
 synchronously (`doc(collection(...))`) and return ids immediately; the write promise is
@@ -539,3 +540,26 @@ Cut Card, reports, owner
   App Check, one retry on 401, 8 s timeout, null when unavailable). The owner dashboard reads the Worker's count through
   it (dynamic import of the facade) and falls back to `dailyStats.aiRenders` only as a labelled estimate.
 - The PRD 11.3 clients import UI is `src/screens/owner/ClientImport.jsx` inside S20 Reports.
+
+### Demo mode (GitHub Pages link without Firebase keys)
+- `src/lib/appMode.js` (pure, no Firebase import): `resolveMode({ prod, hasRealConfig, usingEmulators, demoFlag })` ->
+  `{ mode: 'emulators'|'demo'|'firebase'|'none', demo, configured }`, `hasCompleteConfig(config)`, `APP_MODE`, `demoMode`,
+  `usingEmulators`, `firebaseEnvConfig`, `DEMO_FIREBASE_CONFIG`, `DEMO_USER`, `DEMO_SHOP`, `demoAppName(gen)`,
+  `parseDemoGeneration(raw)`. Services and screen helpers that only need the flag import it from here.
+- Firebase layer in demo mode: no Auth (`auth` is null), no App Check, Firestore network disabled at start (the SDK is a
+  local database). `db.currentUser()` is `DEMO_USER`; `db.commitOps` resolves at once and is not tracked; `db.snapMeta(snap)`
+  (used by every watcher, also `watchMyShops`) reports `{ hasPendingWrites: false, fromCache: false }`; every listener
+  uses `db.LISTEN_OPTIONS` (demo: `source: 'cache'`, so an empty list or a missing doc answers at once in every tab);
+  `readDoc` / `readQuery` read the cache only (a never-written doc is null); `trackQueuedWrites` does nothing;
+  `markDemoClosing()` / `isDemoClosing()` keep listener errors quiet while Reset demo shuts Firestore down.
+  `shops.createDemoShop()` (demo only, once per page load) = `createShop(DEMO_SHOP)`. `createInvite` resolves
+  `{ ..., sent: false, demo: true }` without emailing. `createLookCode` skips anonymous sign-in. Every sign-in in auth.js
+  resolves `DEMO_USER`, `getIdToken()` is null, `signOutAndClear()` is Reset demo. The AI Worker URL is '' (AI Final
+  Look off, quota null).
+- `src/state/DemoMode.jsx`: `DemoProvider` (App.jsx, around AuthProvider) and `useDemo()` -> `{ reset }` in demo mode, null
+  otherwise. When Reset demo runs in another tab (`PREF_KEYS.demoGeneration` changes), the provider reloads this tab. The context object is `DemoContext` in `src/components/kit.js`, so the UI kit reads it without importing a
+  service: `DemoPill({ className })` (src/components/DemoPill.jsx; TopBar, the S01 header, full-screen notices, S21,
+  NotFound) and `SyncBadge` / `SyncStrip` (hidden in demo mode). Screens swap Sign out for `t('demo.reset')` when
+  `useDemo()` is set. Strings: `src/lib/i18n/ns/demo.json` (`demo.*`).
+- `PREF_KEYS.demoGeneration`: the demo database generation (the Firebase app is named `demoAppName(gen)`); Reset demo
+  moves to the next one.

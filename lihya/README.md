@@ -54,6 +54,28 @@ GitHub runs all of these on every pull request (`.github/workflows/lihya-ci.yml`
 The site will be at **https://alzy1996.github.io/10-digitals/**. Every push to `main` that changes `lihya/` deploys it
 (`.github/workflows/lihya-pages.yml`: lint, tests, build, size gate, deploy).
 
+### Demo link (works today, before step A)
+
+Until the Firebase secrets (step C2) are in GitHub, the same Pages build runs as a **zero-setup demo**. Open
+https://alzy1996.github.io/10-digitals/ and it lands in **LIHYA Demo Barbers** (all 34 styles, demo clients and visits)
+in about a second: no account, no login, no backend.
+
+- **What works:** the whole chair flow (camera, face profile, questions, styles, Studio, This is my look, Cut Card PDF,
+  Done, Next customer), Look Code entry, the owner screens (dashboard numbers, catalog, products, staff, settings,
+  reports and CSV) and Try at home (`/try/<shopId>`, with its Look Code).
+- **Limits:** everything is kept in **this browser only** (a local copy of the database; nothing is sent anywhere).
+  Another phone or browser opening the link gets its own, separate demo shop, so the shop link and Look Codes open only
+  in the browser that made them. No emails go out: staff invites show the join link with "Demo: invites are not sent".
+  The AI Final Look is off. Clearing the browser's site data deletes the demo.
+- Every screen shows a brass **Demo** pill next to the language toggle. Tap it for a short explanation and the
+  **Reset demo** button, which deletes the demo shop and starts a fresh one (Reset demo takes the place of Sign out).
+- **Switching to the real app:** add the secrets in C2 and run the workflow again (or merge any change). The same link
+  then becomes the real app with sign-in, automatically; nothing changes in the code. Demo data never reaches the real
+  Firebase project; it stays in the browsers that used the demo until they press Reset demo or clear site data.
+- Options: `VITE_DEMO_MODE=true` forces the demo on any build (on your computer: `VITE_DEMO_MODE=true npm run dev` with
+  `VITE_USE_EMULATORS` empty, no emulators needed); `VITE_DEMO_MODE=false` turns the fallback off, so a build without
+  Firebase keys shows the setup notice instead. `VITE_USE_EMULATORS=true` always wins and is never the demo.
+
 ### A. Firebase project (one time, about 15 minutes)
 
 1. Open https://console.firebase.google.com → **Add project** → name it `lihya` → turn Google Analytics off →

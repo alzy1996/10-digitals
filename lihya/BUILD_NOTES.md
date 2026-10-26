@@ -80,6 +80,47 @@ Format: decision — reason. Newest sections at the bottom.
 - PRD 9.5 Studio ruler: laid along the projected jaw on the front photo; in Live AR and on the 45-degree shots it is a
   straight ruler at the top of the frame. On the Cut Card the ruler follows the Zone Diagram's jaw
   (`src/reports/jawRuler.js`, ticks every 5 mm from the middle of the chin).
+- **Demo mode (Oct 26 2026)**, so the GitHub Pages link works before Sam's Firebase project exists. Decided in
+  `src/lib/appMode.js` (`resolveMode({ prod, hasRealConfig, usingEmulators, demoFlag })`, pure and unit-tested):
+  emulators (`VITE_USE_EMULATORS=true`) always win and are never the demo; `VITE_DEMO_MODE=true` forces the demo;
+  a complete web config (apiKey, projectId, appId) is the real app; a production build without one is the demo
+  (`VITE_DEMO_MODE=false` turns that fallback off: setup notice); a development build without config keeps the setup
+  notice. Adding the secrets therefore switches the same link to the real app with no code change.
+  How it runs: the Firebase SDK starts with a dummy config (project `lihya-demo`), no Auth and no App Check, and
+  Firestore's network is disabled right after `initializeFirestore` (persistent multi-tab cache). Firestore is then a
+  local database in the browser: writes apply at once, listeners and queries (collection groups, where/orderBy/limit)
+  answer from IndexedDB, and the demo survives a reload. Because the network never comes back, a commit promise never
+  settles: in demo mode `commitOps` starts the batch and resolves at once without tracking it (no "will sync" badge),
+  snapshots report `{ hasPendingWrites: false, fromCache: false }` (a missing document is missing, not "still
+  loading", so unknown shop links answer at once), one-time reads go straight to the cache, and the start-up
+  `waitForPendingWrites` tracking is skipped. Every demo branch is guarded by `demoMode`; real mode is unchanged.
+  The user is the fixed `DEMO_USER` (`demo-owner`, verified, not anonymous); every sign-in resolves it without the
+  network and `getIdToken()` is null, so the AI Worker URL and the AI quota are treated as not configured (AI Final
+  Look off). The start screen makes **LIHYA Demo Barbers** on first open (`shops.createDemoShop()`, once per page load:
+  catalog, demo clients and visits) and opens the last demo shop directly afterwards; `/login` and `/join/*` go to the
+  start screen. Look Codes are made without anonymous sign-in or a server wait (a taken code is checked in the local
+  copy); invites are saved but not emailed (`createInvite` returns `demo: true`, Staff shows the join link with
+  "Demo: invites are not sent"). A shop or Try-at-home link this browser does not know shows "This demo shop is not
+  in this browser" with **Open the demo**. UI: a brass **Demo** pill in every top bar (DemoContext from
+  `src/state/DemoMode.jsx`, so the UI kit imports no service) opens a bilingual sheet with **Reset demo**; Reset demo
+  replaces Sign out, and the sync badge is hidden.
+  Reset demo (`auth.signOutAndClear` in demo mode): clears the IndexedDB `session` and `saved` stores, moves to the next
+  demo database generation (`PREF_KEYS.demoGeneration`; the Firebase app is named `lihya-demo-<n>`, so the reset holds
+  even when another tab keeps the old database open), terminates Firestore, clears its persistence when no other tab
+  holds it, and loads the start screen, which makes a fresh demo shop. Language and theme stay.
+  Limits: one browser only (another device gets its own demo; the shop link and Look Codes open only where they were
+  made); the Firestore SDK may log "Failed to obtain primary lease" when two tabs of the demo (or of the real app) swap
+  the primary tab, which is harmless; clearing site data deletes the demo.
+- **Demo QA fixes (Oct 27 2026).** (1) Every listener in demo mode listens to the local cache only
+  (`db.LISTEN_OPTIONS`, `source: 'cache'`, also `watchMyShops`). A listener that waits for the server answers an
+  empty list or a missing document only when its tab's SDK knows it is offline; with multi-tab persistence a tab that
+  starts as secondary takes that state from the primary tab's last broadcast, which is ignored once the tab that wrote
+  it has closed. Seen in Playwright: demo open in tab A, Try at home in tab B, tab A closed and opened again: Staff
+  "Pending invites", an empty Products list and the dashboard's Add-ons tile loaded for ever. Real mode is unchanged.
+  (2) Reset demo in one tab deletes the database the other demo tabs use, which then said "Could not open the shop";
+  `DemoProvider` now reloads those tabs when `PREF_KEYS.demoGeneration` changes (an old shop link then shows "This
+  demo shop is not in this browser" with Open the demo). (3) Settings > Apply now (retention) works offline in demo
+  mode (it only touches this browser's copy).
 
 ## PRD 14.2 — manual checks for Sam (real devices)
 

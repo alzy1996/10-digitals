@@ -4,11 +4,13 @@ import { useT } from '../lib/i18n/useT.js';
 import { useAuth } from '../state/AuthContext.jsx';
 import { useLive } from '../hooks/useLive.js';
 import { useOnline } from '../hooks/useOnline.js';
-import { watchMyShops } from '../services/shops.js';
+import { createDemoShop, watchMyShops } from '../services/shops.js';
 import { signOutAndClear } from '../services/auth.js';
+import { useDemo } from '../state/DemoMode.jsx';
 import { APP } from '../config/app.js';
 import Button from '../components/Button.jsx';
 import Chip from '../components/Chip.jsx';
+import DemoPill from '../components/DemoPill.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import ErrorState from '../components/ErrorState.jsx';
 import Icon from '../components/Icon.jsx';
@@ -26,6 +28,7 @@ function Shell({ children, footer }) {
       <header className="pt-safe shrink-0">
         <div className="gutter mx-auto flex h-14 w-full max-w-[640px] items-center justify-end gap-1">
           <SyncBadge />
+          <DemoPill />
           <LangToggle className="-me-2" />
         </div>
       </header>
@@ -129,6 +132,7 @@ function MyShops({ user }) {
   const location = useLocation();
   const online = useOnline();
   const { show } = useSnackbar();
+  const demo = useDemo();
   const [attempt, setAttempt] = useState(0);
   const [signingOut, setSigningOut] = useState(false);
   const uid = user.uid;
@@ -140,11 +144,12 @@ function MyShops({ user }) {
 
   // Auto-open the shop this phone used last, only when the app was just opened here
   // (not when the barber came back to pick another shop) and the shop is still mine.
-  const fresh = location.key === 'default';
+  // Demo mode: a redirect that means "open the demo" (login, an unknown shop link) counts too.
+  const fresh = location.key === 'default' || Boolean(demo && location.state && location.state.demoOpen === true);
   const autoRef = useRef({ done: !fresh, target: fresh ? readLastShop() : null });
   useEffect(() => {
     const auto = autoRef.current;
-    if (auto.done || live.loading) return;
+    if (demo || auto.done || live.loading) return;
     if (!auto.target) {
       auto.done = true;
       return;
@@ -157,7 +162,32 @@ function MyShops({ user }) {
     }
     // Wait for the server answer before giving up (the offline cache may not know it yet).
     if (!live.fromCache || !online) auto.done = true;
-  }, [shops, live.loading, live.fromCache, online, navigate]);
+  }, [demo, shops, live.loading, live.fromCache, online, navigate]);
+
+  // Demo mode: the link lands in the barber home. With no shop in this browser yet the demo
+  // shop is made (catalog and demo clients included); on a fresh open an existing one opens
+  // directly (the last one used). Coming back here inside the app shows the picker.
+  const demoPending = Boolean(demo) && !live.error && (!autoRef.current.done || (!live.loading && shops.length === 0));
+  useEffect(() => {
+    if (!demo || live.loading || live.error) return;
+    const auto = autoRef.current;
+    let target = null;
+    if (shops.length === 0) {
+      try {
+        target = createDemoShop();
+      } catch (err) {
+        console.error('The demo shop could not be made', err);
+        show({ message: t('common.error') });
+        return;
+      }
+    } else if (!auto.done) {
+      target = (shops.find((s) => s.shopId === auto.target) || shops[0]).shopId;
+    }
+    auto.done = true;
+    if (!target) return;
+    rememberLastShop(target);
+    navigate(`/s/${target}`, { replace: true });
+  }, [demo, shops, live.loading, live.error, navigate, show, t]);
 
   const open = (shop) => {
     autoRef.current.done = true;
@@ -178,6 +208,7 @@ function MyShops({ user }) {
   };
 
   const loading = live.loading && !live.error;
+  if (demoPending) return <DemoStarting />;
   const emptyOffline = !loading && !live.error && shops.length === 0 && live.fromCache && !online;
 
   let list;
@@ -231,9 +262,23 @@ function MyShops({ user }) {
         {user.email ? (
           <p className="break-all text-sm text-text-2">{t('shop.signedInAs', { email: `\u2068${user.email}\u2069` })}</p>
         ) : null}
-        <Button variant="ghost" icon="logout" onClick={signOut} loading={signingOut} className="-ms-3 self-start">
-          {t('entry.shops.signOut')}
+        <Button variant="ghost" icon={demo ? 'refresh' : 'logout'} onClick={signOut} loading={signingOut} className="-ms-3 self-start">
+          {demo ? t('demo.reset') : t('entry.shops.signOut')}
         </Button>
+      </div>
+    </Shell>
+  );
+}
+
+/** Demo mode, first open: the demo shop is being made or opened (about a second). */
+function DemoStarting() {
+  const { t } = useT();
+  return (
+    <Shell>
+      <div role="status" aria-busy="true" className="flex flex-1 flex-col items-center justify-center gap-8">
+        <BrandMark size="lg" />
+        <p className="text-lg text-text-2">{t('demo.starting')}</p>
+        <Skeleton className="h-5 w-48" />
       </div>
     </Shell>
   );

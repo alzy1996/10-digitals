@@ -2,6 +2,7 @@
 // Day math always goes through src/lib/time.js (Asia/Muscat).
 
 import { PREF_KEYS } from '../../config/app.js';
+import { demoMode } from '../../lib/appMode.js';
 import { addDaysToKey, dayKey, dayKeysBetween, formatMuscat, muscatDayRange } from '../../lib/time.js';
 
 export const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -145,8 +146,9 @@ export function applyTheme(theme) {
 
 // ------------------------------------------------------------------ AI Worker
 
-/** VITE_AI_WORKER_URL without a trailing slash ('' when not configured). */
+/** VITE_AI_WORKER_URL without a trailing slash ('' when not configured, and in demo mode). */
 export function workerUrl() {
+  if (demoMode) return '';
   const env = typeof import.meta !== 'undefined' ? import.meta.env : null;
   const raw = env && env.VITE_AI_WORKER_URL ? String(env.VITE_AI_WORKER_URL).trim() : '';
   return raw.replace(/\/+$/, '');

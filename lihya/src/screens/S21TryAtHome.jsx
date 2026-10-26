@@ -6,6 +6,7 @@ import { useSession } from '../hooks/useSession.js';
 import { copyText } from '../reports/share.js';
 import { APP } from '../config/app.js';
 import Button from '../components/Button.jsx';
+import DemoPill from '../components/DemoPill.jsx';
 import Icon from '../components/Icon.jsx';
 import IconButton from '../components/IconButton.jsx';
 import ScreenFrame from '../components/ScreenFrame.jsx';
@@ -102,6 +103,8 @@ function NotActive() {
           <LihyaMark />
           <LangSwitch />
         </div>
+        {/* Demo mode only (renders nothing otherwise): its own line, the header row is full on phones. */}
+        <DemoPill className="-mt-8 self-end" />
         <section className="rounded-card border border-line bg-surface p-6" aria-live="polite">
           <Icon name="link" size={32} className="text-brass" />
           <h1 className="mt-4 text-xl">{t('shop.public.inactive.title')}</h1>
@@ -156,6 +159,8 @@ export default function S21TryAtHome() {
           <LihyaMark />
           <LangSwitch />
         </div>
+        {/* Demo mode only (renders nothing otherwise): its own line, the header row is full on phones. */}
+        <DemoPill className="-mt-8 self-end" />
 
         <section aria-labelledby="home-promise" className="flex flex-col items-center text-center">
           <div className="w-full rounded-card border border-brass/40 p-1.5">

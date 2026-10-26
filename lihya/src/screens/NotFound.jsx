@@ -2,12 +2,14 @@ import { Link } from 'react-router-dom';
 import { useT } from '../lib/i18n/useT.js';
 import Icon from '../components/Icon.jsx';
 import LangToggle from '../components/LangToggle.jsx';
+import DemoPill from '../components/DemoPill.jsx';
 
 export default function NotFound() {
   const { t } = useT();
   return (
     <main className="min-h-dvh bg-bg text-text gutter pt-safe pb-safe flex flex-col">
-      <div className="flex justify-end py-2">
+      <div className="flex justify-end gap-1 py-2">
+        <DemoPill />
         <LangToggle />
       </div>
       <div className="flex-1 flex flex-col items-center justify-center text-center gap-6">

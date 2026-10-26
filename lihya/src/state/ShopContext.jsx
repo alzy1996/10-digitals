@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { hasLangPref, useT } from '../lib/i18n/useT.js';
 import { PREF_KEYS } from '../config/app.js';
 import { useAuth } from './AuthContext.jsx';
@@ -9,11 +9,13 @@ import { mergeSettings, watchPublicInfo, watchShop } from '../services/shops.js'
 import { watchMyStaff } from '../services/staff.js';
 import { watchPublicStyles } from '../services/styles.js';
 import { signOutAndClear } from '../services/auth.js';
+import { useDemo } from './DemoMode.jsx';
 import Button from '../components/Button.jsx';
 import Icon from '../components/Icon.jsx';
 import ScreenFallback from '../components/ScreenFallback.jsx';
 import ErrorState from '../components/ErrorState.jsx';
 import LangToggle from '../components/LangToggle.jsx';
+import DemoPill from '../components/DemoPill.jsx';
 
 const ShopContext = createContext(null);
 const PublicShopContext = createContext(null);
@@ -23,7 +25,8 @@ const PublicShopContext = createContext(null);
 function FullScreen({ children }) {
   return (
     <main className="flex min-h-[100dvh] flex-col bg-bg px-4 pb-8 pt-4 text-text">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-1">
+        <DemoPill />
         <LangToggle />
       </div>
       <div className="flex flex-1 items-center justify-center">{children}</div>
@@ -42,6 +45,22 @@ function Notice({ icon, title, body, note, children }) {
         {children ? <div className="mt-6 flex flex-col gap-3">{children}</div> : null}
       </section>
     </FullScreen>
+  );
+}
+
+/**
+ * Demo mode: a shop link (/s/<id> or /try/<id>) for a demo shop this browser does not have.
+ * Demo shops live only in the browser that made them, so say that instead of "not a member"
+ * or "link not active", and offer the demo here.
+ */
+function DemoUnknownShop() {
+  const { t } = useT();
+  return (
+    <Notice icon="link" title={t('demo.try.unknown.title')} body={t('demo.try.unknown.body')}>
+      <Button as={Link} to="/" state={{ demoOpen: true }} variant="primary" icon="home">
+        {t('demo.try.unknown.action')}
+      </Button>
+    </Notice>
   );
 }
 
@@ -109,6 +128,7 @@ export function ShopProvider({ shopId, children }) {
   const navigate = useNavigate();
   const online = useOnline();
   const { user } = useAuth();
+  const demo = useDemo();
   const uid = user ? user.uid : null;
   const [attempt, setAttempt] = useState(0);
 
@@ -187,6 +207,8 @@ export function ShopProvider({ shopId, children }) {
     );
   }
 
+  if (demo && (status === 'notMember' || status === 'notFound')) return <DemoUnknownShop />;
+
   if (status === 'notMember') {
     return (
       <Notice
@@ -201,8 +223,8 @@ export function ShopProvider({ shopId, children }) {
         <Button variant="secondary" icon="home" onClick={pickShop}>
           {t('shop.pickAnother')}
         </Button>
-        <Button variant="ghost" icon="logout" onClick={signOutAndLogin}>
-          {t('common.signOut')}
+        <Button variant="ghost" icon={demo ? 'refresh' : 'logout'} onClick={signOutAndLogin}>
+          {demo ? t('demo.reset') : t('common.signOut')}
         </Button>
       </Notice>
     );
@@ -214,8 +236,8 @@ export function ShopProvider({ shopId, children }) {
         <Button variant="secondary" icon="home" onClick={pickShop}>
           {t('shop.pickAnother')}
         </Button>
-        <Button variant="ghost" icon="logout" onClick={signOutAndLogin}>
-          {t('common.signOut')}
+        <Button variant="ghost" icon={demo ? 'refresh' : 'logout'} onClick={signOutAndLogin}>
+          {demo ? t('demo.reset') : t('common.signOut')}
         </Button>
       </Notice>
     );
@@ -269,6 +291,7 @@ function publicStatus({ shopId, infoLive, stylesLive }) {
 export function PublicShopProvider({ shopId, children }) {
   const { t } = useT();
   const online = useOnline();
+  const demo = useDemo();
   const [attempt, setAttempt] = useState(0);
 
   const infoLive = useLive((cb, onError) => (shopId ? watchPublicInfo(shopId, cb, onError) : null), [shopId, attempt]);
@@ -316,6 +339,8 @@ export function PublicShopProvider({ shopId, children }) {
       </FullScreen>
     );
   }
+
+  if (status === 'inactive' && demo && !info) return <DemoUnknownShop />;
 
   if (status === 'inactive') {
     return (

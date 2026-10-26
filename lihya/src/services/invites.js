@@ -10,6 +10,7 @@ import { auditOp, createdStamp } from './ops.js';
 import { codedError, colRef, commitOps, listenQuery, readDoc, recall, requireShopId, requireUser } from './db.js';
 import { sendLinkTo } from './auth.js';
 import { appUrl } from '../lib/paths.js';
+import { demoMode } from '../lib/appMode.js';
 
 export function joinPath(shopId) {
   return `/join/${shopId}`;
@@ -24,6 +25,8 @@ export function joinUrl(shopId) {
  * Save the invite (offline-safe) and email a sign-in link to the invitee.
  * Resolves { email, role, joinUrl, sent } — sent is false when the email could
  * not be sent (offline, quota); the invite itself is saved either way.
+ * Demo mode: the invite is saved in this browser, no email goes out, and the
+ * result carries demo: true (the screen says invites are not sent in the demo).
  */
 export async function createInvite(shopId, email, role) {
   requireShopId(shopId);
@@ -44,6 +47,7 @@ export async function createInvite(shopId, email, role) {
     ],
     'invite.create',
   );
+  if (demoMode) return { email: address, role, joinUrl: joinUrl(shopId), sent: false, demo: true };
   let sent = false;
   try {
     await sendLinkTo(address, { next: joinPath(shopId), remember: false });

@@ -57,4 +57,6 @@ export const PREF_KEYS = {
   whiteCard: 'lihya.pref.whiteCardShown',
   studioPreview: 'lihya.pref.studioPreview',
   studioLowFps: 'lihya.pref.studioLowFps',
+  // Demo mode only: which local demo database this browser uses ("Reset demo" moves to the next one).
+  demoGeneration: 'lihya.demo.generation',
 };

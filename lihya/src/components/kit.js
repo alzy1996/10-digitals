@@ -111,6 +111,13 @@ export const FooterContext = createContext(false);
 /** Set by OwnerShell: { nav, setFramed } so a ScreenFrame inside it renders the phone tabs under its top bar. */
 export const ShellContext = createContext(null);
 
+/**
+ * Demo mode (src/state/DemoMode.jsx provides it): { reset() -> Promise } while the app runs as
+ * the no-login demo, null otherwise. The UI kit shows the Demo pill and hides the sync badge
+ * from it, without importing any service.
+ */
+export const DemoContext = createContext(null);
+
 const noop = () => {};
 
 /**

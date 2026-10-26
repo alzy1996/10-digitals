@@ -9,17 +9,21 @@ import { DEFAULT_SETTINGS, cleanText, autoId, diffFields, mergeSettings, sanitiz
 import { DEMO_COUNTS, demoOps, reverseStats, shopOps } from './seed.js';
 import { auditOp, statsOp, updatedStamp } from './ops.js';
 import {
+  LISTEN_OPTIONS,
   codedError,
   colRef,
   commitOps,
   listenDoc,
   readDoc,
+  isDemoClosing,
   readQuery,
   recall,
   requireDb,
   requireShopId,
   requireUser,
+  snapMeta,
 } from './db.js';
+import { DEMO_SHOP, demoMode } from '../lib/appMode.js';
 
 export { DEFAULT_SETTINGS, mergeSettings };
 
@@ -70,6 +74,19 @@ export function createShop({ name, nameAr, whatsapp } = {}) {
   ];
   commitOps(ops, 'shop.create');
   return shopId;
+}
+
+let demoShopId = null;
+
+/**
+ * Demo mode only: the first open makes the demo shop (createShop with DEMO_SHOP: the 34
+ * styles, the demo clients and consultations) in this browser. Once per page load, so a
+ * double effect never makes two shops. Returns the shopId.
+ */
+export function createDemoShop() {
+  if (!demoMode) throw codedError('demo/off', 'createDemoShop is for demo mode only');
+  if (!demoShopId) demoShopId = createShop({ ...DEMO_SHOP });
+  return demoShopId;
 }
 
 /** cb(shop|null, meta). Readable by active staff of the shop. */
@@ -185,9 +202,9 @@ export function watchMyShops(uid, cb, onError) {
 
   const unsubStaff = onSnapshot(
     q,
-    { includeMetadataChanges: true },
+    LISTEN_OPTIONS,
     (snap) => {
-      meta = { hasPendingWrites: snap.metadata.hasPendingWrites, fromCache: snap.metadata.fromCache };
+      meta = snapMeta(snap);
       entries = snap.docs
         .map((d) => {
           const data = d.data({ serverTimestamps: 'estimate' });
@@ -199,6 +216,7 @@ export function watchMyShops(uid, cb, onError) {
       emit();
     },
     (err) => {
+      if (isDemoClosing()) return;
       if (typeof onError === 'function') onError(err);
       else console.error('watchMyShops failed', err);
     },

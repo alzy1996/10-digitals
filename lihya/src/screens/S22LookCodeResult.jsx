@@ -17,6 +17,7 @@ import ScreenFrame from '../components/ScreenFrame.jsx';
 import Skeleton from '../components/Skeleton.jsx';
 import ZoneDiagram from '../components/ZoneDiagram.jsx';
 import { useSnackbar } from '../components/Snackbar.jsx';
+import { useDemo } from '../state/DemoMode.jsx';
 import { createOnce, findCode, lookKey, rememberCode } from './home/codeCache.js';
 import { lookCodeCardBlob, saveCardImage } from './home/codeCard.js';
 import { findStyle, longDate, shopNames, spelled, styleNames } from './home/text.js';
@@ -141,6 +142,7 @@ export default function S22LookCodeResult() {
   const { show, confirmUndo } = useSnackbar();
   const { shopId, info, styles } = usePublicShop();
   const { activeParams, hydrated, wipe, path, issuedCode, setIssuedCode } = useSession();
+  const demo = useDemo();
 
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState({ status: 'idle', key: null, entry: null });
@@ -171,7 +173,8 @@ export default function S22LookCodeResult() {
   // memory or in the session snapshot, reuses it).
   useEffect(() => {
     if (!hydrated || !key || findCode(shopId, key) || restored) return;
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    // Demo mode keeps the code in this browser: no internet needed.
+    if (!demo && typeof navigator !== 'undefined' && navigator.onLine === false) {
       setResult({ status: 'offline', key, entry: null });
       return;
     }
@@ -187,7 +190,7 @@ export default function S22LookCodeResult() {
         if (mountedRef.current && keyRef.current === key) setResult({ status: failureKind(err), key, entry: null });
       },
     );
-  }, [hydrated, key, shopId, styleId, activeParams, attempt, restored, setIssuedCode]);
+  }, [demo, hydrated, key, shopId, styleId, activeParams, attempt, restored, setIssuedCode]);
 
   // The phone comes back online after "You need internet": make the code now. Only on the
   // offline -> online change: a failed request while the phone says it is online waits for Retry.
@@ -392,6 +395,11 @@ export default function S22LookCodeResult() {
         {activeParams ? <LookCard params={activeParams} style={style} /> : null}
 
         <div className="flex flex-col gap-3">
+          {status === 'ready' && demo ? (
+            <Line icon="info" tone="text-brass">
+              {t('demo.code.local')}
+            </Line>
+          ) : null}
           {status === 'ready' && pendingWrites > 0 ? (
             <Line icon="cloud" tone="text-info">
               {t('home.code.syncing')}

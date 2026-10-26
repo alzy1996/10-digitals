@@ -5,12 +5,20 @@
 // (127.0.0.1:9099 and :8080), App Check is skipped, and an empty web config
 // falls back to the emulator-only project "demo-lihya".
 //
-// With no config at all nothing is initialised: app, db and auth are null and
-// AuthProvider shows the setup notice instead of crashing.
+// Demo mode (src/lib/appMode.js: VITE_DEMO_MODE=true, or a production build with no
+// Firebase config, such as the GitHub Pages link before the secrets are added): the SDK
+// starts with a dummy config, no Auth, no App Check, and Firestore's network is disabled
+// at once. Firestore is then a local database in this browser: writes apply at once,
+// listeners and queries (collection groups too) answer from the persistent cache, and
+// nothing ever leaves the device. The services treat that local copy as the truth.
+//
+// With no config at all (development build) nothing is initialised: app, db and auth are
+// null and AuthProvider shows the setup notice instead of crashing.
 
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import {
   connectFirestoreEmulator,
+  disableNetwork,
   getFirestore,
   initializeFirestore,
   persistentLocalCache,
@@ -18,22 +26,27 @@ import {
 } from 'firebase/firestore';
 import { connectAuthEmulator, getAuth } from 'firebase/auth';
 import { getToken, initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
+import {
+  APP_MODE,
+  DEMO_FIREBASE_CONFIG,
+  DEMO_USER,
+  demoAppName,
+  demoMode,
+  firebaseEnvConfig,
+  parseDemoGeneration,
+  resolveMode,
+  usingEmulators,
+} from './appMode.js';
+import { PREF_KEYS } from '../config/app.js';
 
 const env = import.meta.env || {};
 
-export const usingEmulators = env.VITE_USE_EMULATORS === 'true';
+export { demoMode, DEMO_USER, resolveMode, usingEmulators };
 
-const envConfig = {
-  apiKey: env.VITE_FB_API_KEY || '',
-  authDomain: env.VITE_FB_AUTH_DOMAIN || '',
-  projectId: env.VITE_FB_PROJECT_ID || '',
-  appId: env.VITE_FB_APP_ID || '',
-};
+const envConfig = firebaseEnvConfig;
 
-const hasRealConfig = Boolean(envConfig.apiKey && envConfig.projectId && envConfig.appId);
-
-/** True when the app can talk to Firebase: a real web config, or the emulators. */
-export const firebaseConfigured = hasRealConfig || usingEmulators;
+/** True when the app can start: a real web config, the emulators, or demo mode. */
+export const firebaseConfigured = APP_MODE.configured;
 
 function resolveConfig() {
   if (!usingEmulators) return envConfig;
@@ -47,8 +60,36 @@ function resolveConfig() {
   return config;
 }
 
+/** The demo database generation this browser uses (PREF_KEYS.demoGeneration). */
+export function demoGeneration() {
+  try {
+    return parseDemoGeneration(localStorage.getItem(PREF_KEYS.demoGeneration));
+  } catch {
+    return 1;
+  }
+}
+
+function initDemo() {
+  const name = demoAppName(demoGeneration());
+  const existing = getApps().find((a) => a.name === name);
+  const app = existing || initializeApp(DEMO_FIREBASE_CONFIG, name);
+  let db;
+  try {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
+  } catch {
+    db = getFirestore(app);
+  }
+  // Before any listener or write is queued: the SDK never opens a connection, and gets
+  // and listeners answer from this browser's copy straight away.
+  disableNetwork(db).catch((err) => console.warn('LIHYA demo: the local database could not go offline', err));
+  return { app, db, auth: null, appCheck: null };
+}
+
 function init() {
   if (!firebaseConfigured) return { app: null, db: null, auth: null };
+  if (demoMode) return initDemo();
 
   const firstInit = getApps().length === 0;
   const app = firstInit ? initializeApp(resolveConfig()) : getApp();

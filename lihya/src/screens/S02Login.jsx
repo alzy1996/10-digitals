@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useT } from '../lib/i18n/useT.js';
 import { useAuth } from '../state/AuthContext.jsx';
+import { useDemo } from '../state/DemoMode.jsx';
 import { useOnline } from '../hooks/useOnline.js';
 import { authErrorKey, safeNextPath, sendEmailLink, signInGoogle, signOutAndClear } from '../services/auth.js';
 import { acceptInvite } from '../services/invites.js';
@@ -420,7 +421,10 @@ export default function S02Login({ join = false }) {
   const { shopId: routeShopId } = useParams();
   const inviteShopId = (join ? routeShopId : params.get('invite')) || null;
   const next = inviteShopId ? `/join/${encodeURIComponent(inviteShopId)}` : safeNextPath(params.get('next'), '/');
+  const demo = useDemo();
 
+  // Demo mode: nobody signs in or joins; the start screen opens the demo shop.
+  if (demo) return <Navigate to="/" replace state={{ demoOpen: true }} />;
   if (loading) {
     if (emailLink.status === 'completing') return <Working title={t('entry.login.title')} label={t('auth.completing')} />;
     return <ScreenFallback />;
