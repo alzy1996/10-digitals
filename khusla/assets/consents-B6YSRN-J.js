@@ -1,0 +1,1 @@
+import{Mt as e,Ot as t,X as n,mt as r,tt as i,vt as a}from"./index-CvizzZAp.js";function o(o,{type:s,clientId:c=null,consultationId:l=null,granted:u}){return n(a(t(r,`salons`,o,`consents`),{type:s,clientId:c,consultationId:l,granted:!!u,at:e(),by:i()}),`consent`)}export{o as t};

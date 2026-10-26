@@ -7,7 +7,7 @@
     <script>
       // Deep links into sub-apps (e.g. /10-digitals/nail-mirror/admin) → hand the route to that app.
       ;(function () {
-        var apps = ['/10-digitals/nail-mirror/']
+        var apps = ['/10-digitals/nail-mirror/', '/10-digitals/khusla/']
         var p = location.pathname
         for (var i = 0; i < apps.length; i++) {
           if (p.indexOf(apps[i]) === 0 && p !== apps[i]) {
