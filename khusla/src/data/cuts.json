@@ -1,0 +1,662 @@
+[
+  {
+    "id": "micro-pixie",
+    "name": {
+      "en": "Micro pixie",
+      "ar": "بيكسي قصير جداً"
+    },
+    "length": "very-short",
+    "faces": [
+      "oval",
+      "heart"
+    ],
+    "textures": [
+      "straight",
+      "wavy"
+    ],
+    "trimWeeks": 4,
+    "trend2026": false
+  },
+  {
+    "id": "classic-pixie",
+    "name": {
+      "en": "Classic pixie",
+      "ar": "بيكسي كلاسيكي"
+    },
+    "length": "short",
+    "faces": [
+      "oval",
+      "heart",
+      "diamond"
+    ],
+    "textures": [
+      "straight",
+      "wavy"
+    ],
+    "trimWeeks": 5,
+    "trend2026": false
+  },
+  {
+    "id": "long-pixie",
+    "name": {
+      "en": "Long pixie",
+      "ar": "بيكسي طويل"
+    },
+    "length": "short",
+    "faces": [
+      "oval",
+      "round",
+      "heart"
+    ],
+    "textures": [
+      "straight",
+      "wavy",
+      "curly",
+      "coily"
+    ],
+    "trimWeeks": 6,
+    "trend2026": false
+  },
+  {
+    "id": "bixie",
+    "name": {
+      "en": "Bixie (pixie + bob)",
+      "ar": "بيكسي بوب"
+    },
+    "length": "short",
+    "faces": [
+      "oval",
+      "square",
+      "heart"
+    ],
+    "textures": [
+      "straight",
+      "wavy"
+    ],
+    "trimWeeks": 6,
+    "trend2026": true
+  },
+  {
+    "id": "undercut-pixie",
+    "name": {
+      "en": "Undercut pixie",
+      "ar": "بيكسي بجوانب قصيرة"
+    },
+    "length": "short",
+    "faces": [
+      "oval",
+      "diamond"
+    ],
+    "textures": [
+      "straight"
+    ],
+    "trimWeeks": 4,
+    "trend2026": false
+  },
+  {
+    "id": "cherub-cut",
+    "name": {
+      "en": "Cherub cut (soft curly crop)",
+      "ar": "قصة كيروب المموجة"
+    },
+    "length": "short",
+    "faces": [
+      "oval",
+      "round",
+      "heart"
+    ],
+    "textures": [
+      "wavy",
+      "curly"
+    ],
+    "trimWeeks": 6,
+    "trend2026": true
+  },
+  {
+    "id": "buzz",
+    "name": {
+      "en": "Buzz cut",
+      "ar": "قص قصير جداً بالماكينة"
+    },
+    "length": "very-short",
+    "faces": [
+      "oval"
+    ],
+    "textures": [
+      "straight",
+      "wavy",
+      "curly",
+      "coily"
+    ],
+    "trimWeeks": 3,
+    "trend2026": false
+  },
+  {
+    "id": "itty-bitty-bob",
+    "name": {
+      "en": "Itty-bitty bob (blunt, at the jaw)",
+      "ar": "بوب قصير عند الفك"
+    },
+    "length": "jaw",
+    "faces": [
+      "oval",
+      "heart",
+      "oblong"
+    ],
+    "textures": [
+      "straight"
+    ],
+    "trimWeeks": 5,
+    "trend2026": true
+  },
+  {
+    "id": "french-bob",
+    "name": {
+      "en": "French bob with fringe",
+      "ar": "بوب فرنسي مع غرة"
+    },
+    "length": "jaw",
+    "faces": [
+      "oval",
+      "oblong",
+      "heart"
+    ],
+    "textures": [
+      "straight",
+      "wavy"
+    ],
+    "trimWeeks": 6,
+    "trend2026": true
+  },
+  {
+    "id": "italian-bob",
+    "name": {
+      "en": "Italian bob (full, soft ends)",
+      "ar": "بوب إيطالي"
+    },
+    "length": "chin",
+    "faces": [
+      "oval",
+      "square",
+      "heart"
+    ],
+    "textures": [
+      "straight",
+      "wavy"
+    ],
+    "trimWeeks": 6,
+    "trend2026": false
+  },
+  {
+    "id": "blunt-bob",
+    "name": {
+      "en": "Blunt bob",
+      "ar": "بوب مستقيم"
+    },
+    "length": "chin",
+    "faces": [
+      "oval",
+      "oblong",
+      "heart"
+    ],
+    "textures": [
+      "straight"
+    ],
+    "trimWeeks": 6,
+    "trend2026": false
+  },
+  {
+    "id": "a-line-bob",
+    "name": {
+      "en": "A-line bob",
+      "ar": "بوب أطول من الأمام"
+    },
+    "length": "chin",
+    "faces": [
+      "round",
+      "square",
+      "oval"
+    ],
+    "textures": [
+      "straight"
+    ],
+    "trimWeeks": 6,
+    "trend2026": false
+  },
+  {
+    "id": "stacked-bob",
+    "name": {
+      "en": "Stacked (inverted) bob",
+      "ar": "بوب متدرج من الخلف"
+    },
+    "length": "chin",
+    "faces": [
+      "oval",
+      "heart"
+    ],
+    "textures": [
+      "straight",
+      "wavy"
+    ],
+    "trimWeeks": 6,
+    "trend2026": false
+  },
+  {
+    "id": "asymmetric-bob",
+    "name": {
+      "en": "Asymmetric bob",
+      "ar": "بوب غير متماثل"
+    },
+    "length": "chin",
+    "faces": [
+      "round",
+      "square"
+    ],
+    "textures": [
+      "straight"
+    ],
+    "trimWeeks": 6,
+    "trend2026": false
+  },
+  {
+    "id": "flipped-bob",
+    "name": {
+      "en": "Flipped bob (90s)",
+      "ar": "بوب بأطراف للخارج"
+    },
+    "length": "chin",
+    "faces": [
+      "oval",
+      "heart"
+    ],
+    "textures": [
+      "straight"
+    ],
+    "trimWeeks": 6,
+    "trend2026": false
+  },
+  {
+    "id": "curly-bob",
+    "name": {
+      "en": "Curly bob",
+      "ar": "بوب كيرلي"
+    },
+    "length": "chin",
+    "faces": [
+      "oval",
+      "heart",
+      "diamond"
+    ],
+    "textures": [
+      "curly",
+      "coily"
+    ],
+    "trimWeeks": 8,
+    "trend2026": false
+  },
+  {
+    "id": "lob",
+    "name": {
+      "en": "Lob (long bob)",
+      "ar": "لوب (بوب طويل)"
+    },
+    "length": "collarbone",
+    "faces": [
+      "oval",
+      "round",
+      "square",
+      "oblong",
+      "heart",
+      "diamond",
+      "triangle"
+    ],
+    "textures": [
+      "straight",
+      "wavy",
+      "curly",
+      "coily"
+    ],
+    "trimWeeks": 8,
+    "trend2026": false
+  },
+  {
+    "id": "angled-lob",
+    "name": {
+      "en": "Angled lob",
+      "ar": "لوب مائل"
+    },
+    "length": "collarbone",
+    "faces": [
+      "round",
+      "square"
+    ],
+    "textures": [
+      "straight",
+      "wavy"
+    ],
+    "trimWeeks": 8,
+    "trend2026": false
+  },
+  {
+    "id": "textured-lob",
+    "name": {
+      "en": "Textured lob",
+      "ar": "لوب بطبقات"
+    },
+    "length": "collarbone",
+    "faces": [
+      "oval",
+      "oblong",
+      "square"
+    ],
+    "textures": [
+      "wavy"
+    ],
+    "trimWeeks": 8,
+    "trend2026": false
+  },
+  {
+    "id": "modern-shag",
+    "name": {
+      "en": "Modern shag",
+      "ar": "قصة شاغ"
+    },
+    "length": "shoulder",
+    "faces": [
+      "oval",
+      "oblong",
+      "square"
+    ],
+    "textures": [
+      "wavy",
+      "curly"
+    ],
+    "trimWeeks": 8,
+    "trend2026": true
+  },
+  {
+    "id": "wolf-cut",
+    "name": {
+      "en": "Wolf cut",
+      "ar": "قصة الذئب"
+    },
+    "length": "shoulder",
+    "faces": [
+      "oval",
+      "heart"
+    ],
+    "textures": [
+      "wavy"
+    ],
+    "trimWeeks": 8,
+    "trend2026": false
+  },
+  {
+    "id": "curly-shag",
+    "name": {
+      "en": "Curly shag",
+      "ar": "شاغ كيرلي"
+    },
+    "length": "shoulder",
+    "faces": [
+      "oval",
+      "heart",
+      "diamond"
+    ],
+    "textures": [
+      "curly",
+      "coily"
+    ],
+    "trimWeeks": 10,
+    "trend2026": false
+  },
+  {
+    "id": "mid-layers",
+    "name": {
+      "en": "Mid-length layers",
+      "ar": "طبقات متوسطة"
+    },
+    "length": "shoulder",
+    "faces": [
+      "oval",
+      "round",
+      "square"
+    ],
+    "textures": [
+      "straight",
+      "wavy",
+      "curly",
+      "coily"
+    ],
+    "trimWeeks": 8,
+    "trend2026": false
+  },
+  {
+    "id": "jellyfish",
+    "name": {
+      "en": "Jellyfish cut",
+      "ar": "قصة قنديل البحر"
+    },
+    "length": "shoulder",
+    "faces": [
+      "oval",
+      "oblong"
+    ],
+    "textures": [
+      "straight"
+    ],
+    "trimWeeks": 6,
+    "trend2026": false
+  },
+  {
+    "id": "hush-cut",
+    "name": {
+      "en": "Hush cut (soft Korean layers)",
+      "ar": "قصة هاش الكورية"
+    },
+    "length": "shoulder",
+    "faces": [
+      "oval",
+      "round",
+      "heart"
+    ],
+    "textures": [
+      "straight",
+      "wavy"
+    ],
+    "trimWeeks": 8,
+    "trend2026": false
+  },
+  {
+    "id": "long-layers",
+    "name": {
+      "en": "Long layers",
+      "ar": "طبقات طويلة"
+    },
+    "length": "long",
+    "faces": [
+      "oval",
+      "round",
+      "square",
+      "oblong",
+      "heart",
+      "diamond",
+      "triangle"
+    ],
+    "textures": [
+      "straight",
+      "wavy",
+      "curly",
+      "coily"
+    ],
+    "trimWeeks": 10,
+    "trend2026": false
+  },
+  {
+    "id": "butterfly",
+    "name": {
+      "en": "Butterfly cut",
+      "ar": "قصة الفراشة"
+    },
+    "length": "long",
+    "faces": [
+      "oval",
+      "round",
+      "square",
+      "heart"
+    ],
+    "textures": [
+      "straight",
+      "wavy"
+    ],
+    "trimWeeks": 10,
+    "trend2026": false
+  },
+  {
+    "id": "face-framing-long",
+    "name": {
+      "en": "Long with face-framing",
+      "ar": "طويل مع تحديد الوجه"
+    },
+    "length": "long",
+    "faces": [
+      "round",
+      "square",
+      "oblong"
+    ],
+    "textures": [
+      "straight",
+      "wavy",
+      "curly",
+      "coily"
+    ],
+    "trimWeeks": 10,
+    "trend2026": false
+  },
+  {
+    "id": "ghost-layers",
+    "name": {
+      "en": "Ghost (invisible) layers",
+      "ar": "طبقات مخفية"
+    },
+    "length": "long",
+    "faces": [
+      "oval"
+    ],
+    "textures": [
+      "straight"
+    ],
+    "trimWeeks": 10,
+    "trend2026": false
+  },
+  {
+    "id": "v-cut",
+    "name": {
+      "en": "V-cut",
+      "ar": "قصة V"
+    },
+    "length": "long",
+    "faces": [
+      "oval",
+      "oblong"
+    ],
+    "textures": [
+      "straight"
+    ],
+    "trimWeeks": 10,
+    "trend2026": false
+  },
+  {
+    "id": "u-cut",
+    "name": {
+      "en": "U-cut",
+      "ar": "قصة U"
+    },
+    "length": "long",
+    "faces": [
+      "oval",
+      "round"
+    ],
+    "textures": [
+      "straight",
+      "wavy"
+    ],
+    "trimWeeks": 10,
+    "trend2026": false
+  },
+  {
+    "id": "blunt-long",
+    "name": {
+      "en": "Blunt one-length",
+      "ar": "طويل بطول واحد"
+    },
+    "length": "long",
+    "faces": [
+      "oval",
+      "heart",
+      "diamond"
+    ],
+    "textures": [
+      "straight"
+    ],
+    "trimWeeks": 12,
+    "trend2026": false
+  },
+  {
+    "id": "extra-long-glossy",
+    "name": {
+      "en": "Extra-long glossy",
+      "ar": "طويل جداً ولامع"
+    },
+    "length": "very-long",
+    "faces": [
+      "oval",
+      "heart"
+    ],
+    "textures": [
+      "straight"
+    ],
+    "trimWeeks": 12,
+    "trend2026": true
+  },
+  {
+    "id": "hime-cut",
+    "name": {
+      "en": "Hime cut",
+      "ar": "قصة هيمي اليابانية"
+    },
+    "length": "long",
+    "faces": [
+      "oval",
+      "oblong"
+    ],
+    "textures": [
+      "straight"
+    ],
+    "trimWeeks": 6,
+    "trend2026": false
+  },
+  {
+    "id": "curly-dry-cut",
+    "name": {
+      "en": "Curl-by-curl dry cut",
+      "ar": "قص كيرلي على الجاف"
+    },
+    "length": "any",
+    "faces": [
+      "oval",
+      "round",
+      "square",
+      "oblong",
+      "heart",
+      "diamond",
+      "triangle"
+    ],
+    "textures": [
+      "curly",
+      "coily"
+    ],
+    "trimWeeks": 12,
+    "trend2026": false
+  }
+]

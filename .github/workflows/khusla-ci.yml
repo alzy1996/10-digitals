@@ -1,0 +1,65 @@
+# KHUSLA checks: runs on every pull request that touches khusla/.
+# Same commands a contributor runs locally (khusla/README.md "Tests").
+name: KHUSLA checks
+
+on:
+  pull_request:
+    paths:
+      - 'khusla/**'
+      - '.github/workflows/khusla-*.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: khusla-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: App (lint, unit, rules, build, size)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: khusla
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: khusla/package-lock.json
+
+      # Java 21 for the Firestore emulator (rules tests)
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:rules
+      - run: npm run build
+      - run: npm run check:size
+
+  worker:
+    name: AI Worker tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: khusla/worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: khusla/worker/package-lock.json
+
+      - run: npm ci
+      - run: npm test

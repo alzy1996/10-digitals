@@ -1,0 +1,33 @@
+{
+  "developer": [
+    { "volume": 10, "minLift": 0, "maxLift": 0, "use": "deposit" },
+    { "volume": 20, "minLift": 1, "maxLift": 2, "use": "lift" },
+    { "volume": 30, "minLift": 2, "maxLift": 3, "use": "lift" },
+    { "volume": 40, "minLift": 3, "maxLift": 4, "use": "lift" }
+  ],
+  "highLift": { "maxLift": 4, "minStartLevel": 6 },
+  "lightenerAboveLift": 4,
+  "safeLiftPerSession": { "virgin": 4, "processed": 3, "metallicPositive": 0 },
+  "greyCoverageNaturalTonePct": 50,
+  "fillerDarkerLevels": 3,
+  "likelyLightenedFromLevel": 9,
+  "tonerReach": 0.6,
+  "pigments": {
+    "red-violet": [16, 2],
+    "red": [20, 11],
+    "red-orange": [19, 19],
+    "orange": [16, 27],
+    "orange-gold": [12, 30],
+    "yellow-gold": [7, 31],
+    "yellow": [3, 29],
+    "pale yellow": [1, 21],
+    "palest yellow": [0, 12]
+  },
+  "henna": {
+    "stage": { "lab": [38, 32, 34], "greyBoost": 1.35 },
+    "lightenedStages": [
+      { "lab": [48, 30, 40] },
+      { "lab": [58, 24, 44] }
+    ]
+  }
+}

@@ -1,0 +1,110 @@
+[
+  {
+    "level": 1,
+    "name": {
+      "en": "Black",
+      "ar": "أسود"
+    },
+    "swatch": "#1A1513",
+    "pigment": "red-violet"
+  },
+  {
+    "level": 2,
+    "name": {
+      "en": "Darkest brown",
+      "ar": "بني داكن جداً"
+    },
+    "swatch": "#251B17",
+    "pigment": "red-violet"
+  },
+  {
+    "level": 3,
+    "name": {
+      "en": "Dark brown",
+      "ar": "بني داكن"
+    },
+    "swatch": "#33241C",
+    "pigment": "red"
+  },
+  {
+    "level": 4,
+    "name": {
+      "en": "Medium brown",
+      "ar": "بني متوسط"
+    },
+    "swatch": "#45301F",
+    "pigment": "red-orange"
+  },
+  {
+    "level": 5,
+    "name": {
+      "en": "Light brown",
+      "ar": "بني فاتح"
+    },
+    "swatch": "#5C4029",
+    "pigment": "red-orange"
+  },
+  {
+    "level": 6,
+    "name": {
+      "en": "Dark blonde",
+      "ar": "أشقر داكن"
+    },
+    "swatch": "#775535",
+    "pigment": "orange"
+  },
+  {
+    "level": 7,
+    "name": {
+      "en": "Medium blonde",
+      "ar": "أشقر متوسط"
+    },
+    "swatch": "#96714A",
+    "pigment": "orange-gold"
+  },
+  {
+    "level": 8,
+    "name": {
+      "en": "Light blonde",
+      "ar": "أشقر فاتح"
+    },
+    "swatch": "#B79466",
+    "pigment": "yellow-gold"
+  },
+  {
+    "level": 9,
+    "name": {
+      "en": "Very light blonde",
+      "ar": "أشقر فاتح جداً"
+    },
+    "swatch": "#D2B486",
+    "pigment": "yellow"
+  },
+  {
+    "level": 10,
+    "name": {
+      "en": "Lightest blonde",
+      "ar": "أشقر أفتح"
+    },
+    "swatch": "#E5D2AE",
+    "pigment": "pale yellow"
+  },
+  {
+    "level": 11,
+    "name": {
+      "en": "High-lift blonde",
+      "ar": "أشقر عالي الرفع"
+    },
+    "swatch": "#EDE2CB",
+    "pigment": "pale yellow"
+  },
+  {
+    "level": 12,
+    "name": {
+      "en": "Ultra high-lift (platinum base)",
+      "ar": "بلاتيني"
+    },
+    "swatch": "#F2ECDF",
+    "pigment": "palest yellow"
+  }
+]

@@ -1,0 +1,145 @@
+[
+  {
+    "id": "natural",
+    "name": {
+      "en": "Natural",
+      "ar": "طبيعي"
+    },
+    "family": "neutral",
+    "shift": [
+      0,
+      2
+    ],
+    "use": "Grey coverage base"
+  },
+  {
+    "id": "ash",
+    "name": {
+      "en": "Ash",
+      "ar": "آش (رمادي)"
+    },
+    "family": "cool",
+    "shift": [
+      -2,
+      -6
+    ],
+    "use": "Cancels orange-gold warmth"
+  },
+  {
+    "id": "violet",
+    "name": {
+      "en": "Violet",
+      "ar": "بنفسجي"
+    },
+    "family": "cool",
+    "shift": [
+      4,
+      -8
+    ],
+    "use": "Cancels yellow"
+  },
+  {
+    "id": "pearl",
+    "name": {
+      "en": "Pearl",
+      "ar": "لؤلؤي"
+    },
+    "family": "cool",
+    "shift": [
+      1,
+      -6
+    ],
+    "use": "Soft yellow control in blondes"
+  },
+  {
+    "id": "matte",
+    "name": {
+      "en": "Matte",
+      "ar": "مطفي (أخضر)"
+    },
+    "family": "cool",
+    "shift": [
+      -5,
+      1
+    ],
+    "use": "Cancels red"
+  },
+  {
+    "id": "beige",
+    "name": {
+      "en": "Beige",
+      "ar": "بيج"
+    },
+    "family": "neutral",
+    "shift": [
+      1,
+      3
+    ],
+    "use": "Soft natural blondes and browns"
+  },
+  {
+    "id": "gold",
+    "name": {
+      "en": "Gold",
+      "ar": "ذهبي"
+    },
+    "family": "warm",
+    "shift": [
+      1,
+      10
+    ],
+    "use": "Warmth and shine"
+  },
+  {
+    "id": "copper",
+    "name": {
+      "en": "Copper",
+      "ar": "نحاسي"
+    },
+    "family": "warm",
+    "shift": [
+      10,
+      12
+    ],
+    "use": "Copper and ginger"
+  },
+  {
+    "id": "mahogany",
+    "name": {
+      "en": "Mahogany",
+      "ar": "ماهوجني"
+    },
+    "family": "warm-red",
+    "shift": [
+      11,
+      1
+    ],
+    "use": "Red-violet browns"
+  },
+  {
+    "id": "red",
+    "name": {
+      "en": "Red",
+      "ar": "أحمر"
+    },
+    "family": "warm",
+    "shift": [
+      18,
+      8
+    ],
+    "use": "Reds"
+  },
+  {
+    "id": "mocha",
+    "name": {
+      "en": "Mocha",
+      "ar": "موكا"
+    },
+    "family": "neutral-warm",
+    "shift": [
+      4,
+      4
+    ],
+    "use": "Chocolate browns"
+  }
+]
