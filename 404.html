@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Page not found</title>
+    <script>
+      // Deep links into sub-apps (e.g. /10-digitals/nail-mirror/admin) → hand the route to that app.
+      ;(function () {
+        var apps = ['/10-digitals/nail-mirror/']
+        var p = location.pathname
+        for (var i = 0; i < apps.length; i++) {
+          if (p.indexOf(apps[i]) === 0 && p !== apps[i]) {
+            location.replace(apps[i] + '?__p=' + encodeURIComponent(p.slice(apps[i].length) + location.search) + location.hash)
+            return
+          }
+        }
+      })()
+    </script>
+  </head>
+  <body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;background:#171009;color:#f5efe6">
+    <p>Page not found · <a href="/10-digitals/" style="color:#d8b47a">Home</a></p>
+  </body>
+</html>
