@@ -15,6 +15,14 @@
       rel="stylesheet"
     />
     <title>Nail Mirror</title>
+    <script>
+      // GitHub Pages deep links: the site 404 page redirects /<base>/some/route to /<base>/?__p=some/route.
+      // Restore the real URL before the router starts (no effect on Firebase Hosting, which rewrites to index.html).
+      ;(function () {
+        var m = location.search.match(/[?&]__p=([^&]*)/)
+        if (m) history.replaceState(null, '', location.pathname.replace(/\/?$/, '/') + decodeURIComponent(m[1]) + location.hash)
+      })()
+    </script>
   </head>
   <body class="bg-porcelain text-ink antialiased">
     <div id="root"></div>
