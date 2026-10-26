@@ -28,6 +28,18 @@ for (const f of readdirSync(wasmSrc)) {
 }
 console.log('[setup-assets] MediaPipe WASM ready in public/mediapipe/wasm')
 
+// onnxruntime-web runtime for AI Perfect Fit (MobileSAM): WASM build
+const ortSrc = join(root, 'node_modules/onnxruntime-web/dist')
+const ortDst = join(root, 'public/ort')
+mkdirSync(ortDst, { recursive: true })
+for (const f of ['ort-wasm-simd-threaded.wasm', 'ort-wasm-simd-threaded.mjs']) {
+  const s = join(ortSrc, f)
+  const d = join(ortDst, f)
+  if (!existsSync(s)) continue
+  if (!existsSync(d) || statSync(d).size !== statSync(s).size) copyFileSync(s, d)
+}
+console.log('[setup-assets] onnxruntime-web ready in public/ort')
+
 if (existsSync(modelFile) && statSync(modelFile).size > 1_000_000) {
   console.log('[setup-assets] Hand model already present')
 } else {

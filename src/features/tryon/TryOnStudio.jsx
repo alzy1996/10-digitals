@@ -83,7 +83,7 @@ export default function TryOnStudio() {
   const [ftVersion, setFtVersion] = useState(0)
   const [favorites, setFavorites] = useState([])
   const [compareSet, setCompareSet] = useState(null)
-  const [opts, setOpts] = useState({ exposure: 1, illum: [1, 1, 1], forceVisible: false, smartFit: true, tint: LIGHT_PRESETS.salon })
+  const [opts, setOpts] = useState({ exposure: 1, illum: [1, 1, 1], forceVisible: false, smartFit: true, perfectFit: true, tint: LIGHT_PRESETS.salon })
   const [light, setLight] = useState('salon')
   const [substitute, setSubstitute] = useState(null)
   const [white, setWhite] = useState(null)
@@ -91,6 +91,7 @@ export default function TryOnStudio() {
   const [holdOriginal, setHoldOriginal] = useState(false)
   const [analysis, setAnalysis] = useState(null)
   const [fps, setFps] = useState(0)
+  const [fit, setFit] = useState(null) // AI Perfect Fit progress
   const inApp = useMemo(() => detectInAppBrowser(), [])
   const dragTilt = useRef(null)
   const panelRef = useRef(null)
@@ -104,7 +105,7 @@ export default function TryOnStudio() {
     }
     let eng
     try {
-      eng = new TryOnEngine(canvasRef.current, { onStatus: setStatus, onFrame: (f) => setFps(f.fps) })
+      eng = new TryOnEngine(canvasRef.current, { onStatus: setStatus, onFrame: (f) => setFps(f.fps), onFit: setFit })
     } catch (e) {
       console.warn(e)
       setEngineState('nogl')
@@ -132,6 +133,13 @@ export default function TryOnStudio() {
   useEffect(() => {
     engineRef.current?.setOptions({ ...opts, tilt: tiltCtl.tilt, showOriginal: holdOriginal, showEdges: fineTune })
   }, [opts, tiltCtl.tilt, holdOriginal, fineTune])
+
+  useEffect(() => {
+    if (fit && (fit.stage === 'done' || fit.stage === 'none' || fit.stage === 'error')) {
+      const id = setTimeout(() => setFit(null), fit.stage === 'done' ? 2600 : 0)
+      return () => clearTimeout(id)
+    }
+  }, [fit])
 
   // Photo mode: fit the picture into the space ABOVE the bottom panel (live mode stays full-bleed behind glass)
   useEffect(() => {
@@ -236,6 +244,7 @@ export default function TryOnStudio() {
     setFineTune(false)
     setSheet(null)
     engineRef.current?.stop()
+    engineRef.current?.resetCalibration()
     cam.stop()
     setView('start')
     toast(t('new_customer_ready'), 'info')
@@ -291,12 +300,12 @@ export default function TryOnStudio() {
     const lum = 0.2126 * w.rgb[0] + 0.7152 * w.rgb[1] + 0.0722 * w.rgb[2]
     const illum = w.rgb.map((c) => Math.min(1.6, Math.max(0.5, c / lum)))
     setWhite(w.rgb)
-    setOpts((o) => ({ ...o, illum, exposure: Math.min(1.5, Math.max(0.35, lum / 0.85)) }))
+    setOpts((o) => ({ ...o, illum, calibrated: true, exposure: Math.min(1.5, Math.max(0.35, lum / 0.85)) }))
     toast(t('calib_ok'))
   }
   const resetCalibration = () => {
     setWhite(null)
-    setOpts((o) => ({ ...o, illum: [1, 1, 1], exposure: 1 }))
+    setOpts((o) => ({ ...o, illum: [1, 1, 1], calibrated: false, exposure: 1 }))
   }
 
   // drag on the photo = tilt (see cat-eye / glitter / chrome move)
@@ -398,6 +407,18 @@ export default function TryOnStudio() {
       {view !== 'start' && light !== 'salon' && !fineTune && (
         <div className="pointer-events-none absolute start-3 top-[132px] z-20">
           <span className="glass-dark rounded-full px-3 py-1.5 text-[12px] font-bold">{t('light_' + light)}</span>
+        </div>
+      )}
+      {view === 'photo' && fit && !fineTune && fit.stage !== 'none' && fit.stage !== 'error' && (
+        <div className="pointer-events-none absolute inset-x-0 top-[76px] z-20 flex justify-center px-6">
+          <span className={`flex animate-rise items-center gap-2 rounded-full px-4 py-2 text-[13px] font-bold shadow-lift ${fit.stage === 'done' ? 'bg-ok text-white' : 'glass-dark'}`}>
+            {fit.stage === 'done' ? <Sparkles size={15} /> : <Spinner size={15} />}
+            {fit.stage === 'done'
+              ? t('fit_done', { n: fit.fitted })
+              : fit.stage === 'download'
+                ? t('fit_downloading', { p: Math.round(fit.p * 100) })
+                : t('fit_working')}
+          </span>
         </div>
       )}
       {calibrating && (
@@ -742,6 +763,16 @@ export default function TryOnStudio() {
               }
             }}
             label={t('always_show_nails')}
+          />
+          <Toggle
+            dark
+            checked={opts.perfectFit}
+            onChange={(v) => {
+              setOpts((o) => ({ ...o, perfectFit: v }))
+              engineRef.current?.setOptions({ perfectFit: v })
+              if (v && view === 'photo') engineRef.current?.perfectFit()
+            }}
+            label={t('perfect_fit_toggle')}
           />
           <Toggle
             dark

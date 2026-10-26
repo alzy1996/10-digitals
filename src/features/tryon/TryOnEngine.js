@@ -1,6 +1,9 @@
 // Orchestrates camera/photo → hand AI → nail fit → WebGL render. UI-agnostic (React talks to it via callbacks).
 import { loadHandTracker, detectVideo, detectImage } from '../../ai/handTracker'
-import { estimateNails, refineNail, NailTracker, handKeys } from '../../ai/nailGeometry'
+import { estimateNails, refineNail, NailTracker, handKeys, fingerSpacing, FINGER_CHAINS } from '../../ai/nailGeometry'
+import { samPerfectFit } from '../../ai/segmentation/samFit'
+import { sceneFromSkin, sceneFromWhite, median } from '../../lib/color'
+import { findAutoWhite } from '../../ai/skinAnalysis'
 import { segmenterEnabled, segmentNails, refineWithMask } from '../../ai/segmentation/nailSegmenter'
 import { NailRenderer } from '../../render/NailRenderer'
 
@@ -8,10 +11,14 @@ const PHOTO_MAX = 1600 // photo / HD capture cap
 const FIT_W = 360 // width of the small frame used for Smart Fit pixel sampling
 
 export class TryOnEngine {
-  constructor(canvas, { onStatus, onFrame } = {}) {
+  constructor(canvas, { onStatus, onFrame, onFit } = {}) {
     this.canvas = canvas
     this.onStatus = onStatus || (() => {})
     this.onFrame = onFrame || (() => {})
+    this.onFit = onFit || (() => {})
+    this.calib = {} // { Left: { index: {start, end, widthOfSpacing} }, Right: {...} } learned from Perfect Fit
+    this.fitToken = 0
+    this.scene = null // { cast, sat } read from the skin
     this.renderer = new NailRenderer(canvas)
     this.tracker = new NailTracker()
     this.design = null
@@ -63,6 +70,8 @@ export class TryOnEngine {
   // ------------------------------------------------------------ LIVE
   startLive(video) {
     this.stop()
+    this.fitToken++
+    this.renderer.clearMask()
     this.mode = 'live'
     this.video = video
     this.tracker.reset()
@@ -105,18 +114,19 @@ export class TryOnEngine {
         img = this.fitCtx.getImageData(0, 0, this.fitCanvas.width, this.fitCanvas.height)
       }
       res.hands.forEach((h, i) => {
-        let ns = estimateNails(h, W, H, { handKey: keys[i], forceVisible: this.opts.forceVisible })
+        let ns = estimateNails(h, W, H, { handKey: keys[i], forceVisible: this.opts.forceVisible, calib: this.calib[h.handedness] })
         if (img) ns = ns.map((n) => (n.alpha > 0.05 ? refineNail(n, img, h.landmarks, W, H, s) : n))
         nails.push(...ns)
       })
     }
     nails = this.tracker.update(nails, t)
+    this.updateScene(nails, 0.08)
     const visible = nails.filter((n) => n.alpha > 0.3).length
     if (!res.hands.length) this.status('no_hand')
     else if (!visible) this.status('show_back')
     else this.status('ok')
     this.lastLiveNails = nails
-    if (this.renderer.upload(v, W, H)) this.renderer.render(nails, this.design, { ...this.opts, time: t })
+    if (this.renderer.upload(v, W, H)) this.renderer.render(nails, this.design, { ...this.opts, ...this.sceneOpts(), time: t })
     this._fpsN++
     if (t - this._fpsT > 1000) {
       this.fps = Math.round((this._fpsN * 1000) / (t - this._fpsT))
@@ -162,9 +172,11 @@ export class TryOnEngine {
     this.removed.clear()
     this.manual = []
     this.status('analyzing')
+    this.renderer.clearMask()
     await this.detectPhoto()
     this.renderPhoto()
     this.startPhotoAnimation()
+    if (this.opts.perfectFit !== false) this.perfectFit()
     return { width: c.width, height: c.height }
   }
 
@@ -203,6 +215,8 @@ export class TryOnEngine {
       }
     }
     this.photoNails = nails
+    this.photoWhite = findAutoWhite(img)
+    this.updateScene(nails)
     const visible = nails.filter((n) => n.alpha > 0.3).length
     this.status(!res.hands.length ? 'no_hand_photo' : visible ? 'ok' : 'show_back')
   }
@@ -210,8 +224,99 @@ export class TryOnEngine {
   /** Re-run detection with "always show nails" etc. */
   async redetect() {
     if (this.mode !== 'photo') return
+    this.renderer.clearMask()
     await this.detectPhoto()
     this.renderPhoto()
+    if (this.opts.perfectFit !== false) this.perfectFit()
+  }
+
+  /**
+   * AI Perfect Fit: pixel-precise outline for every nail (MobileSAM, on the device), then learn this person's
+   * nail proportions so the LIVE camera fits better too. Non-blocking; progress via onFit({stage, p}).
+   */
+  async perfectFit() {
+    if (this.mode !== 'photo' || !this.photo) return
+    const token = ++this.fitToken
+    const base = this.photoNails.filter((n) => n.alpha > 0.3)
+    if (!base.length) return
+    this.onFit({ stage: 'start', p: 0 })
+    try {
+      const res = await samPerfectFit(this.photo, this.photoNails, {
+        onProgress: (e) => token === this.fitToken && this.onFit(e),
+      })
+      if (token !== this.fitToken || this.mode !== 'photo') return
+      if (!res.mask || !res.fitted) {
+        this.onFit({ stage: 'none', p: 1 })
+        return
+      }
+      this.renderer.setMask(res.mask.data, res.mask.width, res.mask.height)
+      this.lastMask = res.mask
+      this.photoNails = res.nails
+      this.learnCalibration(res.nails)
+      this.dirty = true
+      this.renderPhoto()
+      this.onFit({ stage: 'done', p: 1, fitted: res.fitted, backend: res.backend, ms: res.ms })
+    } catch (e) {
+      console.warn('[engine] Perfect Fit unavailable', e)
+      if (token === this.fitToken) this.onFit({ stage: 'error', p: 1, error: String(e?.message || e) })
+    }
+  }
+
+  /**
+   * Photo look (colour cast + saturation) applied to the polish. A neutral white surface in the photo wins;
+   * otherwise a gentle hint from the skin around the nails. EMA-smoothed in live mode.
+   */
+  updateScene(nails, smooth = 0) {
+    const labs = nails.filter((n) => n.skinLab && n.alpha > 0.3).map((n) => n.skinLab)
+    if (!labs.length) return
+    const skin = [0, 1, 2].map((i) => median(labs.map((l) => l[i])))
+    const fromSkin = sceneFromSkin(skin)
+    const white = this.mode === 'photo' ? this.photoWhite : null
+    const next = white ? sceneFromWhite(white, fromSkin.sat) : fromSkin
+    if (smooth && this.scene) {
+      const k = smooth
+      this.scene = {
+        cast: this.scene.cast.map((v, i) => v + (next.cast[i] - v) * k),
+        sat: this.scene.sat + (next.sat - this.scene.sat) * k,
+      }
+    } else this.scene = next
+  }
+
+  sceneOpts() {
+    if (!this.scene || this.opts.calibrated || this.opts.sceneMatch === false) return { cast: [1, 1, 1], sat: 1 }
+    return this.scene
+  }
+
+  /** New customer: forget the previous person's learned nail proportions. */
+  resetCalibration() {
+    this.calib = {}
+  }
+
+  learnCalibration(nails) {
+    const keys = handKeys(this.hands)
+    const W = this.photo.width
+    const H = this.photo.height
+    this.hands.forEach((h, i) => {
+      const spacing = fingerSpacing(h.landmarks, W, H)
+      const cal = { ...(this.calib[h.handedness] || {}) }
+      for (const n of nails) {
+        if (!n.maskId || !n.key.startsWith(keys[i] + ':')) continue
+        const ch = FINGER_CHAINS[n.finger]
+        const D = { x: h.landmarks[ch[2]].x * W, y: h.landmarks[ch[2]].y * H }
+        const T = { x: h.landmarks[ch[3]].x * W, y: h.landmarks[ch[3]].y * H }
+        const L = Math.hypot(T.x - D.x, T.y - D.y)
+        if (L < 4) continue
+        const ux = (T.x - D.x) / L
+        const uy = (T.y - D.y) / L
+        const proj = (x, y) => ((x - D.x) * ux + (y - D.y) * uy) / L
+        const start = proj(n.cx - n.ux * n.len * 0.5, n.cy - n.uy * n.len * 0.5)
+        const end = proj(n.cx + n.ux * n.len * 0.5, n.cy + n.uy * n.len * 0.5)
+        const wos = n.wid / Math.max(1, spacing[n.finger])
+        if (!(start > 0 && start < 1.2 && end > start + 0.2 && end < 2.2 && wos > 0.3 && wos < 1.4)) continue
+        cal[n.finger] = { start, end, widthOfSpacing: wos }
+      }
+      this.calib[h.handedness] = cal
+    })
   }
 
   currentNails() {
@@ -226,7 +331,7 @@ export class TryOnEngine {
   }
 
   setNail(key, nail) {
-    this.overrides.set(key, { ...nail, alpha: 1 })
+    this.overrides.set(key, { ...nail, alpha: 1, maskId: 0 }) // moved by hand → analytic outline
     this.renderPhoto()
   }
 
@@ -259,7 +364,7 @@ export class TryOnEngine {
   renderPhoto() {
     if (this.mode !== 'photo' || !this.photo) return
     if (this.renderer.upload(this.photo, this.photo.width, this.photo.height) || this.renderer.w) {
-      this.renderer.render(this.currentNails(), this.design, { ...this.opts, time: performance.now() })
+      this.renderer.render(this.currentNails(), this.design, { ...this.opts, ...this.sceneOpts(), time: performance.now() })
     }
   }
 
@@ -273,7 +378,7 @@ export class TryOnEngine {
       if (key !== lastTilt || this.dirty) {
         lastTilt = key
         this.dirty = false
-        this.renderer.render(this.currentNails(), this.design, { ...this.opts, time: performance.now() })
+        this.renderer.render(this.currentNails(), this.design, { ...this.opts, ...this.sceneOpts(), time: performance.now() })
       }
       this.raf = requestAnimationFrame(loop)
     }
@@ -285,11 +390,11 @@ export class TryOnEngine {
   capture(design = this.design, quality = 0.9, extra = {}) {
     if (this.mode === 'photo') {
       this.renderer.upload(this.photo, this.photo.width, this.photo.height)
-      const url = this.renderer.capture(this.currentNails(), design, { ...this.opts, ...extra, time: performance.now() }, 'image/jpeg', quality)
+      const url = this.renderer.capture(this.currentNails(), design, { ...this.opts, ...this.sceneOpts(), ...extra, time: performance.now() }, 'image/jpeg', quality)
       if (design !== this.design || extra.showOriginal !== undefined) this.renderPhoto() // restore the live view
       return url
     }
-    return this.renderer.capture(this.lastLiveNails || [], design, { ...this.opts, ...extra, time: performance.now() }, 'image/jpeg', quality)
+    return this.renderer.capture(this.lastLiveNails || [], design, { ...this.opts, ...this.sceneOpts(), ...extra, time: performance.now() }, 'image/jpeg', quality)
   }
 
   /** Small JPEG thumbnail (≤ maxSide px) for Firestore (fits the 1 MiB doc limit easily). */

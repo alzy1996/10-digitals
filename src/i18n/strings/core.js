@@ -71,6 +71,7 @@ const en = {
   accuracy_note: 'Preview, not a guarantee: screens and cameras change colors slightly. Calibrate with white paper for the closest match, and check the real bottle.',
   tryon_staff_only: 'The try-on is available inside the salon. Ask our team to show you.',
   // AI match
+  fit_downloading: 'AI Perfect Fit · downloading {p}% (first time only)', fit_working: 'AI Perfect Fit · tracing every nail…', fit_done: 'Perfect Fit ✓ {n} nails traced', perfect_fit_toggle: 'AI Perfect Fit (pixel-precise nail outlines on photos)',
   ai_match: 'AI match', analyzing_hand: 'Reading your skin tone and hand shape…', your_skin: 'Your skin', monk_level: 'Monk scale {n}', monk_scale: 'Monk Skin Tone scale', confidence: 'confidence',
   calibrate_for_accuracy: 'Calibrate light for better accuracy', confirm_undertone: 'Is this your undertone? Tap to correct', occasion: 'Occasion', style: 'Your style (optional)',
   best_for_you: 'Best for you', compare_top4: 'Compare top 4', finishes_suggested: 'Suggested finishes', shape_for_hand: 'Shape for your hand',
@@ -172,6 +173,7 @@ const ar = {
   always_show_nails: 'إظهار الأظافر دائماً (إذا اكتُشف باطن اليد بالخطأ)', smart_fit: 'الملاءمة الذكية (قياس عرض الظفر من الصورة)', enable_tilt: 'استخدام إمالة الهاتف لتأثيرات اللمعان',
   accuracy_note: 'معاينة وليست ضماناً: الشاشات والكاميرات تغيّر الألوان قليلاً. عايري بورقة بيضاء لأقرب تطابق، وتأكدي من الزجاجة الحقيقية.',
   tryon_staff_only: 'التجربة متاحة داخل الصالون. اطلبي من فريقنا أن يريكِ.',
+  fit_downloading: 'الملاءمة المثالية · تحميل {p}% (أول مرة فقط)', fit_working: 'الملاءمة المثالية · نرسم حدود كل ظفر…', fit_done: 'ملاءمة مثالية ✓ {n} أظافر', perfect_fit_toggle: 'الملاءمة المثالية بالذكاء الاصطناعي (حدود دقيقة للأظافر في الصور)',
   ai_match: 'المطابقة الذكية', analyzing_hand: 'نقرأ لون بشرتك وشكل يدك…', your_skin: 'بشرتك', monk_level: 'مقياس مونك {n}', monk_scale: 'مقياس مونك للون البشرة', confidence: 'الثقة',
   calibrate_for_accuracy: 'عايري الإضاءة لدقة أفضل', confirm_undertone: 'هل هذا لونك التحتي؟ اضغطي للتصحيح', occasion: 'المناسبة', style: 'أسلوبك (اختياري)',
   best_for_you: 'الأنسب لكِ', compare_top4: 'قارني أفضل 4', finishes_suggested: 'اللمسات المقترحة', shape_for_hand: 'الشكل المناسب ليدك',

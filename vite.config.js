@@ -13,20 +13,21 @@ export default defineConfig({
       manifest: false, // we ship public/manifest.webmanifest ourselves
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,woff2,webmanifest}'],
-        globIgnores: ['mediapipe/**', 'models/**'],
+        globIgnores: ['mediapipe/**', 'models/**', 'ort/**'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [
           {
             // AI runtime + hand model: download once, then instant + offline
             urlPattern: ({ url }) =>
               url.pathname.includes('/mediapipe/wasm/') ||
+              url.pathname.includes('/ort/') ||
               url.pathname.includes('/models/') ||
               (url.origin === 'https://cdn.jsdelivr.net' && url.pathname.startsWith('/npm/@mediapipe/')) ||
               (url.origin === 'https://storage.googleapis.com' && url.pathname.startsWith('/mediapipe-models/')),
             handler: 'CacheFirst',
             options: {
               cacheName: 'ai-assets-v1',
-              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 90 },
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 90 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

@@ -118,6 +118,18 @@ export class NailRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
+    // nail mask texture (RG8: coverage, nail id) — 1×1 empty until an AI Perfect Fit mask arrives
+    this.maskTex = gl.createTexture()
+    gl.bindTexture(gl.TEXTURE_2D, this.maskTex)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, 1, 1, 0, gl.RG, gl.UNSIGNED_BYTE, new Uint8Array([0, 0]))
+    this.maskW = 1
+    this.maskH = 1
+    this.hasMask = false
     this.w = 0
     this.h = 0
     this.lost = false
@@ -125,6 +137,21 @@ export class NailRenderer {
       e.preventDefault()
       this.lost = true
     })
+  }
+
+  /** Pixel mask for the current photo: data = Uint8Array(w*h*2) [coverage, nailId] per pixel. */
+  setMask(data, w, h) {
+    const gl = this.gl
+    gl.bindTexture(gl.TEXTURE_2D, this.maskTex)
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, w, h, 0, gl.RG, gl.UNSIGNED_BYTE, data)
+    this.maskW = w
+    this.maskH = h
+    this.hasMask = true
+  }
+
+  clearMask() {
+    this.hasMask = false
   }
 
   /** Upload the current camera frame / photo. Call once per frame for video. */
@@ -183,6 +210,15 @@ export class NailRenderer {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.nailBuf)
     const u = P.u
     gl.uniform1i(u.uSrc, 0)
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, this.maskTex)
+    gl.uniform1i(u.uMask, 1)
+    gl.uniform2f(u.uMaskSize, this.maskW, this.maskH)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.uniform1f(u.uAutoExposure, opts.autoExposure ?? 0.6)
+    const cast = opts.cast || [1, 1, 1]
+    gl.uniform3f(u.uCast, cast[0], cast[1], cast[2])
+    gl.uniform1f(u.uSat, opts.sat ?? 1)
     gl.uniform2f(u.uRes, this.w, this.h)
     gl.uniform1f(u.uTime, (opts.time || 0) / 1000)
     gl.uniform2f(u.uTilt, opts.tilt?.[0] || 0, opts.tilt?.[1] || 0)
@@ -237,6 +273,8 @@ export class NailRenderer {
       gl.uniform1i(u.uMode, f.mode)
       gl.uniform1f(u.uApex, t.apex)
       gl.uniform1f(u.uAlpha, Math.min(1, n.alpha))
+      gl.uniform1i(u.uMaskId, this.hasMask && n.maskId ? n.maskId : 0)
+      gl.uniform1f(u.uNailL, n.nailL || 0)
       gl.uniform1f(u.uSeed, seedOf(n.key))
       gl.uniform1f(u.uMeanLod, Math.max(0, Math.log2(Math.max(n.wid, 2) * 1.1)))
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
@@ -254,6 +292,7 @@ export class NailRenderer {
   dispose() {
     const gl = this.gl
     gl.deleteTexture(this.tex)
+    gl.deleteTexture(this.maskTex)
     gl.deleteBuffer(this.quad)
     gl.deleteBuffer(this.nailBuf)
     gl.deleteProgram(this.copy.p)

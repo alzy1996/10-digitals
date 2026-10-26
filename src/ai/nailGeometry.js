@@ -51,7 +51,7 @@ export function dorsalScore(lm, handedness, W, H, mirrored = false) {
   return (realRight ? 1 : -1) * (nz / n)
 }
 
-function fingerSpacing(lm, W, H) {
+export function fingerSpacing(lm, W, H) {
   const d = (i, j) => len2(sub(px(lm, i, W, H), px(lm, j, W, H)))
   const s59 = d(5, 9)
   const s913 = d(9, 13)
@@ -89,14 +89,15 @@ export function estimateNails(hand, W, H, opts = {}) {
     if (L < 3) continue
     const ux = seg.x / L
     const uy = seg.y / L
-    const P = PLATE[finger]
+    const cal = opts.calib && opts.calib[finger]
+    const P = cal ? { ...PLATE[finger], ...cal } : PLATE[finger]
     const start = { x: D.x + ux * L * P.start, y: D.y + uy * L * P.start }
     const end = { x: D.x + ux * L * P.end, y: D.y + uy * L * P.end }
     const len = Math.hypot(end.x - start.x, end.y - start.y)
     let wid = spacing[finger] * P.widthOfSpacing
     // when a finger points at the camera the plate looks shorter; keep width sane relative to length
     wid = clamp(wid, len * 0.45, len * 1.45)
-    if (finger === 'thumb') wid *= 1 - 0.3 * clamp(side, 0, 1) // thumb is seen side-on on a flat hand
+    if (finger === 'thumb' && !cal) wid *= 1 - 0.3 * clamp(side, 0, 1) // thumb is seen side-on on a flat hand
     let alpha
     if (forceVisible) alpha = 1
     else if (finger === 'thumb') alpha = smoothstep(-0.55, -0.1, side)
@@ -232,6 +233,9 @@ export function refineNail(nail, img, lm, W, H, scale) {
     out.fit += 0.5
   }
   out.skinLab = skinLab
+  // bare-nail light level (linear luminance) → the polish follows the photo's exposure
+  const fy = (nailLab[0] + 16) / 116
+  out.nailL = nailLab[0] > 8 ? fy * fy * fy : nailLab[0] / 903.3
   out.nailLab = nailLab
   return out
 }

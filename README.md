@@ -13,7 +13,7 @@ OMR prices, Oman time, WhatsApp hand-off, henna-aware skin reading.
 
 | Area | What it does |
 |---|---|
-| **Try-on studio** `/try` | Live camera or photo · 269 shades in 20 families (138 curated with Arabic names + 131 research shades with similar-product references) · 16 finishes (crème, gel, matte, satin, jelly, milky, shimmer, pearl, metallic, chrome, holo, glitter, cat eye, velvet, duochrome, neon) · 8 shapes × 5 lengths · French / micro French / ombré / chrome tip / half moon · a different color per finger · freeze frame · fine-tune nails by dragging · hold to see bare nails · compare (side by side + before/after slider) · light preview (salon / daylight / evening hall) · white-paper calibration · tilt to see chrome, glitter and cat eye move |
+| **Try-on studio** `/try` | Live camera or photo · **AI Perfect Fit** (pixel-exact nail outlines on the phone) · 269 shades in 20 families (138 curated with Arabic names + 131 research shades with similar-product references) · 16 finishes (crème, gel, matte, satin, jelly, milky, shimmer, pearl, metallic, chrome, holo, glitter, cat eye, velvet, duochrome, neon) · 8 shapes × 5 lengths · French / micro French / ombré / chrome tip / half moon · a different color per finger · freeze frame · fine-tune nails by dragging · hold to see bare nails · compare (side by side + before/after slider) · light preview (salon / daylight / evening hall) · white-paper calibration · tilt to see chrome, glitter and cat eye move |
 | **AI Match** | Skin depth (ITA°) + undertone (warm / cool / neutral / olive) + Monk Skin Tone level from the back of the hand, henna detection, finger proportions → ranked shades **in stock** with a reason for each, plus finish and shape suggestions. Never guesses age or ethnicity. |
 | **Website** `/` | Luxury bilingual landing page, collections (incl. Oman National Day 20 Nov), finishes, services & prices, visit info, WhatsApp, `/catalog` shade library, `/privacy` |
 | **Customer → salon** | "Send to salon" (name, phone, preferred time, look recipe, optional photo) → appears live in the salon inbox. WhatsApp click-to-chat (free, no API). Share / download / PDF card. |
@@ -115,10 +115,29 @@ Every push to `main` builds the app and publishes it (`.github/workflows/deploy-
 
 ---
 
-## 5. How accurate is it? (honest)
+## 5. AI Perfect Fit (photo mode, on by default)
+
+After a photo or freeze frame, the app outlines every nail pixel by pixel, on the phone:
+
+1. **MobileSAM** (Segment Anything, Apache-2.0) finds each fingertip's exact outline, prompted by the hand landmarks.
+2. The **cuticle** is found as the strongest colour step along the finger, then shaped as a natural U-curve. The **free edge** is rounded inside the fingertip.
+3. The polish is painted only inside that mask, with the photo's own light: real highlights, exposure of each bare nail, camera grain and (when a white surface is in the picture) its white balance.
+4. The fitted proportions are learned for that customer, so the **live camera** fits better too. **New customer** clears them.
+
+| | |
+|---|---|
+| Files | `public/models/mobilesam/encoder.onnx` (14 MB, 8-bit) + `decoder.onnx` (4.7 MB), runtime `onnxruntime-web` (WASM, copied to `public/ort/` by `npm run dev/build`) |
+| First use | ≈ 30 MB download, then cached on the phone (works offline) |
+| Speed | ≈ 5–15 s per photo depending on the phone (one AI pass covers all 10 nails); the preview shows instantly and sharpens when the fit is done |
+| Switch off | ☀ sheet → **AI Perfect Fit** toggle (falls back to landmark + Smart Fit outlines) |
+| Re-export the model | `python scripts/export_mobilesam.py --mobilesam path/to/MobileSAM --out public/models/mobilesam --quantize` |
+
+Licence: MobileSAM is Apache-2.0 (`public/models/mobilesam/LICENSE-MobileSAM.txt`). Free for commercial use.
+
+## 6. How accurate is it? (honest)
 
 - Colors are a **calibrated preview, not a guarantee**. Phone cameras and screens shift color. For the closest match, tap **☀ → Calibrate with white paper**, and always check the real bottle.
-- Nail edges come from AI hand landmarks plus Smart Fit (measures each nail from the photo). On difficult photos the technician fixes edges in seconds with **Adjust nails** (drag).
+- Nail edges: in photos, AI Perfect Fit follows the real fingertip outline. The cuticle line on a bare nail is found from colour, so on very pale nails it can sit 1–2 px off. In live camera mode the outline comes from hand landmarks + Smart Fit + the proportions learned from the last photo. The technician fixes any edge in seconds with **Adjust nails** (drag).
 - Undertone from a camera is only moderately reliable (olive is the hardest), so the customer confirms it with one tap.
 - Neon is brighter in real life than any screen can show.
 - Henna and very dark nail polish make skin reading less exact. The app warns but never refuses service.
@@ -126,12 +145,12 @@ Every push to `main` builds the app and publishes it (`.github/workflows/deploy-
 
 ---
 
-## 6. Free-tier limits (Firebase Spark)
+## 7. Free-tier limits (Firebase Spark)
 
 | Limit | What the app does about it |
 |---|---|
 | Firestore 50k reads / 20k writes per day | Customers read **one** document per visit (the public catalog); admin lists are capped |
-| Hosting ~360 MB/day transfer | The 19 MB AI files load from Google's / jsDelivr's free CDNs, with your hosting as fallback; cached on the phone after the first visit |
+| Hosting ~360 MB/day transfer | Hand-tracking files load from Google's / jsDelivr's free CDNs (hosting is the fallback). Perfect Fit's ≈ 30 MB is served from your hosting once per phone, then cached: roughly 10 new phones a day fit the free quota with room to spare; GitHub Pages has no daily cap |
 | No Cloud Storage on the free plan | No photo storage service is used. Optional small preview photos (≤180 KB) live inside the request record and are **deleted after 90 days** by the app |
 | No paid APIs | WhatsApp uses free click-to-chat links; no SMS, no OCR |
 
@@ -139,11 +158,11 @@ If a daily quota runs out, the site pauses until the reset (around 11:00 Muscat 
 
 ---
 
-## 7. Switch on later (built in, off for now)
+## 8. Switch on later (built in, off for now)
 
 | Feature | How to enable |
 |---|---|
-| **Trained nail segmentation model** (pixel-perfect cuticle edges) | Train a 2-class TFLite model (see `docs/RESEARCH.md` → model plan; use MobileNetV3/EfficientNet encoders, not YOLO (AGPL) or MiT (non-commercial)), put it in `public/models/`, set `VITE_NAIL_SEGMENTER_URL=/models/nail_segmenter.tflite`, rebuild |
+| **Trained nail segmentation model** (exact cuticle on bare nails, also in live video) | Train a 2-class TFLite model (see `docs/RESEARCH.md` → model plan; use MobileNetV3/EfficientNet encoders, not YOLO (AGPL) or MiT (non-commercial)), put it in `public/models/`, set `VITE_NAIL_SEGMENTER_URL=/models/nail_segmenter.tflite`, rebuild |
 | Custom domain (e.g. `try.yoursalon.om`) | Firebase Console → Hosting → **Add custom domain** → follow the DNS steps |
 | App Check (anti-abuse) | Firebase Console → App Check → reCAPTCHA Enterprise (free up to 10k/month) |
 | Payments / deposits (Thawani, OmanNet) | Paid gateway, needs the Blaze plan + Cloud Functions; not included |
@@ -151,7 +170,7 @@ If a daily quota runs out, the site pauses until the reset (around 11:00 Muscat 
 
 ---
 
-## 8. Before commercial launch (checklist)
+## 9. Before commercial launch (checklist)
 
 - [ ] Omani lawyer reviews `/privacy` against the Personal Data Protection Law (Royal Decree 6/2022)
 - [ ] Measure your real bottles (Pick color from bottle photo, daylight, white card) — library hex values are approximations
@@ -170,7 +189,7 @@ src/
     nailGeometry.js    landmarks → 5 oriented nails per hand + Smart Fit pixel refinement + tracking
     skinAnalysis.js    ITA° / hue / Monk level, henna + highlight rejection, white calibration
     recommend.js       explainable recommendation rules (shades, finishes, shapes)
-    segmentation/      optional trained-model slot (off by default)
+    segmentation/      samFit.js = AI Perfect Fit (MobileSAM, ONNX, on the device) + optional trained-model slot
   render/              WebGL2 polish shaders (linear light, real highlights, chrome, glitter, cat eye…)
   features/tryon/      studio UI, engine, compare, save, fine-tune
   store/DataProvider   Firestore / demo data layer + audit trail
@@ -178,6 +197,6 @@ src/
   pages/               public website
   data/                taxonomy, 269-shade library, seed data
   i18n/strings/        EN + AR texts
-firestore.rules        security rules (tested: 47 cases)
+firestore.rules        security rules (tested: 50 cases)
 firebase.json          hosting headers, caching, SPA routing
 ```

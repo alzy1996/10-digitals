@@ -12,3 +12,4 @@ public/mediapipe/wasm
 dev-test
 public/models/*.task
 *.tflite.tmp
+public/ort

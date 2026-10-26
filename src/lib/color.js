@@ -167,6 +167,52 @@ export function hexToHsl(hex) {
   return [h, s, l]
 }
 
+/** CIELAB (D65) → linear RGB (unclamped) */
+export function labToLinear([L, a, b]) {
+  const fy = (L + 16) / 116
+  const fx = fy + a / 500
+  const fz = fy - b / 200
+  const inv = (t) => (t * t * t > 216 / 24389 ? t * t * t : (116 * t - 16) / (24389 / 27))
+  const X = inv(fx) * Xn
+  const Y = inv(fy) * Yn
+  const Z = inv(fz) * Zn
+  return [
+    3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z,
+    -0.969266 * X + 1.8760108 * Y + 0.041556 * Z,
+    0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z,
+  ]
+}
+
+/**
+ * Scene look from the skin: human skin sits in a narrow hue band (h_ab ≈ 52°, C* ≈ 18 in neutral light),
+ * so the skin in a photo hints at the camera's colour cast and saturation. Returned values are applied to the
+ * virtual polish so it shares the photo's look. Kept gentle: pale / rosy / olive skin is also off-centre, and a
+ * red must still read as THAT red (customers compare it with the bottle).
+ */
+export function sceneFromSkin(skinLab, strength = 0.3) {
+  if (!skinLab) return { cast: [1, 1, 1], sat: 1 }
+  const [L, a, b] = skinLab
+  const C = Math.hypot(a, b)
+  const H = (52 * Math.PI) / 180
+  const exp = labToLinear([L, 18 * Math.cos(H), 18 * Math.sin(H)]).map((v) => Math.max(v, 1e-4))
+  const obs = labToLinear(skinLab).map((v) => Math.max(v, 1e-4))
+  let cast = obs.map((v, i) => v / exp[i])
+  const lum = 0.2126 * cast[0] + 0.7152 * cast[1] + 0.0722 * cast[2]
+  cast = cast.map((v) => clamp(1 + (v / lum - 1) * strength, 0.88, 1.14))
+  const sat = clamp(1 + (C / 18 - 1) * 0.2, 0.94, 1.03)
+  return { cast, sat }
+}
+
+/**
+ * Scene cast from a real neutral surface in the frame (white table, tissue, paper) — far more reliable than skin.
+ * whiteLin: linear [r,g,b] of that surface.
+ */
+export function sceneFromWhite(whiteLin, sat = 1, strength = 0.8) {
+  const w = whiteLin.map((v) => Math.max(v, 1e-4))
+  const lum = 0.2126 * w[0] + 0.7152 * w[1] + 0.0722 * w[2]
+  return { cast: w.map((v) => clamp(1 + (v / lum - 1) * strength, 0.8, 1.25)), sat }
+}
+
 /** Classify a POLISH color's own temperature (warm / cool / neutral) from its LCh hue. */
 export function polishTemperature(hex) {
   const [L, C, h] = labToLch(hexToLab(hex))

@@ -63,6 +63,14 @@ uniform vec2 uTilt;
 uniform vec3 uLightDir, uIllum;
 uniform float uShowEdges;
 uniform vec3 uTint;
+// Pixel-precise nail mask (AI "Perfect Fit"): R = soft coverage, G = nail id (1..255). uMaskId 0 = no mask.
+uniform sampler2D uMask;
+uniform vec2 uMaskSize;
+uniform int uMaskId;
+uniform float uAutoExposure;   // 0..1 how much the polish follows the photo's light level
+uniform float uNailL;          // measured linear luminance of this bare nail (0 = unknown)
+uniform vec3 uCast;            // photo colour cast (from the skin), applied to the polish only
+uniform float uSat;            // photo saturation factor (from the skin)
 
 const float PI = 3.14159265;
 
@@ -123,10 +131,23 @@ void main() {
   // implicit outline (≈ px distance) for anti-aliasing
   float f = max(abs(x) - hw, max(-y, y - Lt));
   if (hw < 0.0) f = max(f, 1.0);
-  float aa = max(fwidth(f), 0.75);
+  // photos are never razor sharp: feather ~2% of the nail width (min ≈ 1 px)
+  float aa = max(fwidth(f) * 1.25, max(0.9, uWid * 0.02));
   float cov = 1.0 - smoothstep(-aa, aa * 0.6, f);
   // soft cuticle edge (polish never touches the cuticle) + soft sidewalls
   cov *= smoothstep(0.0, max(2.0, uLen * 0.05), y);
+  if (uMaskId > 0) {
+    float mA = texture(uMask, vUv).r;
+    float mId = texelFetch(uMask, ivec2(clamp(vUv, 0.0, 0.9999) * uMaskSize), 0).g * 255.0;
+    float mine = 1.0 - step(0.5, abs(mId - float(uMaskId)));
+    float maskCov = smoothstep(0.42, 0.78, mA) * mine;   // slight erosion = hairline gap at the cuticle
+    if (uExt > 1.0) {
+      // natural plate from the mask, the new free edge / shape from the analytic outline
+      cov = max(maskCov * (1.0 - smoothstep(uLen * 0.82, uLen * 0.97, y)), cov * smoothstep(uLen * 0.55, uLen * 0.8, y));
+    } else {
+      cov = maskCov;
+    }
+  }
   if (cov <= 0.002) discard;
 
   float s = clamp(x / max(hw, 1.0), -1.0, 1.0);      // transverse −1..1
@@ -144,12 +165,24 @@ void main() {
 
   // ---------- read the real photo
   vec3 src = texture(uSrc, vUv).rgb;
-  vec3 low = textureLod(uSrc, vUv, max(uMeanLod - 1.6, 0.0)).rgb;
+  vec3 low = textureLod(uSrc, vUv, max(uMeanLod - 1.6, 0.0)).rgb;      // ~1/3 nail: separates highlights
+  vec3 broad = textureLod(uSrc, vUv, max(uMeanLod - 0.6, 0.0)).rgb;    // ~2/3 nail: lighting only (ignores white tip / lunula)
   vec3 mean = textureLod(uSrc, uCenterUv, uMeanLod).rgb;
   float lSrc = lum(src), lLow = lum(low), lMean = max(lum(mean), 0.003);
-  float shade = mix(1.0, clamp(lLow / lMean, 0.55, 1.35), natural);
-  float detail = mix(1.0, clamp(lSrc / max(lLow, 0.002), 0.75, 1.3), natural);
-  float realSpec = natural * clamp((lSrc - lLow * 1.1) / lMean, 0.0, 2.5);
+  float shade = mix(1.0, clamp(lum(broad) / lMean, 0.75, 1.15), natural);
+  // fine texture + the camera's own grain carried through the polish (stops the "sticker" look)
+  float detail = mix(1.0, clamp(lSrc / max(lLow, 0.002), 0.9, 1.12), natural);
+  float realSpec = natural * clamp((lSrc - lLow * 1.25) / lMean, 0.0, 2.5);
+  // does the real nail already show a highlight? (5 probes across the plate)
+  vec2 perpUv = vec2(-uAxis.y, uAxis.x) * (uWid * 0.33) / uRes;
+  float pk = 0.0;
+  for (int k = -2; k <= 2; k++) {
+    pk = max(pk, lum(textureLod(uSrc, uCenterUv + perpUv * float(k) * 0.5, max(uMeanLod - 1.6, 0.0)).rgb));
+  }
+  float realGloss = clamp((pk / lMean - 1.12) * 3.0, 0.0, 1.0);
+  // follow the photo's light level: a bright bare nail ≈ 0.40 linear luminance in good light
+  float nailL = uNailL > 0.0 ? uNailL : lMean;
+  float autoE = mix(1.0, clamp(pow(nailL / 0.40, 0.6), 0.55, 1.15), uAutoExposure);
 
   // ---------- choose the paint for this pixel (art)
   vec3 paint = uColor;
@@ -180,7 +213,7 @@ void main() {
   float frameL = max(lum(textureLod(uSrc, vec2(0.5), uFrameLod).rgb), 0.02);
 
   // ---------- lighting
-  float E = uExposure;
+  float E = uExposure * autoE;
   vec3 illum = uIllum * E;
   float NdH = max(dot(N, H), 0.0);
   float shin = mix(6.0, 520.0, pow(1.0 - rough, 2.2));
@@ -189,14 +222,14 @@ void main() {
   // salon "softbox" streak along the nail (classic gel highlight)
   float s0 = clamp(-L.x * 0.9 - 0.25, -0.7, 0.4);
   float sCurve = s0 + 0.08 * (yn - 0.5) * (yn - 0.5) * 4.0;
-  float streak = exp(-pow((s - sCurve) / mix(0.14, 0.42, rough), 2.0)) * smoothstep(0.1, 0.38, yn) * smoothstep(0.98, 0.66, yn);
+  float streak = exp(-pow((s - sCurve) / mix(0.08, 0.36, rough), 2.0)) * smoothstep(0.1, 0.38, yn) * smoothstep(0.98, 0.66, yn);
   float band = 0.55 + 0.45 * cos(s * 4.6 + 1.2 + uTilt.x * 2.0);   // cylinder mirror bands
 
   // ---------- base color
   vec3 albedo = paint;
   float wrapL = clamp((dot(N, L) + 0.4) / 1.4, 0.0, 1.0);
   float curvature = mix(0.6, 1.06, wrapL);                          // C-curve: sides turn away from the light
-  vec3 diffuse = albedo * illum * shade * curvature * mix(1.0, detail, 0.06 + 0.3 * (1.0 - uOpacity)) * (1.0 - metal * 0.82);
+  vec3 diffuse = albedo * illum * shade * curvature * mix(1.0, detail, 0.55 + 0.3 * (1.0 - uOpacity)) * (1.0 - metal * 0.82);
   // sheer / jelly: tint the real nail like colored glass
   vec3 tint = albedo / max(max(albedo.r, max(albedo.g, albedo.b)), 0.04);
   vec3 jelly = src * mix(vec3(1.0), tint, 0.85) * 0.92;
@@ -259,8 +292,9 @@ void main() {
   // ---------- clear coat: reuse REAL highlights + synthetic streak + Fresnel reflection
   vec3 specCol = mix(vec3(1.0), albedo * 1.8 + 0.08, metal * 0.85);
   float g = clamp(gloss, 0.0, 1.0);
-  vec3 spec = specCol * illum * (realSpec * g * 0.7 + specSynth * g + streak * g * g * 0.34);
-  spec += env * fres * g * 0.35;
+  // real highlights first (same light as the photo); the synthetic salon streak only when the photo has none
+  vec3 spec = specCol * illum * (realSpec * g * 0.95 + specSynth * g * (1.0 - 0.6 * realGloss) + streak * g * g * 0.3 * (1.0 - realGloss));
+  spec += env * fres * g * 0.2;
   if (rough > 0.8) spec = vec3(0.025 * (1.0 - N.z)) * illum;   // matte: chalky soft sheen only
   col += spec;
 
@@ -270,5 +304,7 @@ void main() {
     col = mix(col, vec3(1.0, 0.85, 0.5), edge * 0.9);
   }
 
+  // share the photo's colour cast + saturation so the polish sits IN the picture, not on top of it
+  col = mix(vec3(lum(col)), col, uSat) * uCast;
   outColor = vec4(encode(col * uTint), cov * uAlpha);
 }`
