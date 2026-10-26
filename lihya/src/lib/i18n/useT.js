@@ -44,7 +44,8 @@ export function format(str, vars) {
 /** Translate outside React (reports, PDFs). Falls back to English, then the key. */
 export function translate(lang, key, vars) {
   const s = DICT[lang]?.[key] ?? DICT.en[key] ?? key;
-  return format(s, vars);
+  // {app} is the app name from src/config/app.js, so a rename touches one constant.
+  return format(s, { app: lang === 'ar' ? APP.nameAr : APP.name, ...vars });
 }
 
 /** Pick the right field of a bilingual object: { en, ar } or { name, nameAr }. */

@@ -4,6 +4,7 @@
 import { createElement } from 'react';
 import CutCardDocument, { CUT_CARD_WIDTH } from './CutCardDocument.jsx';
 import { blockBreaks, canvasToImage, canvasToPdf, printElement, rasterize, withMounted } from './raster.js';
+import { APP } from '../config/app.js';
 
 export const SHARE_SIZE = Object.freeze({ width: 1080, height: 1350 });
 
@@ -24,7 +25,7 @@ export async function cutCardPdf(data, lang = 'ar') {
     const breaks = blockBreaks(node);
     const canvas = await rasterize(node);
     try {
-      return await canvasToPdf(canvas, { format: 'a6', cssWidth: width, breaks, marginMm: 5, title: 'LIHYA Cut Card' });
+      return await canvasToPdf(canvas, { format: 'a6', cssWidth: width, breaks, marginMm: 5, title: `${APP.name} Cut Card` });
     } finally {
       canvas.width = 0;
       canvas.height = 0;
@@ -56,5 +57,5 @@ export function printCutCard(data, lang = 'ar') {
 /** File name for a card, for example lihya-cut-card-2026-10-25.pdf. */
 export function cutCardFilename(dayKey, ext = 'pdf') {
   const day = /^\d{4}-\d{2}-\d{2}$/.test(String(dayKey || '')) ? dayKey : 'card';
-  return `lihya-cut-card-${day}.${ext}`;
+  return `${APP.slug}-cut-card-${day}.${ext}`;
 }

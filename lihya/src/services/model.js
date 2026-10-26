@@ -5,7 +5,7 @@
 import { DEFAULT_GUARD_CHART, validateGuardChart } from '../lib/guards.js';
 import { normalizeOmanPhone, roundOmr } from '../lib/format.js';
 import { toDate } from '../lib/time.js';
-import { LIMITS } from '../config/app.js';
+import { FLAGS, LIMITS } from '../config/app.js';
 
 export const ZONE_KEYS = ['M', 'S', 'C', 'J_L', 'J_R', 'K_L', 'K_R', 'B_L', 'B_R', 'N'];
 export const ROLES = ['owner', 'manager', 'barber'];
@@ -27,13 +27,13 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Shop settings defaults (PRD 10.2). `shop.settings` is always merged over these. */
 export const DEFAULT_SETTINGS = Object.freeze({
-  aiPreview: false,
+  aiPreview: FLAGS.aiPreviewDefault === true,
   aiDailyCap: LIMITS.aiDailyCapShopDefault,
   retentionDays: LIMITS.retentionDaysDefault,
   growthMmPerDay: LIMITS.growthMmPerDayDefault,
   guardChart: DEFAULT_GUARD_CHART,
   defaultLanguage: 'ar',
-  tryAtHome: true,
+  tryAtHome: FLAGS.tryAtHome !== false,
   whatsapp: '',
 });
 

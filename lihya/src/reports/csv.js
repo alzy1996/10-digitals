@@ -13,6 +13,7 @@ import { normalizeOmanPhone, roundOmr } from '../lib/format.js';
 import { formatMuscat, toDate, dayKey as muscatDayKey, dayKeysBetween } from '../lib/time.js';
 import { translate, pickLang } from '../lib/i18n/useT.js';
 import { filterConsultations, isApproved, productNameOf, staffNameOf, styleNameOf, summarizeConsultations } from './summary.js';
+import { APP } from '../config/app.js';
 
 export const BOM = '\uFEFF';
 export const CSV_MIME = 'text/csv;charset=utf-8';
@@ -461,7 +462,7 @@ export function exportConsultationsCsv({ consultations, startKey, endKey, lang =
     col(L, 'demo', (c) => yesNo(L, c.demo === true)),
   ];
   const text = toCsv(list, columns);
-  return { blob: csvBlob(text), text, filename: `lihya-consultations-${rangeName(startKey, endKey)}.csv`, count: list.length };
+  return { blob: csvBlob(text), text, filename: `${APP.slug}-consultations-${rangeName(startKey, endKey)}.csv`, count: list.length };
 }
 
 /** Clients with their coarse labels only (no photo, no measurements). */
@@ -482,7 +483,7 @@ export function exportClientsCsv({ clients, lang = 'ar', includeDemo = false, no
     col(L, 'growth', (c) => (Number.isFinite(Number(c.growthMmPerDay)) && c.growthMmPerDay !== null ? Number(c.growthMmPerDay) : '')),
   ];
   const text = toCsv(list, columns);
-  return { blob: csvBlob(text), text, filename: `lihya-clients-${muscatDayKey(now)}.csv`, count: list.length };
+  return { blob: csvBlob(text), text, filename: `${APP.slug}-clients-${muscatDayKey(now)}.csv`, count: list.length };
 }
 
 /**
@@ -527,5 +528,5 @@ export function exportStatsCsv({ stats = [], consultations = null, startKey, end
   });
   const columns = ['date', 'consultations', 'approvals', 'conversion', 'avgDecision', 'aiRenders', 'addOnsCount', 'topStyle'].map((k) => col(L, k));
   const text = toCsv(rows, columns);
-  return { blob: csvBlob(text), text, filename: `lihya-stats-${rangeName(startKey, endKey)}.csv`, count: rows.length };
+  return { blob: csvBlob(text), text, filename: `${APP.slug}-stats-${rangeName(startKey, endKey)}.csv`, count: rows.length };
 }

@@ -6,6 +6,7 @@ import { createElement } from 'react';
 import DailyReportDocument, { DAILY_REPORT_WIDTH } from './DailyReportDocument.jsx';
 import { summarizeDay } from './summary.js';
 import { blockBreaks, canvasToPdf, printElement, rasterize, withMounted } from './raster.js';
+import { APP } from '../config/app.js';
 
 function normLang(lang) {
   return lang === 'en' ? 'en' : 'ar';
@@ -42,7 +43,7 @@ export async function dailyReportPdf(input = {}) {
     const breaks = blockBreaks(node);
     const canvas = await rasterize(node);
     try {
-      return await canvasToPdf(canvas, { format: 'a4', cssWidth: DAILY_REPORT_WIDTH, breaks, marginMm: 12, title: 'LIHYA daily report' });
+      return await canvasToPdf(canvas, { format: 'a4', cssWidth: DAILY_REPORT_WIDTH, breaks, marginMm: 12, title: `${APP.name} daily report` });
     } finally {
       canvas.width = 0;
       canvas.height = 0;
@@ -59,5 +60,5 @@ export function printDailyReport(input = {}) {
 
 /** File name, for example lihya-daily-2026-10-25.pdf. */
 export function dailyReportFilename(dayKey) {
-  return `lihya-daily-${/^\d{4}-\d{2}-\d{2}$/.test(String(dayKey || '')) ? dayKey : 'report'}.pdf`;
+  return `${APP.slug}-daily-${/^\d{4}-\d{2}-\d{2}$/.test(String(dayKey || '')) ? dayKey : 'report'}.pdf`;
 }

@@ -3,6 +3,8 @@
 export const APP = {
   name: 'LIHYA',
   nameAr: 'لحية',
+  // File names (lihya-cut-card-2026-10-26.pdf) and other lowercase ids.
+  slug: 'lihya',
   studio: '10 Digital',
   version: '1.0.0',
   defaultLanguage: 'ar',

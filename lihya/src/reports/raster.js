@@ -6,6 +6,7 @@
 
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
+import { APP } from '../config/app.js';
 
 export const RASTER_SCALE = 2;
 
@@ -208,7 +209,7 @@ function canvasToBlob(canvas, type, quality) {
  * block breaks. The DOM node carries its own margins; continuation pages get
  * `marginMm` at the top. Page numbers (digits only) are added when there are 2+ pages.
  */
-export async function canvasToPdf(canvas, { format = 'a4', cssWidth, breaks = [], marginMm = 6, title = 'LIHYA' }) {
+export async function canvasToPdf(canvas, { format = 'a4', cssWidth, breaks = [], marginMm = 6, title = APP.name }) {
   const { jsPDF } = await import('jspdf');
   const page = PAGE[format] || PAGE.a4;
   const pxPerCss = canvas.width / cssWidth;
@@ -219,7 +220,7 @@ export async function canvasToPdf(canvas, { format = 'a4', cssWidth, breaks = []
   const nextRoom = (page.h - marginMm - footMm) * cssPerMm;
   const ranges = paginate(totalCss, breaks, firstRoom, nextRoom);
   const pdf = new jsPDF({ unit: 'mm', format, orientation: 'portrait', compress: true });
-  pdf.setProperties({ title, creator: 'LIHYA' });
+  pdf.setProperties({ title, creator: APP.name });
   ranges.forEach(([a, b], i) => {
     if (i > 0) pdf.addPage(format, 'portrait');
     const sy = Math.round(a * pxPerCss);

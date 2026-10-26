@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { copyFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { APP } from './src/config/app.js';
 
 // '/' for Firebase Hosting (default). GitHub Pages serves the repo under a sub-path:
 // LIHYA_BASE=/10-digitals/ npm run build (the Pages workflow sets it).
@@ -20,6 +21,12 @@ const dropBundledWasm = () => ({
   generateBundle(_options, bundle) {
     for (const name of Object.keys(bundle)) if (name.endsWith('.wasm')) delete bundle[name];
   },
+});
+
+// index.html carries %APP_NAME% / %APP_NAME_AR% so the app name lives only in src/config/app.js.
+const appName = () => ({
+  name: 'lihya-app-name',
+  transformIndexHtml: (html) => html.replaceAll('%APP_NAME%', APP.name).replaceAll('%APP_NAME_AR%', APP.nameAr),
 });
 
 // GitHub Pages has no SPA rewrite: serve the app for every unknown path through 404.html.
@@ -60,6 +67,7 @@ export default defineConfig({
   base: BASE,
   plugins: [
     react(),
+    appName(),
     spaFallback(),
     dropBundledWasm(),
     VitePWA({
@@ -67,8 +75,8 @@ export default defineConfig({
       injectRegister: 'auto',
       includeAssets: ['icons/sprite.svg', 'icons/favicon.svg', 'icons/apple-touch-icon.png', 'templates/products-template.csv'],
       manifest: {
-        name: 'LIHYA لحية',
-        short_name: 'LIHYA',
+        name: `${APP.name} ${APP.nameAr}`,
+        short_name: APP.name,
         description: 'Beard simulator and barber Cut Card',
         lang: 'ar',
         dir: 'rtl',
