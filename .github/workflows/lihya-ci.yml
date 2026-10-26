@@ -1,0 +1,79 @@
+# LIHYA checks on every pull request and push that touches lihya/: lint, unit tests,
+# production build + size/secret gate, Firestore security rules on the emulator, Worker tests.
+name: LIHYA CI
+
+on:
+  pull_request:
+    paths:
+      - 'lihya/**'
+      - '.github/workflows/lihya-ci.yml'
+  push:
+    branches-ignore: [main]
+    paths:
+      - 'lihya/**'
+      - '.github/workflows/lihya-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lihya-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lihya
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lihya/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Size and secrets gate
+        run: npm run check:size
+
+      - name: Firestore rules tests (emulator)
+        run: npm run test:rules
+
+  worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lihya/worker
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lihya/worker/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Worker tests
+        run: npm test

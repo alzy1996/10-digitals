@@ -1,0 +1,62 @@
+// One place to rename the app or flip a feature. Business logic reads from here.
+
+export const APP = {
+  name: 'LIHYA',
+  nameAr: 'لحية',
+  // File names (lihya-cut-card-2026-10-26.pdf) and other lowercase ids.
+  slug: 'lihya',
+  studio: '10 Digital',
+  version: '1.0.0',
+  defaultLanguage: 'ar',
+  languages: ['ar', 'en'],
+  timezone: 'Asia/Muscat',
+  currency: 'OMR',
+  currencyDecimals: 3,
+  schemaVersion: 1,
+};
+
+// Feature flags. Shop-level settings (Firestore) can turn some of these off per shop.
+export const FLAGS = {
+  // AI Final Look is built but OFF by default; the owner turns it on in Settings.
+  aiPreviewDefault: false,
+  // Customer "Try at home" link.
+  tryAtHome: true,
+  // Lazy age-band model (Wi-Fi only). When it cannot load, age chips ask instead.
+  ageModel: true,
+};
+
+export const LIMITS = {
+  aiDailyCapAccount: 80,
+  aiDailyCapShopDefault: 20,
+  maxLooks: 3,
+  sessionIdleMs: 10 * 60 * 1000,
+  undoMs: 6000,
+  lookCodeDays: 30,
+  lookCodeLength: 6,
+  // Alphabet without 0, O, 1, I so codes read clearly aloud and on screen.
+  lookCodeAlphabet: 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
+  decisionSecondsMax: 3600,
+  retentionDaysDefault: 365,
+  growthMmPerDayDefault: 0.4,
+  topStyles: 6,
+  maxReasonChips: 3,
+};
+
+// localStorage is used for per-device UI preferences only (language, theme,
+// camera mirror). Business data never goes to localStorage. The capture and Studio
+// keys below are per-session UI choices kept in sessionStorage (capturePrefs.js,
+// studioPrefs.js).
+export const PREF_KEYS = {
+  lang: 'lihya.pref.lang',
+  theme: 'lihya.pref.theme',
+  mirror: 'lihya.pref.mirror',
+  lastShop: 'lihya.pref.lastShop',
+  purgeDay: 'lihya.pref.purgeDay',
+  emailForSignIn: 'lihya.auth.emailForSignIn',
+  captureMode: 'lihya.pref.captureMode',
+  whiteCard: 'lihya.pref.whiteCardShown',
+  studioPreview: 'lihya.pref.studioPreview',
+  studioLowFps: 'lihya.pref.studioLowFps',
+  // Demo mode only: which local demo database this browser uses ("Reset demo" moves to the next one).
+  demoGeneration: 'lihya.demo.generation',
+};

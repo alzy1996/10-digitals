@@ -1,0 +1,310 @@
+[
+  {
+    "id": "natural",
+    "name": {
+      "en": "Natural (no color)",
+      "ar": "طبيعي"
+    },
+    "type": "none",
+    "notes": {
+      "en": "Default",
+      "ar": "الافتراضي"
+    },
+    "warn": null,
+    "hex": null,
+    "hexDay3": null,
+    "chemical": false,
+    "safety": [],
+    "greyBlend": null,
+    "greyDefault": null
+  },
+  {
+    "id": "jet-black",
+    "name": {
+      "en": "Jet black",
+      "ar": "أسود فاحم"
+    },
+    "type": "permanent",
+    "notes": null,
+    "warn": {
+      "en": "Can look flat and harsh on lighter skin",
+      "ar": "قد يبدو مسطحاً وقاسياً على البشرة الفاتحة"
+    },
+    "hex": "#1a1919",
+    "hexDay3": null,
+    "chemical": true,
+    "safety": [
+      "patchTest48h",
+      "metallicSaltProducts",
+      "pureHenna",
+      "irritationToday"
+    ],
+    "greyBlend": null,
+    "greyDefault": null
+  },
+  {
+    "id": "natural-black",
+    "name": {
+      "en": "Natural black",
+      "ar": "أسود طبيعي"
+    },
+    "type": "permanent",
+    "notes": {
+      "en": "Softer than jet black",
+      "ar": "أنعم من الأسود الفاحم"
+    },
+    "warn": null,
+    "hex": "#312b27",
+    "hexDay3": null,
+    "chemical": true,
+    "safety": [
+      "patchTest48h",
+      "metallicSaltProducts",
+      "pureHenna",
+      "irritationToday"
+    ],
+    "greyBlend": null,
+    "greyDefault": null
+  },
+  {
+    "id": "dark-brown",
+    "name": {
+      "en": "Dark brown",
+      "ar": "بني غامق"
+    },
+    "type": "permanent",
+    "notes": null,
+    "warn": null,
+    "hex": "#4c3a2f",
+    "hexDay3": null,
+    "chemical": true,
+    "safety": [
+      "patchTest48h",
+      "metallicSaltProducts",
+      "pureHenna",
+      "irritationToday"
+    ],
+    "greyBlend": null,
+    "greyDefault": null
+  },
+  {
+    "id": "medium-brown",
+    "name": {
+      "en": "Medium brown",
+      "ar": "بني متوسط"
+    },
+    "type": "permanent",
+    "notes": null,
+    "warn": null,
+    "hex": "#6b4f3a",
+    "hexDay3": null,
+    "chemical": true,
+    "safety": [
+      "patchTest48h",
+      "metallicSaltProducts",
+      "pureHenna",
+      "irritationToday"
+    ],
+    "greyBlend": null,
+    "greyDefault": null
+  },
+  {
+    "id": "light-brown",
+    "name": {
+      "en": "Light brown",
+      "ar": "بني فاتح"
+    },
+    "type": "permanent",
+    "notes": null,
+    "warn": null,
+    "hex": "#8d6c4d",
+    "hexDay3": null,
+    "chemical": true,
+    "safety": [
+      "patchTest48h",
+      "metallicSaltProducts",
+      "pureHenna",
+      "irritationToday"
+    ],
+    "greyBlend": null,
+    "greyDefault": null
+  },
+  {
+    "id": "auburn",
+    "name": {
+      "en": "Auburn",
+      "ar": "أحمر نحاسي"
+    },
+    "type": "permanent",
+    "notes": null,
+    "warn": null,
+    "hex": "#7c432b",
+    "hexDay3": null,
+    "chemical": true,
+    "safety": [
+      "patchTest48h",
+      "metallicSaltProducts",
+      "pureHenna",
+      "irritationToday"
+    ],
+    "greyBlend": null,
+    "greyDefault": null
+  },
+  {
+    "id": "blonde",
+    "name": {
+      "en": "Blonde",
+      "ar": "أشقر"
+    },
+    "type": "permanent",
+    "notes": {
+      "en": "Needs lightening on dark beards",
+      "ar": "يحتاج إلى تفتيح على اللحى الداكنة"
+    },
+    "warn": null,
+    "hex": "#b09168",
+    "hexDay3": null,
+    "chemical": true,
+    "safety": [
+      "patchTest48h",
+      "metallicSaltProducts",
+      "pureHenna",
+      "irritationToday"
+    ],
+    "greyBlend": null,
+    "greyDefault": null
+  },
+  {
+    "id": "salt-pepper",
+    "name": {
+      "en": "Salt and pepper (keep)",
+      "ar": "ملح وفلفل"
+    },
+    "type": "none",
+    "notes": {
+      "en": "Simulate grey ratio as-is",
+      "ar": "محاكاة نسبة الشيب كما هي"
+    },
+    "warn": null,
+    "hex": null,
+    "hexDay3": null,
+    "chemical": false,
+    "safety": [],
+    "greyBlend": null,
+    "greyDefault": null
+  },
+  {
+    "id": "silver",
+    "name": {
+      "en": "Silver or white (embrace)",
+      "ar": "فضي أو أبيض"
+    },
+    "type": "toner",
+    "notes": null,
+    "warn": null,
+    "hex": "#c7c7c4",
+    "hexDay3": null,
+    "chemical": true,
+    "safety": [
+      "patchTest48h",
+      "metallicSaltProducts",
+      "pureHenna",
+      "irritationToday"
+    ],
+    "greyBlend": null,
+    "greyDefault": null
+  },
+  {
+    "id": "grey-blend",
+    "name": {
+      "en": "Grey blending 25 / 50 / 75%",
+      "ar": "تمويه الشيب"
+    },
+    "type": "demi-permanent",
+    "notes": {
+      "en": "Slider; keeps some grey for a natural look",
+      "ar": "بشريط تمرير؛ يُبقي بعض الشيب لمظهر طبيعي"
+    },
+    "warn": null,
+    "hex": null,
+    "hexDay3": null,
+    "chemical": true,
+    "safety": [
+      "patchTest48h",
+      "metallicSaltProducts",
+      "pureHenna",
+      "irritationToday"
+    ],
+    "greyBlend": [
+      25,
+      50,
+      75
+    ],
+    "greyDefault": 50
+  },
+  {
+    "id": "henna",
+    "name": {
+      "en": "Henna (orange-red)",
+      "ar": "حناء"
+    },
+    "type": "vegetable",
+    "notes": {
+      "en": "Pure henna coats the hair and blocks later chemical color",
+      "ar": "الحناء الصافية تغلّف الشعر وتمنع الصبغات الكيميائية لاحقاً"
+    },
+    "warn": null,
+    "hex": "#b04c1e",
+    "hexDay3": "#944020",
+    "chemical": false,
+    "safety": [
+      "metallicSaltProducts",
+      "irritationToday"
+    ],
+    "greyBlend": null,
+    "greyDefault": null
+  },
+  {
+    "id": "henna-katam",
+    "name": {
+      "en": "Henna + katam (brown-black)",
+      "ar": "حناء وكتم"
+    },
+    "type": "vegetable",
+    "notes": {
+      "en": "Two-step natural darkening",
+      "ar": "تغميق طبيعي على مرحلتين"
+    },
+    "warn": null,
+    "hex": "#4b342b",
+    "hexDay3": "#382924",
+    "chemical": false,
+    "safety": [
+      "metallicSaltProducts",
+      "irritationToday"
+    ],
+    "greyBlend": null,
+    "greyDefault": null
+  },
+  {
+    "id": "temp-color",
+    "name": {
+      "en": "Temporary color (wash-out)",
+      "ar": "لون مؤقت"
+    },
+    "type": "temporary",
+    "notes": {
+      "en": "Lasts until next wash",
+      "ar": "يدوم حتى الغسلة التالية"
+    },
+    "warn": null,
+    "hex": "#2c2724",
+    "hexDay3": null,
+    "chemical": false,
+    "safety": [
+      "irritationToday"
+    ],
+    "greyBlend": null,
+    "greyDefault": null
+  }
+]

@@ -1,0 +1,40 @@
+{
+  "en": {
+    "demo.pill": "Demo",
+    "demo.pill.label": "Demo mode: what it means",
+    "demo.sheet.title": "Demo mode",
+    "demo.sheet.lead": "Demo mode: no login, everything stays in this browser.",
+    "demo.sheet.links": "Look Codes and the shop link open only in this browser.",
+    "demo.sheet.ai": "AI Final Look is off.",
+    "demo.sheet.photos": "Photos stay on this device, as in the real app.",
+    "demo.sheet.reset": "Reset demo deletes the demo shop, its clients and visits, and starts a fresh one.",
+    "demo.reset": "Reset demo",
+    "demo.starting": "Opening the demo shop",
+    "demo.try.unknown.title": "This demo shop is not in this browser",
+    "demo.try.unknown.body": "A demo shop lives only in the browser that opened the demo. Open this link in that browser, or start the demo here.",
+    "demo.try.unknown.action": "Open the demo",
+    "demo.invite.notSent": "Demo: invites are not sent. In the real app the invite arrives by email. This is the join link it would carry.",
+    "demo.code.local": "Demo: this code works only in this browser.",
+    "demo.shopLink": "Demo: this link opens only in this browser.",
+    "demo.ai.off": "AI Final Look is off in the demo. Barbers see the live preview."
+  },
+  "ar": {
+    "demo.pill": "تجريبي",
+    "demo.pill.label": "الوضع التجريبي: ماذا يعني",
+    "demo.sheet.title": "الوضع التجريبي",
+    "demo.sheet.lead": "الوضع التجريبي: بدون تسجيل دخول، وكل شيء يبقى في هذا المتصفح.",
+    "demo.sheet.links": "رموز الإطلالة ورابط المحل تفتح في هذا المتصفح فقط.",
+    "demo.sheet.ai": "الإطلالة النهائية بالذكاء الاصطناعي متوقفة.",
+    "demo.sheet.photos": "الصور تبقى على هذا الجهاز، كما في التطبيق الحقيقي.",
+    "demo.sheet.reset": "إعادة ضبط التجربة تحذف المحل التجريبي وعملاءه وزياراته، وتبدأ محلًا جديدًا.",
+    "demo.reset": "إعادة ضبط التجربة",
+    "demo.starting": "جارٍ فتح المحل التجريبي",
+    "demo.try.unknown.title": "هذا المحل التجريبي غير موجود في هذا المتصفح",
+    "demo.try.unknown.body": "المحل التجريبي يعيش فقط في المتصفح الذي فُتحت فيه التجربة. افتح هذا الرابط في ذلك المتصفح، أو ابدأ التجربة هنا.",
+    "demo.try.unknown.action": "افتح التجربة",
+    "demo.invite.notSent": "تجريبي: الدعوات لا تُرسل. في التطبيق الحقيقي تصل الدعوة بالبريد. هذا رابط الانضمام الذي ستحمله.",
+    "demo.code.local": "تجريبي: هذا الرمز يعمل في هذا المتصفح فقط.",
+    "demo.shopLink": "تجريبي: هذا الرابط يفتح في هذا المتصفح فقط.",
+    "demo.ai.off": "الإطلالة النهائية بالذكاء الاصطناعي متوقفة في التجربة. يرى الحلاقون المعاينة الحيّة."
+  }
+}

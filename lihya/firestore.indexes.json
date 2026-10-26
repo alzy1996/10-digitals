@@ -1,0 +1,44 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "clients",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lastVisitAt", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "staff",
+      "fieldPath": "uid",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION" },
+        { "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    { "collectionGroup": "consultations", "fieldPath": "params", "indexes": [] },
+    { "collectionGroup": "consultations", "fieldPath": "cutCard", "indexes": [] },
+    { "collectionGroup": "lookCodes", "fieldPath": "params", "indexes": [] },
+    { "collectionGroup": "audit", "fieldPath": "changedFields", "indexes": [] },
+    { "collectionGroup": "shops", "fieldPath": "settings", "indexes": [] },
+    { "collectionGroup": "clients", "fieldPath": "lastLengths", "indexes": [] },
+    { "collectionGroup": "styles", "fieldPath": "zones", "indexes": [] },
+    { "collectionGroup": "styles", "fieldPath": "shape", "indexes": [] },
+    { "collectionGroup": "styles", "fieldPath": "lines", "indexes": [] },
+    { "collectionGroup": "styles", "fieldPath": "weights", "indexes": [] },
+    { "collectionGroup": "styles", "fieldPath": "required", "indexes": [] },
+    {
+      "collectionGroup": "lookCodes",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION" }
+      ]
+    }
+  ]
+}

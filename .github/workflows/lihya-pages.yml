@@ -1,0 +1,79 @@
+# LIHYA on GitHub Pages: https://<owner>.github.io/<repo>/
+# Runs on every push to main that touches lihya/, or by hand (Actions > this workflow > Run workflow).
+# One-time setup (Sam): Settings > Pages > Source: GitHub Actions; Settings > Secrets and variables >
+# Actions > New repository secret for each VITE_* below (the Firebase web config from .env.local).
+# Without the VITE_FB_* secrets the build is the zero-setup Demo mode (lihya/README.md, "Demo link"); adding them
+# switches the same link to the real app on the next run.
+name: LIHYA deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lihya/**'
+      - '.github/workflows/lihya-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: lihya-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lihya
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lihya/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build for the Pages sub-path
+        env:
+          LIHYA_BASE: /${{ github.event.repository.name }}/
+          VITE_FB_API_KEY: ${{ secrets.VITE_FB_API_KEY }}
+          VITE_FB_AUTH_DOMAIN: ${{ secrets.VITE_FB_AUTH_DOMAIN }}
+          VITE_FB_PROJECT_ID: ${{ secrets.VITE_FB_PROJECT_ID }}
+          VITE_FB_APP_ID: ${{ secrets.VITE_FB_APP_ID }}
+          VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
+          VITE_AI_WORKER_URL: ${{ secrets.VITE_AI_WORKER_URL }}
+        run: npm run build
+
+      - name: Size and secrets gate
+        run: npm run check:size
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: lihya/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

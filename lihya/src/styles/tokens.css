@@ -1,0 +1,105 @@
+/* LIHYA design tokens (PRD 9.1). Dark is the default theme.
+   Each color is also exposed as an "r g b" triplet for Tailwind alpha utilities.
+   The --*-ink tokens are the text versions of the status colors: they meet WCAG AA (4.5:1 or more)
+   on --bg, --surface, --surface-2 and on each tone's own 10% tint in both themes (PRD 9.1).
+   The PRD values stay as they are for fills, borders and zone tints; Tailwind's text-keep,
+   text-cut, text-warn and text-info resolve to the ink tokens (tailwind.config.js). */
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0f1012;
+  --surface: #1a1c1f;
+  --surface-2: #26292e;
+  --line: #3a3e45;
+  --text: #ede8df;
+  --text-2: #a7a39b;
+  --brass: #c9a35b;
+  --on-brass: #0f1012;
+  --keep: #3e9b6a;
+  --cut: #c2412d;
+  --warn: #e0a43a;
+  --info: #6e8ca8;
+  --keep-ink: #46af78;
+  --cut-ink: #e77866;
+  --warn-ink: #e0a43a;
+  --info-ink: #869fb6;
+
+  --bg-rgb: 15 16 18;
+  --surface-rgb: 26 28 31;
+  --surface-2-rgb: 38 41 46;
+  --line-rgb: 58 62 69;
+  --text-rgb: 237 232 223;
+  --text-2-rgb: 167 163 155;
+  --brass-rgb: 201 163 91;
+  --on-brass-rgb: 15 16 18;
+  --keep-rgb: 62 155 106;
+  --cut-rgb: 194 65 45;
+  --warn-rgb: 224 164 58;
+  --info-rgb: 110 140 168;
+  --keep-ink-rgb: 70 175 120;
+  --cut-ink-rgb: 231 120 102;
+  --warn-ink-rgb: 224 164 58;
+  --info-ink-rgb: 134 159 182;
+
+  /* spacing, shape, motion (PRD 9.3) */
+  --gutter: 16px;
+  --radius-ctl: 10px;
+  --radius-card: 16px;
+  --dur-press: 160ms;
+  --dur-sheet: 240ms;
+  --dur-screen: 320ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f6f3ee;
+  --surface: #ffffff;
+  --surface-2: #eee9e1;
+  --line: #d9d2c6;
+  --text: #16171a;
+  --text-2: #5e5a53;
+  --brass: #7e622a;
+  --on-brass: #ffffff;
+  --keep: #2e7d53;
+  --cut: #a8331f;
+  --warn: #9a6a12;
+  --info: #3f5f7d;
+  --keep-ink: #286c48;
+  --cut-ink: #a8331f;
+  --warn-ink: #80570c;
+  --info-ink: #3f5f7d;
+
+  --bg-rgb: 246 243 238;
+  --surface-rgb: 255 255 255;
+  --surface-2-rgb: 238 233 225;
+  --line-rgb: 217 210 198;
+  --text-rgb: 22 23 26;
+  --text-2-rgb: 94 90 83;
+  --brass-rgb: 126 98 42;
+  --on-brass-rgb: 255 255 255;
+  --keep-rgb: 46 125 83;
+  --cut-rgb: 168 51 31;
+  --warn-rgb: 154 106 18;
+  --info-rgb: 63 95 125;
+  --keep-ink-rgb: 40 108 72;
+  --cut-ink-rgb: 168 51 31;
+  --warn-ink-rgb: 128 87 12;
+  --info-ink-rgb: 63 95 125;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --gutter: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-press: 0ms;
+    --dur-sheet: 0ms;
+    --dur-screen: 0ms;
+  }
+}
