@@ -1,0 +1,210 @@
+[
+  {
+    "id": "natural-short",
+    "name": {
+      "en": "Natural short",
+      "ar": "شنب طبيعي قصير"
+    },
+    "shape": {
+      "en": "Trimmed at the lip line",
+      "ar": "مشذّب عند خط الشفة"
+    },
+    "widthFactor": 1,
+    "thicknessMm": 12,
+    "ends": "trim",
+    "overLip": false,
+    "waxed": false
+  },
+  {
+    "id": "sunnah-trimmed",
+    "name": {
+      "en": "Trimmed short",
+      "ar": "شنب محفوف"
+    },
+    "shape": {
+      "en": "Clipped very short above the lip",
+      "ar": "مقصوص قصيراً جداً فوق الشفة"
+    },
+    "widthFactor": 1,
+    "thicknessMm": 12,
+    "ends": "trim",
+    "overLip": false,
+    "waxed": false
+  },
+  {
+    "id": "chevron",
+    "name": {
+      "en": "Chevron",
+      "ar": "شيفرون"
+    },
+    "shape": {
+      "en": "Thick and wide, covers the top lip edge",
+      "ar": "كثيف وعريض، يغطي حافة الشفة العليا"
+    },
+    "widthFactor": 1.08,
+    "thicknessMm": 14,
+    "ends": "trim",
+    "overLip": true,
+    "waxed": false
+  },
+  {
+    "id": "pencil",
+    "name": {
+      "en": "Pencil",
+      "ar": "شنب رفيع"
+    },
+    "shape": {
+      "en": "Thin line just above the lip",
+      "ar": "خط رفيع فوق الشفة مباشرة"
+    },
+    "widthFactor": 0.95,
+    "thicknessMm": 3,
+    "ends": "trim",
+    "overLip": false,
+    "waxed": false
+  },
+  {
+    "id": "english",
+    "name": {
+      "en": "English",
+      "ar": "إنجليزي"
+    },
+    "shape": {
+      "en": "Narrow, long ends pulled sideways with wax",
+      "ar": "ضيق، أطرافه طويلة مشدودة إلى الجانبين بالشمع"
+    },
+    "widthFactor": 1.25,
+    "thicknessMm": 6,
+    "ends": "pulled",
+    "overLip": false,
+    "waxed": true
+  },
+  {
+    "id": "handlebar",
+    "name": {
+      "en": "Handlebar",
+      "ar": "المقود"
+    },
+    "shape": {
+      "en": "Long ends curled upward with wax",
+      "ar": "أطراف طويلة ملفوفة إلى الأعلى بالشمع"
+    },
+    "widthFactor": 1.35,
+    "thicknessMm": 10,
+    "ends": "curl-up",
+    "overLip": false,
+    "waxed": true
+  },
+  {
+    "id": "horseshoe",
+    "name": {
+      "en": "Horseshoe",
+      "ar": "حدوة الحصان"
+    },
+    "shape": {
+      "en": "Runs down the mouth corners to the jaw",
+      "ar": "ينزل من زاويتي الفم حتى الفك"
+    },
+    "widthFactor": 1.05,
+    "thicknessMm": 10,
+    "ends": "down-to-jaw",
+    "overLip": false,
+    "waxed": false
+  },
+  {
+    "id": "walrus",
+    "name": {
+      "en": "Walrus",
+      "ar": "الفظ"
+    },
+    "shape": {
+      "en": "Very thick, hangs over the lip",
+      "ar": "كثيف جداً ويتدلى فوق الشفة"
+    },
+    "widthFactor": 1.15,
+    "thicknessMm": 16,
+    "ends": "hang",
+    "overLip": true,
+    "waxed": false
+  },
+  {
+    "id": "fu-manchu",
+    "name": {
+      "en": "Fu Manchu",
+      "ar": "فو مانشو"
+    },
+    "shape": {
+      "en": "Long thin ends hanging past the chin",
+      "ar": "أطراف طويلة رفيعة تتدلى إلى ما بعد الذقن"
+    },
+    "widthFactor": 1,
+    "thicknessMm": 5,
+    "ends": "down-long",
+    "overLip": false,
+    "waxed": false
+  },
+  {
+    "id": "imperial",
+    "name": {
+      "en": "Imperial",
+      "ar": "إمبريال"
+    },
+    "shape": {
+      "en": "Full, ends curl up onto the cheeks",
+      "ar": "كثيف، وأطرافه تلتف إلى الأعلى نحو الخدين"
+    },
+    "widthFactor": 1.3,
+    "thicknessMm": 12,
+    "ends": "curl-cheek",
+    "overLip": false,
+    "waxed": true
+  },
+  {
+    "id": "painters-brush",
+    "name": {
+      "en": "Painter's brush",
+      "ar": "فرشاة الرسام"
+    },
+    "shape": {
+      "en": "Thick, flat, wide brush shape",
+      "ar": "كثيف ومسطح وعريض على شكل فرشاة"
+    },
+    "widthFactor": 1.05,
+    "thicknessMm": 13,
+    "ends": "brush",
+    "overLip": false,
+    "waxed": false
+  },
+  {
+    "id": "dali",
+    "name": {
+      "en": "Dali",
+      "ar": "دالي"
+    },
+    "shape": {
+      "en": "Thin, ends waxed straight up",
+      "ar": "رفيع، وأطرافه مشدودة بالشمع إلى الأعلى مباشرة"
+    },
+    "widthFactor": 1.05,
+    "thicknessMm": 3,
+    "ends": "waxed-up",
+    "overLip": false,
+    "waxed": true
+  },
+  {
+    "id": "pyramid",
+    "name": {
+      "en": "Pyramid",
+      "ar": "هرمي"
+    },
+    "shape": {
+      "en": "Narrow on top, wide at the bottom",
+      "ar": "ضيق من الأعلى وعريض من الأسفل"
+    },
+    "widthFactor": 1,
+    "thicknessMm": 12,
+    "ends": "pyramid",
+    "overLip": false,
+    "waxed": false
+  }
+]

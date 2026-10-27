@@ -1,0 +1,483 @@
+[
+  {
+    "id": "jet-black",
+    "name": {
+      "en": "Jet black",
+      "ar": "أسود فاحم"
+    },
+    "family": "natural",
+    "level": 1,
+    "tone": "natural",
+    "swatch": "#141110",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "blue-black",
+    "name": {
+      "en": "Glossy blue-black",
+      "ar": "أسود لامع مزرق"
+    },
+    "family": "natural",
+    "level": 1,
+    "tone": "ash",
+    "swatch": "#12141A",
+    "trend2026": true,
+    "highUpkeep": false
+  },
+  {
+    "id": "soft-black",
+    "name": {
+      "en": "Soft black",
+      "ar": "أسود ناعم"
+    },
+    "family": "natural",
+    "level": 2,
+    "tone": "natural",
+    "swatch": "#241C18",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "espresso",
+    "name": {
+      "en": "Espresso",
+      "ar": "إسبريسو"
+    },
+    "family": "brunette",
+    "level": 2,
+    "tone": "mocha",
+    "swatch": "#2E2019",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "dark-chocolate",
+    "name": {
+      "en": "Dark chocolate",
+      "ar": "شوكولاتة داكنة"
+    },
+    "family": "brunette",
+    "level": 3,
+    "tone": "mocha",
+    "swatch": "#3D2A20",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "smoky-brunette",
+    "name": {
+      "en": "Smoky brunette",
+      "ar": "بني دخاني"
+    },
+    "family": "cool",
+    "level": 4,
+    "tone": "ash",
+    "swatch": "#4E423B",
+    "trend2026": true,
+    "highUpkeep": false
+  },
+  {
+    "id": "warm-chestnut",
+    "name": {
+      "en": "Warm chestnut",
+      "ar": "كستنائي دافئ"
+    },
+    "family": "brunette",
+    "level": 5,
+    "tone": "gold",
+    "swatch": "#6A4128",
+    "trend2026": true,
+    "highUpkeep": false
+  },
+  {
+    "id": "mushroom-brown",
+    "name": {
+      "en": "Mushroom brown",
+      "ar": "بني مشروم"
+    },
+    "family": "cool",
+    "level": 5,
+    "tone": "beige",
+    "swatch": "#7A6656",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "cherry-cola",
+    "name": {
+      "en": "Cherry cola",
+      "ar": "كرزي كولا"
+    },
+    "family": "red",
+    "level": 3,
+    "tone": "mahogany",
+    "swatch": "#4A1E1E",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "burgundy",
+    "name": {
+      "en": "Burgundy",
+      "ar": "عنابي"
+    },
+    "family": "red",
+    "level": 4,
+    "tone": "mahogany",
+    "swatch": "#5C1F2A",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "plum",
+    "name": {
+      "en": "Plum",
+      "ar": "برقوقي"
+    },
+    "family": "red",
+    "level": 4,
+    "tone": "violet",
+    "swatch": "#4E2638",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "mahogany",
+    "name": {
+      "en": "Mahogany",
+      "ar": "ماهوجني"
+    },
+    "family": "red",
+    "level": 5,
+    "tone": "mahogany",
+    "swatch": "#6B2E25",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "auburn",
+    "name": {
+      "en": "Auburn",
+      "ar": "أحمر كستنائي"
+    },
+    "family": "red",
+    "level": 5,
+    "tone": "copper",
+    "swatch": "#7E3B26",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "ruby-red",
+    "name": {
+      "en": "Ruby red",
+      "ar": "أحمر ياقوتي"
+    },
+    "family": "red",
+    "level": 6,
+    "tone": "red",
+    "swatch": "#9B1E2B",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "cowboy-copper",
+    "name": {
+      "en": "Cowboy copper",
+      "ar": "نحاسي بني"
+    },
+    "family": "warm",
+    "level": 6,
+    "tone": "copper",
+    "swatch": "#9E5A36",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "teddy-bronde",
+    "name": {
+      "en": "Teddy bronde",
+      "ar": "برونْد دافئ"
+    },
+    "family": "warm",
+    "level": 7,
+    "tone": "gold",
+    "swatch": "#8E6A48",
+    "trend2026": true,
+    "highUpkeep": false
+  },
+  {
+    "id": "caramel",
+    "name": {
+      "en": "Caramel",
+      "ar": "كراميل"
+    },
+    "family": "warm",
+    "level": 7,
+    "tone": "gold",
+    "swatch": "#A86F3E",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "soft-copper",
+    "name": {
+      "en": "Soft copper",
+      "ar": "نحاسي ناعم"
+    },
+    "family": "warm",
+    "level": 7,
+    "tone": "copper",
+    "swatch": "#C47A4A",
+    "trend2026": true,
+    "highUpkeep": false
+  },
+  {
+    "id": "ginger",
+    "name": {
+      "en": "Ginger",
+      "ar": "زنجبيلي"
+    },
+    "family": "warm",
+    "level": 7,
+    "tone": "copper",
+    "swatch": "#D06A2E",
+    "trend2026": true,
+    "highUpkeep": false
+  },
+  {
+    "id": "honey",
+    "name": {
+      "en": "Honey",
+      "ar": "عسلي"
+    },
+    "family": "warm",
+    "level": 7,
+    "tone": "gold",
+    "swatch": "#B98A4E",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "golden-blonde",
+    "name": {
+      "en": "Golden blonde",
+      "ar": "أشقر ذهبي"
+    },
+    "family": "warm",
+    "level": 8,
+    "tone": "gold",
+    "swatch": "#C9A05E",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "strawberry-blonde",
+    "name": {
+      "en": "Strawberry blonde",
+      "ar": "أشقر فراولي"
+    },
+    "family": "warm",
+    "level": 8,
+    "tone": "copper",
+    "swatch": "#C98A5E",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "ash-blonde",
+    "name": {
+      "en": "Ash blonde",
+      "ar": "أشقر رمادي"
+    },
+    "family": "cool",
+    "level": 8,
+    "tone": "ash",
+    "swatch": "#B8A88E",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "buttery-blonde",
+    "name": {
+      "en": "Buttery blonde",
+      "ar": "أشقر زبدي"
+    },
+    "family": "warm",
+    "level": 9,
+    "tone": "gold",
+    "swatch": "#D9BE8A",
+    "trend2026": true,
+    "highUpkeep": false
+  },
+  {
+    "id": "beige-blonde",
+    "name": {
+      "en": "Beige blonde",
+      "ar": "أشقر بيج"
+    },
+    "family": "neutral",
+    "level": 9,
+    "tone": "beige",
+    "swatch": "#D6C3A2",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "pearl-blonde",
+    "name": {
+      "en": "Pearl blonde",
+      "ar": "أشقر لؤلؤي"
+    },
+    "family": "cool",
+    "level": 10,
+    "tone": "pearl",
+    "swatch": "#E3D9CB",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "platinum",
+    "name": {
+      "en": "Platinum",
+      "ar": "بلاتيني"
+    },
+    "family": "cool",
+    "level": 11,
+    "tone": "violet",
+    "swatch": "#ECE6DA",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "icy-white",
+    "name": {
+      "en": "Icy white",
+      "ar": "أبيض ثلجي"
+    },
+    "family": "cool",
+    "level": 12,
+    "tone": "violet",
+    "swatch": "#F2F0EC",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "white-gold",
+    "name": {
+      "en": "White-gold metallic",
+      "ar": "ذهبي أبيض معدني"
+    },
+    "family": "metallic",
+    "level": 11,
+    "tone": "gold",
+    "swatch": "#E8DCC0",
+    "trend2026": true,
+    "highUpkeep": false
+  },
+  {
+    "id": "silver",
+    "name": {
+      "en": "Silver",
+      "ar": "فضي"
+    },
+    "family": "cool",
+    "level": 11,
+    "tone": "ash",
+    "swatch": "#C9C9C9",
+    "trend2026": false,
+    "highUpkeep": false
+  },
+  {
+    "id": "rose-gold",
+    "name": {
+      "en": "Rose gold",
+      "ar": "ذهبي وردي"
+    },
+    "family": "pastel",
+    "level": 10,
+    "tone": "copper",
+    "swatch": "#D9A08E",
+    "trend2026": false,
+    "highUpkeep": true
+  },
+  {
+    "id": "pastel-pink",
+    "name": {
+      "en": "Pastel pink",
+      "ar": "وردي باستيل"
+    },
+    "family": "pastel",
+    "level": 10,
+    "tone": "red",
+    "swatch": "#E8B4C0",
+    "trend2026": true,
+    "highUpkeep": true
+  },
+  {
+    "id": "lilac",
+    "name": {
+      "en": "Lilac",
+      "ar": "ليلكي"
+    },
+    "family": "pastel",
+    "level": 10,
+    "tone": "violet",
+    "swatch": "#C3A6D8",
+    "trend2026": true,
+    "highUpkeep": true
+  },
+  {
+    "id": "peach",
+    "name": {
+      "en": "Peach",
+      "ar": "خوخي"
+    },
+    "family": "pastel",
+    "level": 10,
+    "tone": "copper",
+    "swatch": "#F0B48E",
+    "trend2026": false,
+    "highUpkeep": true
+  },
+  {
+    "id": "mint",
+    "name": {
+      "en": "Mint",
+      "ar": "نعناعي"
+    },
+    "family": "pastel",
+    "level": 10,
+    "tone": "matte",
+    "swatch": "#A8D8C0",
+    "trend2026": false,
+    "highUpkeep": true
+  },
+  {
+    "id": "neon-pink",
+    "name": {
+      "en": "Neon pink",
+      "ar": "وردي نيون"
+    },
+    "family": "vivid",
+    "level": 9,
+    "tone": "red",
+    "swatch": "#FF4FA0",
+    "trend2026": true,
+    "highUpkeep": true
+  },
+  {
+    "id": "electric-blue",
+    "name": {
+      "en": "Electric blue",
+      "ar": "أزرق كهربائي"
+    },
+    "family": "vivid",
+    "level": 8,
+    "tone": "ash",
+    "swatch": "#2E6BE6",
+    "trend2026": false,
+    "highUpkeep": true
+  }
+]

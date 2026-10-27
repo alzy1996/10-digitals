@@ -1,0 +1,288 @@
+{
+  "types": [
+    {
+      "id": "cheek",
+      "name": {
+        "en": "Cheek line",
+        "ar": "خط الخد"
+      },
+      "options": [
+        {
+          "id": "natural",
+          "name": {
+            "en": "Natural",
+            "ar": "طبيعي"
+          },
+          "level": null,
+          "curve": "natural"
+        },
+        {
+          "id": "low",
+          "name": {
+            "en": "Low, follows jaw",
+            "ar": "منخفض"
+          },
+          "level": 0.25,
+          "curve": "jaw"
+        },
+        {
+          "id": "medium",
+          "name": {
+            "en": "Medium",
+            "ar": "متوسط"
+          },
+          "level": 0.5,
+          "curve": "jaw"
+        },
+        {
+          "id": "high",
+          "name": {
+            "en": "High",
+            "ar": "مرتفع"
+          },
+          "level": 0.85,
+          "curve": "natural"
+        },
+        {
+          "id": "curved",
+          "name": {
+            "en": "Curved",
+            "ar": "منحني"
+          },
+          "level": 0.6,
+          "curve": "curved"
+        },
+        {
+          "id": "straight",
+          "name": {
+            "en": "Straight razor (khatt)",
+            "ar": "مستقيم حاد"
+          },
+          "level": 0.6,
+          "curve": "straight"
+        }
+      ]
+    },
+    {
+      "id": "neckline",
+      "name": {
+        "en": "Neckline",
+        "ar": "خط الرقبة"
+      },
+      "options": [
+        {
+          "id": "1f",
+          "name": {
+            "en": "1 finger above Adam's apple (long beards)",
+            "ar": "إصبع"
+          },
+          "fingers": 1,
+          "mmAboveAdamsApple": 15,
+          "followsJaw": false,
+          "squared": false
+        },
+        {
+          "id": "2f",
+          "name": {
+            "en": "2 fingers, about 3 cm (standard)",
+            "ar": "إصبعين"
+          },
+          "fingers": 2,
+          "mmAboveAdamsApple": 30,
+          "followsJaw": false,
+          "squared": false
+        },
+        {
+          "id": "jaw",
+          "name": {
+            "en": "Follows jaw curve",
+            "ar": "مع خط الفك"
+          },
+          "fingers": null,
+          "mmAboveAdamsApple": null,
+          "followsJaw": true,
+          "squared": false
+        },
+        {
+          "id": "squared",
+          "name": {
+            "en": "Squared corner",
+            "ar": "زاوية مربعة"
+          },
+          "fingers": 2,
+          "mmAboveAdamsApple": 30,
+          "followsJaw": false,
+          "squared": true
+        }
+      ]
+    },
+    {
+      "id": "sideburn",
+      "name": {
+        "en": "Sideburn join",
+        "ar": "وصلة السوالف"
+      },
+      "options": [
+        {
+          "id": "hard",
+          "name": {
+            "en": "Hard part",
+            "ar": "خط فاصل"
+          }
+        },
+        {
+          "id": "skin-fade",
+          "name": {
+            "en": "Skin fade",
+            "ar": "فيد على الجلد"
+          }
+        },
+        {
+          "id": "blended",
+          "name": {
+            "en": "Blended",
+            "ar": "مدمج"
+          }
+        },
+        {
+          "id": "disconnected",
+          "name": {
+            "en": "Disconnected",
+            "ar": "منفصل"
+          }
+        }
+      ]
+    },
+    {
+      "id": "edge",
+      "name": {
+        "en": "Edge finish",
+        "ar": "تشطيب الحواف"
+      },
+      "options": [
+        {
+          "id": "soft",
+          "name": {
+            "en": "Soft (scissor)",
+            "ar": "ناعم"
+          },
+          "tool": "scissor",
+          "sharpness": 0.3
+        },
+        {
+          "id": "crisp",
+          "name": {
+            "en": "Crisp (trimmer)",
+            "ar": "حاد"
+          },
+          "tool": "trimmer",
+          "sharpness": 0.75
+        },
+        {
+          "id": "razor",
+          "name": {
+            "en": "Razor (straight razor)",
+            "ar": "تحديد بالموس"
+          },
+          "tool": "razor",
+          "sharpness": 1
+        }
+      ]
+    },
+    {
+      "id": "mustacheEdge",
+      "name": {
+        "en": "Mustache edge",
+        "ar": "حافة الشنب"
+      },
+      "options": [
+        {
+          "id": "over",
+          "name": {
+            "en": "Over the lip",
+            "ar": "فوق الشفة"
+          }
+        },
+        {
+          "id": "at",
+          "name": {
+            "en": "At the lip line",
+            "ar": "على خط الشفة"
+          }
+        },
+        {
+          "id": "short",
+          "name": {
+            "en": "Very short (Sunnah)",
+            "ar": "محفوف"
+          }
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "id": "light-awarid",
+      "name": {
+        "en": "Light 'awarid",
+        "ar": "عوارض خفيفة"
+      },
+      "desc": {
+        "en": "Cheeks and sideburns kept light and short, low clean cheek line",
+        "ar": "العوارض والسوالف خفيفة وقصيرة مع خط خد منخفض ونظيف"
+      },
+      "patch": {
+        "zonesMax": {
+          "K_L": 3,
+          "K_R": 3,
+          "B_L": 3,
+          "B_R": 3
+        },
+        "lines": {
+          "cheek": "low",
+          "edge": "crisp"
+        }
+      }
+    },
+    {
+      "id": "eid-lineup",
+      "name": {
+        "en": "Eid line-up",
+        "ar": "تحديد العيد"
+      },
+      "desc": {
+        "en": "Straight razor cheek line and a clean 2-finger neckline",
+        "ar": "خط خد مستقيم بالموس وخط رقبة نظيف بعرض إصبعين"
+      },
+      "patch": {
+        "lines": {
+          "cheek": "straight",
+          "neckline": "2f",
+          "edge": "razor",
+          "mustacheEdge": "at"
+        },
+        "finish": "oiled"
+      }
+    },
+    {
+      "id": "wedding-lineup",
+      "name": {
+        "en": "Wedding line-up",
+        "ar": "تحديد العرس"
+      },
+      "desc": {
+        "en": "Curved razor cheek line, clean neckline and a balm-shaped finish",
+        "ar": "خط خد منحني بالموس وخط رقبة نظيف وتشكيل بالبلسم"
+      },
+      "patch": {
+        "lines": {
+          "cheek": "curved",
+          "neckline": "2f",
+          "edge": "razor",
+          "mustacheEdge": "at"
+        },
+        "finish": "balm"
+      }
+    }
+  ]
+}

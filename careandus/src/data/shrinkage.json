@@ -1,0 +1,6 @@
+{
+  "straight": { "pct": 0, "range": [0, 0] },
+  "wavy": { "pct": 15, "range": [10, 20] },
+  "curly": { "pct": 40, "range": [30, 50] },
+  "coily": { "pct": 60, "range": [50, 75] }
+}

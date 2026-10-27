@@ -1,0 +1,6 @@
+[
+  { "id": "glossy", "name": { "en": "Glossy (glass hair)", "ar": "لامع جداً" }, "specular": 1.6, "tightness": 1.4, "tint": [1, 1, 1] },
+  { "id": "satin", "name": { "en": "Satin (natural)", "ar": "ساتان طبيعي" }, "specular": 1.0, "tightness": 1.0, "tint": [1, 1, 1] },
+  { "id": "matte", "name": { "en": "Matte", "ar": "مطفي" }, "specular": 0.5, "tightness": 0.6, "tint": [1, 1, 1] },
+  { "id": "pearl", "name": { "en": "Pearl or metallic", "ar": "لؤلؤي معدني" }, "specular": 1.3, "tightness": 1.1, "tint": [0.93, 0.97, 1.06] }
+]

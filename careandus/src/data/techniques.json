@@ -1,0 +1,462 @@
+[
+  {
+    "id": "global",
+    "name": {
+      "en": "All-over (single process)",
+      "ar": "صبغة كاملة"
+    },
+    "where": {
+      "en": "Root to ends",
+      "ar": "من الجذور حتى الأطراف"
+    },
+    "upkeep": "high",
+    "upkeepNote": "high",
+    "trend2026": false,
+    "mask": "global",
+    "params": {
+      "start": 0,
+      "density": 1,
+      "softness": 0.2,
+      "level": 0
+    },
+    "needsSecondShade": false,
+    "lighten": false
+  },
+  {
+    "id": "root-touch-up",
+    "name": {
+      "en": "Root touch-up",
+      "ar": "صبغ الجذور"
+    },
+    "where": {
+      "en": "First 1 to 2 cm",
+      "ar": "أول 1 إلى 2 سم"
+    },
+    "upkeep": "high",
+    "upkeepNote": "every 4 to 6 weeks",
+    "trend2026": false,
+    "mask": "root",
+    "params": {
+      "start": 0,
+      "density": 1,
+      "softness": 0.3,
+      "level": 0
+    },
+    "needsSecondShade": false,
+    "lighten": false
+  },
+  {
+    "id": "color-drench",
+    "name": {
+      "en": "Color drenching",
+      "ar": "صبغة لون واحد لامعة"
+    },
+    "where": {
+      "en": "One shade root to ends, high gloss",
+      "ar": "لون واحد من الجذور حتى الأطراف بلمعان عالٍ"
+    },
+    "upkeep": "high",
+    "upkeepNote": "high (2026)",
+    "trend2026": true,
+    "mask": "drench",
+    "params": {
+      "start": 0,
+      "density": 1,
+      "softness": 0.2,
+      "level": 0
+    },
+    "needsSecondShade": false,
+    "lighten": false
+  },
+  {
+    "id": "full-highlights",
+    "name": {
+      "en": "Full highlights",
+      "ar": "هايلايت كامل"
+    },
+    "where": {
+      "en": "Fine strands all over",
+      "ar": "خصلات رفيعة في كل الشعر"
+    },
+    "upkeep": "medium",
+    "upkeepNote": "medium",
+    "trend2026": false,
+    "mask": "highlights",
+    "params": {
+      "start": 0.08,
+      "density": 0.4,
+      "softness": 0.4,
+      "level": 2
+    },
+    "needsSecondShade": false,
+    "lighten": true
+  },
+  {
+    "id": "partial-highlights",
+    "name": {
+      "en": "Partial highlights",
+      "ar": "هايلايت جزئي"
+    },
+    "where": {
+      "en": "Top and sides",
+      "ar": "أعلى الرأس والجانبان"
+    },
+    "upkeep": "medium",
+    "upkeepNote": "medium",
+    "trend2026": false,
+    "mask": "partial",
+    "params": {
+      "start": 0.08,
+      "density": 0.35,
+      "softness": 0.4,
+      "level": 2
+    },
+    "needsSecondShade": false,
+    "lighten": true
+  },
+  {
+    "id": "babylights",
+    "name": {
+      "en": "Babylights",
+      "ar": "بيبي لايت"
+    },
+    "where": {
+      "en": "Very fine, dense strands",
+      "ar": "خصلات رفيعة جداً وكثيفة"
+    },
+    "upkeep": "medium",
+    "upkeepNote": "medium",
+    "trend2026": false,
+    "mask": "babylights",
+    "params": {
+      "start": 0.05,
+      "density": 0.5,
+      "softness": 0.6,
+      "level": 2
+    },
+    "needsSecondShade": false,
+    "lighten": true
+  },
+  {
+    "id": "lowlights",
+    "name": {
+      "en": "Lowlights",
+      "ar": "لولايت"
+    },
+    "where": {
+      "en": "Darker strands",
+      "ar": "خصلات أغمق"
+    },
+    "upkeep": "medium",
+    "upkeepNote": "medium",
+    "trend2026": false,
+    "mask": "lowlights",
+    "params": {
+      "start": 0.1,
+      "density": 0.35,
+      "softness": 0.4,
+      "level": -2
+    },
+    "needsSecondShade": false,
+    "lighten": false
+  },
+  {
+    "id": "balayage",
+    "name": {
+      "en": "Balayage",
+      "ar": "بالياج"
+    },
+    "where": {
+      "en": "Hand-painted, lighter toward the ends",
+      "ar": "رسم باليد، يفتح باتجاه الأطراف"
+    },
+    "upkeep": "low",
+    "upkeepNote": "low",
+    "trend2026": false,
+    "mask": "balayage",
+    "params": {
+      "start": 0.25,
+      "density": 0.6,
+      "softness": 0.6,
+      "level": 3
+    },
+    "needsSecondShade": false,
+    "lighten": true
+  },
+  {
+    "id": "foilyage",
+    "name": {
+      "en": "Foilyage",
+      "ar": "فويلياج"
+    },
+    "where": {
+      "en": "Balayage in foils, brighter",
+      "ar": "بالياج داخل ورق القصدير، أفتح"
+    },
+    "upkeep": "low",
+    "upkeepNote": "low",
+    "trend2026": false,
+    "mask": "foilyage",
+    "params": {
+      "start": 0.22,
+      "density": 0.65,
+      "softness": 0.5,
+      "level": 4
+    },
+    "needsSecondShade": false,
+    "lighten": true
+  },
+  {
+    "id": "ombre",
+    "name": {
+      "en": "Ombré",
+      "ar": "أومبريه"
+    },
+    "where": {
+      "en": "Dark roots to light ends, clear gradient",
+      "ar": "جذور داكنة وأطراف فاتحة بتدرج واضح"
+    },
+    "upkeep": "low",
+    "upkeepNote": "low",
+    "trend2026": false,
+    "mask": "ombre",
+    "params": {
+      "start": 0.45,
+      "density": 1,
+      "softness": 0.3,
+      "level": 2
+    },
+    "needsSecondShade": false,
+    "lighten": true
+  },
+  {
+    "id": "sombre",
+    "name": {
+      "en": "Sombré",
+      "ar": "سومبريه"
+    },
+    "where": {
+      "en": "Soft, subtle ombré",
+      "ar": "أومبريه ناعم وخفيف"
+    },
+    "upkeep": "low",
+    "upkeepNote": "low",
+    "trend2026": false,
+    "mask": "sombre",
+    "params": {
+      "start": 0.35,
+      "density": 1,
+      "softness": 0.8,
+      "level": 2
+    },
+    "needsSecondShade": false,
+    "lighten": true
+  },
+  {
+    "id": "reverse-balayage",
+    "name": {
+      "en": "Reverse balayage",
+      "ar": "بالياج عكسي"
+    },
+    "where": {
+      "en": "Adds depth back into light hair",
+      "ar": "يعيد العمق إلى الشعر الفاتح"
+    },
+    "upkeep": "low",
+    "upkeepNote": "low",
+    "trend2026": false,
+    "mask": "reverse",
+    "params": {
+      "start": 0.2,
+      "density": 0.5,
+      "softness": 0.6,
+      "level": -2
+    },
+    "needsSecondShade": true,
+    "lighten": false
+  },
+  {
+    "id": "color-melt",
+    "name": {
+      "en": "Color melt",
+      "ar": "ذوبان الألوان"
+    },
+    "where": {
+      "en": "Seamless multi-stop gradient",
+      "ar": "تدرج سلس بعدة درجات"
+    },
+    "upkeep": "medium",
+    "upkeepNote": "medium",
+    "trend2026": false,
+    "mask": "melt",
+    "params": {
+      "start": 0.2,
+      "density": 1,
+      "softness": 0.7,
+      "level": 2
+    },
+    "needsSecondShade": true,
+    "lighten": true
+  },
+  {
+    "id": "shadow-root",
+    "name": {
+      "en": "Shadow root",
+      "ar": "ظل الجذور"
+    },
+    "where": {
+      "en": "Darker root fade over 2 to 4 cm",
+      "ar": "ظل أغمق عند الجذور على 2 إلى 4 سم"
+    },
+    "upkeep": "low",
+    "upkeepNote": "low",
+    "trend2026": false,
+    "mask": "shadow",
+    "params": {
+      "start": 0,
+      "density": 1,
+      "softness": 0.6,
+      "level": -2
+    },
+    "needsSecondShade": true,
+    "lighten": false
+  },
+  {
+    "id": "money-piece",
+    "name": {
+      "en": "Money piece",
+      "ar": "إطار الوجه"
+    },
+    "where": {
+      "en": "Bright front sections around the face",
+      "ar": "خصلات فاتحة أمامية حول الوجه"
+    },
+    "upkeep": "medium",
+    "upkeepNote": "medium",
+    "trend2026": false,
+    "mask": "money",
+    "params": {
+      "start": 0,
+      "density": 1,
+      "softness": 0.4,
+      "level": 3
+    },
+    "needsSecondShade": false,
+    "lighten": true
+  },
+  {
+    "id": "peekaboo",
+    "name": {
+      "en": "Peekaboo",
+      "ar": "لون مخفي"
+    },
+    "where": {
+      "en": "Under layer only",
+      "ar": "الطبقة السفلية فقط"
+    },
+    "upkeep": "medium",
+    "upkeepNote": "medium",
+    "trend2026": false,
+    "mask": "peekaboo",
+    "params": {
+      "start": 0.1,
+      "density": 1,
+      "softness": 0.3,
+      "level": 0
+    },
+    "needsSecondShade": false,
+    "lighten": false
+  },
+  {
+    "id": "split-dye",
+    "name": {
+      "en": "Split dye",
+      "ar": "صبغة نصفين"
+    },
+    "where": {
+      "en": "Left vs right of the part",
+      "ar": "يمين ويسار الفرق"
+    },
+    "upkeep": "high",
+    "upkeepNote": "high",
+    "trend2026": false,
+    "mask": "split",
+    "params": {
+      "start": 0,
+      "density": 1,
+      "softness": 0.1,
+      "level": 0
+    },
+    "needsSecondShade": true,
+    "lighten": false
+  },
+  {
+    "id": "chunky-highlights",
+    "name": {
+      "en": "Chunky highlights",
+      "ar": "هايلايت عريض"
+    },
+    "where": {
+      "en": "Wide bold stripes",
+      "ar": "خطوط عريضة وجريئة"
+    },
+    "upkeep": "medium",
+    "upkeepNote": "medium",
+    "trend2026": false,
+    "mask": "chunky",
+    "params": {
+      "start": 0.05,
+      "density": 0.3,
+      "softness": 0.2,
+      "level": 3
+    },
+    "needsSecondShade": false,
+    "lighten": true
+  },
+  {
+    "id": "chroma-shift",
+    "name": {
+      "en": "Chroma-shift balayage",
+      "ar": "بالياج بلونين"
+    },
+    "where": {
+      "en": "Two tones changing along the length",
+      "ar": "لونان يتغيران على طول الشعر"
+    },
+    "upkeep": "medium",
+    "upkeepNote": "medium (2026)",
+    "trend2026": true,
+    "mask": "chroma",
+    "params": {
+      "start": 0.3,
+      "density": 1,
+      "softness": 0.5,
+      "level": 0
+    },
+    "needsSecondShade": true,
+    "lighten": false
+  },
+  {
+    "id": "gloss-toner",
+    "name": {
+      "en": "Gloss or toner",
+      "ar": "جلوس / تونر"
+    },
+    "where": {
+      "en": "Deposit-only over everything",
+      "ar": "إيداع لون فقط على كل الشعر"
+    },
+    "upkeep": "low",
+    "upkeepNote": "low to medium",
+    "trend2026": false,
+    "mask": "gloss",
+    "params": {
+      "start": 0,
+      "density": 1,
+      "softness": 0.2,
+      "level": 0
+    },
+    "needsSecondShade": false,
+    "lighten": false
+  }
+]

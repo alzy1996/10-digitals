@@ -1,0 +1,65 @@
+# Care & Us checks: runs on every pull request that touches careandus/.
+# Same commands a contributor runs locally (careandus/README.md "Tests").
+name: Care & Us checks
+
+on:
+  pull_request:
+    paths:
+      - 'careandus/**'
+      - '.github/workflows/careandus-*.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: careandus-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: App (lint, unit, rules, build, size)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: careandus
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: careandus/package-lock.json
+
+      # Java 21 for the Firestore emulator (rules tests)
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:rules
+      - run: npm run build
+      - run: npm run check:size
+
+  worker:
+    name: AI Worker tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: careandus/worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: careandus/worker/package-lock.json
+
+      - run: npm ci
+      - run: npm test

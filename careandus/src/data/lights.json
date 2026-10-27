@@ -1,0 +1,6 @@
+[
+  { "id": "daylight", "name": { "en": "Daylight", "ar": "ضوء النهار" }, "kelvin": 6500, "icon": "sun", "contrast": 1.0, "specular": 1.0 },
+  { "id": "salon", "name": { "en": "Salon", "ar": "إضاءة الصالون" }, "kelvin": 4000, "icon": "lamp", "contrast": 1.0, "specular": 1.0 },
+  { "id": "evening", "name": { "en": "Evening", "ar": "إضاءة مسائية دافئة" }, "kelvin": 2700, "icon": "moon", "contrast": 0.97, "specular": 0.9 },
+  { "id": "flash", "name": { "en": "Phone flash", "ar": "فلاش الهاتف" }, "kelvin": 5500, "icon": "flash", "contrast": 1.18, "specular": 1.45 }
+]

@@ -1,0 +1,1071 @@
+rules_version = '2';
+
+// =============================================================================
+// Care & Us - Firestore security rules (Hair · Nails · Beard in one salon system)
+//
+// Source of truth for every document shape: src/services/schema.js
+// (FIELDS, enums, RANGES). Every keys().hasOnly([...]) list and every enum below
+// mirrors that file one to one - when you change one, change the other.
+//
+// Conventions used throughout:
+//   * Default deny. Only the paths matched below are reachable.
+//   * The app writes every createdAt / updatedAt / at / scannedAt / usedAt /
+//     approvals.* timestamp with serverTimestamp(), so the rules compare them
+//     with request.time. Every createdBy / updatedBy / by / scannedBy / usedBy is
+//     request.auth.uid.
+//   * "Optional" fields may be absent OR null. When present and not null they
+//     must have the right type, be in the enum list and be inside the range.
+//   * Lists cannot be iterated in rules, so list fields are checked for type,
+//     size and (where an enum exists) list.hasOnly(enum).
+//   * Budget: Firestore evaluates at most 1000 expressions per request and
+//     denies the write past that. See "HOT PATH" below (clients and
+//     consultations) for how the big documents stay under it.
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -------------------------------------------------------------------------
+    // Enums and patterns (mirror src/services/schema.js)
+    // -------------------------------------------------------------------------
+    function ROLES() { return ['owner', 'manager', 'stylist']; }
+    function INVITE_ROLES() { return ['manager', 'stylist']; }        // owners are never invited
+    function FACE_SHAPES() { return ['oval', 'round', 'square', 'oblong', 'heart', 'diamond', 'triangle']; }
+    function UNDERTONES() { return ['warm', 'cool', 'neutral', 'olive']; }
+    function EYE_COLORS() { return ['dark-brown', 'brown', 'hazel', 'green', 'blue', 'grey']; }
+    function AGE_BANDS() { return ['18-24', '25-34', '35-44', '45-54', '55+']; }
+    function TEXTURES() { return ['straight', 'wavy', 'curly', 'coily']; }
+    function DENSITIES() { return ['fine', 'medium', 'thick']; }
+    function LENGTH_BANDS() { return ['very-short', 'short', 'jaw', 'chin', 'collarbone', 'shoulder', 'long', 'very-long']; }
+    function HENNA() { return ['none', 'pure', 'compound', 'unsure']; }
+    function RECENT_COLOR() { return ['none', 'darker', 'lighter', 'unsure']; }
+    function PROCESSES() { return ['deposit-only', 'lift-color', 'high-lift', 'lightener', 'correction', 'blocked']; }
+    function TESTS() { return ['strand', 'metallic', 'patch']; }
+    function CONSULTATION_STATUS() { return ['draft', 'approved', 'done', 'cancelled']; }
+    function PRODUCT_CATEGORIES() { return ['service', 'color', 'treatment', 'retail', 'other']; }
+    function LIGHT_PRESETS() { return ['daylight', 'salon', 'evening', 'flash']; }
+    function FINISHES() { return ['glossy', 'satin', 'matte', 'pearl']; }
+    function CONSENT_TYPES() { return ['ai_render', 'profile_save']; }
+    function SWATCH_LIGHTS() { return ['daylight', 'salon']; }
+    function SOURCES() { return ['chair', 'look-code']; }
+    function SALON_LANGUAGES() { return ['ar', 'en']; }
+    function SECTIONS() { return ['hair', 'nails', 'beard']; }
+    function NAIL_FINISHES() { return ['creme', 'gloss', 'matte', 'satin', 'sheer', 'milky', 'shimmer', 'pearl', 'metallic', 'chrome', 'holo', 'glitter', 'cateye', 'velvet', 'duochrome', 'neon']; }   // src/data/nails/taxonomy.js FINISHES
+    function NAIL_SHAPES() { return ['natural', 'round', 'squoval', 'square', 'oval', 'almond', 'coffin', 'stiletto']; }
+    function NAIL_TYPES() { return ['gel', 'lacquer', 'breathable', 'biab', 'acrylic', 'dip', 'presson']; }
+    function FINGER_KEYS() { return ['thumb', 'index', 'middle', 'ring', 'pinky']; }
+    function HEX_RE() { return '^#[0-9A-Fa-f]{6}$'; }
+    function ID_RE() { return '^[A-Za-z0-9_-]{1,80}$'; }
+
+    function DAY_KEY_RE() { return '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; }       // Muscat date, en-CA format
+    function OMAN_PHONE_RE() { return '^\\+968[0-9]{8}$'; }
+    function LOOK_CODE_RE() { return '^[A-HJ-NP-Z2-9]{6}$'; }             // no 0, O, 1, I
+    function EMAIL_RE() { return '^[^@\\s]+@[^@\\s]+$'; }
+
+    // -------------------------------------------------------------------------
+    // Identity and role helpers
+    // -------------------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Signed in with a real provider (Google, email link, ...), not Anonymous Auth.
+    function isRealUser() {
+      return isSignedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function hasVerifiedEmail() {
+      return isRealUser()
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.get('email', null) is string;
+    }
+
+    function salonPath(salonId) {
+      return /databases/$(database)/documents/salons/$(salonId);
+    }
+
+    function staffPath(salonId, staffUid) {
+      return /databases/$(database)/documents/salons/$(salonId)/staff/$(staffUid);
+    }
+
+    function publicSalonPath(salonId) {
+      return /databases/$(database)/documents/publicSalons/$(salonId);
+    }
+
+    // Active staff member of the salon. Anonymous users are never staff.
+    function isStaff(salonId) {
+      return isRealUser() && ownStaffDocIsActive(salonId);
+    }
+
+    function ownStaffDocIsActive(salonId) {
+      let p = staffPath(salonId, request.auth.uid);
+      return exists(p) && get(p).data.active == true;
+    }
+
+    function hasRole(salonId, roles) {
+      return isStaff(salonId) && get(staffPath(salonId, request.auth.uid)).data.role in roles;
+    }
+
+    function isOwner(salonId) {
+      return hasRole(salonId, ['owner']);
+    }
+
+    function isOwnerOrManager(salonId) {
+      return hasRole(salonId, ['owner', 'manager']);
+    }
+
+    // Bootstrap: the salon document is being created by this user in the SAME
+    // batch (salon + owner staff + users + publicSalons are one batched write).
+    // exists() sees the state before the batch, getAfter() the state after it.
+    function salonCreatedInThisBatch(salonId) {
+      return isRealUser()
+        && !exists(salonPath(salonId))
+        && getAfter(salonPath(salonId)).data.createdBy == request.auth.uid;
+    }
+
+    // -------------------------------------------------------------------------
+    // Generic value helpers.
+    //
+    // Call them with m.get('key', null) so that "absent" and "null" take the
+    // same path: every opt* helper accepts null, every req* helper does not.
+    // -------------------------------------------------------------------------
+    function optStr(v, maxLen) {
+      return v == null || (v is string && v.size() <= maxLen);
+    }
+
+    function reqStr(v, minLen, maxLen) {
+      return v is string && v.size() >= minLen && v.size() <= maxLen;
+    }
+
+    function optBool(v) {
+      return v == null || v is bool;
+    }
+
+    function optEnum(v, values) {
+      return v == null || v in values;
+    }
+
+    // number = int or float
+    function optNum(v, lo, hi) {
+      return v == null || (v is number && v >= lo && v <= hi);
+    }
+
+    function reqNum(v, lo, hi) {
+      return v is number && v >= lo && v <= hi;
+    }
+
+    function optAnyNum(v) {
+      return v == null || v is number;
+    }
+
+    function optInt(v, lo, hi) {
+      return v == null || (v is int && v >= lo && v <= hi);
+    }
+
+    function reqInt(v, lo, hi) {
+      return v is int && v >= lo && v <= hi;
+    }
+
+    // A non-empty name in at least one language.
+    function hasAName(m) {
+      return reqStr(m.get('name', null), 1, 200) || reqStr(m.get('nameAr', null), 1, 200);
+    }
+
+    // Top-level keys this write touches: every key on create, the changed keys
+    // on update. Lets an update re-validate only the nested maps it touches.
+    function changedKeys() {
+      return resource == null
+        ? request.resource.data.keys().toSet()
+        : request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // Timestamps the app writes with serverTimestamp() (approvals.customerAt,
+    // consent.at, scannedAt): null, fresh (== request.time), or unchanged.
+    // path = field path in the stored doc, e.g. ['approvals', 'customerAt'];
+    // it is only read when the value is neither null nor fresh.
+    function stampOk(v, path) {
+      return v == null || v == request.time
+        || (resource != null && v == resource.data.get(path, null));
+    }
+
+    // uid fields the app sets to the caller (consent.by, scannedBy): null, the
+    // caller, or unchanged.
+    function byOk(v, path) {
+      return v == null || v == request.auth.uid
+        || (resource != null && v == resource.data.get(path, null));
+    }
+
+    // Audit stamps on create: all four, fresh.
+    function createStamps() {
+      let d = request.resource.data;
+      return d.createdBy == request.auth.uid
+        && d.createdAt == request.time
+        && d.updatedBy == request.auth.uid
+        && d.updatedAt == request.time;
+    }
+
+    // Audit stamps on update: fresh updated*, created* never change.
+    function updateStamps() {
+      let d = request.resource.data;
+      return d.updatedBy == request.auth.uid
+        && d.updatedAt == request.time
+        && d.createdAt == resource.data.createdAt
+        && d.createdBy == resource.data.createdBy;
+    }
+
+    // -------------------------------------------------------------------------
+    // users/{uid} - FIELDS.user
+    // -------------------------------------------------------------------------
+    function validUser() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['salonIds', 'lastSalonId', 'updatedAt'])
+        && d.get('salonIds', null) is list && d.salonIds.size() <= 50
+        && optStr(d.get('lastSalonId', null), 128)
+        && d.updatedAt == request.time;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      // Anonymous customers never need a users doc.
+      allow create, update: if isRealUser() && request.auth.uid == userId && validUser();
+      allow delete: if isRealUser() && request.auth.uid == userId;
+    }
+
+    // -------------------------------------------------------------------------
+    // salons/{salonId} - FIELDS.salon, FIELDS.salonSettings
+    // -------------------------------------------------------------------------
+    function validSalonSettings(s) {
+      return s is map
+        && s.keys().hasOnly(['privateMode', 'idleWipeMin', 'aiPreview', 'aiDailyCap',
+                             'growthCmPerMonth', 'retentionDays', 'tryAtHome'])
+        && optBool(s.get('privateMode', null))
+        && optInt(s.get('idleWipeMin', null), 1, 60)
+        && optBool(s.get('aiPreview', null))
+        && optInt(s.get('aiDailyCap', null), 0, 80)
+        && optNum(s.get('growthCmPerMonth', null), 0.3, 3)
+        && optInt(s.get('retentionDays', null), 30, 3650)
+        && optBool(s.get('tryAtHome', null));
+    }
+
+    // Which services the salon offers: at least one on.
+    function validSections(m) {
+      return m is map && m.keys().hasOnly(SECTIONS())
+        && [m.get('hair', false), m.get('nails', false), m.get('beard', false)].hasOnly([true, false])
+        && (m.get('hair', false) || m.get('nails', false) || m.get('beard', false));
+    }
+
+    // The services a staff member works in (or an invite grants): a non-empty subset.
+    function validSectionList(v) {
+      return v is list && v.size() >= 1 && v.size() <= 3 && v.hasOnly(SECTIONS());
+    }
+
+    function validSalonLanguages(v) {
+      return v == null || (v is list && v.size() >= 1 && v.size() <= 2 && v.hasOnly(SALON_LANGUAGES()));
+    }
+
+    function validSalon() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['name', 'nameAr', 'languages', 'timezone', 'schemaVersion', 'sections',
+                               'settings', 'whatsapp', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+        && validSections(d.get('sections', null))
+        && optStr(d.get('name', null), 80)
+        && optStr(d.get('nameAr', null), 80)
+        && hasAName(d)
+        && validSalonLanguages(d.get('languages', null))
+        && d.get('timezone', null) == 'Asia/Muscat'
+        && d.get('schemaVersion', null) == 1
+        && validSalonSettings(d.get('settings', null))
+        && optStr(d.get('whatsapp', null), 32);
+    }
+
+    match /salons/{salonId} {
+      allow read: if isStaff(salonId);
+      // Bootstrap: any real (non-anonymous) user may open a salon they own.
+      allow create: if isRealUser() && validSalon() && createStamps();
+      allow update: if isOwner(salonId) && validSalon() && updateStamps();
+      // No delete.
+
+      // -----------------------------------------------------------------------
+      // salons/{salonId}/staff/{staffId} - FIELDS.staff
+      // -----------------------------------------------------------------------
+      function validStaff(staffId) {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['uid', 'name', 'email', 'role', 'active', 'sections',
+                                 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+          && d.get('uid', null) == staffId
+          && validSectionList(d.get('sections', null))
+          && d.get('role', null) in ROLES()
+          && d.get('active', null) is bool
+          && optStr(d.get('name', null), 80)
+          && optStr(d.get('email', null), 254);
+      }
+
+      // Bootstrap: the creator of a salon (in the same batch) becomes its owner.
+      function ownerBootstrap(salonId, staffId) {
+        let d = request.resource.data;
+        return staffId == request.auth.uid
+          && d.role == 'owner'
+          && d.active == true
+          && salonCreatedInThisBatch(salonId);
+      }
+
+      // Join: verified email + an invite at invites/{email} + the invite's role.
+      function joinWithInvite(salonId, staffId) {
+        let d = request.resource.data;
+        return hasVerifiedEmail()
+          && staffId == request.auth.uid
+          && d.active == true
+          && inviteGrants(salonId, d.role, d.sections);
+      }
+
+      // The joiner copies the invite's role and services exactly.
+      function inviteGrants(salonId, role, sections) {
+        let invite = /databases/$(database)/documents/salons/$(salonId)/invites/$(request.auth.token.email.lower());
+        return exists(invite) && get(invite).data.role == role && get(invite).data.sections == sections;
+      }
+
+      // Owners keep their own role (and stay active): no self-demotion lock-out.
+      function ownRoleKept() {
+        return request.resource.data.role == resource.data.role
+          && request.resource.data.active == resource.data.active;
+      }
+
+      match /staff/{staffId} {
+        allow read: if isStaff(salonId) || (isSignedIn() && request.auth.uid == staffId);
+        allow create: if isRealUser() && validStaff(staffId) && createStamps()
+          && (ownerBootstrap(salonId, staffId)
+              || joinWithInvite(salonId, staffId)
+              || (isOwner(salonId) && staffId != request.auth.uid));
+        allow update: if isOwner(salonId) && validStaff(staffId) && updateStamps()
+          && (staffId != request.auth.uid || ownRoleKept());
+        allow delete: if isOwner(salonId) && staffId != request.auth.uid;
+      }
+
+      // -----------------------------------------------------------------------
+      // salons/{salonId}/invites/{email} - FIELDS.invite (doc id = lower-case email)
+      // -----------------------------------------------------------------------
+      function isInvitee(email) {
+        return hasVerifiedEmail() && request.auth.token.email.lower() == email;
+      }
+
+      function validInvite(email) {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['email', 'role', 'sections', 'createdAt', 'createdBy'])
+          && validSectionList(d.get('sections', null))
+          && d.get('email', null) == email
+          && email == email.lower()
+          && email.size() <= 254
+          && email.matches(EMAIL_RE())
+          && d.get('role', null) in INVITE_ROLES()
+          && d.get('createdBy', null) == request.auth.uid
+          && d.get('createdAt', null) == request.time;
+      }
+
+      match /invites/{email} {
+        allow read: if isStaff(salonId) || isInvitee(email);
+        allow create: if isOwner(salonId) && validInvite(email);
+        allow delete: if isOwner(salonId) || isInvitee(email);
+        // No update: delete and re-invite.
+      }
+
+      // -----------------------------------------------------------------------
+      // Catalog: hair_cuts, hair_fringes, hair_styles, hair_shades, hair_techniques,
+      // hair_looks (signature looks), beard_styles.
+      // Seed JSON shapes vary, so no hasOnly; owner fields are FIELDS.catalogOwner.
+      // Public read (no auth needed) of non-hidden items when Try at home is on;
+      // public list queries must filter where('hidden', '==', false).
+      // -----------------------------------------------------------------------
+      function catalogPublicRead(salonId) {
+        return resource.data.hidden == false
+          && get(publicSalonPath(salonId)).data.tryAtHome == true;
+      }
+
+      function canReadCatalog(salonId) {
+        return isStaff(salonId) || catalogPublicRead(salonId);
+      }
+
+      function validCatalogWrite() {
+        let d = request.resource.data;
+        return d.get('hidden', null) is bool
+          && d.get('updatedBy', null) == request.auth.uid
+          && d.get('updatedAt', null) == request.time;
+      }
+
+      match /hair_cuts/{itemId} {
+        allow read: if canReadCatalog(salonId);
+        allow create, update: if isOwnerOrManager(salonId) && validCatalogWrite();
+        allow delete: if isOwnerOrManager(salonId);
+      }
+
+      match /hair_fringes/{itemId} {
+        allow read: if canReadCatalog(salonId);
+        allow create, update: if isOwnerOrManager(salonId) && validCatalogWrite();
+        allow delete: if isOwnerOrManager(salonId);
+      }
+
+      match /hair_styles/{itemId} {
+        allow read: if canReadCatalog(salonId);
+        allow create, update: if isOwnerOrManager(salonId) && validCatalogWrite();
+        allow delete: if isOwnerOrManager(salonId);
+      }
+
+      match /hair_shades/{itemId} {
+        allow read: if canReadCatalog(salonId);
+        allow create, update: if isOwnerOrManager(salonId) && validCatalogWrite();
+        allow delete: if isOwnerOrManager(salonId);
+      }
+
+      match /hair_techniques/{itemId} {
+        allow read: if canReadCatalog(salonId);
+        allow create, update: if isOwnerOrManager(salonId) && validCatalogWrite();
+        allow delete: if isOwnerOrManager(salonId);
+      }
+
+      match /hair_looks/{itemId} {
+        allow read: if canReadCatalog(salonId);
+        allow create, update: if isOwnerOrManager(salonId) && validCatalogWrite();
+        allow delete: if isOwnerOrManager(salonId);
+      }
+
+      // Beard styles (seed JSON shapes vary like the hair catalog; same owner fields).
+      match /beard_styles/{itemId} {
+        allow read: if canReadCatalog(salonId);
+        allow create, update: if isOwnerOrManager(salonId) && validCatalogWrite();
+        allow delete: if isOwnerOrManager(salonId);
+      }
+
+      // -----------------------------------------------------------------------
+      // nails_polishes/{id} - FIELDS.nailPolish: the salon's own polishes only
+      // (name, colour, finish, stock, price). Never a photo.
+      // -----------------------------------------------------------------------
+      function validNailPolish() {
+        let d = request.resource.data;
+        let hex2 = d.get('hex2', null);
+        let stock = d.get('stock', null);
+        let price = d.get('priceOmr', null);
+        return d.keys().hasOnly(['name', 'nameAr', 'brand', 'code', 'hex', 'hex2', 'finish', 'type',
+                                 'stock', 'priceOmr', 'active', 'hidden',
+                                 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+          && hasAName(d)
+          && [d.get('name', ''), d.get('nameAr', ''), d.get('brand', ''), d.get('code', '')].join('').size() <= 260
+          && d.get('hex', null) is string && d.hex.matches(HEX_RE())
+          && (hex2 == null || (hex2 is string && hex2.matches(HEX_RE())))
+          && d.get('finish', null) in NAIL_FINISHES()
+          && optEnum(d.get('type', null), NAIL_TYPES())
+          && (stock == null || (stock is int && stock >= 0 && stock <= 100000))
+          && (price == null || (price is number && price >= 0 && price <= 10000))
+          && [d.get('active', null), d.get('hidden', null)].hasOnly([null, true, false]);
+      }
+
+      match /nails_polishes/{itemId} {
+        allow read: if canReadCatalog(salonId);
+        allow create: if isOwnerOrManager(salonId) && validNailPolish() && createStamps();
+        allow update: if isOwnerOrManager(salonId) && validNailPolish() && updateStamps();
+        allow delete: if isOwnerOrManager(salonId);
+      }
+
+      // Saved nail looks (designs the salon shows customers): a design, a name, hidden.
+      function validNailLook() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['name', 'nameAr', 'design', 'hidden', 'signature',
+                                 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+          && hasAName(d)
+          && d.get('hidden', null) is bool
+          && d.get('signature', false) is bool
+          && d.get('design', null) is map && validNailDesign(d.design);
+      }
+
+      match /nails_looks/{itemId} {
+        allow read: if canReadCatalog(salonId);
+        allow create: if isOwnerOrManager(salonId) && validNailLook() && createStamps();
+        allow update: if isOwnerOrManager(salonId) && validNailLook() && updateStamps();
+        allow delete: if isOwnerOrManager(salonId);
+      }
+
+      // -----------------------------------------------------------------------
+      // swatchLines/{lineId} + swatches/{swatchId} - FIELDS.swatchLine, FIELDS.swatch
+      // -----------------------------------------------------------------------
+      function validSwatchLine() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['name', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+          && reqStr(d.get('name', null), 1, 80);
+      }
+
+      // labMeasured: null or [L, a, b] measured by the camera.
+      function optLab(v) {
+        return v == null
+          || (v is list && v.size() == 3
+              && reqNum(v[0], 0, 100)
+              && reqNum(v[1], -128, 128)
+              && reqNum(v[2], -128, 128));
+      }
+
+      function validSwatch() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['code', 'level', 'tone', 'labMeasured', 'scannedAt', 'scannedBy', 'light',
+                                 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+          && reqStr(d.get('code', null), 1, 24)
+          && reqInt(d.get('level', null), 1, 12)
+          && reqStr(d.get('tone', null), 0, 40)
+          && optLab(d.get('labMeasured', null))
+          && optEnum(d.get('light', null), SWATCH_LIGHTS())
+          && stampOk(d.get('scannedAt', null), ['scannedAt'])
+          && byOk(d.get('scannedBy', null), ['scannedBy']);
+      }
+
+      match /swatchLines/{lineId} {
+        allow read: if isStaff(salonId);
+        allow create: if isOwnerOrManager(salonId) && validSwatchLine() && createStamps();
+        allow update: if isOwnerOrManager(salonId) && validSwatchLine() && updateStamps();
+        allow delete: if isOwnerOrManager(salonId);
+
+        match /swatches/{swatchId} {
+          allow read: if isStaff(salonId);
+          allow create: if isOwnerOrManager(salonId) && validSwatch() && createStamps();
+          allow update: if isOwnerOrManager(salonId) && validSwatch() && updateStamps();
+          allow delete: if isOwnerOrManager(salonId);
+        }
+      }
+
+      // -----------------------------------------------------------------------
+      // products/{productId} - FIELDS.product (prices live only here)
+      // -----------------------------------------------------------------------
+      function validProduct() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['name', 'nameAr', 'category', 'section', 'priceOmr', 'active',
+                                 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+          && optEnum(d.get('section', null), SECTIONS())
+          && optStr(d.get('name', null), 120)
+          && optStr(d.get('nameAr', null), 120)
+          && hasAName(d)
+          && d.get('category', null) in PRODUCT_CATEGORIES()
+          && reqNum(d.get('priceOmr', null), 0, 10000)
+          && d.get('active', null) is bool;
+      }
+
+      match /products/{productId} {
+        allow read: if isStaff(salonId);
+        allow create: if isOwnerOrManager(salonId) && validProduct() && createStamps();
+        allow update: if isOwnerOrManager(salonId) && validProduct() && updateStamps();
+        allow delete: if isOwnerOrManager(salonId);
+      }
+
+      // -----------------------------------------------------------------------
+      // HOT PATH: clients + consultations.
+      //
+      // Firestore stops after 1000 evaluated expressions per request (and then
+      // denies the write). A complete consultation has ~45 validated fields, so
+      // these validators are written for cost, not with the generic helpers:
+      //   * each value is bound once with `let` and checked inline (a function
+      //     may hold at most 10 lets, hence the *Scalars / *Maps split);
+      //   * small int ranges and nullable bools use one list check, e.g.
+      //     [targetLevel, todayLevel].hasOnly([null, 1, ..., 12]);
+      //   * on update a nested map is re-validated only when the write changes it.
+      // Measured in the emulator, expressions per write:
+      //   status-only update ~330, draft create with params ~510,
+      //   agreement-only write ~650, complete client create ~715,
+      //   complete consultation create ~885 (~915 with approvals + rating set),
+      //   one update writing params + agreement + approvals + rating ~920.
+      // tests/rules covers those maximal writes, so a change that pushes them
+      // past 1000 fails there first. Services should write consultations
+      // incrementally (draft -> params -> agreement -> approvals -> done).
+      // -----------------------------------------------------------------------
+      function LEVEL_OR_NULL() { return [null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]; }   // RANGES.level
+      function SESSIONS_OR_NULL() { return [null, 0, 1, 2, 3, 4, 5, 6]; }                   // RANGES.sessions
+      function RATING_OR_NULL() { return [null, 1, 2, 3, 4, 5]; }                           // RANGES.rating
+      function MST_OR_NULL() { return [null, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; }              // RANGES.mst
+      function BOOL_OR_NULL() { return [null, true, false]; }
+
+      // -----------------------------------------------------------------------
+      // clients/{clientId} - FIELDS.client + consent / profile / hair / history.
+      // Labels only: hasOnly on the doc and on every nested map, so no health
+      // answer (or any other unexpected field) can ever be stored.
+      // The nested-map validators take a non-null map (callers check null / map).
+      // -----------------------------------------------------------------------
+      function validClientConsent(m) {
+        return m.keys().hasOnly(['profile', 'at', 'by'])
+          && m.get('profile', null) in BOOL_OR_NULL()
+          && stampOk(m.get('at', null), ['consent', 'at'])
+          && byOk(m.get('by', null), ['consent', 'by']);
+      }
+
+      function validClientProfile(m) {
+        let faceShape = m.get('faceShape', null);
+        let undertone = m.get('undertone', null);
+        let eyes = m.get('eyes', null);
+        let ageBand = m.get('ageBand', null);
+        return m.keys().hasOnly(['faceShape', 'mst', 'undertone', 'eyes', 'ageBand'])
+          && (faceShape == null || faceShape in FACE_SHAPES())
+          && m.get('mst', null) in MST_OR_NULL()
+          && (undertone == null || undertone in UNDERTONES())
+          && (eyes == null || eyes in EYE_COLORS())
+          && (ageBand == null || ageBand in AGE_BANDS());
+      }
+
+      function validClientHair(m) {
+        let greyPct = m.get('greyPct', null);
+        let texture = m.get('texture', null);
+        let density = m.get('density', null);
+        let lengthBand = m.get('lengthBand', null);
+        return m.keys().hasOnly(['rootLevel', 'endsLevel', 'greyPct', 'texture', 'density', 'lengthBand'])
+          && [m.get('rootLevel', null), m.get('endsLevel', null)].hasOnly(LEVEL_OR_NULL())
+          && (greyPct == null || (greyPct is number && greyPct >= 0 && greyPct <= 100))
+          && (texture == null || texture in TEXTURES())
+          && (density == null || density in DENSITIES())
+          && (lengthBand == null || lengthBand in LENGTH_BANDS());
+      }
+
+      function validClientHistory(m) {
+        let henna = m.get('henna', null);
+        let recentColor = m.get('recentColor', null);
+        return m.keys().hasOnly(['henna', 'recentColor', 'bleach', 'chemical'])
+          && (henna == null || henna in HENNA())
+          && (recentColor == null || recentColor in RECENT_COLOR())
+          && [m.get('bleach', null), m.get('chemical', null)].hasOnly(BOOL_OR_NULL());
+      }
+
+      function validClient() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['displayName', 'phone', 'consent', 'profile', 'hair', 'history',
+                                 'shrinkagePct', 'growthCmPerMonth', 'lastVisitAt', 'visits', 'demo',
+                                 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+          && validClientScalars(d)
+          && validClientMaps(d, changedKeys());
+      }
+
+      function validClientScalars(d) {
+        let displayName = d.get('displayName', null);
+        let phone = d.get('phone', null);
+        let shrinkagePct = d.get('shrinkagePct', null);
+        let growth = d.get('growthCmPerMonth', null);
+        let lastVisitAt = d.get('lastVisitAt', null);
+        let visits = d.get('visits', null);
+        return displayName is string && displayName.size() <= 80
+          && (phone == null || (phone is string && phone.matches(OMAN_PHONE_RE())))
+          && (shrinkagePct == null || (shrinkagePct is number && shrinkagePct >= 0 && shrinkagePct <= 80))
+          && (growth == null || (growth is number && growth >= 0.3 && growth <= 3))
+          && (lastVisitAt == null || lastVisitAt is timestamp)
+          && (visits == null || (visits is int && visits >= 0))
+          && d.get('demo', null) in BOOL_OR_NULL();
+      }
+
+      // Nested maps: validated on create, and on update only when touched.
+      function validClientMaps(d, changed) {
+        let consent = d.get('consent', null);
+        let profile = d.get('profile', null);
+        let hair = d.get('hair', null);
+        let history = d.get('history', null);
+        return (!('consent' in changed) || consent == null || (consent is map && validClientConsent(consent)))
+          && (!('profile' in changed) || profile == null || (profile is map && validClientProfile(profile)))
+          && (!('hair' in changed) || hair == null || (hair is map && validClientHair(hair)))
+          && (!('history' in changed) || history == null || (history is map && validClientHistory(history)));
+      }
+
+      match /clients/{clientId} {
+        allow read: if isStaff(salonId);
+        allow create: if isStaff(salonId) && createStamps() && validClient();
+        allow update: if isStaff(salonId) && updateStamps() && validClient();
+        allow delete: if isOwnerOrManager(salonId);
+      }
+
+      // -----------------------------------------------------------------------
+      // consultations/{id} - FIELDS.consultation + params / techniqueParams /
+      // agreement / approvals maps. validParams is also used for lookCodes.
+      // The nested-map validators take a non-null map (callers check null / map).
+      // -----------------------------------------------------------------------
+      // Mask values copied from techniques.json (no range in schema.js). One sum
+      // checks all four at once: `+` on anything but numbers raises an error
+      // (which denies), and four strings would concatenate into a string, which
+      // fails `is number`. Absent keys count as 0; explicit nulls are refused.
+      function validTechniqueParams(m) {
+        return m.keys().hasOnly(['start', 'density', 'softness', 'level'])
+          && (m.get('start', 0) + m.get('density', 0) + m.get('softness', 0) + m.get('level', 0)) is number;
+      }
+
+      function validParams(m) {
+        let lengthCm = m.get('lengthCm', null);
+        let finish = m.get('finish', null);
+        let lightPreset = m.get('lightPreset', null);
+        let tp = m.get('techniqueParams', null);
+        return m.keys().hasOnly(['cutId', 'fringeId', 'styleId', 'lengthCm', 'shadeId', 'shade2Id',
+                                 'swatchId', 'technique', 'techniqueParams', 'finish', 'lightPreset'])
+          // Catalog ids: null or a scalar, never a nested map or list (which could
+          // smuggle unexpected fields). list.join() raises an error (deny) on a
+          // map, list or timestamp element; one join checks all seven ids.
+          && [m.get('cutId', null), m.get('fringeId', null), m.get('styleId', null),
+              m.get('shadeId', null), m.get('shade2Id', null), m.get('swatchId', null),
+              m.get('technique', null)].join('') is string
+          && (lengthCm == null || (lengthCm is number && lengthCm >= 0 && lengthCm <= 150))
+          && (tp == null || (tp is map && validTechniqueParams(tp)))
+          && (finish == null || finish in FINISHES())
+          && (lightPreset == null || lightPreset in LIGHT_PRESETS());
+      }
+
+      function validAgreement(m) {
+        let currentLengthCm = m.get('currentLengthCm', null);
+        let lengthWetCm = m.get('lengthWetCm', null);
+        let lengthDryCm = m.get('lengthDryCm', null);
+        let shrinkagePct = m.get('shrinkagePct', null);
+        let targetTone = m.get('targetTone', null);
+        let process = m.get('process', null);
+        let tests = m.get('tests', null);
+        let priceItems = m.get('priceItems', null);
+        let addOnCount = m.get('addOnCount', null);
+        let aftercareKeys = m.get('aftercareKeys', null);
+        return m.keys().hasOnly(['currentLengthCm', 'lengthWetCm', 'lengthDryCm', 'shrinkagePct',
+                                 'targetLevel', 'targetTone', 'process', 'sessionsTotal', 'sessionNumber',
+                                 'todayLevel', 'tests', 'fillerLikely', 'priceItems', 'addOnCount',
+                                 'aftercareKeys'])
+          && (currentLengthCm == null || (currentLengthCm is number && currentLengthCm >= 0 && currentLengthCm <= 150))
+          && (lengthWetCm == null || (lengthWetCm is number && lengthWetCm >= 0 && lengthWetCm <= 150))
+          && (lengthDryCm == null || (lengthDryCm is number && lengthDryCm >= 0 && lengthDryCm <= 150))
+          && (shrinkagePct == null || (shrinkagePct is number && shrinkagePct >= 0 && shrinkagePct <= 80))
+          && [m.get('targetLevel', null), m.get('todayLevel', null)].hasOnly(LEVEL_OR_NULL())
+          && [m.get('sessionsTotal', null), m.get('sessionNumber', null)].hasOnly(SESSIONS_OR_NULL())
+          && (targetTone == null || (targetTone is string && targetTone.size() <= 40))
+          && (process == null || process in PROCESSES())
+          && (tests == null || (tests is list && tests.size() <= 3 && tests.hasOnly(TESTS())))
+          && m.get('fillerLikely', null) in BOOL_OR_NULL()
+          && (priceItems == null || (priceItems is list && priceItems.size() <= 30))
+          && (addOnCount == null || addOnCount is int)
+          && (aftercareKeys == null || (aftercareKeys is list && aftercareKeys.size() <= 8));
+      }
+
+      // customerAt / stylistAt are serverTimestamp() when set, unchanged afterwards.
+      function validApprovals(m) {
+        let stylistUid = m.get('stylistUid', null);
+        return m.keys().hasOnly(['customerAt', 'stylistAt', 'stylistUid'])
+          && stampOk(m.get('customerAt', null), ['approvals', 'customerAt'])
+          && stampOk(m.get('stylistAt', null), ['approvals', 'stylistAt'])
+          && (stylistUid == null || stylistUid is string);
+      }
+
+      // -----------------------------------------------------------------------
+      // Nails: the designed manicure only (polish ids + colours, shape, art).
+      // FIELDS.nailDesign / nailPaint. Never a photo or a thumbnail.
+      // -----------------------------------------------------------------------
+      function validNailPaint(m) {
+        let hex2 = m.get('hex2', null);
+        return m is map
+          && m.keys().hasOnly(['polishId', 'hex', 'hex2', 'finish'])
+          && (m.get('polishId', null) == null || (m.polishId is string && m.polishId.matches(ID_RE())))
+          && m.get('hex', null) is string && m.hex.matches(HEX_RE())
+          && (hex2 == null || (hex2 is string && hex2.matches(HEX_RE())))
+          && m.get('finish', null) in NAIL_FINISHES();
+      }
+
+      function validNailDesign(m) {
+        let pf = m.get('perFinger', {});
+        let art = m.get('art', null);
+        let artHex = m.get('artHex', null);
+        let length = m.get('length', null);
+        return m.keys().hasOnly(['base', 'perFinger', 'shape', 'length', 'art', 'artHex', 'type'])
+          && validNailPaint(m.get('base', null))
+          && pf is map && pf.keys().hasOnly(FINGER_KEYS())
+          && (!('thumb' in pf) || validNailPaint(pf.thumb))
+          && (!('index' in pf) || validNailPaint(pf.index))
+          && (!('middle' in pf) || validNailPaint(pf.middle))
+          && (!('ring' in pf) || validNailPaint(pf.ring))
+          && (!('pinky' in pf) || validNailPaint(pf.pinky))
+          && m.get('shape', null) in NAIL_SHAPES()
+          && (length == null || (length is number && length >= -1 && length <= 3))
+          && (art == null || (art is string && art.matches('^[a-z0-9-]{1,40}$')))
+          && (artHex == null || (artHex is string && artHex.matches(HEX_RE())))
+          && optEnum(m.get('type', null), NAIL_TYPES());
+      }
+
+      // -----------------------------------------------------------------------
+      // Beard (from LIHYA): the designed beard (10 zones in mm x 10, lines, shape)
+      // and the Cut Card summary. Short scalars only: join() fails on nested data.
+      // -----------------------------------------------------------------------
+      function scalarsOk(m, max) {
+        return m.values().join(',').size() <= max;
+      }
+
+      function validBeardZones(m) {
+        return m is map && m.keys().hasOnly(['M', 'S', 'C', 'J_L', 'J_R', 'K_L', 'K_R', 'B_L', 'B_R', 'N'])
+          && math.abs(m.get('M', 0) - 150) <= 150 && math.abs(m.get('S', 0) - 150) <= 150
+          && math.abs(m.get('C', 0) - 150) <= 150 && math.abs(m.get('J_L', 0) - 150) <= 150
+          && math.abs(m.get('J_R', 0) - 150) <= 150 && math.abs(m.get('K_L', 0) - 150) <= 150
+          && math.abs(m.get('K_R', 0) - 150) <= 150 && math.abs(m.get('B_L', 0) - 150) <= 150
+          && math.abs(m.get('B_R', 0) - 150) <= 150 && math.abs(m.get('N', 0) - 150) <= 150;
+      }
+
+      function validBeardShape(m) {
+        let fadeB = m.get('fadeB', null);
+        return m is map
+          && m.keys().hasOnly(['chin', 'jFront', 'mustacheFloating', 'fadeB', 'flare', 'lengthAdjustable'])
+          && [m.get('chin', ''), m.get('jFront', false), m.get('mustacheFloating', false),
+              m.get('flare', false), m.get('lengthAdjustable', '')].join(',').size() <= 80
+          && (fadeB == null || (fadeB is list && fadeB.size() <= 2 && fadeB.join(',').size() <= 24));
+      }
+
+      function validBeardParams(p) {
+        let lines = p.get('lines', {});
+        return p.keys().hasOnly(['styleId', 'zones', 'lines', 'mustacheId', 'fadeStartMm', 'colorId',
+                                 'greyTarget', 'finish', 'shape', 'presetId'])
+          && validBeardZones(p.get('zones', {}))
+          && lines is map && lines.keys().hasOnly(['cheek', 'cheekOffset', 'neckline', 'necklineOffset',
+                                                    'sideburn', 'edge', 'mustacheEdge'])
+          && scalarsOk(lines, 200)
+          && math.abs(lines.get('cheekOffset', 0)) <= 1 && math.abs(lines.get('necklineOffset', 0)) <= 1
+          && [p.get('styleId', ''), p.get('mustacheId', ''), p.get('colorId', ''), p.get('finish', ''),
+              p.get('presetId', '')].removeAll([null]).join('').matches('^[A-Za-z0-9_-]*$')
+          && (p.get('fadeStartMm', null) == null || math.abs(p.fadeStartMm - 150) <= 150)
+          && (p.get('greyTarget', null) == null || math.abs(p.greyTarget - 50) <= 50)
+          && (p.get('shape', null) == null || validBeardShape(p.shape));
+      }
+
+      function validCutCard(c) {
+        let flags = c.get('safetyFlags', null);
+        return c.keys().hasOnly(['zonesMm', 'guards', 'cheekLineMm', 'necklineMm', 'notes', 'safetyFlags'])
+          && c.get('zonesMm', {}).size() <= 10 && c.get('guards', {}).size() <= 10 && c.get('notes', {}).size() <= 10
+          && c.get('zonesMm', {}).values()
+               .concat(c.get('guards', {}).values())
+               .concat(c.get('notes', {}).values())
+               .concat([c.get('cheekLineMm', null), c.get('necklineMm', null)])
+               .join(',').size() <= 2600
+          && (flags == null || (flags is list && flags.size() <= 20 && flags.join(',').size() <= 1300));
+      }
+
+      // One params validator per service. Only the consultation's own section runs,
+      // so a write pays for one branch of the 1,000-expression budget, not three.
+      function validSectionParams(section, m) {
+        return (section == 'hair' && validParams(m))
+          || (section == 'nails' && validNailDesign(m))
+          || (section == 'beard' && validBeardParams(m));
+      }
+
+      function validConsultation() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['section', 'visitId', 'cutCard', 'clientId', 'stylistUid', 'params', 'agreement', 'approvals', 'status',
+                                 'decisionSeconds', 'aiPreviewUsed', 'rating', 'nextVisitWeeks',
+                                 'notTodayShown', 'source', 'dayKey', 'demo',
+                                 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+          && validConsultationScalars(d)
+          && validConsultationMaps(d, changedKeys());
+      }
+
+      // stylistUid is pinned by the allow rules (== caller on create, unchanged on update).
+      function validConsultationScalars(d) {
+        let clientId = d.get('clientId', null);
+        let decisionSeconds = d.get('decisionSeconds', null);
+        let nextVisitWeeks = d.get('nextVisitWeeks', null);
+        let notTodayShown = d.get('notTodayShown', null);
+        let source = d.get('source', null);
+        let dayKey = d.get('dayKey', null);
+        let visitId = d.get('visitId', null);
+        return d.get('section', null) in SECTIONS()
+          && (resource == null || d.section == resource.data.section)     // a consultation never changes service
+          && (visitId == null || (visitId is string && visitId.matches(ID_RE())))   // hair + nails in one visit
+          && (clientId == null || clientId is string)                  // null for a walk-in
+          && d.get('status', null) in CONSULTATION_STATUS()
+          && (decisionSeconds == null || (decisionSeconds is number && decisionSeconds >= 0 && decisionSeconds <= 86400))
+          && [d.get('aiPreviewUsed', null), d.get('demo', null)].hasOnly(BOOL_OR_NULL())
+          && d.get('rating', null) in RATING_OR_NULL()
+          && (nextVisitWeeks == null || (nextVisitWeeks is int && nextVisitWeeks >= 1 && nextVisitWeeks <= 52))
+          && (notTodayShown == null || (notTodayShown is int && notTodayShown >= 0 && notTodayShown <= 50))
+          && (source == null || source in SOURCES())
+          && dayKey is string && dayKey.matches(DAY_KEY_RE());
+      }
+
+      // Nested maps: validated on create, and on update only when touched.
+      // agreement is the hair Agreement Card, cutCard the beard Cut Card.
+      function validConsultationMaps(d, changed) {
+        let params = d.get('params', null);
+        let agreement = d.get('agreement', null);
+        let cutCard = d.get('cutCard', null);
+        let approvals = d.get('approvals', null);
+        return (!('params' in changed) || params == null || (params is map && validSectionParams(d.section, params)))
+          && (!('agreement' in changed) || agreement == null || (d.section == 'hair' && agreement is map && validAgreement(agreement)))
+          && (!('cutCard' in changed) || cutCard == null || (d.section == 'beard' && cutCard is map && validCutCard(cutCard)))
+          && (!('approvals' in changed) || approvals == null || (approvals is map && validApprovals(approvals)));
+      }
+
+      match /consultations/{consultationId} {
+        allow read: if isStaff(salonId);
+        allow create: if isStaff(salonId) && createStamps()
+          && request.resource.data.stylistUid == request.auth.uid
+          && validConsultation();
+        allow update: if isStaff(salonId) && updateStamps()
+          && request.resource.data.stylistUid == resource.data.stylistUid
+          && validConsultation();
+        allow delete: if isOwnerOrManager(salonId);
+      }
+
+      // -----------------------------------------------------------------------
+      // lookCodes/{code} - FIELDS.lookCode. Created at home (Anonymous Auth),
+      // redeemed in the chair by staff (usedAt / usedBy only).
+      // -----------------------------------------------------------------------
+      function validNewLookCode(salonId, code) {
+        let d = request.resource.data;
+        let expiresAt = d.get('expiresAt', null);
+        return code.matches(LOOK_CODE_RE())
+          && d.keys().hasOnly(['section', 'params', 'createdAt', 'expiresAt', 'createdBy'])
+          && d.get('section', null) in SECTIONS()
+          && get(publicSalonPath(salonId)).data.sections.get(d.section, false) == true
+          && d.get('createdBy', null) == request.auth.uid
+          && d.get('createdAt', null) == request.time
+          && expiresAt is timestamp
+          && expiresAt > request.time
+          && expiresAt <= request.time + duration.value(31, 'd')
+          && d.get('params', null) is map
+          && validSectionParams(d.section, d.params)
+          && get(publicSalonPath(salonId)).data.tryAtHome == true;
+      }
+
+      function lookCodeRedeem() {
+        let d = request.resource.data;
+        return d.diff(resource.data).affectedKeys().hasOnly(['usedAt', 'usedBy'])
+          && d.get('usedBy', null) == request.auth.uid
+          && d.get('usedAt', null) == request.time;
+      }
+
+      match /lookCodes/{code} {
+        allow get: if isStaff(salonId)
+          || (isSignedIn() && resource.data.createdBy == request.auth.uid);
+        allow create: if isSignedIn() && validNewLookCode(salonId, code);
+        allow update: if isStaff(salonId) && lookCodeRedeem();
+        allow delete: if isOwnerOrManager(salonId);
+      }
+
+      // -----------------------------------------------------------------------
+      // requests/{id} - FIELDS.request. A customer at home sends a look to the
+      // salon (any section) with a name or phone. The look only: never a photo.
+      // Anyone may create one well-formed request; staff read and manage them.
+      // -----------------------------------------------------------------------
+      function validNewRequest() {
+        let d = request.resource.data;
+        let name = d.get('customerName', '');
+        let phone = d.get('customerPhone', '');
+        return d.keys().hasOnly(['section', 'params', 'customerName', 'customerPhone', 'note', 'preferredDate',
+                                 'status', 'lang', 'createdAt', 'createdBy'])
+          && d.get('section', null) in SECTIONS()
+          && d.get('params', null) is map && validSectionParams(d.section, d.params)
+          && name is string && name.size() <= 60
+          && phone is string && (phone == '' || phone.matches(OMAN_PHONE_RE()))
+          && (name.size() > 0 || phone.size() > 0)
+          && d.get('note', '') is string && d.get('note', '').size() <= 300
+          && d.get('preferredDate', '') is string && d.get('preferredDate', '').size() <= 40
+          && d.get('status', null) == 'new'
+          && optEnum(d.get('lang', null), SALON_LANGUAGES())
+          && d.get('createdAt', null) == request.time
+          && ((request.auth == null && d.get('createdBy', null) == 'public')
+              || (request.auth != null && d.get('createdBy', null) == request.auth.uid))
+          && get(publicSalonPath(salonId)).data.tryAtHome == true;
+      }
+
+      // Staff may only move the status along (and nothing else changes).
+      function requestStatusUpdate() {
+        let d = request.resource.data;
+        return d.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'updatedBy'])
+          && d.get('status', null) in ['new', 'contacted', 'booked', 'closed']
+          && d.get('updatedBy', null) == request.auth.uid
+          && d.get('updatedAt', null) == request.time;
+      }
+
+      match /requests/{requestId} {
+        allow read: if isStaff(salonId);
+        allow create: if validNewRequest();
+        allow update: if isStaff(salonId) && requestStatusUpdate();
+        allow delete: if isOwnerOrManager(salonId);
+      }
+
+      // -----------------------------------------------------------------------
+      // consents/{id} - FIELDS.consent. Append-only log.
+      // -----------------------------------------------------------------------
+      function validConsent() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['type', 'clientId', 'consultationId', 'granted', 'at', 'by'])
+          && d.get('type', null) in CONSENT_TYPES()
+          && d.get('granted', null) is bool
+          && d.get('by', null) == request.auth.uid
+          && d.get('at', null) == request.time
+          && optStr(d.get('clientId', null), 128)
+          && optStr(d.get('consultationId', null), 128);
+      }
+
+      match /consents/{consentId} {
+        allow read: if isOwner(salonId);
+        allow create: if isStaff(salonId) && validConsent();
+        // No update, no delete.
+      }
+
+      // -----------------------------------------------------------------------
+      // dailyStats/{dayKey} - FIELDS.dailyStats (counters via increment()).
+      // -----------------------------------------------------------------------
+      function optMap(v) {
+        return v == null || v is map;
+      }
+
+      function validDailyStats() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['consultations', 'approvals', 'totalDecisionSeconds', 'aiRenders',
+                                 'addOns', 'notToday', 'ratingsSum', 'ratingsCount',
+                                 'topLooks', 'topShades', 'bySection', 'updatedAt'])
+          && optAnyNum(d.get('consultations', null))
+          && optAnyNum(d.get('approvals', null))
+          && optAnyNum(d.get('totalDecisionSeconds', null))
+          && optAnyNum(d.get('aiRenders', null))
+          && optAnyNum(d.get('addOns', null))
+          && optAnyNum(d.get('notToday', null))
+          && optAnyNum(d.get('ratingsSum', null))
+          && optAnyNum(d.get('ratingsCount', null))
+          && optMap(d.get('topLooks', null))
+          && optMap(d.get('topShades', null))
+          && (d.get('bySection', null) == null || (d.bySection is map && d.bySection.keys().hasOnly(SECTIONS())))
+          && d.get('updatedAt', null) == request.time;
+      }
+
+      match /dailyStats/{dayKey} {
+        allow read: if isStaff(salonId);
+        allow create, update: if isStaff(salonId) && dayKey.matches(DAY_KEY_RE()) && validDailyStats();
+        // No delete.
+      }
+
+      // -----------------------------------------------------------------------
+      // audit/{id} - FIELDS.audit. Append-only, owner reads.
+      // -----------------------------------------------------------------------
+      function validAudit() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['action', 'path', 'by', 'at', 'changedFields'])
+          && reqStr(d.get('action', null), 1, 64)
+          && reqStr(d.get('path', null), 1, 512)
+          && d.get('by', null) == request.auth.uid
+          && d.get('at', null) == request.time
+          && d.get('changedFields', null) is map;
+      }
+
+      match /audit/{auditId} {
+        allow read: if isOwner(salonId);
+        allow create: if isStaff(salonId) && validAudit();
+        // No update, no delete.
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // publicSalons/{salonId} - FIELDS.publicSalon. Branded landing page data for
+    // the "Try at home" link: readable by anyone, written by the salon owner.
+    // -------------------------------------------------------------------------
+    function validPublicSalon() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['name', 'nameAr', 'tryAtHome', 'whatsapp', 'sections', 'updatedAt', 'updatedBy'])
+        && validSections(d.get('sections', null))
+        && optStr(d.get('name', null), 80)
+        && optStr(d.get('nameAr', null), 80)
+        && optBool(d.get('tryAtHome', null))
+        && optStr(d.get('whatsapp', null), 32)
+        && d.get('updatedBy', null) == request.auth.uid
+        && d.get('updatedAt', null) == request.time;
+    }
+
+    match /publicSalons/{salonId} {
+      allow read: if true;
+      allow create: if (isOwner(salonId) || salonCreatedInThisBatch(salonId)) && validPublicSalon();
+      allow update: if isOwner(salonId) && validPublicSalon();
+      allow delete: if isOwner(salonId);
+    }
+
+    // Everything else: denied (no catch-all match is opened).
+  }
+}
