@@ -8,13 +8,12 @@ Hair (KHUSLA) + Nails (Nail Mirror) + Beard (LIHYA) in one salon system on Fireb
 | Phase | What | State |
 | --- | --- | --- |
 | 1 | Architecture, data model, file structure | Approved |
-| 2 | Firebase setup + shared data layer + rules + the three AI cores copied in | **Done (this PR)** |
-| 3 | Screens: service switch on home, Nails and Beard screens on the shared client and team | Next |
-| 4 | Combined Agreement Card / PDF, dashboard and daily report across services | |
-| 5 | Polish, RTL and phone checks, demo data, GitHub Pages demo | |
+| 2 | Firebase setup + shared data layer + rules + the three AI cores copied in | Done |
+| 3 | Service picker, Nails screens (Nail Mirror), Beard screens (LIHYA) on the shared client and team | Done |
+| 4 | Visit card (all services of one visit, PDF, WhatsApp), dashboard and reports per service | Done |
+| 5 | Branding, RTL / phone checks, GitHub Pages demo | Done (real devices: Sam, see below) |
 
-Until Phase 3 the app runs the Hair flow (KHUSLA) on the new data layer. Nails and Beard AI are in
-`src/ai/nails` and `src/ai/beard`, tested to load, not yet on screens.
+Sam approved all phases at once ("Approved all phases"), so 3–5 were built without stopping.
 
 ## Decisions (Phase 2)
 
@@ -36,6 +35,22 @@ Until Phase 3 the app runs the Hair flow (KHUSLA) on the new data layer. Nails a
 | 14 | Emulator project id `demo-careandus` | Local runs never touch the real project |
 | 15 | Roles stay owner / manager / stylist for every service (a barber or nail tech is a "stylist" with `sections: ['beard']` / `['nails']`) | One team model; the UI labels the role per service in Phase 3 |
 
+## Decisions (Phases 3–5)
+
+| # | Decision | Why |
+| --- | --- | --- |
+| 16 | Each service lives in `src/screens/<service>/` and plugs in through `routes.jsx` (`routes`, `ENTRY`, `HOME_ENTRY`, `OWNER_TABS`) and `scripts/i18n/<service>.mjs`; a duplicate translation key stops the build | The three apps were ported in parallel without touching each other |
+| 17 | Home asks "Which service?" only when the person works in more than one | One tap less for a nail technician or a barber |
+| 18 | Visit card at `/visit/<visitId>` lists every service of the visit with its own approvals; prices only from the salon list (hair price items; nails / beard use the salon products tagged with their service) | One card for hair + nails, no invented prices |
+| 19 | A client visit is counted once: by the first service finished in the visit | Hair + nails must not count two visits |
+| 20 | Look Codes carry their service; the stylist's code entry opens that service's flow | One code screen for all services |
+| 21 | Products carry an optional `section` (form + CSV column) | Nails and Beard Agreements show their own services' prices |
+| 22 | Beard guard chart and beard growth (mm/day) live in salon settings (`guardChart` ≤ 40 guards, `beardGrowthMmPerDay` 0.1–1) | From LIHYA; owner-only write, rules-tested |
+| 23 | The Nails studio keeps Nail Mirror's dark full-screen camera look; Hair and Beard use the light Care & Us look | Nail colours read truer on dark; the studio is a camera screen |
+| 24 | Beard texts address the customer in the masculine, Hair and Nails in the feminine (as in the original apps); Try at home for several services uses a neutral line | Who the customer is in each service |
+| 25 | MobileSAM nail fine-fit is off unless `VITE_SAM_BASE` points at a CDN copy of the model | The 18 MB model must not be served from free Hosting |
+| 26 | The app name in the browser, manifest and texts is "Care & Us" / "كير آند أس" | Sam's name for the system |
+
 ## Test results (Phase 2)
 
 - `npm run lint`: 0 errors, 0 warnings.
@@ -47,9 +62,24 @@ Until Phase 3 the app runs the Hair flow (KHUSLA) on the new data layer. Nails a
   stats, product service tag). The maximal hair writes still pass under the 1,000-expression limit.
 - `npm run build` passes; `npm run check:size`: 1.38 MB gzipped shell.
 
+## Test results (Phases 3–5)
+
+- `npm run lint` 0 warnings; `npm test` 207 unit tests (KHUSLA, Nails, LIHYA beard data / session / Cut
+  Card / guards / look, visit card, CSV service column, sections); `npm run test:rules` 138 rules tests.
+- `npm run build` and `npm run build:pages` pass; `npm run check:size` 1.90 MB of 2.00 MB (gzipped,
+  every file in `dist/`; three.js only in the beard chunk).
+- Browser, emulators: Nails chair (polish, photo, AI match, Agreement, approvals, Done), owner polishes /
+  looks / requests, Try at home request + Look Code; Beard chair (capture with white card, analysis,
+  styles, Studio, Cut Card, approvals, PDF, Done), beard catalog, Try at home Look Code + request.
+  No photo written to Firestore in either.
+- GitHub Pages demo copy (local, same 404 handoff): 17/17 — salon with three services, service picker,
+  Nails studio, Beard capture, every owner screen, dashboard filter, Try at home with three services,
+  deep link, no page errors.
+
 ## Not yet (honest)
 
-- Nails and Beard screens: Phase 3.
-- The nails and beard AI are copied as written in their apps; they run on MediaPipe 1.1.1 here
-  (Nail Mirror was on 0.10.35). Retested when they get screens in Phase 3.
-- Real-device checks for all three services after Phase 5.
+- Real phones for all three services (camera, speed, PDF on iPhone): `docs/hair-BUILD_NOTES.md` §7
+  applies to every service.
+- The 4-photo beard capture was tested with a front pose only (fake camera); Live AR untested.
+- Size margin is 0.10 MB: the next big feature should load lazily or drop a font weight.
+- The home "New client" button says عميلة (feminine) even in a beard-only salon.

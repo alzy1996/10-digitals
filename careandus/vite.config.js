@@ -24,9 +24,9 @@ export default defineConfig(({ mode }) => ({
       injectRegister: 'auto',
       includeAssets: ['icons/sprite.svg', 'icons/favicon.svg', 'templates/*.csv'],
       manifest: {
-        name: 'KHUSLA خُصلة',
-        short_name: 'KHUSLA',
-        description: 'Hair cut, color and style simulator with the Agreement Card',
+        name: 'Care & Us',
+        short_name: 'Care & Us',
+        description: 'Hair, nails and beard in one salon system, with the Agreement Card',
         lang: 'ar',
         dir: 'rtl',
         theme_color: '#5B2A4D',

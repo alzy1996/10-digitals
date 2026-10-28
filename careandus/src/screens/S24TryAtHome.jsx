@@ -41,10 +41,10 @@ export default function S24TryAtHome() {
       {salon && salon.tryAtHome !== false ? (
         <>
           <section className="flex flex-1 flex-col justify-center py-8">
-            <p className="eyebrow">{t('home.welcomeTo')}</p>
+            <p className="eyebrow">{homeSections(salon).length > 1 ? t('home.welcomeToAll') : t('home.welcomeTo')}</p>
             <h1 className="mt-2 font-display text-[40px] leading-[1.05] text-plum">{name({ en: salon.name, ar: salon.nameAr })}</h1>
             <p className="mt-1 text-ink2" lang={lang === 'ar' ? 'en' : 'ar'}>{lang === 'ar' ? salon.name : salon.nameAr}</p>
-            <p className="mt-6 max-w-[34ch] text-lg">{t('home.lead')}</p>
+            <p className="mt-6 max-w-[34ch] text-lg">{homeSections(salon).length > 1 ? t('home.leadAll') : t('home.lead')}</p>
             <div className="card mt-6 flex items-start gap-3 p-4">
               <Icon name="lock" className="mt-0.5 text-clay" />
               <div>
@@ -57,7 +57,7 @@ export default function S24TryAtHome() {
             <div className="grid gap-3">
               {homeSections(salon).map((s) => (
                 <Button key={s} icon={sectionMeta(s).icon} variant={s === 'hair' ? 'primary' : 'secondary'} busy={s === 'hair' && busy} onClick={() => (s === 'hair' ? start() : navigate(homeEntry(s, salonId)))}>
-                  {t('home.tryService', { service: name(sectionMeta(s).name) })}
+                  {t(`home.try.${s}`)}
                 </Button>
               ))}
             </div>

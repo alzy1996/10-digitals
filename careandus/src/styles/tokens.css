@@ -1,4 +1,4 @@
-/* KHUSLA design tokens (PRD 9.1). Light is the default; dark via [data-theme="dark"]. */
+/* Care & Us design tokens (from KHUSLA) (PRD 9.1). Light is the default; dark via [data-theme="dark"]. */
 :root,
 [data-theme='light'] {
   --bg: #fbf8f4;

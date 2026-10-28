@@ -9,7 +9,25 @@ MediaPipe Tasks Vision + WebGL2 + Three.js (beard 3D, loaded only in Beard) + js
 Free tiers only. Firebase project: **careandus-19cf3**.
 
 Read `BUILD_NOTES.md` for every decision and the build status. The original KHUSLA notes are in
-`docs/hair-BUILD_NOTES.md`.
+`docs/hair-BUILD_NOTES.md`; Nail Mirror and LIHYA keep theirs on their own branches / folders.
+
+**Live demo (no account, nothing saved):** https://alzy1996.github.io/10-digitals/careandus/
+
+## How the one system works
+
+- **One salon, three services.** The owner turns Hair, Nails and Beard on in Create salon or
+  Settings → Services. Each staff member works in the services she is given (Owner → Team).
+- **Chair:** Home → New client → pick the service (one tap; skipped when she does only one) →
+  that service's flow → Agreement / Cut Card with two approvals → Done.
+  "Add another service for her" keeps the same client and visit: hair + nails end on **one visit card**
+  (`/visit/<id>`, PDF + WhatsApp). The visit is counted once.
+- **Owner screens:** one dashboard and one report for every service, with a filter
+  (All / Hair / Nails / Beard). Each service adds its own screens: hair catalog and Swatch Scan,
+  nail polishes / nail looks / booking requests, beard styles / guard chart.
+- **Try at home:** the salon link offers each service; customers send a booking request or bring a
+  Look Code. Never a photo.
+- **Prices** come only from Owner → Products & services; a product can be tagged Hair, Nails or Beard
+  (CSV column `section`, optional).
 
 ---
 
@@ -39,6 +57,12 @@ With an empty `.env.local` the app always uses the emulators.
 ---
 
 ## Deploy — every click
+
+### 0 · GitHub Pages demo (no Firebase)
+
+`npm run build:pages` builds the demo (base `/10-digitals/careandus/`, Firestore in memory, one-tap demo
+sign-in, banner on every screen). Every merge to `main` that touches `careandus/` republishes it
+(`.github/workflows/careandus-pages.yml`, only the `careandus/` folder of `gh-pages`).
 
 ### A1 · Firebase project careandus-19cf3 (browser clicks, once)
 
