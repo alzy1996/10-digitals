@@ -33,8 +33,7 @@ export default function S16LookCodeEntry() {
       const section = res.data.section || 'hair';
       const base = { salonId: app.salonId, lookCode: c, section, visitId: newVisitId() };
       if (section === 'nails') await session.start('chair', { ...base, nailDesign: res.data.params });
-      else if (section === 'beard') await session.start('chair', { ...base, beardLook: res.data.params });
-      else await session.start('chair', { ...base, look: res.data.params });
+      else await session.start('chair', { ...base, look: res.data.params }); // hair and beard both read session.look
       markLookCodeUsed(app.salonId, c).catch(() => {});
       navigate(section === 'hair' ? '/capture' : sectionEntry(section), { state: { fromCode: true } });
     } catch {

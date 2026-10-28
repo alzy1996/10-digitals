@@ -35,7 +35,7 @@ export const SOURCES = ['chair', 'look-code'];
 // Allowed keys per document / nested map.
 export const FIELDS = {
   salon: ['name', 'nameAr', 'languages', 'timezone', 'schemaVersion', 'sections', 'settings', 'whatsapp', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'],
-  salonSettings: ['privateMode', 'idleWipeMin', 'aiPreview', 'aiDailyCap', 'growthCmPerMonth', 'retentionDays', 'tryAtHome'],
+  salonSettings: ['privateMode', 'idleWipeMin', 'aiPreview', 'aiDailyCap', 'growthCmPerMonth', 'retentionDays', 'tryAtHome', 'guardChart', 'beardGrowthMmPerDay'],
   publicSalon: ['name', 'nameAr', 'tryAtHome', 'whatsapp', 'sections', 'updatedAt', 'updatedBy'],
   user: ['salonIds', 'lastSalonId', 'updatedAt'],
   staff: ['uid', 'name', 'email', 'role', 'active', 'sections', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'],

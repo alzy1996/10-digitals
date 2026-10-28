@@ -237,7 +237,11 @@ service cloud.firestore {
     function validSalonSettings(s) {
       return s is map
         && s.keys().hasOnly(['privateMode', 'idleWipeMin', 'aiPreview', 'aiDailyCap',
-                             'growthCmPerMonth', 'retentionDays', 'tryAtHome'])
+                             'growthCmPerMonth', 'retentionDays', 'tryAtHome',
+                             'guardChart', 'beardGrowthMmPerDay'])
+        // Beard (LIHYA): the salon's clipper guard chart (at most 40 guards) and beard growth per day.
+        && (s.get('guardChart', null) == null || (s.guardChart is list && s.guardChart.size() <= 40))
+        && optNum(s.get('beardGrowthMmPerDay', null), 0.1, 1)
         && optBool(s.get('privateMode', null))
         && optInt(s.get('idleWipeMin', null), 1, 60)
         && optBool(s.get('aiPreview', null))

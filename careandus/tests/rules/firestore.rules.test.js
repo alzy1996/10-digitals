@@ -1505,3 +1505,14 @@ describe('Care & Us sections', () => {
     await assertFails(setDoc(ref('p-bad'), productData(OWNER, { section: 'spa' })));
   });
 });
+
+describe('Care & Us beard settings', () => {
+  it('allows the guard chart (up to 40 guards) and beard growth 0.1-1 mm/day; denies more', async () => {
+    const ref = doc(real(OWNER), `salons/${S1}`);
+    const guards = (n) => Array.from({ length: n }, (_, i) => ({ id: `g${i}`, label: { en: `#${i}`, ar: `#${i}` }, mm: i * 3 }));
+    await assertSucceeds(updateDoc(ref, { 'settings.guardChart': guards(8), 'settings.beardGrowthMmPerDay': 0.4, ...touched(OWNER) }));
+    await assertFails(updateDoc(ref, { 'settings.guardChart': guards(41), ...touched(OWNER) }));
+    await assertFails(updateDoc(ref, { 'settings.beardGrowthMmPerDay': 3, ...touched(OWNER) }));
+    await assertFails(updateDoc(doc(real(STYLIST), `salons/${S1}`), { 'settings.beardGrowthMmPerDay': 0.4, ...touched(STYLIST) }));
+  });
+});
