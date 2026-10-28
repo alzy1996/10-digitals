@@ -9,6 +9,7 @@ import { useApp } from '../hooks/useApp.jsx';
 import { useSession } from '../hooks/useSession.jsx';
 import { useOnline } from '../hooks/useOnline.js';
 import { getLookCode, markLookCodeUsed, isValidCode } from '../services/lookCodes.js';
+import { newVisitId, sectionEntry } from '../lib/sections.js';
 
 export default function S16LookCodeEntry() {
   const { t } = useT();
@@ -28,9 +29,14 @@ export default function S16LookCodeEntry() {
         setState(res.status);
         return;
       }
-      await session.start('chair', { salonId: app.salonId, lookCode: c, look: res.data.params });
+      // A code belongs to one service: hair opens Capture, nails / beard open their own chair flow.
+      const section = res.data.section || 'hair';
+      const base = { salonId: app.salonId, lookCode: c, section, visitId: newVisitId() };
+      if (section === 'nails') await session.start('chair', { ...base, nailDesign: res.data.params });
+      else if (section === 'beard') await session.start('chair', { ...base, beardLook: res.data.params });
+      else await session.start('chair', { ...base, look: res.data.params });
       markLookCodeUsed(app.salonId, c).catch(() => {});
-      navigate('/capture', { state: { fromCode: true } });
+      navigate(section === 'hair' ? '/capture' : sectionEntry(section), { state: { fromCode: true } });
     } catch {
       setState('error');
     }

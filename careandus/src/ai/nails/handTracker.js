@@ -1,19 +1,15 @@
 // ISOLATED AI MODULE — MediaPipe Hand Landmarker (Apache-2.0). Image processing runs 100% on the device.
 // Note (disclosed in /privacy): the MediaPipe Tasks runtime may send anonymous performance metrics to Google.
 //
-// Asset delivery: Firebase Hosting's free plan has a daily bandwidth cap, and the AI files are ~19 MB,
-// so they load from Google's / jsDelivr's free CDNs first and fall back to our self-hosted copies.
+// Asset delivery (Care & Us): the runtime and the model load from pinned free CDNs only (src/ai/shared/cdn.js)
+// and the service worker caches them; Firebase Hosting never serves them.
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision'
-import { withBase } from './lib/base.js'
+import { wasmBase } from '../shared/cdn.js'
 
-const MP_VERSION = '0.10.35' // must match package.json
-const SOURCES = [
-  {
-    wasm: `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/wasm`,
-    model: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
-  },
-  { wasm: withBase('mediapipe/wasm'), model: withBase('models/hand_landmarker.task') },
-]
+// Care & Us: one pinned MediaPipe runtime for all services (src/ai/shared/cdn.js, 1.1.1).
+// Nothing is self-hosted (Firebase Hosting transfer is limited), so there is one source.
+export const HAND_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'
+const SOURCES = [{ wasm: wasmBase(import.meta.env), model: HAND_MODEL_URL }]
 
 let landmarkerPromise = null
 let currentMode = null

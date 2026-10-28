@@ -10,6 +10,12 @@ describe('CSV parser (PRD 11.3)', () => {
       ['Gloss', 'جلوس "لامع"'],
     ]);
   });
+  it('reads the optional service column (hair, nails, beard)', () => {
+    const r = validateProducts(['name,nameAr,category,section,priceOmr,active', 'Gel,جل,service,nails,6,yes', 'Trim,,service,,3,yes', 'Spa,,service,spa,9,yes'].join('\n'));
+    expect(r.valid.map((x) => x.section)).toEqual(['nails', null]);
+    expect(r.invalid[0].reasons).toEqual(['csv.err.section']);
+  });
+
   it('imports valid products and rejects bad rows with reasons', () => {
     const csv = [
       'name,nameAr,category,priceOmr,active',
@@ -22,7 +28,7 @@ describe('CSV parser (PRD 11.3)', () => {
     ].join('\n');
     const r = validateProducts(csv);
     expect(r.valid).toHaveLength(2);
-    expect(r.valid[0]).toEqual({ name: 'Haircut', nameAr: 'قص الشعر', category: 'service', priceOmr: 8.5, active: true });
+    expect(r.valid[0]).toEqual({ name: 'Haircut', nameAr: 'قص الشعر', category: 'service', section: null, priceOmr: 8.5, active: true });
     expect(r.invalid.map((x) => x.reasons[0])).toEqual(['csv.err.category', 'csv.err.decimals', 'csv.err.price', 'csv.err.name']);
     expect(r.invalid[0].line).toBe(4);
   });

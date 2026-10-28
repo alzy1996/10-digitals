@@ -16,7 +16,7 @@ import { nextVisitWeeks } from '../reports/aftercare.js';
 import { whatsappLink } from '../reports/agreementCardPdf.js';
 import { profileLabels, learnGrowthRate } from '../ai/hair/index.js';
 import { disposeThumbs } from '../hooks/useThumbs.js';
-import { mySections } from '../lib/sections.js';
+import { mySections, firstServiceOfVisit } from '../lib/sections.js';
 
 export default function S15Done() {
   const { t, name } = useT();
@@ -56,7 +56,7 @@ export default function S15Done() {
           growthCmPerMonth: growth,
         });
       }
-      markVisit(app.salonId, client.id);
+      if (firstServiceOfVisit(session)) markVisit(app.salonId, client.id);
     }
     setSaved(true);
     snack.show({ message: t('done.saved') });

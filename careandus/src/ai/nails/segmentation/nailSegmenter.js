@@ -7,6 +7,7 @@
 // When enabled, each landmark nail is snapped to the model's mask (center, angle, width, length).
 import { FilesetResolver, ImageSegmenter } from '@mediapipe/tasks-vision'
 import { withBase } from '../lib/base.js'
+import { wasmBase } from '../../shared/cdn.js'
 
 const RAW_URL = import.meta.env.VITE_NAIL_SEGMENTER_URL || ''
 const URL_ = !RAW_URL ? '' : /^https?:\/\//.test(RAW_URL) ? RAW_URL : withBase(RAW_URL)
@@ -20,9 +21,7 @@ export function loadNailSegmenter() {
   if (!URL_) return Promise.resolve(null)
   if (!segPromise) {
     segPromise = (async () => {
-      const fileset = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm').catch(() =>
-        FilesetResolver.forVisionTasks(withBase('mediapipe/wasm')),
-      )
+      const fileset = await FilesetResolver.forVisionTasks(wasmBase(import.meta.env))
       return ImageSegmenter.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: URL_, delegate: 'GPU' },
         runningMode: 'IMAGE',

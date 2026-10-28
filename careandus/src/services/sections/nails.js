@@ -1,7 +1,7 @@
 // Nails (from Nail Mirror): the salon's own polishes, saved nail looks, and the
 // designed manicure that consultations, Look Codes and booking requests store.
 // A design is colours + polish ids + shape + art. Never a photo or a thumbnail.
-import { collection, doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase.js';
 import { fire, created, updated, snapList, clean, newId } from '../base.js';
 import { logAudit, diffFields } from '../audit.js';
@@ -54,6 +54,30 @@ export function savePolish(salonId, polish) {
   fire(setDoc(doc(db, 'salons', salonId, 'nails_polishes', id), stamped), 'polish');
   logAudit(salonId, polish.id ? 'nails.polish.update' : 'nails.polish.create', `salons/${salonId}/nails_polishes/${id}`, diffFields(polish.id ? polish : {}, data));
   return id;
+}
+
+/** Try at home: the salon's visible polishes (public read needs hidden == false and tryAtHome on). */
+export async function publicPolishes(salonId) {
+  try {
+    const s = await getDocs(query(collection(db, 'salons', salonId, 'nails_polishes'), where('hidden', '==', false)));
+    return snapList(s).filter((p) => p.active !== false);
+  } catch {
+    return [];
+  }
+}
+
+/** CSV import (rows already validated): one batch per 400 rows, one audit entry per import. */
+export function importPolishes(salonId, rows) {
+  for (let i = 0; i < rows.length; i += 400) {
+    const batch = writeBatch(db);
+    for (const r of rows.slice(i, i + 400)) {
+      const data = clean(pick(r, FIELDS.nailPolish));
+      if (!HEX.test(data.hex || '')) continue;
+      batch.set(doc(db, 'salons', salonId, 'nails_polishes', newId('pol')), { ...data, ...created() });
+    }
+    fire(batch.commit(), 'polishImport');
+  }
+  logAudit(salonId, 'nails.polish.import', `salons/${salonId}/nails_polishes`, { rows: [null, String(rows.length)] });
 }
 
 export function deletePolish(salonId, id) {

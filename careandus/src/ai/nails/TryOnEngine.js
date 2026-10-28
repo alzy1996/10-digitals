@@ -1,7 +1,7 @@
 // Orchestrates camera/photo → hand AI → nail fit → WebGL render. UI-agnostic (React talks to it via callbacks).
 import { loadHandTracker, detectVideo, detectImage } from './handTracker.js'
 import { estimateNails, refineNail, NailTracker, handKeys, fingerSpacing, FINGER_CHAINS } from './nailGeometry.js'
-import { samPerfectFit } from './segmentation/samFit.js'
+import { samPerfectFit, samEnabled } from './segmentation/samFit.js'
 import { sceneFromSkin, sceneFromWhite, median } from './lib/color.js'
 import { findAutoWhite } from './skinAnalysis.js'
 import { segmenterEnabled, segmentNails, refineWithMask } from './segmentation/nailSegmenter.js'
@@ -235,7 +235,7 @@ export class TryOnEngine {
    * nail proportions so the LIVE camera fits better too. Non-blocking; progress via onFit({stage, p}).
    */
   async perfectFit() {
-    if (this.mode !== 'photo' || !this.photo) return
+    if (this.mode !== 'photo' || !this.photo || !samEnabled()) return
     const token = ++this.fitToken
     const base = this.photoNails.filter((n) => n.alpha > 0.3)
     if (!base.length) return
@@ -397,7 +397,7 @@ export class TryOnEngine {
     return this.renderer.capture(this.lastLiveNails || [], design, { ...this.opts, ...this.sceneOpts(), ...extra, time: performance.now() }, 'image/jpeg', quality)
   }
 
-  /** Small JPEG thumbnail (≤ maxSide px) for Firestore (fits the 1 MiB doc limit easily). */
+  /** Small JPEG thumbnail (≤ maxSide px). Care & Us: memory only, never sent to Firestore. */
   thumbnail(maxSide = 480, quality = 0.72, design = this.design) {
     const url = this.capture(design, 0.92)
     return downscaleDataUrl(url, maxSide, quality)

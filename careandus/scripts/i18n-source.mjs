@@ -130,6 +130,7 @@ export const T = {
   'visit.whatsapp': ['Copy + open WhatsApp', 'نسخ + فتح واتساب'],
   'visit.empty': ['No service saved in this visit yet.', 'لا توجد خدمة محفوظة في هذه الزيارة بعد.'],
   'dash.allServices': ['All services', 'كل الخدمات'],
+  'csv.err.section': ['Service must be hair, nails or beard (or empty)', 'الخدمة يجب أن تكون hair أو nails أو beard (أو فارغة)'],
   'login.demoTitle': ['Demo: no account needed', 'نسخة تجريبية: بدون حساب'],
   'login.demoBody': ['Everything runs on this device. Nothing is saved or sent: refreshing the page starts fresh.', 'كل شيء يعمل على هذا الجهاز. لا يُحفظ أو يُرسل شيء: تحديث الصفحة يبدأ من جديد.'],
   'login.demoEnter': ['Open the demo', 'افتحي النسخة التجريبية'],

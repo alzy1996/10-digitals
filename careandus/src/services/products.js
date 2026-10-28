@@ -14,6 +14,7 @@ export function saveProduct(salonId, product) {
     name: (product.name || '').trim(),
     nameAr: (product.nameAr || '').trim(),
     category: product.category,
+    section: ['hair', 'nails', 'beard'].includes(product.section) ? product.section : null,
     priceOmr: Math.round(Number(product.priceOmr) * 1000) / 1000,
     active: product.active !== false,
     ...(product.id ? { createdAt: product.createdAt, createdBy: product.createdBy, ...updated() } : created()),

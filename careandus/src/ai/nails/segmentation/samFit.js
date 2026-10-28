@@ -1,17 +1,24 @@
 // ISOLATED AI MODULE — "Perfect Fit": pixel-precise nail outlines with MobileSAM (Apache-2.0), on the device.
 // Runs on a still photo / frozen frame: one image encoding, then one tiny decoder pass per nail, prompted with
 // points from the hand landmarks (nail centre = "this", finger skin + beyond the tip = "not this").
-// Models: public/models/mobilesam/{encoder,decoder}.onnx (exported by scripts/export_mobilesam.py).
+// Models: {encoder,decoder}.onnx (Nail Mirror's scripts/export_mobilesam.py). Care & Us does NOT ship them
+// (18 MB would eat the Hosting free transfer): Perfect Fit is OFF unless VITE_SAM_BASE points at a folder
+// (CDN or self-hosted) holding both files. The try-on works fully without it (landmarks + Smart Fit).
 // Runtime: onnxruntime-web (WASM). 8-bit MobileSAM ≈ 18 MB, downloaded once and cached.
-import { withBase } from '../lib/base.js'
 import { rgb8ToLab } from '../lib/color.js'
-import { ORT_MODULE } from '../../shared/cdn.js'
+import { ORT_MODULE, ORT_CDN } from '../../shared/cdn.js'
 
 const SAM = 1024
 const MEAN = [123.675, 116.28, 103.53]
 const STD = [58.395, 57.12, 57.375]
-const MODEL_BASE = import.meta.env.VITE_SAM_BASE || withBase('models/mobilesam/')
-const ORT_BASE = import.meta.env.VITE_ORT_BASE || withBase('ort/')
+const RAW_BASE = String(import.meta.env.VITE_SAM_BASE || '').trim()
+const MODEL_BASE = RAW_BASE && !RAW_BASE.endsWith('/') ? RAW_BASE + '/' : RAW_BASE
+const ORT_BASE = import.meta.env.VITE_ORT_BASE || ORT_CDN
+
+/** Perfect Fit runs only when a model location is configured. */
+export function samEnabled() {
+  return Boolean(MODEL_BASE)
+}
 
 let loading = null
 let backend = null
@@ -55,6 +62,7 @@ async function createSessions(onProgress) {
 
 /** Load once (≈ 15–25 MB the first time, then cached by the service worker). */
 export function loadSam(onProgress) {
+  if (!MODEL_BASE) return Promise.reject(Object.assign(new Error('sam-off'), { code: 'sam-off' }))
   if (!loading) {
     loading = createSessions(onProgress)
     loading.catch(() => {

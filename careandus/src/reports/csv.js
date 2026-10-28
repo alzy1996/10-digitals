@@ -83,8 +83,11 @@ export function validateProducts(text) {
     else if (!/^\d+(\.\d{1,3})?$/.test(priceStr)) reasons.push('csv.err.decimals');
     const active = parseBool(r.active, true);
     if (active === null) reasons.push('csv.err.active');
+    // Optional column: hair | nails | beard (empty = every service).
+    const section = (r.section || '').trim().toLowerCase();
+    if (section && !['hair', 'nails', 'beard'].includes(section)) reasons.push('csv.err.section');
     if (reasons.length) invalid.push({ line: r._line, row: r, reasons });
-    else valid.push({ name: r.name, nameAr: r.nameAr, category: cat, priceOmr: Math.round(price * 1000) / 1000, active });
+    else valid.push({ name: r.name, nameAr: r.nameAr, category: cat, section: section || null, priceOmr: Math.round(price * 1000) / 1000, active });
   }
   return { valid, invalid };
 }

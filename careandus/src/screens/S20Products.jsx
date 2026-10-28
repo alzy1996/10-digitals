@@ -15,8 +15,9 @@ import { validateProducts, validateClients } from '../reports/csv.js';
 import { PRODUCT_CATEGORIES } from '../services/schema.js';
 import { formatOmr } from '../lib/format.js';
 import { publicUrl } from '../lib/url.js';
+import { sectionsOn } from '../services/salons.js';
 
-const EMPTY = { name: '', nameAr: '', category: 'service', priceOmr: '', active: true };
+const EMPTY = { name: '', nameAr: '', category: 'service', section: null, priceOmr: '', active: true };
 
 export default function S20Products() {
   const { t, lang } = useT();
@@ -47,7 +48,7 @@ export default function S20Products() {
               <button type="button" onClick={() => setForm({ ...p, priceOmr: Number(p.priceOmr).toFixed(3) })} className={`press flex min-h-[64px] w-full items-center gap-3 px-4 text-start active:bg-surface2 ${p.active ? '' : 'opacity-55'}`}>
                 <span className="flex-1">
                   <span className="block font-medium">{lang === 'ar' ? p.nameAr || p.name : p.name || p.nameAr}</span>
-                  <span className="block text-xs text-ink2">{t(`category.${p.category}`)}{p.active ? '' : ` · ${t('products.inactive')}`}</span>
+                  <span className="block text-xs text-ink2">{p.section ? `${t(`sections.${p.section}`)} · ` : ''}{t(`category.${p.category}`)}{p.active ? '' : ` · ${t('products.inactive')}`}</span>
                 </span>
                 <span className="num font-semibold">{formatOmr(p.priceOmr, lang)}</span>
                 {p._pending ? <Tag>{t('common.willSync')}</Tag> : null}
@@ -85,6 +86,9 @@ export default function S20Products() {
             <input id="p-ar" dir="rtl" className="field mb-3" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />
             <label className="label mb-1 block" htmlFor="p-en">{t('products.nameEn')}</label>
             <input id="p-en" dir="ltr" className="field mb-3" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            {sectionsOn(app.salon?.sections || { hair: true }).length > 1 ? (
+              <ChipRow label={t('sections.title')} value={form.section || null} onChange={(v) => setForm({ ...form, section: v })} options={[{ value: null, label: t('dash.allServices') }, ...sectionsOn(app.salon?.sections).map((s) => ({ value: s, label: t(`sections.${s}`) }))]} />
+            ) : null}
             <ChipRow label={t('products.category')} value={form.category} onChange={(v) => setForm({ ...form, category: v })} options={PRODUCT_CATEGORIES.map((c) => ({ value: c, label: t(`category.${c}`) }))} />
             <label className="label mb-1 block" htmlFor="p-price">{t('products.price')}</label>
             <input id="p-price" dir="ltr" inputMode="decimal" className={`field num mb-1 ${form.priceOmr !== '' && !priceOk ? 'border-risk' : ''}`} value={form.priceOmr} onChange={(e) => setForm({ ...form, priceOmr: e.target.value.replace(',', '.') })} placeholder="0.000" />

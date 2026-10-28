@@ -29,3 +29,8 @@ export function newVisitId() {
   crypto.getRandomValues(a);
   return `v${Array.from(a, (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 16)}`;
 }
+
+/** A client visit is counted once: by the first service finished in it (hair, nails or beard). */
+export function firstServiceOfVisit(session) {
+  return !(session?.done || []).length;
+}
