@@ -8,9 +8,9 @@ export const APP = {
 
 // The three services. `hair` = KHUSLA, `nails` = Nail Mirror, `beard` = LIHYA.
 export const SECTION_LIST = [
-  { id: 'hair', name: { en: 'Hair', ar: 'الشعر' } },
-  { id: 'nails', name: { en: 'Nails', ar: 'الأظافر' } },
-  { id: 'beard', name: { en: 'Beard', ar: 'اللحية' } },
+  { id: 'hair', name: { en: 'Hair', ar: 'الشعر' }, icon: 'scissors' },
+  { id: 'nails', name: { en: 'Nails', ar: 'الأظافر' }, icon: 'brush' },
+  { id: 'beard', name: { en: 'Beard', ar: 'اللحية' }, icon: 'face' },
 ];
 
 /** A new salon starts with hair + nails on; the owner changes it in Settings or at Create salon. */

@@ -7,6 +7,8 @@ import { SessionProvider, useSession } from './hooks/useSession.jsx';
 import { APP } from './config/app.js';
 import { routerBase } from './lib/url.js';
 import { demoMode } from './lib/firebase.js';
+import * as nails from './screens/nails/routes.jsx';
+import * as beard from './screens/beard/routes.jsx';
 
 const S01Splash = lazy(() => import('./screens/S01Splash.jsx'));
 const S02Login = lazy(() => import('./screens/S02Login.jsx'));
@@ -110,6 +112,8 @@ function AppRoutes() {
         <Route path="/owner/reports" element={<StaffOnly manager><S23Reports /></StaffOnly>} />
         <Route path="/t/:salonId" element={<S24TryAtHome />} />
         <Route path="/t/:salonId/code" element={<S25LookCodeResult />} />
+        {nails.routes({ StaffOnly, InSession })}
+        {beard.routes({ StaffOnly, InSession })}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

@@ -13,6 +13,9 @@ const Ctx = createContext(null);
 const EMPTY = {
   active: false,
   mode: 'chair',
+  section: 'hair', // hair | nails | beard
+  visitId: null, // shared by the services of one visit (one Agreement Card)
+  done: [], // services already finished in this visit: [{ section, consultationId }]
   salonId: null,
   client: null,
   startedAt: null,

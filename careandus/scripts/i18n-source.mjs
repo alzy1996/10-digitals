@@ -102,6 +102,7 @@ export const T = {
   'nails.art_ombre': ['Ombré', 'أومبريه'],
   'nails.art_chrometip': ['Chrome tip', 'طرف كروم'],
   'nails.art_halfmoon': ['Half moon', 'نصف قمر'],
+  'home.whichService': ['Which service?', 'أي خدمة؟'],
   'login.demoTitle': ['Demo: no account needed', 'نسخة تجريبية: بدون حساب'],
   'login.demoBody': ['Everything runs on this device. Nothing is saved or sent: refreshing the page starts fresh.', 'كل شيء يعمل على هذا الجهاز. لا يُحفظ أو يُرسل شيء: تحديث الصفحة يبدأ من جديد.'],
   'login.demoEnter': ['Open the demo', 'افتحي النسخة التجريبية'],

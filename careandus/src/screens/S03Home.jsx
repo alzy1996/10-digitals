@@ -13,6 +13,7 @@ import { watchClients, searchClients, createClient } from '../services/clients.j
 import { watchConsultationsDay } from '../services/consultations.js';
 import { signOut } from '../services/auth.js';
 import { dayKey, formatDate } from '../lib/time.js';
+import { mySections, sectionEntry, sectionMeta, newVisitId } from '../lib/sections.js';
 
 export default function S03Home() {
   const { t, lang, name } = useT();
@@ -20,15 +21,24 @@ export default function S03Home() {
   const session = useSession();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [picking, setPicking] = useState(null); // { client } while choosing the service
+  const services = mySections(app.salon, app.me);
   const [q, setQ] = useState('');
   const [clients, clientsLoading] = useLive((cb) => watchClients(app.salonId, cb), [app.salonId], []);
   const [today] = useLive((cb) => watchConsultationsDay(app.salonId, dayKey(), cb), [app.salonId], []);
   const results = useMemo(() => searchClients(clients || [], q), [clients, q]);
   const mine = (today || []).filter((c) => c.stylistUid === app.me?.uid && !c.demo);
 
+  const startService = async (client, section) => {
+    await session.start('chair', { client: client || null, salonId: app.salonId, section, visitId: newVisitId() });
+    navigate(sectionEntry(section));
+  };
+
+  // One service: straight in. Several: one tap on Hair, Nails or Beard.
   const begin = async (client) => {
-    await session.start('chair', { client: client || null, salonId: app.salonId });
-    navigate('/capture');
+    setOpen(false);
+    if (services.length <= 1) return startService(client, services[0] || 'hair');
+    setPicking({ client: client || null });
   };
 
   const addNew = async () => {
@@ -100,6 +110,16 @@ export default function S03Home() {
           {t('common.signOut')}
         </Button>
       </div>
+
+      <Sheet open={Boolean(picking)} modal onClose={() => setPicking(null)} title={t('home.whichService')}>
+        <div className="grid gap-3 pb-2">
+          {services.map((s) => (
+            <Button key={s} variant="secondary" icon={sectionMeta(s).icon} iconEnd="chevron" className="!min-h-[72px] justify-between text-[20px]" onClick={() => { const c = picking.client; setPicking(null); startService(c, s); }}>
+              {name(sectionMeta(s).name)}
+            </Button>
+          ))}
+        </div>
+      </Sheet>
 
       <Sheet open={open} modal onClose={() => setOpen(false)} title={t('home.whoIs')}>
         <label className="label mb-2 block" htmlFor="client-q">{t('home.searchLabel')}</label>
