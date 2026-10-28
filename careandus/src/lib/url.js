@@ -1,4 +1,4 @@
-// Absolute links to app routes. BASE_URL is "/" on Firebase Hosting and "/10-digitals/khusla/" on GitHub Pages.
+// Absolute links to app routes. BASE_URL is "/" on Firebase Hosting and "/10-digitals/careandus/" on GitHub Pages.
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 /** Router basename ("" means the site root). */

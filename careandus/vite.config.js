@@ -14,9 +14,9 @@ const runtimeCaching = CACHE_HOSTS.map(({ prefix, cache }) => ({
   },
 }));
 
-// Mode "pages" (npm run build:pages) is the GitHub Pages demo at alzy1996.github.io/10-digitals/khusla/.
+// Mode "pages" (npm run build:pages) is the GitHub Pages demo at alzy1996.github.io/10-digitals/careandus/.
 export default defineConfig(({ mode }) => ({
-  base: mode === 'pages' ? '/10-digitals/khusla/' : '/',
+  base: mode === 'pages' ? '/10-digitals/careandus/' : '/',
   plugins: [
     react(),
     VitePWA({
