@@ -1,0 +1,167 @@
+[
+  {
+    "id": "blowout",
+    "name": {
+      "en": "Volume blowout",
+      "ar": "سشوار بحجم"
+    },
+    "occasions": [
+      "daily",
+      "events"
+    ]
+  },
+  {
+    "id": "sleek-glass",
+    "name": {
+      "en": "Sleek glass hair",
+      "ar": "مستقيم لامع جداً"
+    },
+    "occasions": [
+      "daily",
+      "events"
+    ]
+  },
+  {
+    "id": "beach-waves",
+    "name": {
+      "en": "Beach waves",
+      "ar": "تموجات شاطئية"
+    },
+    "occasions": [
+      "daily"
+    ]
+  },
+  {
+    "id": "hollywood-waves",
+    "name": {
+      "en": "Hollywood waves",
+      "ar": "تموجات هوليوود"
+    },
+    "occasions": [
+      "events"
+    ]
+  },
+  {
+    "id": "defined-curls",
+    "name": {
+      "en": "Defined curls",
+      "ar": "كيرلي محدد"
+    },
+    "occasions": [
+      "daily"
+    ]
+  },
+  {
+    "id": "big-soft-curls",
+    "name": {
+      "en": "Big soft curls",
+      "ar": "كيرلي واسع ناعم"
+    },
+    "occasions": [
+      "events"
+    ]
+  },
+  {
+    "id": "sleek-bun",
+    "name": {
+      "en": "Sleek bun",
+      "ar": "كعكة مشدودة"
+    },
+    "occasions": [
+      "daily",
+      "events"
+    ]
+  },
+  {
+    "id": "messy-bun",
+    "name": {
+      "en": "Messy bun",
+      "ar": "كعكة عفوية"
+    },
+    "occasions": [
+      "daily"
+    ]
+  },
+  {
+    "id": "low-chignon",
+    "name": {
+      "en": "Low chignon",
+      "ar": "شينيون منخفض"
+    },
+    "occasions": [
+      "events",
+      "wedding"
+    ]
+  },
+  {
+    "id": "french-twist",
+    "name": {
+      "en": "French twist",
+      "ar": "لفة فرنسية"
+    },
+    "occasions": [
+      "events"
+    ]
+  },
+  {
+    "id": "high-ponytail",
+    "name": {
+      "en": "High ponytail",
+      "ar": "ذيل حصان عالي"
+    },
+    "occasions": [
+      "daily"
+    ]
+  },
+  {
+    "id": "half-up",
+    "name": {
+      "en": "Half-up",
+      "ar": "نصف مرفوع"
+    },
+    "occasions": [
+      "daily",
+      "events"
+    ]
+  },
+  {
+    "id": "crown-braid",
+    "name": {
+      "en": "Crown braid",
+      "ar": "ضفيرة التاج"
+    },
+    "occasions": [
+      "events"
+    ]
+  },
+  {
+    "id": "french-braid",
+    "name": {
+      "en": "French braid",
+      "ar": "ضفيرة فرنسية"
+    },
+    "occasions": [
+      "daily"
+    ]
+  },
+  {
+    "id": "bridal-updo",
+    "name": {
+      "en": "Bridal updo",
+      "ar": "تسريحة عروس مرفوعة"
+    },
+    "occasions": [
+      "wedding"
+    ]
+  },
+  {
+    "id": "bridal-waves",
+    "name": {
+      "en": "Bridal volume waves",
+      "ar": "تسريحة عروس مموجة بحجم"
+    },
+    "occasions": [
+      "wedding"
+    ]
+  }
+]

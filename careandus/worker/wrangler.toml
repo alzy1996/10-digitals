@@ -1,0 +1,39 @@
+#:schema node_modules/wrangler/config-schema.json
+# KHUSLA "AI Final Look" worker. Workers Free plan only: Workers AI binding + one KV namespace.
+# No API keys or secrets: deploy with `npx wrangler login` (see README.md).
+name = "khusla-ai"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+# Logpush is a paid feature and would ship request metadata elsewhere; keep it off.
+logpush = false
+
+[ai]
+binding = "AI"
+
+[[kv_namespaces]]
+binding = "KHUSLA_CAPS"
+id = "PASTE_KV_ID_HERE"
+
+[vars]
+FIREBASE_PROJECT_ID = "khusla"
+ALLOWED_ORIGINS = "https://khusla.web.app,https://khusla.firebaseapp.com,http://localhost:5173,http://localhost:4173"
+ACCOUNT_DAILY_CAP = "80"
+SALON_DAILY_CAP = "20"
+OUTPUT_SIZE = "768"
+
+# Logging: request and response bodies (photos) are never logged. Workers Logs keeps only the
+# worker's own console lines, which carry short error codes and never bodies, images or tokens.
+# Automatic per-request invocation logs (URL and header metadata) and traces are disabled, and
+# query strings (salonId) are redacted from anything that is still recorded.
+[observability]
+enabled = true
+head_sampling_rate = 1
+redact_query_string = true
+
+[observability.logs]
+enabled = true
+invocation_logs = false
+
+[observability.traces]
+enabled = false

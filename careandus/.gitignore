@@ -1,0 +1,16 @@
+node_modules/
+dist/
+dist-pages/
+dev-dist/
+coverage/
+.env*
+!.env.example
+*.log
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+worker/node_modules/
+worker/.wrangler/
+worker/.dev.vars
+.DS_Store

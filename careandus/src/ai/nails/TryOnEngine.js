@@ -1,0 +1,442 @@
+// Orchestrates camera/photo → hand AI → nail fit → WebGL render. UI-agnostic (React talks to it via callbacks).
+import { loadHandTracker, detectVideo, detectImage } from './handTracker.js'
+import { estimateNails, refineNail, NailTracker, handKeys, fingerSpacing, FINGER_CHAINS } from './nailGeometry.js'
+import { samPerfectFit, samEnabled } from './segmentation/samFit.js'
+import { sceneFromSkin, sceneFromWhite, median } from './lib/color.js'
+import { findAutoWhite } from './skinAnalysis.js'
+import { segmenterEnabled, segmentNails, refineWithMask } from './segmentation/nailSegmenter.js'
+import { NailRenderer } from './render/NailRenderer.js'
+
+const PHOTO_MAX = 1600 // photo / HD capture cap
+const FIT_W = 360 // width of the small frame used for Smart Fit pixel sampling
+
+export class TryOnEngine {
+  constructor(canvas, { onStatus, onFrame, onFit } = {}) {
+    this.canvas = canvas
+    this.onStatus = onStatus || (() => {})
+    this.onFrame = onFrame || (() => {})
+    this.onFit = onFit || (() => {})
+    this.calib = {} // { Left: { index: {start, end, widthOfSpacing} }, Right: {...} } learned from Perfect Fit
+    this.fitToken = 0
+    this.scene = null // { cast, sat } read from the skin
+    this.renderer = new NailRenderer(canvas)
+    this.tracker = new NailTracker()
+    this.design = null
+    this.opts = { exposure: 1, illum: [1, 1, 1], tilt: [0, 0], showOriginal: false, showEdges: false, forceVisible: false, smartFit: true }
+    this.mode = 'idle' // 'live' | 'photo'
+    this.video = null
+    this.raf = 0
+    this.photo = null // HTMLCanvasElement holding the still image
+    this.photoNails = [] // detected (photo mode)
+    this.overrides = new Map() // key -> nail (fine-tuned)
+    this.removed = new Set()
+    this.manual = [] // manually added nails
+    this.hands = []
+    this.lastStatus = ''
+    this.fitCanvas = document.createElement('canvas')
+    this.fitCtx = this.fitCanvas.getContext('2d', { willReadFrequently: true })
+    this.frameCount = 0
+    this.fps = 0
+    this._fpsT = performance.now()
+    this._fpsN = 0
+    this.dirty = true
+  }
+
+  async init() {
+    this.status('loading_ai')
+    await loadHandTracker()
+    this.status('ready')
+  }
+
+  status(s) {
+    if (s !== this.lastStatus) {
+      this.lastStatus = s
+      this.onStatus(s)
+    }
+  }
+
+  setDesign(design) {
+    this.design = design
+    this.dirty = true
+    if (this.mode === 'photo') this.renderPhoto()
+  }
+
+  setOptions(patch) {
+    Object.assign(this.opts, patch)
+    this.dirty = true
+    if (this.mode === 'photo') this.renderPhoto()
+  }
+
+  // ------------------------------------------------------------ LIVE
+  startLive(video) {
+    this.stop()
+    this.fitToken++
+    this.renderer.clearMask()
+    this.mode = 'live'
+    this.video = video
+    this.tracker.reset()
+    const loop = async () => {
+      if (this.mode !== 'live') return
+      await this.liveStep()
+      this.raf = requestAnimationFrame(loop)
+    }
+    this.raf = requestAnimationFrame(loop)
+  }
+
+  async liveStep() {
+    const v = this.video
+    if (!v || v.readyState < 2 || !v.videoWidth) return
+    const t = performance.now()
+    if (v.currentTime === this._lastVideoTime && !this.dirty) return
+    this._lastVideoTime = v.currentTime
+    this.dirty = false
+    const W = v.videoWidth
+    const H = v.videoHeight
+    let res
+    try {
+      res = await detectVideo(v, t)
+    } catch (e) {
+      console.warn('[engine] detect failed', e)
+      return
+    }
+    // MediaPipe gives normalized coords; nails are computed in video px = render px
+    this.hands = res.hands
+    let nails = []
+    if (res.hands.length) {
+      const keys = handKeys(res.hands)
+      let img = null
+      let s = 0
+      if (this.opts.smartFit) {
+        s = FIT_W / W
+        this.fitCanvas.width = FIT_W
+        this.fitCanvas.height = Math.round(H * s)
+        this.fitCtx.drawImage(v, 0, 0, this.fitCanvas.width, this.fitCanvas.height)
+        img = this.fitCtx.getImageData(0, 0, this.fitCanvas.width, this.fitCanvas.height)
+      }
+      res.hands.forEach((h, i) => {
+        let ns = estimateNails(h, W, H, { handKey: keys[i], forceVisible: this.opts.forceVisible, calib: this.calib[h.handedness] })
+        if (img) ns = ns.map((n) => (n.alpha > 0.05 ? refineNail(n, img, h.landmarks, W, H, s) : n))
+        nails.push(...ns)
+      })
+    }
+    nails = this.tracker.update(nails, t)
+    this.updateScene(nails, 0.08)
+    const visible = nails.filter((n) => n.alpha > 0.3).length
+    if (!res.hands.length) this.status('no_hand')
+    else if (!visible) this.status('show_back')
+    else this.status('ok')
+    this.lastLiveNails = nails
+    if (this.renderer.upload(v, W, H)) this.renderer.render(nails, this.design, { ...this.opts, ...this.sceneOpts(), time: t })
+    this._fpsN++
+    if (t - this._fpsT > 1000) {
+      this.fps = Math.round((this._fpsN * 1000) / (t - this._fpsT))
+      this._fpsN = 0
+      this._fpsT = t
+      this.onFrame({ fps: this.fps, hands: res.hands.length })
+    }
+  }
+
+  /** Freeze the current live frame into photo mode (customer can relax her arm). */
+  async freeze() {
+    const v = this.video
+    if (!v || !v.videoWidth) return false
+    const c = document.createElement('canvas')
+    const sc = Math.min(1, PHOTO_MAX / Math.max(v.videoWidth, v.videoHeight))
+    c.width = Math.round(v.videoWidth * sc)
+    c.height = Math.round(v.videoHeight * sc)
+    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height)
+    await this.setPhoto(c)
+    return true
+  }
+
+  stop() {
+    cancelAnimationFrame(this.raf)
+    this.raf = 0
+    this.mode = 'idle'
+  }
+
+  // ------------------------------------------------------------ PHOTO
+  /** source: HTMLImageElement | ImageBitmap | HTMLCanvasElement */
+  async setPhoto(source) {
+    this.stop()
+    const sw = source.naturalWidth || source.videoWidth || source.width
+    const sh = source.naturalHeight || source.videoHeight || source.height
+    const sc = Math.min(1, PHOTO_MAX / Math.max(sw, sh))
+    const c = document.createElement('canvas')
+    c.width = Math.max(1, Math.round(sw * sc))
+    c.height = Math.max(1, Math.round(sh * sc))
+    c.getContext('2d').drawImage(source, 0, 0, c.width, c.height)
+    this.photo = c
+    this.mode = 'photo'
+    this.overrides.clear()
+    this.removed.clear()
+    this.manual = []
+    this.status('analyzing')
+    this.renderer.clearMask()
+    await this.detectPhoto()
+    this.renderPhoto()
+    this.startPhotoAnimation()
+    if (this.opts.perfectFit !== false) this.perfectFit()
+    return { width: c.width, height: c.height }
+  }
+
+  async detectPhoto() {
+    const c = this.photo
+    const W = c.width
+    const H = c.height
+    let res
+    try {
+      res = await detectImage(c)
+    } catch (e) {
+      console.warn('[engine] photo detect failed', e)
+      res = { hands: [] }
+    }
+    this.hands = res.hands
+    const keys = handKeys(res.hands)
+    const fitScale = Math.min(1, 720 / W)
+    const fc = document.createElement('canvas')
+    fc.width = Math.round(W * fitScale)
+    fc.height = Math.round(H * fitScale)
+    const fctx = fc.getContext('2d', { willReadFrequently: true })
+    fctx.drawImage(c, 0, 0, fc.width, fc.height)
+    const img = fctx.getImageData(0, 0, fc.width, fc.height)
+    let nails = []
+    res.hands.forEach((h, i) => {
+      let ns = estimateNails(h, W, H, { handKey: keys[i], forceVisible: this.opts.forceVisible })
+      if (this.opts.smartFit) ns = ns.map((n) => (n.alpha > 0.05 ? refineNail(n, img, h.landmarks, W, H, fitScale) : n))
+      nails.push(...ns)
+    })
+    if (segmenterEnabled()) {
+      try {
+        const mask = await segmentNails(c)
+        nails = refineWithMask(nails, mask, W, H)
+      } catch (e) {
+        console.warn('[engine] segmenter failed', e)
+      }
+    }
+    this.photoNails = nails
+    this.photoWhite = findAutoWhite(img)
+    this.updateScene(nails)
+    const visible = nails.filter((n) => n.alpha > 0.3).length
+    this.status(!res.hands.length ? 'no_hand_photo' : visible ? 'ok' : 'show_back')
+  }
+
+  /** Re-run detection with "always show nails" etc. */
+  async redetect() {
+    if (this.mode !== 'photo') return
+    this.renderer.clearMask()
+    await this.detectPhoto()
+    this.renderPhoto()
+    if (this.opts.perfectFit !== false) this.perfectFit()
+  }
+
+  /**
+   * AI Perfect Fit: pixel-precise outline for every nail (MobileSAM, on the device), then learn this person's
+   * nail proportions so the LIVE camera fits better too. Non-blocking; progress via onFit({stage, p}).
+   */
+  async perfectFit() {
+    if (this.mode !== 'photo' || !this.photo || !samEnabled()) return
+    const token = ++this.fitToken
+    const base = this.photoNails.filter((n) => n.alpha > 0.3)
+    if (!base.length) return
+    this.onFit({ stage: 'start', p: 0 })
+    try {
+      const res = await samPerfectFit(this.photo, this.photoNails, {
+        onProgress: (e) => token === this.fitToken && this.onFit(e),
+      })
+      if (token !== this.fitToken || this.mode !== 'photo') return
+      if (!res.mask || !res.fitted) {
+        this.onFit({ stage: 'none', p: 1 })
+        return
+      }
+      this.renderer.setMask(res.mask.data, res.mask.width, res.mask.height)
+      this.lastMask = res.mask
+      this.photoNails = res.nails
+      this.learnCalibration(res.nails)
+      this.dirty = true
+      this.renderPhoto()
+      this.onFit({ stage: 'done', p: 1, fitted: res.fitted, backend: res.backend, ms: res.ms })
+    } catch (e) {
+      console.warn('[engine] Perfect Fit unavailable', e)
+      if (token === this.fitToken) this.onFit({ stage: 'error', p: 1, error: String(e?.message || e) })
+    }
+  }
+
+  /**
+   * Photo look (colour cast + saturation) applied to the polish. A neutral white surface in the photo wins;
+   * otherwise a gentle hint from the skin around the nails. EMA-smoothed in live mode.
+   */
+  updateScene(nails, smooth = 0) {
+    const labs = nails.filter((n) => n.skinLab && n.alpha > 0.3).map((n) => n.skinLab)
+    if (!labs.length) return
+    const skin = [0, 1, 2].map((i) => median(labs.map((l) => l[i])))
+    const fromSkin = sceneFromSkin(skin)
+    const white = this.mode === 'photo' ? this.photoWhite : null
+    const next = white ? sceneFromWhite(white, fromSkin.sat) : fromSkin
+    if (smooth && this.scene) {
+      const k = smooth
+      this.scene = {
+        cast: this.scene.cast.map((v, i) => v + (next.cast[i] - v) * k),
+        sat: this.scene.sat + (next.sat - this.scene.sat) * k,
+      }
+    } else this.scene = next
+  }
+
+  sceneOpts() {
+    if (!this.scene || this.opts.calibrated || this.opts.sceneMatch === false) return { cast: [1, 1, 1], sat: 1 }
+    return this.scene
+  }
+
+  /** New customer: forget the previous person's learned nail proportions. */
+  resetCalibration() {
+    this.calib = {}
+  }
+
+  learnCalibration(nails) {
+    const keys = handKeys(this.hands)
+    const W = this.photo.width
+    const H = this.photo.height
+    this.hands.forEach((h, i) => {
+      const spacing = fingerSpacing(h.landmarks, W, H)
+      const cal = { ...(this.calib[h.handedness] || {}) }
+      for (const n of nails) {
+        if (!n.maskId || !n.key.startsWith(keys[i] + ':')) continue
+        const ch = FINGER_CHAINS[n.finger]
+        const D = { x: h.landmarks[ch[2]].x * W, y: h.landmarks[ch[2]].y * H }
+        const T = { x: h.landmarks[ch[3]].x * W, y: h.landmarks[ch[3]].y * H }
+        const L = Math.hypot(T.x - D.x, T.y - D.y)
+        if (L < 4) continue
+        const ux = (T.x - D.x) / L
+        const uy = (T.y - D.y) / L
+        const proj = (x, y) => ((x - D.x) * ux + (y - D.y) * uy) / L
+        const start = proj(n.cx - n.ux * n.len * 0.5, n.cy - n.uy * n.len * 0.5)
+        const end = proj(n.cx + n.ux * n.len * 0.5, n.cy + n.uy * n.len * 0.5)
+        const wos = n.wid / Math.max(1, spacing[n.finger])
+        if (!(start > 0 && start < 1.2 && end > start + 0.2 && end < 2.2 && wos > 0.3 && wos < 1.4)) continue
+        cal[n.finger] = { start, end, widthOfSpacing: wos }
+      }
+      this.calib[h.handedness] = cal
+    })
+  }
+
+  currentNails() {
+    if (this.mode === 'live') return this.lastLiveNails || []
+    const out = []
+    for (const n of this.photoNails) {
+      if (this.removed.has(n.key)) continue
+      out.push(this.overrides.get(n.key) || n)
+    }
+    for (const m of this.manual) if (!this.removed.has(m.key)) out.push(this.overrides.get(m.key) || m)
+    return out
+  }
+
+  setNail(key, nail) {
+    this.overrides.set(key, { ...nail, alpha: 1, maskId: 0 }) // moved by hand → analytic outline
+    this.renderPhoto()
+  }
+
+  removeNail(key) {
+    this.removed.add(key)
+    this.renderPhoto()
+  }
+
+  /** Add a nail at a point (photo px) using the median size of detected nails. */
+  addNailAt(x, y) {
+    const ref = this.currentNails()
+    const med = (arr, d) => (arr.length ? arr.slice().sort((a, b) => a - b)[arr.length >> 1] : d)
+    const base = Math.min(this.photo.width, this.photo.height)
+    const len = med(ref.map((n) => n.len), base * 0.06)
+    const wid = med(ref.map((n) => n.wid), base * 0.05)
+    const key = 'manual:' + (this.manual.length + 1) + ':' + Math.round(x) + '_' + Math.round(y)
+    const nail = { key, finger: 'middle', cx: x, cy: y, ux: 0, uy: -1, len, wid, alpha: 1, side: 1 }
+    this.manual.push(nail)
+    this.renderPhoto()
+    return nail
+  }
+
+  resetEdits() {
+    this.overrides.clear()
+    this.removed.clear()
+    this.manual = []
+    this.renderPhoto()
+  }
+
+  renderPhoto() {
+    if (this.mode !== 'photo' || !this.photo) return
+    if (this.renderer.upload(this.photo, this.photo.width, this.photo.height) || this.renderer.w) {
+      this.renderer.render(this.currentNails(), this.design, { ...this.opts, ...this.sceneOpts(), time: performance.now() })
+    }
+  }
+
+  /** Gentle re-render loop in photo mode so glitter / cat-eye respond to tilt & drag. */
+  startPhotoAnimation() {
+    cancelAnimationFrame(this.raf)
+    let lastTilt = ''
+    const loop = () => {
+      if (this.mode !== 'photo') return
+      const key = this.opts.tilt.map((v) => v.toFixed(3)).join(',')
+      if (key !== lastTilt || this.dirty) {
+        lastTilt = key
+        this.dirty = false
+        this.renderer.render(this.currentNails(), this.design, { ...this.opts, ...this.sceneOpts(), time: performance.now() })
+      }
+      this.raf = requestAnimationFrame(loop)
+    }
+    this.raf = requestAnimationFrame(loop)
+  }
+
+  // ------------------------------------------------------------ outputs
+  /** JPEG of the current view (photo mode: full res; live: current frame) */
+  capture(design = this.design, quality = 0.9, extra = {}) {
+    if (this.mode === 'photo') {
+      this.renderer.upload(this.photo, this.photo.width, this.photo.height)
+      const url = this.renderer.capture(this.currentNails(), design, { ...this.opts, ...this.sceneOpts(), ...extra, time: performance.now() }, 'image/jpeg', quality)
+      if (design !== this.design || extra.showOriginal !== undefined) this.renderPhoto() // restore the live view
+      return url
+    }
+    return this.renderer.capture(this.lastLiveNails || [], design, { ...this.opts, ...this.sceneOpts(), ...extra, time: performance.now() }, 'image/jpeg', quality)
+  }
+
+  /** Small JPEG thumbnail (≤ maxSide px). Care & Us: memory only, never sent to Firestore. */
+  thumbnail(maxSide = 480, quality = 0.72, design = this.design) {
+    const url = this.capture(design, 0.92)
+    return downscaleDataUrl(url, maxSide, quality)
+  }
+
+  /** ImageData of the still photo (for skin analysis / calibration). */
+  photoImageData(maxSide = 900) {
+    if (!this.photo) return null
+    const sc = Math.min(1, maxSide / Math.max(this.photo.width, this.photo.height))
+    const c = document.createElement('canvas')
+    c.width = Math.round(this.photo.width * sc)
+    c.height = Math.round(this.photo.height * sc)
+    const ctx = c.getContext('2d', { willReadFrequently: true })
+    ctx.drawImage(this.photo, 0, 0, c.width, c.height)
+    return { img: ctx.getImageData(0, 0, c.width, c.height), scale: sc }
+  }
+
+  photoSize() {
+    return this.photo ? { width: this.photo.width, height: this.photo.height } : null
+  }
+
+  dispose() {
+    this.stop()
+    this.renderer.dispose()
+  }
+}
+
+export function downscaleDataUrl(url, maxSide, quality) {
+  return new Promise((resolve, reject) => {
+    const im = new Image()
+    im.onload = () => {
+      const sc = Math.min(1, maxSide / Math.max(im.width, im.height))
+      const c = document.createElement('canvas')
+      c.width = Math.round(im.width * sc)
+      c.height = Math.round(im.height * sc)
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height)
+      resolve(c.toDataURL('image/jpeg', quality))
+    }
+    im.onerror = reject
+    im.src = url
+  })
+}
