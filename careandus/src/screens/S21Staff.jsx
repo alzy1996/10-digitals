@@ -11,6 +11,7 @@ import { watchStaff, updateStaff, removeStaff } from '../services/staff.js';
 import { watchInvites, createInvite, deleteInvite, isEmail } from '../services/invites.js';
 import { whatsappLink } from '../reports/agreementCardPdf.js';
 import { sectionsOn } from '../services/salons.js';
+import SectionPicker from '../components/SectionPicker.jsx';
 
 export default function S21Staff() {
   const { t } = useT();
@@ -21,11 +22,13 @@ export default function S21Staff() {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('stylist');
   const [link, setLink] = useState(null);
+  const offered = sectionsOn(app.salon?.sections || { hair: true });
+  const [inviteSections, setInviteSections] = useState(offered);
+  const picked = inviteSections.filter((s) => offered.includes(s));
 
   const invite = () => {
     try {
-      // Phase 3 adds the per-person service picker; until then she gets every service the salon offers.
-      const url = createInvite(app.salonId, email, role, sectionsOn(app.salon?.sections));
+      const url = createInvite(app.salonId, email, role, picked.length ? picked : offered);
       setLink({ url, email: email.trim().toLowerCase() });
       setEmail('');
     } catch {
@@ -63,6 +66,11 @@ export default function S21Staff() {
                       </>
                     ) : null}
                   </div>
+                  {offered.length > 1 ? (
+                    <div className="mt-3">
+                      <SectionPicker value={(m.sections || ['hair']).filter((s) => offered.includes(s)).length ? (m.sections || ['hair']).filter((s) => offered.includes(s)) : offered} only={offered} onChange={(list) => updateStaff(app.salonId, m, { sections: list })} />
+                    </div>
+                  ) : null}
                 </li>
               );
             })}
@@ -78,6 +86,7 @@ export default function S21Staff() {
                 <Chip key={r} selected={role === r} onClick={() => setRole(r)}>{t(`role.${r}`)}</Chip>
               ))}
             </div>
+            {offered.length > 1 ? <SectionPicker label={t('sections.staffWorks')} value={picked.length ? picked : offered} only={offered} onChange={setInviteSections} /> : null}
             <Button icon="plus" disabled={!isEmail(email)} onClick={invite}>{t('staff.sendInvite')}</Button>
             {link ? (
               <div className="mt-4 rounded-control border border-ok p-3 text-sm">
@@ -100,6 +109,7 @@ export default function S21Staff() {
                     <Icon name="user" className="text-ink2" />
                     <span className="flex-1 text-sm" dir="ltr">{i.email}</span>
                     <Tag>{t(`role.${i.role}`)}</Tag>
+                    {(i.sections || []).map((s) => <Tag key={s}>{t(`sections.${s}`)}</Tag>)}
                     <button type="button" aria-label={t('common.delete')} className="press grid min-h-tap min-w-tap place-items-center rounded-full text-risk" onClick={() => deleteInvite(app.salonId, i.id)}>
                       <Icon name="trash" />
                     </button>

@@ -24,5 +24,5 @@ export async function dailyReportPdf(node, dayKey) {
     first = false;
     y += pageHpx;
   }
-  return { blob: pdf.output('blob'), filename: `khusla-daily-${dayKey}.pdf` };
+  return { blob: pdf.output('blob'), filename: `careandus-daily-${dayKey}.pdf` };
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import Button from '../components/Button.jsx';
 import Sheet from '../components/Sheet.jsx';
@@ -23,6 +23,17 @@ export default function S03Home() {
   const [open, setOpen] = useState(false);
   const [picking, setPicking] = useState(null); // { client } while choosing the service
   const services = mySections(app.salon, app.me);
+  const [params, setParams] = useSearchParams();
+  // Coming back from a finished service of the same visit (Done screen "Add another service").
+  const continuing = params.get('continueVisit') === '1' && session.active && session.visitId ? session : null;
+  const doneNow = continuing ? [...(continuing.done || []), { section: continuing.section, consultationId: continuing.consultationId }] : [];
+  const remaining = services.filter((s) => !doneNow.some((d) => d.section === s));
+  const continueWith = async (section) => {
+    const keep = { client: continuing.client, salonId: app.salonId, visitId: continuing.visitId, done: doneNow, profile: continuing.profile };
+    setParams({}, { replace: true });
+    await session.start('chair', { ...keep, section });
+    navigate(sectionEntry(section));
+  };
   const [q, setQ] = useState('');
   const [clients, clientsLoading] = useLive((cb) => watchClients(app.salonId, cb), [app.salonId], []);
   const [today] = useLive((cb) => watchConsultationsDay(app.salonId, dayKey(), cb), [app.salonId], []);
@@ -65,6 +76,21 @@ export default function S03Home() {
         <h1 className="mt-1 text-2xl">{t('home.hello', { name: app.me?.name?.split(' ')[0] || '' })}</h1>
         <p className="mt-1 text-sm text-ink2">{t('home.todayCount', { n: mine.length })}</p>
       </section>
+
+      {continuing && remaining.length ? (
+        <section className="card mb-5 border-plum p-4">
+          <h2 className="text-lg">{t('home.addService', { name: continuing.client?.displayName || '' })}</h2>
+          <p className="mb-3 text-sm text-ink2">{t('home.sameVisit')}</p>
+          <Button variant="ghost" icon="list" className="mb-2" onClick={() => navigate(`/visit/${continuing.visitId}`)}>{t('visit.open', { n: doneNow.length })}</Button>
+          <div className="grid gap-2">
+            {remaining.map((s) => (
+              <Button key={s} variant="secondary" icon={sectionMeta(s).icon} iconEnd="chevron" className="justify-between" onClick={() => continueWith(s)}>
+                {name(sectionMeta(s).name)}
+              </Button>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <Button icon="camera" onClick={() => setOpen(true)} className="!min-h-[72px] text-[20px]">
         {t('home.newClient')}

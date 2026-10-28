@@ -9,6 +9,7 @@ import { useSession } from '../hooks/useSession.jsx';
 import { getPublicSalon } from '../services/salons.js';
 import { publicCatalog } from '../services/catalog.js';
 import { APP } from '../config/app.js';
+import { homeSections, homeEntry, sectionMeta } from '../lib/sections.js';
 
 export default function S24TryAtHome() {
   const { salonId } = useParams();
@@ -52,7 +53,19 @@ export default function S24TryAtHome() {
               </div>
             </div>
           </section>
-          <Button icon="camera" busy={busy} onClick={start}>{t('home.start')}</Button>
+          {homeSections(salon).length > 1 ? (
+            <div className="grid gap-3">
+              {homeSections(salon).map((s) => (
+                <Button key={s} icon={sectionMeta(s).icon} variant={s === 'hair' ? 'primary' : 'secondary'} busy={s === 'hair' && busy} onClick={() => (s === 'hair' ? start() : navigate(homeEntry(s, salonId)))}>
+                  {t('home.tryService', { service: name(sectionMeta(s).name) })}
+                </Button>
+              ))}
+            </div>
+          ) : homeSections(salon)[0] && homeSections(salon)[0] !== 'hair' ? (
+            <Button icon={sectionMeta(homeSections(salon)[0]).icon} onClick={() => navigate(homeEntry(homeSections(salon)[0], salonId))}>{t('home.start')}</Button>
+          ) : (
+            <Button icon="camera" busy={busy} onClick={start}>{t('home.start')}</Button>
+          )}
           <p className="mt-4 text-center text-xs text-ink2">{t('splash.footer', { studio: APP.studio })}</p>
         </>
       ) : null}

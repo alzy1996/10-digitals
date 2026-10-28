@@ -117,3 +117,9 @@ export function watchClientConsultations(salonId, clientId, cb) {
   const q = query(collection(db, 'salons', salonId, 'consultations'), where('clientId', '==', clientId), orderBy('createdAt', 'desc'));
   return onSnapshot(q, (s) => cb(snapList(s)), () => cb([]));
 }
+
+/** Every service of one visit (hair + nails + beard for the same client). */
+export function watchVisit(salonId, visitId, cb) {
+  const q = query(collection(db, 'salons', salonId, 'consultations'), where('visitId', '==', visitId));
+  return onSnapshot(q, (s) => cb(snapList(s)), () => cb([]));
+}

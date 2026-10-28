@@ -12,6 +12,9 @@ import { watchStaff } from '../services/staff.js';
 import { watchClients } from '../services/clients.js';
 import { watchStatsRange } from '../services/stats.js';
 import { computeKpis } from '../reports/kpis.js';
+import { ChipRow } from '../components/Chip.jsx';
+import { sectionsOn } from '../services/salons.js';
+import { SECTION_LIST } from '../config/app.js';
 import { dailyReportPdf } from '../reports/dailyReportPdf.js';
 import { downloadBlob } from '../reports/agreementCardPdf.js';
 import { downloadCsv } from '../reports/csv.js';
@@ -28,8 +31,13 @@ export default function S23Reports() {
   const [includeDemo, setIncludeDemo] = useState(false);
   const [busy, setBusy] = useState(false);
   const nodeRef = useRef(null);
-  const [dayList] = useLive((cb) => watchConsultationsRange(app.salonId, day, day, cb), [app.salonId, day], []);
-  const [rangeList] = useLive((cb) => watchConsultationsRange(app.salonId, from, today, cb), [app.salonId, from, today], []);
+  const offered = sectionsOn(app.salon?.sections || { hair: true });
+  const [section, setSection] = useState('all');
+  const bySection = (l) => (section === 'all' ? l : (l || []).filter((c) => (c.section || 'hair') === section));
+  const [dayAll] = useLive((cb) => watchConsultationsRange(app.salonId, day, day, cb), [app.salonId, day], []);
+  const [rangeAll] = useLive((cb) => watchConsultationsRange(app.salonId, from, today, cb), [app.salonId, from, today], []);
+  const dayList = useMemo(() => bySection(dayAll), [dayAll, section]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rangeList = useMemo(() => bySection(rangeAll), [rangeAll, section]); // eslint-disable-line react-hooks/exhaustive-deps
   const [staff] = useLive((cb) => watchStaff(app.salonId, cb), [app.salonId], []);
   const [clients] = useLive((cb) => watchClients(app.salonId, cb), [app.salonId], []);
   const [stats] = useLive((cb) => watchStatsRange(app.salonId, from, today, cb), [app.salonId, from, today], []);
@@ -53,6 +61,8 @@ export default function S23Reports() {
       .filter((c) => includeDemo || !c.demo)
       .map((c) => ({
         dayKey: c.dayKey,
+        section: c.section || 'hair',
+        visitId: c.visitId || '',
         status: c.status,
         stylist: (staff || []).find((s) => s.uid === c.stylistUid)?.name || c.stylistUid,
         clientId: c.clientId || 'walk-in',
@@ -69,7 +79,7 @@ export default function S23Reports() {
         aiPreviewUsed: c.aiPreviewUsed ? 'yes' : 'no',
         demo: c.demo ? 'yes' : 'no',
       }));
-    downloadCsv(`khusla-consultations-${from}_${today}.csv`, Object.keys(rows[0] || { dayKey: '' }), rows);
+    downloadCsv(`careandus-consultations-${from}_${today}.csv`, Object.keys(rows[0] || { dayKey: '' }), rows);
   };
   const exportClients = () => {
     const rows = (clients || [])
@@ -91,7 +101,7 @@ export default function S23Reports() {
         henna: c.history?.henna || '',
         visits: c.visits || 0,
       }));
-    downloadCsv('khusla-clients.csv', Object.keys(rows[0] || { displayName: '' }), rows);
+    downloadCsv('careandus-clients.csv', Object.keys(rows[0] || { displayName: '' }), rows);
   };
   const exportStats = () => {
     const rows = (stats || []).map((s) => ({
@@ -104,11 +114,16 @@ export default function S23Reports() {
       notToday: s.notToday || 0,
       avgRating: s.ratingsCount ? (s.ratingsSum / s.ratingsCount).toFixed(2) : '',
     }));
-    downloadCsv(`khusla-daily-stats-${from}_${today}.csv`, Object.keys(rows[0] || { dayKey: '' }), rows);
+    downloadCsv(`careandus-daily-stats-${from}_${today}.csv`, Object.keys(rows[0] || { dayKey: '' }), rows);
   };
 
   return (
     <OwnerLayout title={t('reports.title')}>
+      {offered.length > 1 ? (
+        <div className="no-print">
+          <ChipRow label={t('sections.title')} value={section} onChange={setSection} options={[{ value: 'all', label: t('dash.allServices') }, ...SECTION_LIST.filter((s) => offered.includes(s.id)).map((s) => ({ value: s.id, label: name(s.name), icon: s.icon }))]} />
+        </div>
+      ) : null}
       <div className="no-print mb-4 flex flex-wrap items-center gap-2">
         {[0, -1, -2, -3, -4, -5, -6].map((d) => {
           const key = addDaysKey(today, d);

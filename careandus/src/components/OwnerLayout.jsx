@@ -3,13 +3,17 @@ import Icon from './Icon.jsx';
 import TopBar from './TopBar.jsx';
 import { useT } from '../lib/i18n/useT.js';
 import { useApp } from '../hooks/useApp.jsx';
+import * as nails from '../screens/nails/routes.jsx';
+import * as beard from '../screens/beard/routes.jsx';
 
 const NAV = [
   { to: '/owner', key: 'nav.dashboard', icon: 'chart', end: true },
-  { to: '/owner/catalog', key: 'nav.catalog', icon: 'grid' },
-  { to: '/owner/swatch-scan', key: 'nav.swatch', icon: 'swatch' },
+  { to: '/owner/catalog', key: 'nav.catalog', icon: 'grid', section: 'hair' },
+  { to: '/owner/swatch-scan', key: 'nav.swatch', icon: 'swatch', section: 'hair' },
   { to: '/owner/products', key: 'nav.products', icon: 'tag' },
   { to: '/owner/staff', key: 'nav.staff', icon: 'users', owner: true },
+  ...nails.OWNER_TABS.map((n) => ({ to: n.to, key: n.labelKey, icon: n.icon, section: 'nails' })),
+  ...beard.OWNER_TABS.map((n) => ({ to: n.to, key: n.labelKey, icon: n.icon, section: 'beard' })),
   { to: '/owner/settings', key: 'nav.settings', icon: 'settings' },
   { to: '/owner/reports', key: 'nav.reports', icon: 'print' },
 ];
@@ -19,7 +23,9 @@ export default function OwnerLayout({ title, children, actions }) {
   const { t, name } = useT();
   const app = useApp();
   const navigate = useNavigate();
-  const items = NAV.filter((n) => !n.owner || app.isOwner);
+  const on = app.salon?.sections || { hair: true };
+  // Owner-only items for owners; service items only when the salon offers that service.
+  const items = NAV.filter((n) => (!n.owner || app.isOwner) && (!n.section || on[n.section]));
   const link = (n, compact) => (
     <NavLink
       key={n.to}

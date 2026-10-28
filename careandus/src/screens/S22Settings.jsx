@@ -15,6 +15,8 @@ import { deleteDemo } from '../services/demo.js';
 import { normalizeOmanPhone } from '../reports/csv.js';
 import { formatDateTime } from '../lib/time.js';
 import { appUrl } from '../lib/url.js';
+import SectionPicker from '../components/SectionPicker.jsx';
+import { sectionsOn } from '../services/salons.js';
 import { SALON_SETTINGS_DEFAULT, DEFAULTS } from '../config/app.js';
 
 function themePref() {
@@ -40,6 +42,20 @@ export default function S22Settings() {
   return (
     <OwnerLayout title={t('settings.title')}>
       <div className="grid grid-cols-1 gap-6 desk:grid-cols-2">
+        {app.isOwner ? (
+          <Section title={t('sections.title')}>
+            <div className="card p-4">
+              <SectionPicker
+                label={t('sections.salonOffers')}
+                value={sectionsOn(app.salon?.sections || { hair: true })}
+                onChange={(list) => {
+                  updateSalon(app.salon, { sections: Object.fromEntries(['hair', 'nails', 'beard'].map((k) => [k, list.includes(k)])) });
+                  snack.show({ message: t('sections.saved'), tone: 'ok' });
+                }}
+              />
+            </div>
+          </Section>
+        ) : null}
         <Section title={t('settings.privacy')}>
           <div className="card p-5">
             <ChipRow label={t('settings.privateMode')} value={s.privateMode} onChange={(v) => set({ privateMode: v })} options={[{ value: true, label: t('common.on') }, { value: false, label: t('common.off') }]} />

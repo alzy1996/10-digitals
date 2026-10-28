@@ -16,6 +16,7 @@ import { nextVisitWeeks } from '../reports/aftercare.js';
 import { whatsappLink } from '../reports/agreementCardPdf.js';
 import { profileLabels, learnGrowthRate } from '../ai/hair/index.js';
 import { disposeThumbs } from '../hooks/useThumbs.js';
+import { mySections } from '../lib/sections.js';
 
 export default function S15Done() {
   const { t, name } = useT();
@@ -66,6 +67,13 @@ export default function S15Done() {
     disposeThumbs();
     await session.wipe();
     navigate('/home', { replace: true });
+  };
+
+  // Same client, same visit: keeps the visit id so hair + nails end on one Agreement Card.
+  const another = () => {
+    finish();
+    disposeThumbs();
+    navigate('/home?continueVisit=1', { replace: true });
   };
 
   const openWa = async () => {
@@ -122,6 +130,12 @@ export default function S15Done() {
       ) : null}
       <div className="space-y-3">
         {!saved ? <Button variant="secondary" icon="check" onClick={finish}>{t('done.save')}</Button> : null}
+        {mySections(app.salon, app.me).length > 1 ? (
+          <Button variant="secondary" icon="plus" onClick={another}>{t('home.addService', { name: session.client?.displayName || '' })}</Button>
+        ) : null}
+        {session.visitId && (session.done || []).length ? (
+          <Button variant="secondary" icon="list" onClick={() => navigate(`/visit/${session.visitId}`)}>{t('visit.open', { n: (session.done || []).length + 1 })}</Button>
+        ) : null}
         <Button icon="refresh" onClick={next}>{t('done.nextClient')}</Button>
       </div>
       <p className="mt-4 flex items-center justify-center gap-1 text-xs text-ink2">

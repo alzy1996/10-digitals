@@ -12,6 +12,8 @@ export function useConsultation() {
       if (session.mode !== 'chair' || !app.isStaff) return null;
       if (session.consultationId) return session.consultationId;
       const id = createConsultation(app.salonId, {
+        section: 'hair',
+        visitId: session.visitId || null,
         clientId: session.client?.id || null,
         params: { ...session.look, ...extra.params },
         source: session.lookCode ? 'look-code' : 'chair',

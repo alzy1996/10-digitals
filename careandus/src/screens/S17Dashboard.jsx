@@ -15,7 +15,9 @@ import { sweepRetention } from '../services/retention.js';
 import { computeKpis } from '../reports/kpis.js';
 import { dayKey, lastNDayKeys } from '../lib/time.js';
 import { formatDuration, formatPct } from '../lib/format.js';
-import { DEFAULTS } from '../config/app.js';
+import { DEFAULTS, SECTION_LIST } from '../config/app.js';
+import { ChipRow } from '../components/Chip.jsx';
+import { sectionsOn } from '../services/salons.js';
 
 export default function S17Dashboard() {
   const { t, lang, name } = useT();
@@ -26,7 +28,12 @@ export default function S17Dashboard() {
   const today = dayKey();
   const [all, , pending] = useLive((cb) => watchConsultationsRange(app.salonId, days[0], days[6], cb), [app.salonId, days[0]], []);
   const [staff] = useLive((cb) => watchStaff(app.salonId, cb), [app.salonId], []);
-  const list = all || [];
+  const offered = sectionsOn(app.salon?.sections || { hair: true });
+  const [section, setSection] = useState('all');
+  const allList = all || [];
+  // One salon, several services: filter every KPI below by service (consultations without one are hair).
+  const list = section === 'all' ? allList : allList.filter((c) => (c.section || 'hair') === section);
+  const todayBySection = Object.fromEntries(offered.map((s) => [s, allList.filter((c) => c.dayKey === dayKey() && (c.section || 'hair') === s && (includeDemo || !c.demo)).length]));
   const retentionDays = app.settings?.retentionDays;
   useEffect(() => {
     if (retentionDays && navigator.onLine) sweepRetention(app.salonId, retentionDays).catch(() => {});
@@ -45,6 +52,16 @@ export default function S17Dashboard() {
 
   return (
     <OwnerLayout title={t('dash.title')} actions={pending ? <Tag>{t('common.willSync')}</Tag> : null}>
+      {offered.length > 1 ? (
+        <>
+          <ChipRow
+            label={t('sections.title')}
+            value={section}
+            onChange={setSection}
+            options={[{ value: 'all', label: t('dash.allServices') }, ...SECTION_LIST.filter((s) => offered.includes(s.id)).map((s) => ({ value: s.id, label: `${name(s.name)} · ${todayBySection[s.id]}`, icon: s.icon }))]}
+          />
+        </>
+      ) : null}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Tag tone="plum">{t('dash.today', { date: today })}</Tag>
         {hasDemo ? (

@@ -87,7 +87,7 @@ export default function S13AiLook() {
 
   const share = async () => {
     if (!result) return;
-    const file = new File([result.blob], 'khusla-ai-preview.jpg', { type: result.blob.type || 'image/jpeg' });
+    const file = new File([result.blob], 'careandus-ai-preview.jpg', { type: result.blob.type || 'image/jpeg' });
     if (navigator.canShare?.({ files: [file] })) {
       await navigator.share({ files: [file], title: t('ai.label') }).catch(() => {});
     }

@@ -7,6 +7,8 @@ import { ErrorBox, Steps } from '../components/States.jsx';
 import { useT } from '../lib/i18n/useT.js';
 import { useApp } from '../hooks/useApp.jsx';
 import { createSalon } from '../services/salons.js';
+import SectionPicker from '../components/SectionPicker.jsx';
+import { SECTIONS_DEFAULT } from '../config/app.js';
 import { normalizeOmanPhone } from '../reports/csv.js';
 
 export default function CreateSalon() {
@@ -15,6 +17,7 @@ export default function CreateSalon() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', nameAr: '', whatsapp: '', ownerName: app.staffUser?.displayName || '' });
   const [demo, setDemo] = useState(true);
+  const [sections, setSections] = useState(Object.keys(SECTIONS_DEFAULT).filter((k) => SECTIONS_DEFAULT[k]));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -35,7 +38,7 @@ export default function CreateSalon() {
     setErr(null);
     setBusy(true);
     try {
-      const id = await createSalon({ name: form.name.trim(), nameAr: form.nameAr.trim(), whatsapp: phone || null, ownerName: form.ownerName.trim(), withDemo: demo });
+      const id = await createSalon({ name: form.name.trim(), nameAr: form.nameAr.trim(), whatsapp: phone || null, ownerName: form.ownerName.trim(), sections: Object.fromEntries(['hair', 'nails', 'beard'].map((k) => [k, sections.includes(k)])), withDemo: demo });
       app.setSalonId(id);
       navigate('/home', { replace: true });
     } catch (e) {
@@ -57,6 +60,7 @@ export default function CreateSalon() {
       <label className="label mb-1 block" htmlFor="wa">{t('create.whatsapp')}</label>
       <input id="wa" dir="ltr" inputMode="tel" className={`field mb-1 ${phone === undefined ? 'border-risk' : ''}`} value={form.whatsapp} onChange={set('whatsapp')} placeholder="+968 9xxx xxxx" />
       <p className="mb-5 text-xs text-ink2">{phone === undefined ? t('create.phoneBad') : t('create.whatsappHint')}</p>
+      <SectionPicker label={t('sections.salonOffers')} value={sections} onChange={setSections} />
       <div className="mb-6 flex flex-wrap gap-2">
         <Chip selected={demo} onClick={() => setDemo(true)}>{t('create.withDemo')}</Chip>
         <Chip selected={!demo} onClick={() => setDemo(false)}>{t('create.noDemo')}</Chip>

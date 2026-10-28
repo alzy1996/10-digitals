@@ -4,7 +4,7 @@ import * as nails from '../screens/nails/routes.jsx';
 import * as beard from '../screens/beard/routes.jsx';
 
 const ENTRIES = { hair: '/capture', nails: nails.ENTRY, beard: beard.ENTRY };
-const HOME_ENTRIES = { hair: (salonId) => `/t/${salonId}/hair`, nails: nails.HOME_ENTRY, beard: beard.HOME_ENTRY };
+const HOME_ENTRIES = { hair: (salonId) => `/t/${salonId}`, nails: nails.HOME_ENTRY, beard: beard.HOME_ENTRY };
 
 /** Services the salon offers AND this staff member works in, in the fixed order (hair, nails, beard). */
 export function mySections(salon, me) {

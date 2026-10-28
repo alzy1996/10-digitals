@@ -37,6 +37,7 @@ const S22Settings = lazy(() => import('./screens/S22Settings.jsx'));
 const S23Reports = lazy(() => import('./screens/S23Reports.jsx'));
 const S24TryAtHome = lazy(() => import('./screens/S24TryAtHome.jsx'));
 const S25LookCodeResult = lazy(() => import('./screens/S25LookCodeResult.jsx'));
+const VisitCard = lazy(() => import('./screens/VisitCard.jsx'));
 
 function Loading() {
   const { lang } = useT();
@@ -103,6 +104,7 @@ function AppRoutes() {
         <Route path="/ai/result" element={<StaffOnly><InSession><S13AiLook /></InSession></StaffOnly>} />
         <Route path="/agreement" element={<StaffOnly><InSession><S14Agreement /></InSession></StaffOnly>} />
         <Route path="/done" element={<StaffOnly><S15Done /></StaffOnly>} />
+        <Route path="/visit/:visitId" element={<StaffOnly><VisitCard /></StaffOnly>} />
         <Route path="/owner" element={<StaffOnly manager><S17Dashboard /></StaffOnly>} />
         <Route path="/owner/catalog" element={<StaffOnly manager><S18Catalog /></StaffOnly>} />
         <Route path="/owner/swatch-scan" element={<StaffOnly manager><S19SwatchScan /></StaffOnly>} />
