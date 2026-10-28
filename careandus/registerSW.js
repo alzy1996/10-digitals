@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/10-digitals/careandus/sw.js', { scope: '/10-digitals/careandus/' })})}

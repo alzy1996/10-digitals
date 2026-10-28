@@ -1,0 +1,1 @@
+import{H as e,J as t}from"./salons-DsxTgFLD.js";import{B as n,C as r,D as i,W as a}from"./time-CITRZeLy.js";function o(o,{type:s,clientId:c=null,consultationId:l=null,granted:u}){return e(i(n(r,`salons`,o,`consents`),{type:s,clientId:c,consultationId:l,granted:!!u,at:a(),by:t()}),`consent`)}export{o as t};
