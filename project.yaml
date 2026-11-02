@@ -32,3 +32,30 @@ project:
 modes:
   rigor: standard
   automation: guided
+
+engine:
+  name: "Unity"
+  version: "6.3 LTS"
+  language: "C#"
+  rendering: "URP"
+  physics: "PhysX"
+
+specialists:
+  code: "unity-specialist"
+  shader: "unity-shader-specialist"
+  ui: "unity-ui-specialist"
+  additional: ["unity-dots-specialist", "unity-addressables-specialist"]
+
+naming:
+  classes: PascalCase
+  variables: camelCase
+  constants: SCREAMING_SNAKE   # UNVERIFIED — not sourceable from
+                               # docs/engine-reference/unity/; confirm before relying on it
+  signals: OnEventName
+  files: PascalCase
+  scenes: PascalCase
+
+commands:
+  # TODO: the Unity editor is not installed or located yet, so build, test, run and
+  # smoke are NOT set. Each needs the editor's full path; set them via /settings once
+  # Unity Hub has installed 6.3 LTS. /smoke-check reports NOT ASSESSED until then.
