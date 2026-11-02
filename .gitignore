@@ -1,0 +1,8 @@
+# === Claude Code Game Studios (local/runtime) ===
+.claude/settings.local.json
+CLAUDE.local.md
+project.local.yaml
+production/session-logs/
+production/session-state/
+.claude/agent-memory/
+.claude/worktrees/
