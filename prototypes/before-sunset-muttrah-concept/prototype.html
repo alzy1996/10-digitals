@@ -1,420 +1,398 @@
 <!-- PROTOTYPE - NOT FOR PRODUCTION -->
-<!-- Question: Can a first-time player notice a subtle in-world clue while chased, and does a miss feel fair (not random)? -->
+<!-- Question: With a learnable deduction rule, deliberate cats, and story woven in, does a 2.5D run feel like a fair "I-should-have-seen-it" puzzle, not random? -->
 <!-- Date: 2026-11-03 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Before Sunset: Muttrah - concept prototype</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Before Sunset: Muttrah (prototype v2)</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #120d0b; overflow: hidden; }
-  body { display: flex; align-items: center; justify-content: center; }
-  canvas {
-    width: min(100vw, calc(100vh * 16 / 9));
-    height: auto;
-    aspect-ratio: 16 / 9;
-    display: block;
-    touch-action: none;
-    user-select: none;
-    -webkit-user-select: none;
-  }
+  html,body{margin:0;height:100%;background:#0e0b14;overflow:hidden;}
+  body{display:flex;align-items:center;justify-content:center;}
+  #c{width:min(100vw,calc(100vh*16/9));height:auto;aspect-ratio:16/9;display:block;background:#000;touch-action:none;user-select:none;-webkit-user-select:none;}
 </style>
 </head>
 <body>
 <canvas id="c" width="960" height="540"></canvas>
 <script>
 // PROTOTYPE - NOT FOR PRODUCTION
-// Question: Can a first-time player notice a subtle in-world clue while chased, and does a miss feel fair (not random)?
-// Date: 2026-11-03
-//
-// Rule of the world (never stated in the game): an ORANGE chalk X painted on the wall
-// beside a street means that street is trapped just ahead. Every other colour is decoration.
-// Fork 1 clue is big and obvious. Fork 2 clue is small and sits among decoys.
+// Core idea under test: ONE rule the player can learn — "a lit lane is a kind lane."
+// Lanterns mark the safe lane (the clue), lantern-light slows the cats (the mechanic),
+// and the dying sun is the timer. Fair deduction, not a colour code.
+"use strict";
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const W = 960, H = 540, CX = 480, HY = 176, GROUND = 512;
 
-const W = 960, H = 540;
-const cv = document.getElementById('c');
-const ctx = cv.getContext('2d');
+// ---- tuning (hardcoded on purpose) ----
+const FWD = 7.2;            // forward units/sec at full walk
+const STEER = 2.7;          // lateral units/sec
+const SUN_T = 78;           // seconds of light
+const SEG = 6;              // depth units between fork scenes
+const FORK_GAP = 22;        // depth units between forks
+const LANE = 1.15;          // lateral offset of each lane (units)
+const CAT_GAIN_MOVE = -0.052;  // closeness/sec while walking in the open
+const CAT_GAIN_BRAKE = 0.085;  // while braked (standing to read)
+const CAT_GAIN_DARK = 0.040;   // extra while outside lantern light
+const CAT_LIGHT_RELIEF = -0.075; // while standing inside a lantern's glow
+const CAT_DUSK = 0.03;      // extra gain per full dusk
 
-// ---------- tuning (hardcoded on purpose) ----------
-const PLAYER_V = 120;      // px/s
-const PR = 8;              // player radius
-const CAT_V0 = 62;         // cat speed at t=0 (px/s)
-const CAT_ACC = 2.3;       // cat speed gain per second
-const HEAD_START = 170;    // trail px between cats and player at start
-const CATCH_R = 16;
-const SUN_T = 40;          // seconds until sunset (fallback loss)
-const START = { x: 70, y: 470 };
-const GOAL = { x: 870, y: 68, r: 24 };
+// ---- story (respectful Muttrah texture; no religious framing, no real people) ----
+const STORY = {
+  intro: "The sun is almost in the sea. Be inside the Fort gate before the lanes go dark.",
+  grandfather: "Grandfather lit the harbour lanterns. “A lit lane is a kind lane,” he'd say.",
+  frags: [
+    "Frankincense smoke still hangs in the souq. You know its turns by heart.",
+    "The fishermen hauled in early today. Empty nets drying mean the lane is still walked.",
+    "A resting cat trusts a doorway. A fleeing cat knows something you don't."
+  ],
+  arrival: "The Fort gate is warm against the dusk. You read the city the way he taught you. These stones know you."
+};
 
-// ---------- world ----------
-// Two rings of street. Each ring is a fork: one safe street, one trapped street.
-const STREETS = [
-  [30, 440, 290, 60],  // start street
-  [240, 300, 60, 200], // ring 1 left connector
-  [270, 440, 350, 60], // ring 1 lower street  (TRAPPED)
-  [240, 300, 380, 60], // ring 1 upper street  (safe)
-  [560, 300, 60, 200], // ring 1 right connector
-  [560, 130, 60, 200], // link to ring 2
-  [560, 140, 340, 60], // ring 2 lower street  (safe)
-  [560, 40, 60, 160],  // ring 2 left connector
-  [560, 40, 340, 60],  // ring 2 upper street  (TRAPPED)
-  [840, 40, 60, 160]   // ring 2 right connector
-];
-const TRAPS = [
-  { id: 1, rect: [400, 440, 70, 60], name: 'Falling crates' },
-  { id: 2, rect: [680, 40, 70, 60], name: 'Open drain' }
-];
-const FORKS = [
-  { safe: 'upper', test: (x, y) => (x >= 380 && x <= 520) ? (y >= 440 ? 'lower' : (y <= 360 ? 'upper' : null)) : null },
-  { safe: 'lower', test: (x, y) => (x >= 660 && x <= 780) ? (y >= 140 ? 'lower' : (y <= 100 ? 'upper' : null)) : null }
-];
+// ---- forks: each has a safe side and the tells; escalating from obvious to combined ----
+// tells on each lane: lantern 'lit'|'flicker'|'dark', cat 'rest'|'flee'|'none', life 'open'|'laundry'|'shut'|'cart'
+function makeForks() { return [
+  { safeSide: (seedPick(0)?1:-1), hint: STORY.grandfather, trap: "cistern",
+    reveal: "The dark lane's lantern was out and its shop shut. The other lane glowed and a cat sat easy.",
+    lanes: { safe:{lantern:'lit',cat:'rest',life:'open'}, trap:{lantern:'dark',cat:'none',life:'shut'} } },
+  { safeSide: (seedPick(1)?1:-1), hint: STORY.frags[2], trap: "surge",
+    reveal: "Its lantern only flickered and a cat fled from its mouth. Steady light and a resting cat were the other way.",
+    lanes: { safe:{lantern:'lit',cat:'rest',life:'laundry'}, trap:{lantern:'flicker',cat:'flee',life:'open'} } },
+  { safeSide: (seedPick(2)?1:-1), hint: STORY.frags[1], trap: "deadend",
+    reveal: "Laundry still hung means people still walk it. The empty lane with the cart turned outward was the trap.",
+    lanes: { safe:{lantern:'lit',cat:'rest',life:'laundry'}, trap:{lantern:'lit',cat:'none',life:'cart'} } }
+]; }
+// deterministic-but-mixed safe sides so it isn't always the same lane (fixed per load, not random mid-run)
+let SEED = 1234567;
+function seedPick(i){ let x=Math.sin(SEED+ i*97.13)*10000; return (x-Math.floor(x))>0.5; }
 
-function walkable(x, y) {
-  for (const s of STREETS) {
-    if (x >= s[0] + PR && x <= s[0] + s[2] - PR && y >= s[1] + PR && y <= s[1] + s[3] - PR) return true;
-  }
-  return false;
+// ---- state ----
+let forks, state, t, travel, px, braking, catC, curFork, done, result, missReveal, fragShown, shownFrags, shake, attemptN=0, history=[];
+function reset(reseed){
+  if(reseed){ SEED = (SEED*48271+1)%2147483647; }
+  forks = makeForks();
+  state='ready'; t=0; travel=0; px=0; braking=false; catC=0.12; curFork=0; done=false;
+  result=null; missReveal=''; fragShown=''; shownFrags=0; shake=0;
+  banner = STORY.intro; bannerT = 0;
 }
+let banner='', bannerT=0;
 
-// ---------- state ----------
-let state = 'ready';       // ready | run | over
-let t = 0, res = null, trapHit = null, shake = 0;
-let px, py, xs, ys, ds, sc;
-let attemptN = 0, cur = null;
-const attempts = [];
+function forkTravel(i){ return 10 + i*FORK_GAP; }
+function finishTravel(){ return forkTravel(forks.length-1) + 14; }
 
-function reset() {
-  px = START.x; py = START.y;
-  xs = []; ys = []; ds = [];
-  for (let i = 0; i <= HEAD_START / 10; i++) { xs.push(START.x - HEAD_START + i * 10); ys.push(START.y); ds.push(i * 10); }
-  sc = 0; t = 0; state = 'ready'; res = null; trapHit = null; shake = 0;
-  cur = { n: attemptN + 1, f: [null, null], res: '', t: 0, trap: '' };
-}
-
-function posAt(s) {
-  const L = ds[ds.length - 1];
-  if (s <= 0) return [xs[0], ys[0]];
-  if (s >= L) return [xs[xs.length - 1], ys[ys.length - 1]];
-  let lo = 0, hi = ds.length - 1;
-  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (ds[m] <= s) lo = m; else hi = m; }
-  const f = (s - ds[lo]) / ((ds[hi] - ds[lo]) || 1);
-  return [xs[lo] + (xs[hi] - xs[lo]) * f, ys[lo] + (ys[hi] - ys[lo]) * f];
-}
-
-function pushTrail() {
-  const i = xs.length - 1;
-  const d = Math.hypot(px - xs[i], py - ys[i]);
-  if (d >= 3) { xs.push(px); ys.push(py); ds.push(ds[i] + d); }
-}
-
-function endRun(r, trapName) {
-  state = 'over'; res = r;
-  cur.res = r; cur.t = t; cur.trap = trapName || '';
-  attemptN++; attempts.push(cur);
-  if (r === 'trapped') shake = 0.4;
-}
-
-// ---------- input ----------
-const keys = {};
-const pointer = { down: false, x: 0, y: 0 };
-window.__bot = null; // test hook: array of [x,y] waypoints or {wait:seconds}
-
-addEventListener('keydown', e => {
-  const k = e.key.toLowerCase();
-  keys[k] = true;
-  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
-  if (k === 'r') reset();
-  else if (state === 'over' && (k === ' ' || k === 'enter')) reset();
+// ---- input ----
+const keys={};
+const touch={left:false,right:false,brake:false};
+window.__bot=null; // test hook
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();keys[k]=true;
+  if(['arrowleft','arrowright','arrowup','arrowdown',' '].includes(k))e.preventDefault();
+  if(k==='r')reset(false);
+  else if(state==='over'&&(k===' '||k==='enter'))reset(true);
 });
-addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
-
-function setPointer(e) {
-  const r = cv.getBoundingClientRect();
-  pointer.x = (e.clientX - r.left) * W / r.width;
-  pointer.y = (e.clientY - r.top) * H / r.height;
+addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+function pt(e){const r=cv.getBoundingClientRect();return [(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height];}
+function applyTouch(x,y){ touch.left=touch.right=touch.brake=false;
+  if(y>H*0.62){ touch.brake=true; }          // lower band = brake / look
+  else if(x<W*0.5){ touch.left=true; } else { touch.right=true; }
 }
-cv.addEventListener('pointerdown', e => {
-  setPointer(e);
-  if (state === 'over') { reset(); pointer.down = false; return; }
-  pointer.down = true;
-  try { cv.setPointerCapture(e.pointerId); } catch (err) {}
-});
-cv.addEventListener('pointermove', e => { setPointer(e); });
-cv.addEventListener('pointerup', () => { pointer.down = false; });
-cv.addEventListener('pointercancel', () => { pointer.down = false; });
-cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('pointerdown',e=>{ if(state==='over'){reset(true);return;} if(state==='ready')state='run';
+  const[x,y]=pt(e); applyTouch(x,y); touch.id=e.pointerId; try{cv.setPointerCapture(e.pointerId);}catch(_){} });
+cv.addEventListener('pointermove',e=>{ if(touch.id!==undefined){const[x,y]=pt(e);applyTouch(x,y);} });
+cv.addEventListener('pointerup',()=>{touch.left=touch.right=touch.brake=false;touch.id=undefined;});
+cv.addEventListener('pointercancel',()=>{touch.left=touch.right=touch.brake=false;touch.id=undefined;});
+cv.addEventListener('contextmenu',e=>e.preventDefault());
 
-function readInput(dt) {
-  let dx = 0, dy = 0;
-  const bot = window.__bot;
-  if (bot && bot.length) {
-    const w = bot[0];
-    if (w.wait !== undefined) { w.wait -= dt; if (w.wait <= 0) bot.shift(); }
-    else {
-      const vx = w[0] - px, vy = w[1] - py, d = Math.hypot(vx, vy);
-      if (d < 5) bot.shift(); else { dx = vx / d; dy = vy / d; }
-    }
-    return [dx, dy];
+function readSteer(){
+  let s=0, brake=false;
+  const b=window.__bot;
+  if(b&&b.length){ const c=b[0];
+    if(c.wait!==undefined){c.wait-=1/60;if(c.wait<=0)b.shift();brake=!!c.brake;}
+    else { if(c.to!==undefined){ if(Math.abs(px-c.to)<0.06){b.shift();} else s=c.to>px?1:-1; } brake=!!c.brake; }
+    return {s,brake};
   }
-  if (pointer.down) {
-    const vx = pointer.x - px, vy = pointer.y - py, d = Math.hypot(vx, vy);
-    if (d > 6) { dx = vx / d; dy = vy / d; }
-    return [dx, dy];
-  }
-  if (keys['arrowleft'] || keys['a']) dx -= 1;
-  if (keys['arrowright'] || keys['d']) dx += 1;
-  if (keys['arrowup'] || keys['w']) dy -= 1;
-  if (keys['arrowdown'] || keys['s']) dy += 1;
-  const m = Math.hypot(dx, dy);
-  if (m > 0) { dx /= m; dy /= m; }
-  return [dx, dy];
+  if(keys['arrowleft']||keys['a'])s-=1;
+  if(keys['arrowright']||keys['d'])s+=1;
+  if(keys['arrowdown']||keys['s']||keys[' '])brake=true;
+  if(touch.left)s-=1; if(touch.right)s+=1; if(touch.brake)brake=true;
+  return {s,brake};
 }
 
-// ---------- update ----------
-function update(dt) {
-  if (shake > 0) shake = Math.max(0, shake - dt);
-  if (state === 'over') { readInput(dt); return; }
-  const [dx, dy] = readInput(dt);
-  if (state === 'ready') { if (dx || dy) state = 'run'; else return; }
+// ---- perspective ----
+function proj(rd){ // relative depth >=0 -> scale 0..1
+  const s = SEG/(SEG+Math.max(0,rd)); return s;
+}
+function groundYs(s){ return HY + (GROUND-HY)*s; }
+function sx(xUnits,s){ return CX + xUnits*150*s; }
 
-  t += dt;
-  const nx = px + dx * PLAYER_V * dt, ny = py + dy * PLAYER_V * dt;
-  if (walkable(nx, ny)) { px = nx; py = ny; }
-  else if (walkable(nx, py)) px = nx;
-  else if (walkable(px, ny)) py = ny;
-  pushTrail();
+function dusk(){ return Math.min(1,t/SUN_T); }
+function inLight(){ // standing in the glow of the upcoming safe lantern near a fork
+  const f=forks[curFork]; if(!f)return false;
+  const ft=forkTravel(curFork); const d=ft-travel;
+  if(d>2.2||d< -1) return false;              // only near the fork mouth
+  const safeX=f.safeSide*LANE;
+  return Math.abs(px-safeX)<0.6;              // standing under the lit lane
+}
 
-  // cats follow the player's own trail
-  sc += (CAT_V0 + CAT_ACC * t) * dt;
-  const L = ds[ds.length - 1];
-  if (sc > L) sc = L;
+// ---- update ----
+function update(dt){
+  if(shake>0)shake=Math.max(0,shake-dt);
+  if(bannerT>0)bannerT-=dt;
+  if(state==='over'){ readSteer(); return; }
+  const {s,brake}=readSteer();
+  if(state==='ready'){ if(s||brake||(window.__bot&&window.__bot.length)) state='run'; else return; }
+  braking=brake;
+  t+=dt;
+  px += s*STEER*dt; px=Math.max(-1.5,Math.min(1.5,px));
+  const speed = brake?0:FWD;
+  travel += speed*dt;
 
-  // which street did the player choose at each fork?
-  for (let i = 0; i < FORKS.length; i++) {
-    if (cur.f[i] === null) { const r = FORKS[i].test(px, py); if (r) cur.f[i] = r; }
-  }
-  // traps
-  for (const tr of TRAPS) {
-    const r = tr.rect;
-    if (px >= r[0] && px <= r[0] + r[2] && py >= r[1] && py <= r[1] + r[3]) { trapHit = tr.id; endRun('trapped', tr.name); return; }
-  }
-  // goal
-  if (Math.hypot(px - GOAL.x, py - GOAL.y) < GOAL.r) { endRun('won'); return; }
   // cats
-  const cp = posAt(sc);
-  if (Math.hypot(px - cp[0], py - cp[1]) < CATCH_R || sc >= L - 1) { endRun('caught'); return; }
+  let gain = brake?CAT_GAIN_BRAKE:CAT_GAIN_MOVE;
+  if(brake && inLight()) gain=CAT_LIGHT_RELIEF;      // "one good look" is safe in the light
+  else if(!inLight()) gain+=CAT_GAIN_DARK*(brake?1:0.5);
+  gain += CAT_DUSK*dusk();
+  catC += gain*dt;
+  catC=Math.max(0,Math.min(1,catC));
+  if(catC>=1){ return endRun('caught'); }
+
+  // fork resolution
+  if(curFork<forks.length){
+    const ft=forkTravel(curFork);
+    if(travel>=ft){
+      const f=forks[curFork];
+      const side = px<0?-1:1;
+      const choseSafe = side===f.safeSide;
+      history.push({fork:curFork+1, side:side<0?'L':'R', safe:choseSafe});
+      if(choseSafe){
+        shownFrags++; banner=f.hint; bannerT=3.2; curFork++;
+        catC=Math.max(0,catC-0.12);   // a correct read buys a breath
+      } else {
+        missReveal=f.reveal; return endRun('trap');
+      }
+    }
+  }
   // sunset
-  if (t >= SUN_T) { endRun('sunset'); return; }
+  if(t>=SUN_T) return endRun('sunset');
+  // win
+  if(travel>=finishTravel()) return endRun('won');
 }
+function endRun(r){ state='over'; result=r; done=true; attemptN++;
+  if(r==='trap'||r==='caught')shake=0.45;
+  cur={n:attemptN,r,t:t}; }
+let cur={n:0,r:'',t:0};
 
-// ---------- drawing ----------
-function block(x, y, w, h) {
-  ctx.fillStyle = '#6c4636'; ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = '#85594a'; ctx.fillRect(x, y, w, 4);
-  for (let wy = y + 12; wy < y + h - 12; wy += 22) {
-    for (let wx = x + 12; wx < x + w - 14; wx += 26) {
-      ctx.fillStyle = ((wx * 7 + wy * 13) % 5 === 0) ? '#e8b35a' : '#2a1a14';
-      ctx.fillRect(wx, wy, 10, 12);
-    }
-  }
-}
-function awning(x, faceY, w, color, dir) {
-  const y = dir < 0 ? faceY - 9 : faceY;
-  ctx.fillStyle = color; ctx.fillRect(x, y, w, 9);
-  ctx.fillStyle = 'rgba(255,255,255,.28)';
-  for (let i = 0; i < w; i += 10) ctx.fillRect(x + i, y, 5, 9);
-}
-function car(x, y, w, h, color) {
-  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x - w / 2 + 2, y - h / 2 + 3, w, h);
-  ctx.fillStyle = color; ctx.fillRect(x - w / 2, y - h / 2, w, h);
-  ctx.fillStyle = 'rgba(20,30,40,.7)';
-  if (w >= h) ctx.fillRect(x - w / 6, y - h / 2 + 2, w / 3, h - 4);
-  else ctx.fillRect(x - w / 2 + 2, y - h / 6, w - 4, h / 3);
-}
-function chalkX(cx, cy, r, lw, color) {
-  ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx + r, cy + r); ctx.moveTo(cx + r, cy - r); ctx.lineTo(cx - r, cy + r); ctx.stroke();
-}
-function chalkO(cx, cy, r, lw, color) {
-  ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke();
-}
-function chalkLine(x1, y1, x2, y2, lw, color) {
-  ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-}
-function scribble(x, y, color) {
-  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y);
-  ctx.lineTo(x + 6, y - 6); ctx.lineTo(x + 12, y + 3); ctx.lineTo(x + 18, y - 5); ctx.lineTo(x + 24, y + 4); ctx.stroke();
-}
+// ---- drawing ----
+function lerp(a,b,u){return a+(b-a)*u;}
+function mix(c1,c2,u){return [Math.round(lerp(c1[0],c2[0],u)),Math.round(lerp(c1[1],c2[1],u)),Math.round(lerp(c1[2],c2[2],u))];}
+function rgb(c){return 'rgb('+c[0]+','+c[1]+','+c[2]+')';}
 
-function drawWorld() {
-  ctx.fillStyle = '#3b2620'; ctx.fillRect(0, 0, W, H);
-  // sea (Muttrah corniche)
-  ctx.fillStyle = '#2b5a73'; ctx.fillRect(0, 512, W, 28);
-  ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 2;
-  for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 526); ctx.quadraticCurveTo(x + 10, 520, x + 20, 526); ctx.quadraticCurveTo(x + 30, 532, x + 40, 526); ctx.stroke(); }
-  // outer buildings
-  block(0, 0, 230, 420); block(240, 20, 300, 250); block(630, 210, 330, 220); block(630, 440, 330, 60);
-  // the Fort (sandstone), top right
-  ctx.fillStyle = '#b08a56'; ctx.fillRect(908, 20, 46, 190);
-  ctx.fillStyle = '#c9a36a'; for (let y = 20; y < 210; y += 16) ctx.fillRect(908, y, 14, 8);
-  ctx.fillStyle = '#7a5a34'; ctx.fillRect(922, 60, 12, 24);
-  // streets
-  ctx.fillStyle = '#d2ac72';
-  for (const s of STREETS) ctx.fillRect(s[0], s[1], s[2], s[3]);
-  // interior blocks
-  block(300, 360, 260, 80); block(620, 100, 220, 40);
-  // awnings (never orange)
-  awning(320, 360, 40, '#3f8f8f', -1); awning(380, 360, 40, '#e8dcc0', -1); awning(470, 360, 40, '#6a5acd', -1);
-  awning(430, 440, 40, '#3f8f8f', 1); awning(500, 440, 40, '#e8dcc0', 1);
-  awning(640, 100, 36, '#3f8f8f', -1); awning(780, 100, 36, '#6a5acd', -1);
-  awning(630, 140, 36, '#e8dcc0', 1); awning(700, 140, 36, '#3f8f8f', 1); awning(790, 140, 40, '#6a5acd', 1);
-  // decoy chalk marks (never orange)
-  chalkO(480, 385, 7, 2.5, '#5aa0e6'); chalkLine(410, 420, 428, 418, 3, '#6fcf7f'); scribble(520, 402, '#f2f2f2');
-  chalkO(655, 122, 6, 2.2, '#5aa0e6'); chalkLine(748, 112, 764, 113, 2.5, '#6fcf7f');
-  scribble(800, 126, '#f2f2f2'); chalkX(762, 124, 5, 2, '#5aa0e6');
-  // CLUE 1 (obvious): big orange X on the wall beside the lower street, just before the trap
-  chalkX(345, 418, 18, 6, '#ff7a1a');
-  // CLUE 2 (subtle): small orange x on the wall beside the upper street, just before the trap
-  chalkX(706, 114, 6, 2.5, '#f07a22');
-  // cars (decor)
-  car(170, 478, 36, 18, '#e8dcc0'); car(530, 474, 34, 17, '#3c6ea5'); car(590, 400, 17, 34, '#a05a5a'); car(820, 178, 34, 17, '#5b8a72');
-  // labels
-  ctx.fillStyle = 'rgba(60,40,25,.8)'; ctx.font = 'bold 12px system-ui,sans-serif'; ctx.textAlign = 'left';
-  ctx.fillText('START', 36, 456);
-  // trap aftermath
-  if (state === 'over' && res === 'trapped') {
-    const r = TRAPS.find(x => x.id === trapHit).rect;
-    if (trapHit === 1) {
-      ctx.fillStyle = '#8a5a2b';
-      for (let i = 0; i < 6; i++) ctx.fillRect(r[0] + 6 + (i % 3) * 20, r[1] + 8 + Math.floor(i / 3) * 22 + (i % 2) * 3, 18, 18);
-    } else {
-      ctx.fillStyle = '#1b1411'; ctx.fillRect(r[0] + 8, r[1] + 10, r[2] - 16, r[3] - 20);
-      ctx.strokeStyle = '#5d5148'; ctx.lineWidth = 2;
-      for (let x = r[0] + 14; x < r[0] + r[2] - 10; x += 10) { ctx.beginPath(); ctx.moveTo(x, r[1] + 10); ctx.lineTo(x, r[1] + r[3] - 10); ctx.stroke(); }
-    }
-  }
-}
-
-// the Fort gate (goal) is drawn on top of the dusk so the player can always find it
-function drawGate() {
-  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 300);
-  ctx.fillStyle = 'rgba(255,214,120,' + (0.35 + 0.25 * pulse) + ')';
-  ctx.beginPath(); ctx.arc(GOAL.x, GOAL.y, GOAL.r, 0, 7); ctx.fill();
-  ctx.fillStyle = '#b08a56'; ctx.fillRect(GOAL.x - 14, GOAL.y - 14, 28, 24);
-  ctx.fillStyle = '#c9a36a'; for (let i = 0; i < 4; i++) ctx.fillRect(GOAL.x - 14 + i * 8, GOAL.y - 19, 5, 6);
-  ctx.fillStyle = '#4a2f1a'; ctx.fillRect(GOAL.x - 4, GOAL.y - 2, 8, 12);
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 11px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.fillText('FORT', GOAL.x, GOAL.y + 28);
-}
-function drawCatBodies() {
-  for (let i = 0; i < 3; i++) {
-    const s = Math.max(0, sc - i * 14);
-    const a = posAt(s), b = posAt(s + 6);
-    const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
-    ctx.save(); ctx.translate(a[0], a[1]); ctx.rotate(ang);
-    ctx.fillStyle = '#100c0a';
-    ctx.beginPath(); ctx.ellipse(0, 0, 9, 5, 0, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.arc(8, 0, 4.5, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(9, -3); ctx.lineTo(7, -8); ctx.lineTo(12, -4); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(9, 3); ctx.lineTo(7, 8); ctx.lineTo(12, 4); ctx.fill();
-    ctx.restore();
-  }
-}
-function drawCatEyes() {
-  for (let i = 0; i < 3; i++) {
-    const s = Math.max(0, sc - i * 14);
-    const a = posAt(s), b = posAt(s + 6);
-    const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
-    ctx.save(); ctx.translate(a[0], a[1]); ctx.rotate(ang);
-    ctx.fillStyle = '#d6ff5a'; ctx.shadowColor = '#d6ff5a'; ctx.shadowBlur = 8;
-    ctx.beginPath(); ctx.arc(10, -2, 1.6, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.arc(10, 2, 1.6, 0, 7); ctx.fill();
-    ctx.restore();
-  }
-}
-function drawPlayer() {
-  ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(px + 1, py + 4, 8, 4, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = '#f4efe4'; ctx.beginPath(); ctx.arc(px, py, PR, 0, 7); ctx.fill();
-  ctx.fillStyle = '#2f6f8f'; ctx.beginPath(); ctx.arc(px, py - 1, 5, Math.PI, 0); ctx.fill();
-}
-function drawDusk() {
-  const k = Math.min(1, t / 30);
-  ctx.fillStyle = 'rgba(70,25,95,' + (0.08 + 0.30 * k) + ')'; ctx.fillRect(0, 0, W, H);
-  const r0 = 70 - 10 * k, r1 = 210 - 70 * k;
-  const g = ctx.createRadialGradient(px, py, r0, px, py, r1);
-  const a = 0.70 + 0.15 * k; // outside the light the world is dark: details need to be looked for
-  g.addColorStop(0, 'rgba(8,10,30,0)'); g.addColorStop(1, 'rgba(8,10,30,' + a + ')');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-}
-function drawHud() {
-  ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.font = 'bold 14px system-ui,sans-serif';
-  ctx.fillText('Attempt ' + cur.n, 16, 24);
-  const frac = Math.max(0, 1 - t / SUN_T);
-  ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(16, 32, 220, 8);
-  ctx.fillStyle = frac > 0.4 ? '#ffb347' : '#b06cd6'; ctx.fillRect(16, 32, 220 * frac, 8);
-  ctx.fillStyle = '#fff'; ctx.font = '11px system-ui,sans-serif'; ctx.fillText('sunset', 16, 54);
-}
-function panel(x, y, w, h) { ctx.fillStyle = 'rgba(10,8,12,.82)'; ctx.fillRect(x, y, w, h); }
-function drawReady() {
-  panel(210, 12, 540, 62);
-  ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = 'bold 16px system-ui,sans-serif';
-  ctx.fillText('Reach the Fort before sunset. The cats are behind you.', 480, 36);
-  ctx.font = '13px system-ui,sans-serif'; ctx.fillStyle = '#ddd';
-  ctx.fillText('Move: arrow keys / WASD, or hold mouse / finger. Your first move starts the run.', 480, 58);
-}
-function resultTitle() {
-  if (res === 'won') return 'You reached the Fort!';
-  if (res === 'trapped') return 'TRAP: ' + cur.trap;
-  if (res === 'caught') return 'The cats caught you';
-  return 'The sun set';
-}
-function forkText(i) {
-  const f = cur.f[i];
-  return f ? f + (f === FORKS[i].safe ? ' (safe)' : ' (trap)') : '-';
-}
-function drawOver() {
-  panel(150, 110, 660, 320);
-  ctx.textAlign = 'center';
-  ctx.fillStyle = res === 'won' ? '#ffd679' : '#ff8a70'; ctx.font = 'bold 28px system-ui,sans-serif';
-  ctx.fillText(resultTitle(), 480, 156);
-  ctx.fillStyle = '#fff'; ctx.font = '15px system-ui,sans-serif';
-  ctx.fillText('Attempt ' + cur.n + '  |  ' + cur.t.toFixed(1) + ' s  |  Fork 1: ' + forkText(0) + '  |  Fork 2: ' + forkText(1), 480, 190);
-  ctx.textAlign = 'left'; ctx.font = '13px ui-monospace,Menlo,Consolas,monospace'; ctx.fillStyle = '#cfc8c0';
-  const rows = attempts.slice(-6);
-  ctx.fillText('History (newest last)', 190, 226);
-  rows.forEach((a, i) => {
-    const f1 = a.f[0] ? a.f[0] + (a.f[0] === FORKS[0].safe ? ' ok' : ' TRAP') : '-';
-    const f2 = a.f[1] ? a.f[1] + (a.f[1] === FORKS[1].safe ? ' ok' : ' TRAP') : '-';
-    ctx.fillText('#' + a.n + '  F1: ' + f1.padEnd(10) + ' F2: ' + f2.padEnd(10) + ' ' + a.res + (a.trap ? ' (' + a.trap + ')' : ''), 190, 248 + i * 20);
-  });
-  ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = 'bold 15px system-ui,sans-serif';
-  ctx.fillText('Press R / Space, or tap, to try again', 480, 414);
-}
-
-function draw() {
-  ctx.save();
-  if (shake > 0) ctx.translate((Math.random() - 0.5) * 10 * shake * 2.5, (Math.random() - 0.5) * 10 * shake * 2.5);
-  drawWorld();
-  drawCatBodies();
-  drawPlayer();
-  drawDusk();
-  drawGate();
-  drawCatEyes();
+function drawSky(){
+  const k=dusk();
+  const top=mix([70,120,170],[26,20,54],k), mid=mix([246,170,80],[120,54,96],k), low=mix([255,150,70],[60,32,70],k);
+  const g=ctx.createLinearGradient(0,0,0,HY+60);
+  g.addColorStop(0,rgb(top)); g.addColorStop(0.7,rgb(mid)); g.addColorStop(1,rgb(low));
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,HY+60);
+  // sun sinking with the timer
+  const sy=lerp(HY-54,HY+20,k);
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  const sg=ctx.createRadialGradient(CX,sy,4,CX,sy,90);
+  sg.addColorStop(0,'rgba(255,238,200,'+(0.9-0.4*k)+')'); sg.addColorStop(1,'rgba(255,170,90,0)');
+  ctx.fillStyle=sg; ctx.beginPath();ctx.arc(CX,sy,90,0,7);ctx.fill();
   ctx.restore();
-  drawHud();
-  if (state === 'ready') drawReady();
-  if (state === 'over') drawOver();
+  ctx.fillStyle=rgb(mix([255,226,170],[210,140,110],k)); ctx.beginPath();ctx.arc(CX,sy,16,0,7);ctx.fill();
+  // sea strip under horizon
+  ctx.fillStyle=rgb(mix([40,90,120],[20,20,54],k)); ctx.fillRect(0,HY,W,16);
+}
+function drawFort(){
+  const k=dusk(); const s=proj(finishTravel()-travel);
+  const fx=CX+ (forks[forks.length-1]? forks[forks.length-1].safeSide:1)*0; // centered at vanishing
+  const w=90*s*3, h=70*s*3, y=groundYs(s);
+  ctx.fillStyle=rgb(mix([176,138,86],[70,50,70],k));
+  ctx.fillRect(CX-w/2,y-h,w,h);
+  // crenellations + warm gate glow (the goal reads warm)
+  ctx.fillStyle=rgb(mix([201,163,106],[96,70,96],k));
+  for(let i=0;i<5;i++)ctx.fillRect(CX-w/2+i*(w/5),y-h-6*s*3,w/8,7*s*3);
+  ctx.save();ctx.globalCompositeOperation='lighter';
+  const gg=ctx.createRadialGradient(CX,y-6,2,CX,y-6,38);
+  gg.addColorStop(0,'rgba(255,196,110,0.8)');gg.addColorStop(1,'rgba(255,170,80,0)');
+  ctx.fillStyle=gg;ctx.beginPath();ctx.arc(CX,y-6,38,0,7);ctx.fill();ctx.restore();
+}
+// draw a receding wall on one side between two depths
+function wall(side, rdNear, rdFar, col){
+  const sN=proj(rdNear), sF=proj(rdFar);
+  const edge=side*1.5;
+  const xN=sx(edge,sN), xF=sx(edge,sF);
+  const yNb=groundYs(sN), yFb=groundYs(sF);
+  const topN=yNb-150*sN, topF=yFb-150*sF;
+  ctx.fillStyle=col;
+  ctx.beginPath();ctx.moveTo(xN,yNb);ctx.lineTo(xF,yFb);ctx.lineTo(xF,topF);ctx.lineTo(xN,topN);ctx.closePath();ctx.fill();
+  return {xN,xF,yNb,yFb,topN,topF,sN,sF};
+}
+function lanternGlow(x,y,r,a,warm){
+  ctx.save();ctx.globalCompositeOperation='lighter';
+  const g=ctx.createRadialGradient(x,y,1,x,y,r);
+  g.addColorStop(0,warm?'rgba(255,200,110,'+a+')':'rgba(255,200,110,'+a+')');g.addColorStop(1,'rgba(255,180,90,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.restore();
+}
+// draw the clue props at a lane mouth (side -1/1), given lane descriptor and depth
+function laneScene(side, rd, lane, flickerPhase){
+  const s=proj(rd); const mouthX=sx(side*LANE,s); const gy=groundYs(s); const scale=s*3;
+  // back wall patch of the alley
+  ctx.fillStyle=rgb(mix([74,54,46],[34,26,40],dusk()));
+  ctx.fillRect(mouthX-26*scale,gy-70*scale,52*scale,70*scale);
+  // lantern
+  const lx=mouthX+side*22*scale, ly=gy-54*scale;
+  let lit = lane.lantern!=='dark';
+  let a = lane.lantern==='lit'?0.9 : lane.lantern==='flicker'? (0.35+0.45*Math.abs(Math.sin(flickerPhase*6))) : 0;
+  ctx.fillStyle='#2a1c16';ctx.fillRect(lx-2*scale,ly-10*scale,4*scale,16*scale); // bracket
+  ctx.fillStyle= lit? rgb(mix([255,210,120],[255,180,90],0.3)) : '#1c1712';
+  ctx.beginPath();ctx.arc(lx,ly,5*scale,0,7);ctx.fill();
+  if(lit) lanternGlow(lx,ly,70*scale*a+10,0.5*a+0.15,true);
+  // shop life
+  if(lane.life==='open'){ctx.fillStyle=rgb(mix([255,196,120],[150,90,80],dusk()));ctx.fillRect(mouthX-14*scale,gy-30*scale,28*scale,30*scale);}
+  else if(lane.life==='shut'){ctx.fillStyle='#241a16';ctx.fillRect(mouthX-16*scale,gy-34*scale,32*scale,34*scale);
+    ctx.strokeStyle='#3a2a22';ctx.lineWidth=1;for(let i=0;i<5;i++){ctx.beginPath();ctx.moveTo(mouthX-16*scale,gy-34*scale+i*7*scale);ctx.lineTo(mouthX+16*scale,gy-34*scale+i*7*scale);ctx.stroke();}}
+  else if(lane.life==='laundry'){ctx.strokeStyle='#5a4636';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(mouthX-24*scale,gy-58*scale);ctx.lineTo(mouthX+24*scale,gy-50*scale);ctx.stroke();
+    const cols=['#c86a6a','#6a8ac8','#d8c88a','#7aa07a'];for(let i=0;i<4;i++){ctx.fillStyle=cols[i];ctx.fillRect(mouthX-18*scale+i*11*scale,gy-56*scale,7*scale,12*scale);}}
+  else if(lane.life==='cart'){ctx.fillStyle='#4a3524';ctx.fillRect(mouthX-18*scale,gy-18*scale,36*scale,16*scale);ctx.fillStyle='#2a1c14';ctx.beginPath();ctx.arc(mouthX-10*scale,gy-2*scale,6*scale,0,7);ctx.arc(mouthX+10*scale,gy-2*scale,6*scale,0,7);ctx.fill();}
+  // cat tell
+  if(lane.cat==='rest'){ drawCatSprite(mouthX-side*10*scale, gy-6*scale, scale*0.9, 'rest'); }
+  else if(lane.cat==='flee'){ drawCatSprite(mouthX+side*14*scale, gy-10*scale, scale*0.9, 'flee'); }
+}
+function drawCatSprite(x,y,sc,mood){
+  ctx.save();ctx.translate(x,y);
+  if(mood==='flee'){ctx.rotate(-0.25);}
+  ctx.fillStyle='#17110e';
+  ctx.beginPath();ctx.ellipse(0,0,10*sc,5.5*sc,0,0,7);ctx.fill();            // body
+  ctx.beginPath();ctx.arc(8*sc,-3*sc,4*sc,0,7);ctx.fill();                   // head
+  ctx.beginPath();ctx.moveTo(9*sc,-6*sc);ctx.lineTo(7*sc,-11*sc);ctx.lineTo(12*sc,-7*sc);ctx.closePath();ctx.fill(); // ear
+  ctx.beginPath();ctx.moveTo(11*sc,-6*sc);ctx.lineTo(13*sc,-11*sc);ctx.lineTo(14*sc,-6*sc);ctx.closePath();ctx.fill();
+  if(mood==='flee'){ctx.strokeStyle='#17110e';ctx.lineWidth=2*sc;ctx.beginPath();ctx.moveTo(-9*sc,0);ctx.quadraticCurveTo(-16*sc,-8*sc,-12*sc,-14*sc);ctx.stroke();} // arched tail
+  ctx.fillStyle='#e6ff66';ctx.beginPath();ctx.arc(9*sc,-3.5*sc,1.2*sc,0,7);ctx.arc(11*sc,-3*sc,1.2*sc,0,7);ctx.fill();
+  ctx.restore();
+}
+function drawStreet(){
+  const base=mix([210,170,120],[70,52,70],dusk());
+  // ground
+  const g=ctx.createLinearGradient(0,HY,0,H);
+  g.addColorStop(0,rgb(mix([150,120,90],[44,34,52],dusk())));g.addColorStop(1,rgb(base));
+  ctx.fillStyle=g;ctx.fillRect(0,HY+16,W,H-HY-16);
+  // receding side walls (draw far->near)
+  const lc=rgb(mix([120,86,66],[48,36,52],dusk())), rc=rgb(mix([136,98,74],[54,40,56],dusk()));
+  for(let i=8;i>=0;i--){ const rdF=(i+1)*SEG, rdN=i*SEG; wall(-1,rdN,rdF,i%2?lc:shade(lc)); wall(1,rdN,rdF,i%2?rc:shade(rc)); }
+  // cobble lines for depth cue
+  ctx.strokeStyle='rgba(0,0,0,0.12)';ctx.lineWidth=1;
+  for(let i=1;i<=9;i++){const s=proj(i*SEG);const y=groundYs(s);ctx.beginPath();ctx.moveTo(sx(-1.5,s),y);ctx.lineTo(sx(1.5,s),y);ctx.stroke();}
+}
+function shade(c){return c;}
+function drawFork(){
+  if(curFork>=forks.length)return;
+  const f=forks[curFork]; const ft=forkTravel(curFork); const rd=ft-travel;
+  if(rd<-2||rd>SEG*6) return;
+  const safe=f.safeSide, trap=-safe;
+  const fp=t;
+  // draw far lane first
+  laneScene(safe, Math.max(0.2,rd), f.lanes.safe, fp);
+  laneScene(trap, Math.max(0.2,rd), f.lanes.trap, fp+1.7);
+  // central divider pillar
+  const s=proj(Math.max(0.2,rd)); const y=groundYs(s);
+  ctx.fillStyle=rgb(mix([96,70,54],[40,30,46],dusk()));
+  ctx.fillRect(CX-10*s*3,y-120*s*3,20*s*3,120*s*3);
+}
+function drawPlayer(){
+  const s=proj(2); const y=groundYs(s)-4; const x=sx(px,proj(3.4));
+  ctx.fillStyle='rgba(0,0,0,0.33)';ctx.beginPath();ctx.ellipse(x,y+6,18,6,0,0,7);ctx.fill();
+  // simple robed runner
+  ctx.fillStyle=braking?'#d8cdbb':'#efe6d4';
+  ctx.beginPath();ctx.moveTo(x,y-54);ctx.lineTo(x-14,y+4);ctx.lineTo(x+14,y+4);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#caa15f';ctx.beginPath();ctx.arc(x,y-56,9,0,7);ctx.fill(); // head/kummah
+  if(braking){ctx.fillStyle='#fff';ctx.font='12px system-ui';ctx.textAlign='center';ctx.fillText('looking…',x,y-70);}
+}
+function drawCats(){
+  const c=catC; const n=3;
+  for(let i=0;i<n;i++){
+    const off=(i-1); const cc=Math.max(0,c-0.04*Math.abs(off));
+    const sc=1.0+2.4*cc; const y=368+140*cc + off*5*cc; const x=CX+off*46*(0.4+cc)+ sx(px,1)-CX;
+    ctx.save();ctx.translate(x,y);ctx.scale(sc,sc);
+    ctx.fillStyle='rgba(0,0,0,0.3)';ctx.beginPath();ctx.ellipse(0,3,11,4,0,0,7);ctx.fill();
+    ctx.fillStyle='#120d0b';
+    ctx.beginPath();ctx.ellipse(0,0,11,6,0,0,7);ctx.fill();
+    ctx.beginPath();ctx.arc(9,-3,4.5,0,7);ctx.fill();
+    ctx.beginPath();ctx.moveTo(9,-6);ctx.lineTo(7,-12);ctx.lineTo(12,-7);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(11,-6);ctx.lineTo(13,-12);ctx.lineTo(15,-6);ctx.closePath();ctx.fill();
+    const alert=c>0.55;
+    ctx.fillStyle=alert?'#ff5a3a':'#e6ff66';ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=8*sc;
+    ctx.beginPath();ctx.arc(10,-3.5,1.5,0,7);ctx.arc(12.5,-3,1.5,0,7);ctx.fill();ctx.shadowBlur=0;
+    ctx.restore();
+  }
+}
+function drawDusk(){
+  const k=dusk();
+  ctx.fillStyle='rgba(50,20,70,'+(0.05+0.32*k)+')';ctx.fillRect(0,0,W,H);
+  const px0=sx(px,proj(3.4)), py0=groundYs(proj(2))-20;
+  const r=lerp(260,150,k);
+  const g=ctx.createRadialGradient(px0,py0,40,px0,py0,r);
+  g.addColorStop(0,'rgba(6,6,24,0)');g.addColorStop(1,'rgba(6,6,24,'+(0.5+0.35*k)+')');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+}
+function drawHud(){
+  ctx.textAlign='left';ctx.fillStyle='#fff';ctx.font='bold 14px system-ui,sans-serif';
+  ctx.fillText('Run '+(attemptN+1)+'    Fork '+Math.min(curFork+1,forks.length)+' of '+forks.length,16,24);
+  const frac=Math.max(0,1-t/SUN_T);
+  ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(16,32,250,8);
+  ctx.fillStyle=frac>0.4?'#ffb347':'#b06cd6';ctx.fillRect(16,32,250*frac,8);
+  ctx.fillStyle='#e9dcc5';ctx.font='11px system-ui';ctx.fillText('sunset',16,54);
+  // cat pressure
+  ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(W-16-180,32,180,8);
+  ctx.fillStyle=catC>0.55?'#ff5a3a':'#9fd68a';ctx.fillRect(W-16-180,32,180*catC,8);
+  ctx.textAlign='right';ctx.fillStyle='#e9dcc5';ctx.fillText('cats',W-16,54);ctx.textAlign='left';
+}
+function wrapText(s,x,y,maxw,lh){ctx.textAlign='center';const words=s.split(' ');let line='',yy=y;
+  for(const w of words){const test=line+w+' ';if(ctx.measureText(test).width>maxw&&line){ctx.fillText(line.trim(),x,yy);line=w+' ';yy+=lh;}else line=test;}
+  ctx.fillText(line.trim(),x,yy);}
+function drawBanner(){
+  if(bannerT<=0)return; const a=Math.min(1,bannerT);
+  ctx.save();ctx.globalAlpha=a;ctx.fillStyle='rgba(10,8,14,0.8)';ctx.fillRect(140,H-96,W-280,54);
+  ctx.fillStyle='#f0e6d2';ctx.font='italic 15px Georgia,serif';wrapText(banner,CX,H-62,W-320,20);ctx.restore();
+}
+function drawReady(){
+  ctx.fillStyle='rgba(10,8,14,0.78)';ctx.fillRect(130,H-120,W-260,80);
+  ctx.textAlign='center';ctx.fillStyle='#ffd679';ctx.font='bold 17px Georgia,serif';ctx.fillText(STORY.intro,CX,H-90);
+  ctx.fillStyle='#ddd';ctx.font='13px system-ui';
+  ctx.fillText('Steer: ◄ ► / A D  ·  hold ▼ / Space to stop and look (the cats gain)  ·  tap sides to steer, lower edge to look',CX,H-64);
+}
+function drawOver(){
+  ctx.fillStyle='rgba(8,6,12,0.86)';ctx.fillRect(120,90,W-240,360);
+  ctx.textAlign='center';
+  const titles={won:'You reached the Fort',trap:'The lane gave way',caught:'The cats took the lane',sunset:'The last light left'};
+  ctx.fillStyle=result==='won'?'#ffd679':'#ff8a70';ctx.font='bold 28px Georgia,serif';ctx.fillText(titles[result]||'',CX,140);
+  ctx.fillStyle='#f0e6d2';ctx.font='15px system-ui';
+  if(result==='won'){ wrapText(STORY.arrival,CX,180,W-320,22); }
+  else if(missReveal){ ctx.fillStyle='#ffcf9a';ctx.font='italic 15px Georgia,serif';wrapText('"'+missReveal+'"',CX,180,W-320,22); }
+  else { ctx.fillStyle='#e9d6c0';wrapText(result==='caught'?'You slowed too long in the dark. Light buys you time; dark lanes feed the pack.':'The sun beat you. Fewer stops, surer reads.',CX,180,W-320,22); }
+  // history
+  ctx.textAlign='left';ctx.font='13px ui-monospace,Menlo,Consolas,monospace';ctx.fillStyle='#cfc8c0';
+  ctx.fillText('Your reads this run:',160,246);
+  history.slice(-6).forEach((h,i)=>{ctx.fillText('Fork '+h.fork+': went '+h.side+'  '+(h.safe?'✓ kind lane':'✗ trap'),160,268+i*20);});
+  ctx.textAlign='center';ctx.fillStyle='#fff';ctx.font='bold 15px system-ui';ctx.fillText('Press R / Space, or tap, to set out again',CX,430);
+}
+function draw(){
+  ctx.save();
+  if(shake>0)ctx.translate((Math.random()-0.5)*12*shake*2,(Math.random()-0.5)*12*shake*2);
+  drawSky(); drawStreet(); drawFork(); drawFort(); drawCats(); drawPlayer(); drawDusk();
+  ctx.restore();
+  drawHud(); drawBanner();
+  if(state==='ready')drawReady();
+  if(state==='over')drawOver();
 }
 
-// ---------- loop ----------
-window.__proto = { get state() { return state; }, get res() { return res; }, get t() { return t; }, attempts, reset, get gap() { return ds[ds.length - 1] - sc; }, get pos() { return [px, py]; } };
-reset();
-let last = performance.now();
-function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  update(dt); draw();
-  requestAnimationFrame(frame);
-}
+// test/debug hook
+window.__proto={get state(){return state;},get result(){return result;},get t(){return t;},get travel(){return travel;},
+  get fork(){return curFork;},get catC(){return catC;},get px(){return px;},history,reset,forks:()=>forks,finish:()=>finishTravel()};
+
+reset(false);
+let last=performance.now();
+function frame(now){const dt=Math.min(0.05,(now-last)/1000);last=now;update(dt);draw();requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
 </script>
 </body>

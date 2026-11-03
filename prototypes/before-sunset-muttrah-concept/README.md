@@ -1,65 +1,62 @@
 <!-- PROTOTYPE - NOT FOR PRODUCTION -->
-<!-- Question: Can a first-time player notice a subtle in-world clue while chased, and does a miss feel fair (not random)? -->
+<!-- Question: fair, learnable deduction + deliberate cats + story, in a 2.5D run -->
 <!-- Date: 2026-11-03 -->
-# Before Sunset: Muttrah - concept prototype
+# Before Sunset: Muttrah - concept prototype (v2)
 
 **Status:** in-progress (built, not yet playtested)
 
-## Hypothesis being tested
+v1 was a flat top-down map where an orange chalk X meant "trap." It was rejected: weak puzzle,
+static/random cats, no story, wrong (flat) view. v2 rebuilds around **one throughline: light = safety.**
 
-> If the player faces a fork with two routes, with a hidden clue in the scene while the cats
-> chase and the sunset timer runs, they will feel "I should have seen that" instead of
-> "that was random."
+## The one rule under test
 
-We will know this is true if, within about 10 minutes (about 5 runs), a first-time tester:
+> **"A lit lane is a kind lane."** Lanterns mark the safe route (the clue), lantern-light slows
+> the cats (the mechanic), and the sinking sun killing the light is the timer (the pressure).
 
-1. retries at least 3 times without being asked,
-2. uses the clue to pick the safe route at least once, and
-3. can name the clue afterward.
+A sharp player should deduce the safe lane by reading several corroborating signals, not one colour:
+lit vs dark/flickering lantern, a resting cat vs a fleeing cat, an open shop or hung laundry vs a
+shut shutter or an abandoned cart. The rule is also taught diegetically — the grandfather's line,
+"a lit lane is a kind lane." A miss shows the exact tell you missed, so failure teaches.
 
-It fails if testers call the traps random or unfair, never notice the clue, or stop after 1-2 tries.
+**Hypothesis:** with a learnable rule, deliberate cats, and story woven in, a run feels like a fair
+"I should have seen that" puzzle, not random. True if a first-time tester within ~10 min: retries
+3+ times unasked, reads the lanterns/cats to pick the safe lane at least once, and can state the
+rule afterward. False if they call it random/unfair, never find the rule, or quit after 1-2 tries.
 
-Riskiest assumption under test: clues are subtle but fair.
+## What changed from v1
+
+- **View:** flat top-down → **2.5D perspective street** (Canvas 2D, no libraries). The street
+  recedes to the Fort at the vanishing point; clues live in the walls, lanterns, shops and cats of
+  each lane mouth.
+- **Puzzle:** single colour tell → a **learnable multi-signal rule** that escalates (obvious →
+  flicker+flee → combine laundry/cart), with a fair after-the-fact reveal on a miss.
+- **Cats:** static/random → **closeness-driven pack** that gains while you brake or stand in the
+  dark, eases while you move or stand in lantern-light ("one good look" is safe in the light),
+  flashes red when alert, and speeds up as dusk deepens.
+- **Story:** none → short diegetic fragments across forks (frankincense souq, the fishermen, the
+  grandfather's lanterns) and a warm beat at the Fort; knowledge is the only progression.
+- **Light/time:** the sky and the player's light radius shift warm → dusk over ~78s.
 
 ## How to run
 
-Double-click `prototype.html` (no server, no install, no libraries). Works in any modern browser.
-
-- Move: arrow keys / WASD, or hold the mouse / finger and the player moves toward it.
-- Your first move starts the run. `R` restarts at any time; `Space` or a tap retries from the end screen.
-
-## What it is
-
-A top-down slice of a street with two forks in a row. At each fork one street is safe and one is
-trapped (instant fail). Cats follow the player's own trail from behind and speed up over time. The
-screen darkens toward sunset, with a small light radius around the player.
-
-- Fork 1: obvious clue (large mark on the wall beside the trapped street).
-- Fork 2: subtle clue (small mark among decoys).
-- The failure screen names the trap you hit and which street you took at each fork, but never the clue.
-
-A full run with no mistakes takes about 10 seconds of walking; the cats allow roughly 6 seconds
-of standing still in total.
-
-## Known limits of this prototype
-
-- It is top-down and the whole map is on screen (dimmed outside the player's light), so a tester can
-  study the map before their first move. Real play would not give that overview. Note whether the
-  tester studied the map first; if the subtle clue is only found that way, that is a weak result.
-- Browser timing and a 2D view cannot judge 3D atmosphere or final touch feel. This tests clue
-  fairness and the retry loop only.
-- Traps are fixed on purpose (no randomness), so repeat testers can memorize them. Use fresh testers.
+Double-click `prototype.html` (single file, no install, no libraries). Steer ◄ ► / A D; hold ▼ /
+Space to stop and study a fork (cats gain while you look). On a phone: tap a side to steer, the
+lower edge to look; turn sideways for a bigger view.
 
 ## How to playtest
 
-Watch a first-time tester without explaining anything. Do not help. Note where they slow down.
-Afterwards ask only: "What was confusing?" and "What did you notice?" Count: retries, whether they
-used the clue, whether they can name it.
+Watch a fresh tester, no explaining. Note: do they find the rule? Do they retry? Do the cats feel
+deliberate or random? Does a miss feel fair? Afterward ask only "What was confusing?" and "What did
+you notice?" Fixed (non-random) tells, so use fresh testers each round.
 
-## Explicitly cut
+## Known limits
 
-Menus, music, art, sprint, story, the real Muttrah map, 3D, cat pathfinding, save data, polish.
+- The chasing pack follows the player, so once you enter a lane it overlaps that lane's clue-cat;
+  reading the fork while still centred (from a distance) is clear. Watch whether this confuses.
+- 2D Canvas and browser timing cannot judge the final 3D feel; this tests the rule, the cats and
+  the view concept only.
+- At full walk the forks arrive ~3s apart; braking to read is the intended way to slow down.
 
 ## Findings
 
-None yet. Update this section after the playtest debrief.
+None yet. Update after the playtest debrief, then the verdict (PROCEED / PIVOT / KILL).

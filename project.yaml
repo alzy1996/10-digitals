@@ -31,7 +31,7 @@ project:
 
 modes:
   rigor: standard
-  automation: guided
+  automation: autonomous
 
 engine:
   name: "Unity"
